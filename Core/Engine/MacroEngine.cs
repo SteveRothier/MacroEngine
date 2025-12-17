@@ -1,0 +1,316 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using MacroEngine.Core.Inputs;
+using MacroEngine.Core.Models;
+
+namespace MacroEngine.Core.Engine
+{
+    /// <summary>
+    /// Moteur d'exécution de macros haute performance
+    /// </summary>
+    public class MacroEngine : IMacroEngine
+    {
+        private MacroEngineState _state = MacroEngineState.Idle;
+        private Macro _currentMacro;
+        private CancellationTokenSource _cancellationTokenSource;
+        private readonly TimingEngine _timingEngine;
+        private readonly object _lockObject = new object();
+
+        public event EventHandler<MacroEngineEventArgs> StateChanged;
+        public event EventHandler<MacroEngineErrorEventArgs> ErrorOccurred;
+        public event EventHandler<ActionExecutedEventArgs> ActionExecuted;
+
+        public MacroEngineState State
+        {
+            get
+            {
+                lock (_lockObject)
+                {
+                    return _state;
+                }
+            }
+            private set
+            {
+                lock (_lockObject)
+                {
+                    var previousState = _state;
+                    _state = value;
+                    StateChanged?.Invoke(this, new MacroEngineEventArgs
+                    {
+                        PreviousState = previousState,
+                        CurrentState = value,
+                        Macro = _currentMacro
+                    });
+                }
+            }
+        }
+
+        public Macro CurrentMacro => _currentMacro;
+        public MacroEngineConfig Config { get; set; } = new MacroEngineConfig();
+
+        public MacroEngine()
+        {
+            _timingEngine = new TimingEngine(Config.MaxCPS);
+        }
+
+        public async Task<bool> StartMacroAsync(Macro macro)
+        {
+            if (macro == null)
+                return false;
+
+            lock (_lockObject)
+            {
+                if (_state != MacroEngineState.Idle)
+                    return false;
+
+                _currentMacro = macro;
+                _cancellationTokenSource = new CancellationTokenSource();
+                State = MacroEngineState.Running;
+            }
+
+            _timingEngine.Reset();
+
+            try
+            {
+                await ExecuteMacroAsync(macro, _cancellationTokenSource.Token);
+                return true;
+            }
+            catch (OperationCanceledException)
+            {
+                return true;
+            }
+            catch (Exception ex)
+            {
+                ErrorOccurred?.Invoke(this, new MacroEngineErrorEventArgs
+                {
+                    Exception = ex,
+                    Message = $"Erreur lors de l'exécution de la macro: {ex.Message}",
+                    Macro = macro
+                });
+                return false;
+            }
+            finally
+            {
+                lock (_lockObject)
+                {
+                    State = MacroEngineState.Idle;
+                    _currentMacro = null;
+                    _cancellationTokenSource?.Dispose();
+                    _cancellationTokenSource = null;
+                }
+            }
+        }
+
+        public async Task StopMacroAsync()
+        {
+            lock (_lockObject)
+            {
+                if (_state == MacroEngineState.Idle)
+                    return;
+
+                State = MacroEngineState.Stopping;
+            }
+
+            _cancellationTokenSource?.Cancel();
+
+            // Attendre que l'exécution se termine
+            while (State != MacroEngineState.Idle)
+            {
+                await Task.Delay(10);
+            }
+        }
+
+        public async Task PauseMacroAsync()
+        {
+            lock (_lockObject)
+            {
+                if (_state != MacroEngineState.Running)
+                    return;
+
+                State = MacroEngineState.Paused;
+            }
+        }
+
+        public async Task ResumeMacroAsync()
+        {
+            lock (_lockObject)
+            {
+                if (_state != MacroEngineState.Paused)
+                    return;
+
+                State = MacroEngineState.Running;
+            }
+        }
+
+        public async Task ExecuteActionsAsync(IEnumerable<IInputAction> actions)
+        {
+            if (actions == null)
+                return;
+
+            var actionList = actions.ToList();
+            if (actionList.Count == 0)
+                return;
+
+            foreach (var action in actionList)
+            {
+                if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                    break;
+
+                // Attendre si en pause
+                while (State == MacroEngineState.Paused)
+                {
+                    await Task.Delay(10);
+                    if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                        return;
+                }
+
+                if (State == MacroEngineState.Stopping)
+                    break;
+
+                try
+                {
+                    // Exécuter l'action sur le thread actuel (les actions sont synchrones)
+                    action.Execute();
+                    
+                    // Notifier l'exécution de l'action de manière asynchrone pour ne pas bloquer
+                    var description = GetActionDescription(action);
+                    ActionExecuted?.Invoke(this, new ActionExecutedEventArgs
+                    {
+                        Action = action,
+                        ActionDescription = description
+                    });
+                    
+                    // Petit délai pour permettre à l'UI de se mettre à jour
+                    await Task.Yield();
+                    
+                    _timingEngine.WaitForNextInterval();
+                }
+                catch (Exception ex)
+                {
+                    ErrorOccurred?.Invoke(this, new MacroEngineErrorEventArgs
+                    {
+                        Exception = ex,
+                        Message = $"Erreur lors de l'exécution de l'action {action.Name}: {ex.Message}",
+                        Macro = _currentMacro
+                    });
+                }
+            }
+        }
+
+        private async Task ExecuteMacroAsync(Macro macro, CancellationToken cancellationToken)
+        {
+            if (macro.Actions == null || macro.Actions.Count == 0)
+                return;
+
+            for (int repeat = 0; repeat < macro.RepeatCount; repeat++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                await ExecuteActionsAsync(macro.Actions);
+
+                if (repeat < macro.RepeatCount - 1 && macro.DelayBetweenRepeats > 0)
+                {
+                    await Task.Delay(macro.DelayBetweenRepeats, cancellationToken);
+                }
+            }
+        }
+
+        private string GetActionDescription(IInputAction action)
+        {
+            if (action == null)
+                return "Action inconnue";
+
+            switch (action.Type)
+            {
+                case InputActionType.Keyboard:
+                    if (action is KeyboardAction kbAction)
+                    {
+                        var keyName = GetKeyName(kbAction.VirtualKeyCode);
+                        var modifiers = GetModifiersString(kbAction.Modifiers);
+                        var actionType = kbAction.ActionType switch
+                        {
+                            KeyboardActionType.Down => "↓",
+                            KeyboardActionType.Up => "↑",
+                            KeyboardActionType.Press => "",
+                            _ => ""
+                        };
+                        return $"{modifiers}{keyName}{actionType}";
+                    }
+                    return $"Clavier: {action.Name}";
+
+                case InputActionType.Mouse:
+                    if (action is MouseAction mouseAction)
+                    {
+                        var mouseType = mouseAction.ActionType switch
+                        {
+                            MouseActionType.LeftClick => "Clic gauche",
+                            MouseActionType.RightClick => "Clic droit",
+                            MouseActionType.MiddleClick => "Clic milieu",
+                            MouseActionType.LeftDown => "Bouton gauche ↓",
+                            MouseActionType.LeftUp => "Bouton gauche ↑",
+                            MouseActionType.RightDown => "Bouton droit ↓",
+                            MouseActionType.RightUp => "Bouton droit ↑",
+                            MouseActionType.MiddleDown => "Bouton milieu ↓",
+                            MouseActionType.MiddleUp => "Bouton milieu ↑",
+                            MouseActionType.Move => "Déplacement",
+                            MouseActionType.WheelUp => "Molette ↑",
+                            MouseActionType.WheelDown => "Molette ↓",
+                            MouseActionType.Wheel => $"Molette ({mouseAction.Delta})",
+                            _ => "Action souris"
+                        };
+                        if (mouseAction.X >= 0 && mouseAction.Y >= 0)
+                            return $"{mouseType} à ({mouseAction.X}, {mouseAction.Y})";
+                        return mouseType;
+                    }
+                    return $"Souris: {action.Name}";
+
+                case InputActionType.Delay:
+                    if (action is DelayAction delayAction)
+                    {
+                        return $"Délai: {delayAction.Duration}ms";
+                    }
+                    return $"Délai: {action.Name}";
+
+                default:
+                    return action.Name;
+            }
+        }
+
+        private string GetKeyName(ushort virtualKeyCode)
+        {
+            // Codes de touches courants
+            return virtualKeyCode switch
+            {
+                0x20 => "Espace",
+                0x0D => "Entrée",
+                0x08 => "Retour",
+                0x09 => "Tab",
+                0x1B => "Échap",
+                0x41 => "A", 0x42 => "B", 0x43 => "C", 0x44 => "D", 0x45 => "E",
+                0x46 => "F", 0x47 => "G", 0x48 => "H", 0x49 => "I", 0x4A => "J",
+                0x4B => "K", 0x4C => "L", 0x4D => "M", 0x4E => "N", 0x4F => "O",
+                0x50 => "P", 0x51 => "Q", 0x52 => "R", 0x53 => "S", 0x54 => "T",
+                0x55 => "U", 0x56 => "V", 0x57 => "W", 0x58 => "X", 0x59 => "Y", 0x5A => "Z",
+                0x30 => "0", 0x31 => "1", 0x32 => "2", 0x33 => "3", 0x34 => "4",
+                0x35 => "5", 0x36 => "6", 0x37 => "7", 0x38 => "8", 0x39 => "9",
+                0x10 => "Shift", 0x11 => "Ctrl", 0x12 => "Alt",
+                _ => $"VK{virtualKeyCode:X}"
+            };
+        }
+
+        private string GetModifiersString(ModifierKeys modifiers)
+        {
+            var parts = new List<string>();
+            if ((modifiers & ModifierKeys.Control) != 0) parts.Add("Ctrl");
+            if ((modifiers & ModifierKeys.Shift) != 0) parts.Add("Shift");
+            if ((modifiers & ModifierKeys.Alt) != 0) parts.Add("Alt");
+            if ((modifiers & ModifierKeys.Windows) != 0) parts.Add("Win");
+            return parts.Count > 0 ? string.Join("+", parts) + "+" : "";
+        }
+    }
+}
+

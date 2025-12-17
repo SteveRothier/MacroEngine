@@ -1,0 +1,72 @@
+using System;
+using System.Collections.Generic;
+using MacroEngine.Core.Inputs;
+
+namespace MacroEngine.Core.Models
+{
+    /// <summary>
+    /// Modèle représentant une macro complète
+    /// </summary>
+    public class Macro
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public List<IInputAction> Actions { get; set; } = new List<IInputAction>();
+        public bool IsEnabled { get; set; } = true;
+        public int RepeatCount { get; set; } = 1;
+        public int DelayBetweenRepeats { get; set; } = 0;
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime ModifiedAt { get; set; } = DateTime.Now;
+    }
+
+    /// <summary>
+    /// Modèle représentant un profil de macros
+    /// </summary>
+    public class MacroProfile
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public List<string> MacroIds { get; set; } = new List<string>();
+        public bool IsActive { get; set; } = false;
+        public Dictionary<string, object> Settings { get; set; } = new Dictionary<string, object>();
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public DateTime ModifiedAt { get; set; } = DateTime.Now;
+    }
+
+    /// <summary>
+    /// Configuration globale de l'application
+    /// </summary>
+    public class MacroEngineConfig
+    {
+        public int MaxCPS { get; set; } = 1000;
+        public bool FullScreenMode { get; set; } = true;
+        public bool EnableHooks { get; set; } = true;
+        public int DefaultDelay { get; set; } = 10; // ms
+        public string ActiveProfileId { get; set; } = string.Empty;
+        public Dictionary<string, object> GlobalSettings { get; set; } = new Dictionary<string, object>();
+    }
+
+    /// <summary>
+    /// Événement de macro
+    /// </summary>
+    public class MacroEvent
+    {
+        public string MacroId { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; } = DateTime.Now;
+        public MacroEventType Type { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public enum MacroEventType
+    {
+        Started,
+        Stopped,
+        Paused,
+        Resumed,
+        Error,
+        Completed
+    }
+}
+
