@@ -9,6 +9,7 @@ using MacroEngine.Core.Models;
 using MacroEngine.Core.Profiles;
 using MacroEngine.Core.Hooks;
 using MacroEngine.Core.Inputs;
+using MacroEngine.Core.Storage;
 using Engine = MacroEngine.Core.Engine;
 
 namespace MacroEngine.UI
@@ -17,6 +18,7 @@ namespace MacroEngine.UI
     {
         private readonly IMacroEngine _macroEngine;
         private readonly IProfileProvider _profileProvider;
+        private readonly MacroStorage _macroStorage;
         private List<Macro> _macros;
         private Macro _selectedMacro;
         private MacroEditor _macroEditor;
@@ -42,6 +44,10 @@ namespace MacroEngine.UI
         private DateTime _lastRapidKeyWarning = DateTime.MinValue;
         private readonly object _recordingLock = new object();
         private volatile int _recordingInProgress = 0;
+        
+        // Timer pour la sauvegarde automatique
+        private System.Windows.Threading.DispatcherTimer _autoSaveTimer;
+        private const int AUTO_SAVE_DELAY_MS = 2000; // Sauvegarder 2 secondes après la dernière modification
 
         public MainWindow()
         {
@@ -49,10 +55,12 @@ namespace MacroEngine.UI
             
             _macroEngine = new Engine.MacroEngine();
             _profileProvider = new AppProfileProvider();
+            _macroStorage = new MacroStorage();
             _macros = new List<Macro>();
 
             // Initialiser l'éditeur de macro
             _macroEditor = new MacroEditor();
+            _macroEditor.MacroModified += MacroEditor_MacroModified;
             MacroEditorContainer.Content = _macroEditor;
 
             // Initialiser les hooks pour l'enregistrement
@@ -66,6 +74,7 @@ namespace MacroEngine.UI
             InitializeGlobalExecuteHook();
 
             InitializeEngine();
+            InitializeAutoSave();
             LoadMacros();
             LoadProfiles();
             
@@ -96,6 +105,53 @@ namespace MacroEngine.UI
                 // Si l'installation échoue, on continue quand même
                 System.Diagnostics.Debug.WriteLine($"Impossible d'installer le hook global F10: {ex.Message}");
             }
+        }
+
+        private void InitializeAutoSave()
+        {
+            _autoSaveTimer = new System.Windows.Threading.DispatcherTimer();
+            _autoSaveTimer.Interval = TimeSpan.FromMilliseconds(AUTO_SAVE_DELAY_MS);
+            _autoSaveTimer.Tick += AutoSaveTimer_Tick;
+        }
+
+        private async void AutoSaveTimer_Tick(object sender, EventArgs e)
+        {
+            _autoSaveTimer.Stop();
+            
+            if (_selectedMacro != null && _macros.Contains(_selectedMacro))
+            {
+                try
+                {
+                    _selectedMacro.ModifiedAt = DateTime.Now;
+                    await _macroStorage.SaveMacrosAsync(_macros);
+                    
+                    Dispatcher.Invoke(() =>
+                    {
+                        StatusText.Text = "Sauvegarde automatique effectuée";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Green;
+                    });
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Erreur lors de la sauvegarde automatique: {ex.Message}");
+                }
+            }
+        }
+
+        private void TriggerAutoSave()
+        {
+            if (_selectedMacro == null)
+                return;
+
+            // Redémarrer le timer : sauvegarder après AUTO_SAVE_DELAY_MS de non-modification
+            _autoSaveTimer.Stop();
+            _autoSaveTimer.Start();
+        }
+
+        private void MacroEditor_MacroModified(object sender, EventArgs e)
+        {
+            // Déclencher la sauvegarde automatique quand la macro est modifiée
+            TriggerAutoSave();
         }
 
         private void GlobalExecuteHook_KeyDown(object sender, KeyboardHookEventArgs e)
@@ -198,13 +254,15 @@ namespace MacroEngine.UI
         {
             try
             {
-                // TODO: Implémenter le chargement depuis le fichier
+                _macros = await _macroStorage.LoadMacrosAsync();
                 
                 // Créer une macro de test par défaut si aucune macro n'existe
                 if (_macros.Count == 0)
                 {
                     var testMacro = CreateTestMacro();
                     _macros.Add(testMacro);
+                    // Sauvegarder la macro de test
+                    await _macroStorage.SaveMacrosAsync(_macros);
                 }
                 
                 MacrosListBox.ItemsSource = _macros;
@@ -561,6 +619,10 @@ namespace MacroEngine.UI
             {
                 _macroEditor.LoadMacro(_selectedMacro);
             }
+
+            // Sauvegarder automatiquement après l'enregistrement
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            _ = _macroStorage.SaveMacrosAsync(_macros);
         }
 
         private void KeyboardHook_KeyDown(object sender, KeyboardHookEventArgs e)
@@ -817,6 +879,9 @@ namespace MacroEngine.UI
 
                     _selectedMacro.Actions.Add(mouseAction);
                     _lastActionTime = timestamp;
+                    
+                    // Déclencher la sauvegarde automatique
+                    TriggerAutoSave();
 
                     // Afficher dans la zone d'actions
                     var actionItem = new ActionLogItem
@@ -1072,9 +1137,32 @@ namespace MacroEngine.UI
             // Ouvrir une macro
         }
 
-        private void SaveMacro_Click(object sender, RoutedEventArgs e)
+        private async void SaveMacro_Click(object sender, RoutedEventArgs e)
         {
-            // Sauvegarder la macro
+            try
+            {
+                if (_selectedMacro == null)
+                {
+                    MessageBox.Show("Aucune macro sélectionnée", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                // Mettre à jour la date de modification
+                _selectedMacro.ModifiedAt = DateTime.Now;
+
+                // Sauvegarder toutes les macros
+                await _macroStorage.SaveMacrosAsync(_macros);
+
+                StatusText.Text = $"Macro '{_selectedMacro.Name}' sauvegardée";
+                StatusText.Foreground = System.Windows.Media.Brushes.Green;
+                MessageBox.Show($"Macro '{_selectedMacro.Name}' sauvegardée avec succès", "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Erreur lors de la sauvegarde: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
+                MessageBox.Show($"Erreur lors de la sauvegarde: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)

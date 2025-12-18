@@ -10,6 +10,8 @@ namespace MacroEngine.UI
     {
         private Macro _currentMacro;
 
+        public event EventHandler MacroModified;
+
         public MacroEditor()
         {
             InitializeComponent();
@@ -22,6 +24,7 @@ namespace MacroEngine.UI
             if (_currentMacro != null)
             {
                 _currentMacro.Name = MacroNameTextBox.Text;
+                OnMacroModified();
             }
         }
 
@@ -30,7 +33,13 @@ namespace MacroEngine.UI
             if (_currentMacro != null)
             {
                 _currentMacro.Description = MacroDescriptionTextBox.Text;
+                OnMacroModified();
             }
+        }
+
+        private void OnMacroModified()
+        {
+            MacroModified?.Invoke(this, EventArgs.Empty);
         }
 
         public void LoadMacro(Macro macro)
