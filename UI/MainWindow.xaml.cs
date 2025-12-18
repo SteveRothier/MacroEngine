@@ -203,7 +203,9 @@ namespace MacroEngine.UI
 
         private void MacroEngine_ActionExecuted(object sender, ActionExecutedEventArgs e)
         {
-            Dispatcher.Invoke(() =>
+            // Utiliser BeginInvoke avec priorité basse pour permettre à l'UI de se mettre à jour
+            // Cela permet au texte de s'afficher touche par touche dans la zone de test
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new System.Action(() =>
             {
                 var actionItem = new ActionLogItem
                 {
@@ -238,7 +240,7 @@ namespace MacroEngine.UI
                 
                 // Mettre à jour le statut
                 StatusText.Text = $"Action: {actionItem.Description}";
-            });
+            }));
         }
 
         private void ClearActionsButton_Click(object sender, RoutedEventArgs e)
@@ -247,6 +249,15 @@ namespace MacroEngine.UI
             {
                 items.Clear();
                 ActionsCountText.Text = "0 action(s)";
+            }
+        }
+
+        private void TestTextBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            // Effacer le texte de placeholder si c'est le texte par défaut
+            if (TestTextBox.Text == "Tapez ici pour tester vos macros...")
+            {
+                TestTextBox.Text = string.Empty;
             }
         }
 

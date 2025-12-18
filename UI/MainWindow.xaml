@@ -121,34 +121,56 @@
                     
                     <ContentControl x:Name="MacroEditorContainer" Grid.Row="0" Margin="10"/>
                     
-                    <!-- Zone d'affichage des actions -->
-                    <GroupBox Header="Actions exécutées" Grid.Row="1" Margin="10,5,10,10">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            <StackPanel Orientation="Horizontal" Margin="5" Grid.Row="0">
-                                <Button Content="Effacer" x:Name="ClearActionsButton" Click="ClearActionsButton_Click" Padding="5,2" Margin="0,0,5,0"/>
-                                <TextBlock x:Name="ActionsCountText" Text="0 action(s)" VerticalAlignment="Center" Foreground="Gray"/>
-                            </StackPanel>
-                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                <ListBox x:Name="ActionsListBox" 
-                                         SelectionMode="Single"
-                                         Background="White"
-                                         BorderThickness="0">
-                                    <ListBox.ItemTemplate>
-                                        <DataTemplate>
-                                            <StackPanel Orientation="Horizontal" Margin="2">
-                                                <TextBlock Text="{Binding Timestamp}" FontSize="10" Foreground="Gray" Width="80" VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding Description}" FontSize="12" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                            </StackPanel>
-                                        </DataTemplate>
-                                    </ListBox.ItemTemplate>
-                                </ListBox>
-                            </ScrollViewer>
-                        </Grid>
-                    </GroupBox>
+                    <!-- Zone d'affichage des actions et zone de test -->
+                    <Grid Grid.Row="1" Margin="10,5,10,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="5"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <!-- Actions exécutées -->
+                        <GroupBox Header="Actions exécutées" Grid.Column="0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <StackPanel Orientation="Horizontal" Margin="5" Grid.Row="0">
+                                    <Button Content="Effacer" x:Name="ClearActionsButton" Click="ClearActionsButton_Click" Padding="5,2" Margin="0,0,5,0"/>
+                                    <TextBlock x:Name="ActionsCountText" Text="0 action(s)" VerticalAlignment="Center" Foreground="Gray"/>
+                                </StackPanel>
+                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox x:Name="ActionsListBox" 
+                                             SelectionMode="Single"
+                                             Background="White"
+                                             BorderThickness="0">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="2">
+                                                    <TextBlock Text="{Binding Timestamp}" FontSize="10" Foreground="Gray" Width="80" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Description}" FontSize="12" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </ScrollViewer>
+                            </Grid>
+                        </GroupBox>
+                        
+                        <!-- Zone de test -->
+                        <GroupBox Header="Zone de test" Grid.Column="2">
+                            <TextBox x:Name="TestTextBox" 
+                                     TextWrapping="Wrap" 
+                                     AcceptsReturn="True"
+                                     AcceptsTab="False"
+                                     VerticalScrollBarVisibility="Auto"
+                                     FontSize="14"
+                                     Padding="5"
+                                     Text="Tapez ici pour tester vos macros..."
+                                     GotFocus="TestTextBox_GotFocus"/>
+                        </GroupBox>
+                    </Grid>
                 </Grid>
             </Grid>
         </Grid>

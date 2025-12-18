@@ -172,10 +172,12 @@ namespace MacroEngine.Core.Engine
 
                 try
                 {
-                    // Exécuter l'action sur le thread actuel (les actions sont synchrones)
+                    // Exécuter l'action directement (keybd_event fonctionne sur n'importe quel thread)
+                    // Les Thread.Sleep() dans Execute() bloquent, mais on force la mise à jour de l'UI après
                     action.Execute();
                     
-                    // Notifier l'exécution de l'action de manière asynchrone pour ne pas bloquer
+                    // Notifier l'exécution de l'action immédiatement
+                    // L'utilisation de BeginInvoke dans MainWindow permet à l'UI de se mettre à jour
                     var description = GetActionDescription(action);
                     ActionExecuted?.Invoke(this, new ActionExecutedEventArgs
                     {
@@ -183,24 +185,32 @@ namespace MacroEngine.Core.Engine
                         ActionDescription = description
                     });
                     
-                    // Petit délai pour permettre à l'UI de se mettre à jour
+                    // Petit délai pour permettre au système de traiter l'action et à l'UI de se mettre à jour
+                    // Utiliser Task.Delay au lieu de Thread.Sleep pour ne pas bloquer le thread UI
+                    await Task.Delay(10);
                     await Task.Yield();
+                    
+                    // Vérifier si l'action suivante est une DelayAction pour ne pas ajouter de délai supplémentaire
+                    int currentIndex = actionList.IndexOf(action);
+                    bool nextActionIsDelay = currentIndex < actionList.Count - 1 && actionList[currentIndex + 1] is DelayAction;
                     
                     // Délai supplémentaire entre les actions pour permettre au système de traiter les touches
                     // Important pour que les touches soient correctement reçues par les applications
-                    // Note: Pour les DelayAction, pas besoin d'ajouter de délai supplémentaire car le délai est déjà dans l'action
-                    if (action is KeyboardAction)
+                    // Ne pas ajouter de délai si l'action courante est une DelayAction ou si la suivante est une DelayAction
+                    if (!(action is DelayAction) && !nextActionIsDelay)
                     {
-                        // Délai plus long entre les touches pour garantir qu'elles sont traitées
-                        // Ce délai est nécessaire pour la fiabilité, mais les DelayAction enregistrées prendront le relais
-                        await Task.Delay(150);
+                        if (action is KeyboardAction)
+                        {
+                            // Délai plus long entre les touches pour garantir qu'elles sont traitées
+                            await Task.Delay(150);
+                        }
+                        else
+                        {
+                            // Pour les autres types d'actions (Mouse, etc.), petit délai
+                            await Task.Delay(20);
+                        }
                     }
-                    else if (!(action is DelayAction))
-                    {
-                        // Pour les autres types d'actions (Mouse, etc.), petit délai
-                        await Task.Delay(20);
-                    }
-                    // Pas de délai supplémentaire pour DelayAction car le délai est déjà dans Duration
+                    // Pas de délai supplémentaire pour DelayAction ou avant une DelayAction car le délai est déjà dans Duration
                     
                     _timingEngine.WaitForNextInterval();
                 }
