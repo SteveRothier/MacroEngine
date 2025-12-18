@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using MacroEngine.Core.Inputs;
@@ -9,6 +11,9 @@ namespace MacroEngine.UI
     public partial class MacroEditor : UserControl
     {
         private Macro _currentMacro;
+        private Stack<List<IInputAction>> _undoStack = new Stack<List<IInputAction>>();
+        private Stack<List<IInputAction>> _redoStack = new Stack<List<IInputAction>>();
+        private bool _isUndoRedo = false;
 
         public event EventHandler MacroModified;
 
@@ -53,17 +58,99 @@ namespace MacroEngine.UI
                 // Initialiser la liste d'actions si elle est null
                 if (macro.Actions == null)
                 {
-                    macro.Actions = new System.Collections.Generic.List<IInputAction>();
+                    macro.Actions = new List<IInputAction>();
                 }
                 
                 ActionsDataGrid.ItemsSource = macro.Actions;
+                
+                // Réinitialiser l'historique
+                _undoStack.Clear();
+                _redoStack.Clear();
+                SaveState();
+                UpdateUndoRedoButtons();
             }
             else
             {
                 MacroNameTextBox.Text = string.Empty;
                 MacroDescriptionTextBox.Text = string.Empty;
                 ActionsDataGrid.ItemsSource = null;
+                _undoStack.Clear();
+                _redoStack.Clear();
+                UpdateUndoRedoButtons();
             }
+        }
+
+        private void SaveState()
+        {
+            if (_currentMacro?.Actions != null)
+            {
+                // Créer une copie profonde de la liste d'actions
+                var state = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+                _undoStack.Push(state);
+                // Limiter la taille de l'historique à 50 états
+                if (_undoStack.Count > 50)
+                {
+                    var temp = new Stack<List<IInputAction>>();
+                    for (int i = 0; i < 50; i++)
+                    {
+                        temp.Push(_undoStack.Pop());
+                    }
+                    _undoStack = temp;
+                }
+                _redoStack.Clear(); // Vider redo quand on fait une nouvelle action
+            }
+        }
+
+        private void RestoreState(List<IInputAction> state)
+        {
+            if (_currentMacro?.Actions != null)
+            {
+                _isUndoRedo = true;
+                _currentMacro.Actions.Clear();
+                _currentMacro.Actions.AddRange(state.Select(a => a.Clone()));
+                ActionsDataGrid.Items.Refresh();
+                OnMacroModified();
+                UpdateUndoRedoButtons();
+                _isUndoRedo = false;
+            }
+        }
+
+        private void UpdateUndoRedoButtons()
+        {
+            // Undo est possible s'il y a plus d'un état (état actuel + au moins un état précédent)
+            UndoButton.IsEnabled = _undoStack.Count > 1;
+            RedoButton.IsEnabled = _redoStack.Count > 0;
+        }
+
+        private void Undo_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro?.Actions == null || _undoStack.Count <= 1)
+                return; // Besoin d'au moins 2 états (état actuel + état précédent)
+
+            // Sauvegarder l'état actuel dans redo
+            var currentState = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            _redoStack.Push(currentState);
+
+            // Retirer l'état actuel (il est dans redo maintenant)
+            _undoStack.Pop();
+            
+            // Restaurer l'état précédent
+            var previousState = _undoStack.Peek(); // Ne pas pop, on garde pour pouvoir undo à nouveau
+            RestoreState(previousState);
+        }
+
+        private void Redo_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro?.Actions == null || _redoStack.Count == 0)
+                return;
+
+            // Sauvegarder l'état actuel dans undo
+            var currentState = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            _undoStack.Push(currentState);
+
+            // Restaurer l'état suivant
+            var nextState = _redoStack.Pop();
+            RestoreState(nextState);
         }
 
         public void RefreshActions()
@@ -104,6 +191,9 @@ namespace MacroEngine.UI
         {
             if (_currentMacro == null) return;
 
+            if (!_isUndoRedo)
+                SaveState();
+
             // Pour l'instant, on crée une action avec la touche A par défaut
             // TODO: Créer un dialogue de sélection de touche
             
@@ -114,6 +204,8 @@ namespace MacroEngine.UI
             };
             _currentMacro.Actions.Add(action);
             ActionsDataGrid.Items.Refresh();
+            OnMacroModified();
+            UpdateUndoRedoButtons();
         }
 
         private string GetKeyName(ushort vkCode)
@@ -161,6 +253,9 @@ namespace MacroEngine.UI
         {
             if (_currentMacro == null) return;
 
+            if (!_isUndoRedo)
+                SaveState();
+
             var action = new DelayAction
             {
                 Name = "Délai",
@@ -168,23 +263,33 @@ namespace MacroEngine.UI
             };
             _currentMacro.Actions.Add(action);
             ActionsDataGrid.Items.Refresh();
+            OnMacroModified();
+            UpdateUndoRedoButtons();
         }
 
         private void DeleteAction_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMacro == null || ActionsDataGrid.SelectedItem == null) return;
 
+            if (!_isUndoRedo)
+                SaveState();
+
             var action = ActionsDataGrid.SelectedItem as IInputAction;
             if (action != null)
             {
                 _currentMacro.Actions.Remove(action);
                 ActionsDataGrid.Items.Refresh();
+                OnMacroModified();
+                UpdateUndoRedoButtons();
             }
         }
 
         private void MoveUpAction_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMacro == null || ActionsDataGrid.SelectedItem == null) return;
+
+            if (!_isUndoRedo)
+                SaveState();
 
             var action = ActionsDataGrid.SelectedItem as IInputAction;
             if (action != null)
@@ -196,6 +301,8 @@ namespace MacroEngine.UI
                     _currentMacro.Actions.Insert(index - 1, action);
                     ActionsDataGrid.Items.Refresh();
                     ActionsDataGrid.SelectedItem = action;
+                    OnMacroModified();
+                    UpdateUndoRedoButtons();
                 }
             }
         }
@@ -203,6 +310,9 @@ namespace MacroEngine.UI
         private void MoveDownAction_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMacro == null || ActionsDataGrid.SelectedItem == null) return;
+
+            if (!_isUndoRedo)
+                SaveState();
 
             var action = ActionsDataGrid.SelectedItem as IInputAction;
             if (action != null)
@@ -214,6 +324,8 @@ namespace MacroEngine.UI
                     _currentMacro.Actions.Insert(index + 1, action);
                     ActionsDataGrid.Items.Refresh();
                     ActionsDataGrid.SelectedItem = action;
+                    OnMacroModified();
+                    UpdateUndoRedoButtons();
                 }
             }
         }

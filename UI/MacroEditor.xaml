@@ -52,6 +52,9 @@
 
         <!-- Barre d'outils -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="10">
+            <Button Content="↶ Retour" x:Name="UndoButton" Click="Undo_Click" Margin="0,0,5,0" IsEnabled="False"/>
+            <Button Content="↷ Avant" x:Name="RedoButton" Click="Redo_Click" Margin="0,0,5,0" IsEnabled="False"/>
+            <Separator Margin="10,0"/>
             <Button Content="Ajouter Touche" Click="AddKeyboardAction_Click" Margin="0,0,5,0"/>
             <Button Content="Ajouter Délai" Click="AddDelayAction_Click" Margin="0,0,5,0"/>
             <Separator Margin="10,0"/>
