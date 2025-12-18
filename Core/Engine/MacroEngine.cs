@@ -186,6 +186,22 @@ namespace MacroEngine.Core.Engine
                     // Petit délai pour permettre à l'UI de se mettre à jour
                     await Task.Yield();
                     
+                    // Délai supplémentaire entre les actions pour permettre au système de traiter les touches
+                    // Important pour que les touches soient correctement reçues par les applications
+                    // Note: Pour les DelayAction, pas besoin d'ajouter de délai supplémentaire car le délai est déjà dans l'action
+                    if (action is KeyboardAction)
+                    {
+                        // Délai plus long entre les touches pour garantir qu'elles sont traitées
+                        // Ce délai est nécessaire pour la fiabilité, mais les DelayAction enregistrées prendront le relais
+                        await Task.Delay(150);
+                    }
+                    else if (!(action is DelayAction))
+                    {
+                        // Pour les autres types d'actions (Mouse, etc.), petit délai
+                        await Task.Delay(20);
+                    }
+                    // Pas de délai supplémentaire pour DelayAction car le délai est déjà dans Duration
+                    
                     _timingEngine.WaitForNextInterval();
                 }
                 catch (Exception ex)

@@ -24,6 +24,10 @@ namespace MacroEngine.UI
         // Hooks pour l'enregistrement
         private KeyboardHook _keyboardHook;
         private MouseHook _mouseHook;
+        
+        // Hook global pour F10 (exécution de macro)
+        private KeyboardHook _globalExecuteHook;
+        private const int VK_F10 = 0x79; // Code virtuel de la touche F10
         private bool _isRecording = false;
         private bool _isRecordingPaused = false;
         private DateTime _lastActionTime;
@@ -56,11 +60,17 @@ namespace MacroEngine.UI
             _mouseHook = new MouseHook();
             InitializeRecordingHooks();
 
+            // Initialiser le hook global pour F10 (exécution)
+            _globalExecuteHook = new KeyboardHook();
+            _globalExecuteHook.KeyDown += GlobalExecuteHook_KeyDown;
+            InitializeGlobalExecuteHook();
+
             InitializeEngine();
             LoadMacros();
             LoadProfiles();
             
             // Initialiser l'état des boutons
+            ExecuteButton.IsEnabled = true;
             StartButton.IsEnabled = true;
             PauseButton.IsEnabled = false;
             StopButton.IsEnabled = false;
@@ -72,6 +82,33 @@ namespace MacroEngine.UI
             _keyboardHook.KeyUp += KeyboardHook_KeyUp;
             _mouseHook.MouseDown += MouseHook_MouseDown;
             _mouseHook.MouseUp += MouseHook_MouseUp;
+        }
+
+        private void InitializeGlobalExecuteHook()
+        {
+            // Installer le hook global pour F10
+            try
+            {
+                _globalExecuteHook.Install();
+            }
+            catch (Exception ex)
+            {
+                // Si l'installation échoue, on continue quand même
+                System.Diagnostics.Debug.WriteLine($"Impossible d'installer le hook global F10: {ex.Message}");
+            }
+        }
+
+        private void GlobalExecuteHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        {
+            // Vérifier que c'est F10 et qu'on n'est pas en train d'enregistrer
+            if (e.VirtualKeyCode == VK_F10 && !_isRecording && _macroEngine.State == MacroEngineState.Idle)
+            {
+                // Bloquer la propagation de F10 pour éviter qu'il ouvre des menus
+                e.Handled = true;
+                
+                // Exécuter la macro de manière asynchrone
+                _ = ExecuteMacroAsync();
+            }
         }
 
         private void InitializeEngine()
@@ -86,9 +123,16 @@ namespace MacroEngine.UI
             Dispatcher.Invoke(() =>
             {
                 EngineStateText.Text = e.CurrentState.ToString();
-                StartButton.IsEnabled = e.CurrentState == MacroEngineState.Idle;
-                PauseButton.IsEnabled = e.CurrentState == MacroEngineState.Running || e.CurrentState == MacroEngineState.Paused;
-                StopButton.IsEnabled = e.CurrentState != MacroEngineState.Idle;
+                
+                // Gérer l'état des boutons selon le mode (enregistrement vs exécution)
+                bool isExecuting = e.CurrentState != MacroEngineState.Idle;
+                
+                ExecuteButton.IsEnabled = e.CurrentState == MacroEngineState.Idle && !_isRecording;
+                StartButton.IsEnabled = !_isRecording && !isExecuting;
+                
+                // Les boutons Pause/Stop fonctionnent pour l'exécution ET l'enregistrement
+                PauseButton.IsEnabled = isExecuting || _isRecording;
+                StopButton.IsEnabled = isExecuting || _isRecording;
             });
         }
 
@@ -314,6 +358,93 @@ namespace MacroEngine.UI
             }
         }
 
+        private async void ExecuteMacro_Click(object sender, RoutedEventArgs e)
+        {
+            await ExecuteMacroAsync();
+        }
+
+        private async System.Threading.Tasks.Task ExecuteMacroAsync()
+        {
+            try
+            {
+                if (_selectedMacro == null)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        StatusText.Text = "Aucune macro sélectionnée";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                        MessageBox.Show("Veuillez sélectionner une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    });
+                    return;
+                }
+
+                if (_selectedMacro.Actions == null || _selectedMacro.Actions.Count == 0)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        StatusText.Text = "La macro sélectionnée ne contient aucune action";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                        MessageBox.Show("La macro sélectionnée ne contient aucune action", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    });
+                    return;
+                }
+
+                if (_isRecording)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        StatusText.Text = "Impossible d'exécuter : enregistrement en cours";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                        MessageBox.Show("Veuillez arrêter l'enregistrement avant d'exécuter une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    });
+                    return;
+                }
+
+                if (_macroEngine.State != MacroEngineState.Idle)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        StatusText.Text = "Une macro est déjà en cours d'exécution";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    });
+                    return;
+                }
+
+                // Exécuter la macro
+                Dispatcher.Invoke(() =>
+                {
+                    StatusText.Text = "Exécution de la macro en cours...";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Black;
+                });
+                
+                bool success = await _macroEngine.StartMacroAsync(_selectedMacro);
+                
+                Dispatcher.Invoke(() =>
+                {
+                    if (success)
+                    {
+                        StatusText.Text = "Exécution terminée";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Green;
+                    }
+                    else
+                    {
+                        StatusText.Text = "Erreur lors de l'exécution";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Red;
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    StatusText.Text = $"Erreur: {ex.Message}";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Red;
+                    MessageBox.Show($"Erreur lors de l'exécution: {ex.Message}\n\nDétails: {ex.StackTrace}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                });
+                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'exécution: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
         private void StartMacro_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -323,6 +454,12 @@ namespace MacroEngine.UI
                 MessageBox.Show("Veuillez sélectionner une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
+
+                if (_macroEngine.State != MacroEngineState.Idle)
+                {
+                    MessageBox.Show("Veuillez arrêter l'exécution avant de commencer l'enregistrement", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
 
                 if (!_isRecording)
                 {
@@ -334,6 +471,7 @@ namespace MacroEngine.UI
             catch (Exception ex)
             {
                 StatusText.Text = $"Erreur: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
                 MessageBox.Show($"Erreur lors de l'enregistrement: {ex.Message}\n\nDétails: {ex.StackTrace}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -366,6 +504,9 @@ namespace MacroEngine.UI
                 // Pour l'instant, on les conserve pour permettre d'ajouter des actions
             }
 
+            // Désinstaller le hook global F10 pendant l'enregistrement
+            _globalExecuteHook.Uninstall();
+
             // Installer les hooks
             try
             {
@@ -384,6 +525,7 @@ namespace MacroEngine.UI
             StartButton.Content = "● Enregistrement...";
             StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris (max 20 touches/seconde)";
             StatusText.Foreground = System.Windows.Media.Brushes.Black;
+            ExecuteButton.IsEnabled = false; // Désactiver l'exécution pendant l'enregistrement
             PauseButton.IsEnabled = true;
             PauseButton.Content = "⏸ Pause";
             StopButton.IsEnabled = true;
@@ -401,12 +543,16 @@ namespace MacroEngine.UI
             _keyboardHook.Uninstall();
             _mouseHook.Uninstall();
 
+            // Réinstaller le hook global F10 après l'enregistrement
+            InitializeGlobalExecuteHook();
+
             // Traiter les touches restantes appuyées
             ProcessRemainingKeys();
 
             // Mettre à jour l'interface
             StartButton.Content = "● Enregistrer";
             StatusText.Text = $"Enregistrement terminé. {_selectedMacro.Actions.Count} action(s) enregistrée(s)";
+            ExecuteButton.IsEnabled = _macroEngine.State == MacroEngineState.Idle; // Réactiver l'exécution si le moteur est inactif
             PauseButton.IsEnabled = false;
             StopButton.IsEnabled = false;
 
@@ -942,6 +1088,7 @@ namespace MacroEngine.UI
             // Nettoyer les hooks
             _keyboardHook?.Dispose();
             _mouseHook?.Dispose();
+            _globalExecuteHook?.Dispose();
 
             Application.Current.Shutdown();
         }

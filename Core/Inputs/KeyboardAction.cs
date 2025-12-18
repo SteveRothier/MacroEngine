@@ -43,11 +43,21 @@ namespace MacroEngine.Core.Inputs
             if (ActionType == KeyboardActionType.Down || ActionType == KeyboardActionType.Press)
             {
                 SendKeyDown(VirtualKeyCode);
+                // Délai entre Down et Up pour que le système traite correctement la touche
+                if (ActionType == KeyboardActionType.Press)
+                {
+                    System.Threading.Thread.Sleep(80);
+                }
             }
 
             if (ActionType == KeyboardActionType.Up || ActionType == KeyboardActionType.Press)
             {
                 SendKeyUp(VirtualKeyCode);
+                // Délai après Up pour que le système finalise la touche
+                if (ActionType == KeyboardActionType.Press)
+                {
+                    System.Threading.Thread.Sleep(50);
+                }
             }
 
             if (Modifiers != ModifierKeys.None)
@@ -73,20 +83,12 @@ namespace MacroEngine.Core.Inputs
 
         private void SendKey(ushort vk, bool down)
         {
-            INPUT input = new INPUT
-            {
-                type = INPUT_KEYBOARD,
-                ki = new KEYBDINPUT
-                {
-                    wVk = vk,
-                    wScan = 0,
-                    dwFlags = down ? 0 : KEYEVENTF_KEYUP,
-                    time = 0,
-                    dwExtraInfo = IntPtr.Zero
-                }
-            };
-
-            SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT)));
+            // Utiliser keybd_event qui est plus fiable pour envoyer des touches
+            // keybd_event fonctionne mieux que SendInput dans certains cas
+            keybd_event((byte)vk, 0, down ? 0 : KEYEVENTF_KEYUP, 0);
+            
+            // Petit délai pour s'assurer que le système traite l'événement
+            System.Threading.Thread.Sleep(10);
         }
 
         private void SendKeyDown(ushort vk)
@@ -140,6 +142,9 @@ namespace MacroEngine.Core.Inputs
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+        [DllImport("user32.dll")]
+        private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, int dwExtraInfo);
     }
 
     public enum KeyboardActionType

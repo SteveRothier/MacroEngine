@@ -88,6 +88,11 @@
 
                 <!-- Barre d'outils -->
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
+                    <Button Content="▶ Exécuter" 
+                            x:Name="ExecuteButton"
+                            Click="ExecuteMacro_Click" 
+                            Padding="10,5" 
+                            Margin="0,0,5,0"/>
                     <Button Content="● Enregistrer" 
                             x:Name="StartButton"
                             Click="StartMacro_Click" 
