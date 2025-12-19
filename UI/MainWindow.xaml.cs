@@ -949,6 +949,10 @@ namespace MacroEngine.UI
 
         private void AddDelayIfNeeded()
         {
+            // Ne pas ajouter de délai si la checkbox est décochée
+            if (RecordDelaysCheckBox.IsChecked == false)
+                return;
+
             if (_selectedMacro.Actions.Count > 0)
             {
                 var elapsed = (DateTime.Now - _lastActionTime).TotalMilliseconds;
