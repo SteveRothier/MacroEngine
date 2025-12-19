@@ -123,6 +123,89 @@ namespace MacroEngine.Core.Storage
             await SaveMacrosAsync(macros);
         }
 
+        /// <summary>
+        /// Exporte une macro vers un fichier JSON
+        /// </summary>
+        public async Task ExportMacroAsync(Macro macro, string filePath)
+        {
+            try
+            {
+                var macroData = new MacroData
+                {
+                    Id = macro.Id,
+                    Name = macro.Name,
+                    Description = macro.Description,
+                    Actions = macro.Actions ?? new List<IInputAction>(),
+                    IsEnabled = macro.IsEnabled,
+                    RepeatCount = macro.RepeatCount,
+                    DelayBetweenRepeats = macro.DelayBetweenRepeats,
+                    CreatedAt = macro.CreatedAt,
+                    ModifiedAt = macro.ModifiedAt
+                };
+
+                var options = new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    Converters = { new InputActionJsonConverter() }
+                };
+
+                string json = JsonSerializer.Serialize(macroData, options);
+                await File.WriteAllTextAsync(filePath, json);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Erreur lors de l'export de la macro: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Importe une macro depuis un fichier JSON
+        /// </summary>
+        public async Task<Macro> ImportMacroAsync(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    throw new FileNotFoundException($"Le fichier '{filePath}' n'existe pas.");
+                }
+
+                string json = await File.ReadAllTextAsync(filePath);
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    WriteIndented = true,
+                    Converters = { new InputActionJsonConverter() }
+                };
+
+                var macroData = JsonSerializer.Deserialize<MacroData>(json, options);
+                if (macroData == null)
+                {
+                    throw new Exception("Impossible de désérialiser la macro depuis le fichier JSON.");
+                }
+
+                // Générer un nouvel ID pour éviter les conflits
+                var importedMacro = new Macro
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Name = macroData.Name,
+                    Description = macroData.Description,
+                    Actions = macroData.Actions ?? new List<IInputAction>(),
+                    IsEnabled = macroData.IsEnabled,
+                    RepeatCount = macroData.RepeatCount,
+                    DelayBetweenRepeats = macroData.DelayBetweenRepeats,
+                    CreatedAt = macroData.CreatedAt,
+                    ModifiedAt = DateTime.Now
+                };
+
+                return importedMacro;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Erreur lors de l'import de la macro: {ex.Message}", ex);
+            }
+        }
+
         private class MacroData
         {
             public string Id { get; set; }

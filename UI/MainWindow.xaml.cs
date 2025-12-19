@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using Microsoft.Win32;
 using MacroEngine.Core.Engine;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Profiles;
@@ -1149,7 +1150,8 @@ namespace MacroEngine.UI
 
         private void OpenMacro_Click(object sender, RoutedEventArgs e)
         {
-            // Ouvrir une macro
+            // Ouvrir une macro (fonctionnalité à implémenter si nécessaire)
+            MessageBox.Show("Utilisez 'Importer Macro' pour importer une macro depuis un fichier JSON", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         private async void SaveMacro_Click(object sender, RoutedEventArgs e)
@@ -1177,6 +1179,115 @@ namespace MacroEngine.UI
                 StatusText.Text = $"Erreur lors de la sauvegarde: {ex.Message}";
                 StatusText.Foreground = System.Windows.Media.Brushes.Red;
                 MessageBox.Show($"Erreur lors de la sauvegarde: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void ExportMacro_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (_selectedMacro == null)
+                {
+                    MessageBox.Show("Aucune macro sélectionnée", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var saveDialog = new SaveFileDialog
+                {
+                    Filter = "Fichiers JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                    FileName = $"{_selectedMacro.Name}.json",
+                    DefaultExt = "json",
+                    Title = "Exporter la macro"
+                };
+
+                if (saveDialog.ShowDialog() == true)
+                {
+                    await _macroStorage.ExportMacroAsync(_selectedMacro, saveDialog.FileName);
+                    
+                    StatusText.Text = $"Macro '{_selectedMacro.Name}' exportée avec succès";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Green;
+                    MessageBox.Show($"Macro '{_selectedMacro.Name}' exportée avec succès vers:\n{saveDialog.FileName}", 
+                        "Export réussi", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Erreur lors de l'export: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
+                MessageBox.Show($"Erreur lors de l'export de la macro: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void ImportMacro_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var openDialog = new OpenFileDialog
+                {
+                    Filter = "Fichiers JSON (*.json)|*.json|Tous les fichiers (*.*)|*.*",
+                    DefaultExt = "json",
+                    Title = "Importer une macro"
+                };
+
+                if (openDialog.ShowDialog() == true)
+                {
+                    var importedMacro = await _macroStorage.ImportMacroAsync(openDialog.FileName);
+                    
+                    // Vérifier si une macro avec le même nom existe déjà
+                    var existingMacro = _macros.FirstOrDefault(m => m.Name == importedMacro.Name);
+                    if (existingMacro != null)
+                    {
+                        var result = MessageBox.Show(
+                            $"Une macro nommée '{importedMacro.Name}' existe déjà.\n\nVoulez-vous la remplacer ou créer une copie avec un nom différent?",
+                            "Macro existante",
+                            MessageBoxButton.YesNoCancel,
+                            MessageBoxImage.Question,
+                            MessageBoxResult.Cancel);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            // Remplacer la macro existante
+                            var index = _macros.IndexOf(existingMacro);
+                            _macros[index] = importedMacro;
+                            importedMacro.Id = existingMacro.Id; // Garder l'ID original
+                        }
+                        else if (result == MessageBoxResult.No)
+                        {
+                            // Créer une copie avec un nom différent
+                            importedMacro.Name = $"{importedMacro.Name} (Importé)";
+                            _macros.Add(importedMacro);
+                        }
+                        else
+                        {
+                            // Annuler
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        // Ajouter la nouvelle macro
+                        _macros.Add(importedMacro);
+                    }
+
+                    // Sauvegarder toutes les macros
+                    await _macroStorage.SaveMacrosAsync(_macros);
+
+                    // Rafraîchir la liste et sélectionner la macro importée
+                    MacrosListBox.ItemsSource = null;
+                    MacrosListBox.ItemsSource = _macros;
+                    MacrosListBox.SelectedItem = importedMacro;
+
+                    StatusText.Text = $"Macro '{importedMacro.Name}' importée avec succès";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Green;
+                    MessageBox.Show($"Macro '{importedMacro.Name}' importée avec succès depuis:\n{openDialog.FileName}", 
+                        "Import réussi", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Erreur lors de l'import: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
+                MessageBox.Show($"Erreur lors de l'import de la macro: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 

@@ -22,6 +22,9 @@
                 <MenuItem Header="Ouvrir Macro" Click="OpenMacro_Click"/>
                 <MenuItem Header="Sauvegarder" Click="SaveMacro_Click"/>
                 <Separator/>
+                <MenuItem Header="Exporter Macro..." Click="ExportMacro_Click"/>
+                <MenuItem Header="Importer Macro..." Click="ImportMacro_Click"/>
+                <Separator/>
                 <MenuItem Header="Quitter" Click="Exit_Click"/>
             </MenuItem>
             <MenuItem Header="Profil">
