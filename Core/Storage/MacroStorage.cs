@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using MacroEngine.Core.Inputs;
+using MacroEngine.Core.Logging;
 using MacroEngine.Core.Models;
 
 namespace MacroEngine.Core.Storage
@@ -16,10 +17,12 @@ namespace MacroEngine.Core.Storage
     public class MacroStorage
     {
         private readonly string _macrosFilePath;
+        private readonly ILogger? _logger;
 
-        public MacroStorage(string macrosFilePath = "Data/macros.json")
+        public MacroStorage(string macrosFilePath = "Data/macros.json", ILogger? logger = null)
         {
             _macrosFilePath = macrosFilePath;
+            _logger = logger;
         }
 
         /// <summary>
@@ -31,9 +34,11 @@ namespace MacroEngine.Core.Storage
             {
                 if (!File.Exists(_macrosFilePath))
                 {
+                    _logger?.Debug($"Fichier de macros introuvable: {_macrosFilePath}", "MacroStorage");
                     return new List<Macro>();
                 }
 
+                _logger?.Debug($"Chargement des macros depuis {_macrosFilePath}", "MacroStorage");
                 string json = await File.ReadAllTextAsync(_macrosFilePath);
                 var options = new JsonSerializerOptions
                 {
@@ -43,7 +48,7 @@ namespace MacroEngine.Core.Storage
                 };
 
                 var macrosData = JsonSerializer.Deserialize<List<MacroData>>(json, options);
-                return macrosData?.Select(m => new Macro
+                var macros = macrosData?.Select(m => new Macro
                 {
                     Id = m.Id,
                     Name = m.Name,
@@ -55,9 +60,13 @@ namespace MacroEngine.Core.Storage
                     CreatedAt = m.CreatedAt,
                     ModifiedAt = m.ModifiedAt
                 }).ToList() ?? new List<Macro>();
+                
+                _logger?.Info($"{macros.Count} macro(s) chargée(s) depuis {_macrosFilePath}", "MacroStorage");
+                return macros;
             }
             catch (Exception ex)
             {
+                _logger?.Error($"Erreur lors du chargement des macros depuis {_macrosFilePath}", ex, "MacroStorage");
                 throw new Exception($"Erreur lors du chargement des macros: {ex.Message}", ex);
             }
         }
@@ -69,10 +78,12 @@ namespace MacroEngine.Core.Storage
         {
             try
             {
+                _logger?.Debug($"Sauvegarde de {macros?.Count ?? 0} macro(s) vers {_macrosFilePath}", "MacroStorage");
                 var directory = Path.GetDirectoryName(_macrosFilePath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
                     Directory.CreateDirectory(directory);
+                    _logger?.Debug($"Dossier créé: {directory}", "MacroStorage");
                 }
 
                 var macrosData = macros.Select(m => new MacroData
@@ -96,9 +107,11 @@ namespace MacroEngine.Core.Storage
 
                 string json = JsonSerializer.Serialize(macrosData, options);
                 await File.WriteAllTextAsync(_macrosFilePath, json);
+                _logger?.Info($"{macros.Count} macro(s) sauvegardée(s) avec succès vers {_macrosFilePath}", "MacroStorage");
             }
             catch (Exception ex)
             {
+                _logger?.Error($"Erreur lors de la sauvegarde des macros vers {_macrosFilePath}", ex, "MacroStorage");
                 throw new Exception($"Erreur lors de la sauvegarde des macros: {ex.Message}", ex);
             }
         }
@@ -130,6 +143,7 @@ namespace MacroEngine.Core.Storage
         {
             try
             {
+                _logger?.Info($"Export de la macro '{macro.Name}' vers {filePath}", "MacroStorage");
                 var macroData = new MacroData
                 {
                     Id = macro.Id,
@@ -151,9 +165,11 @@ namespace MacroEngine.Core.Storage
 
                 string json = JsonSerializer.Serialize(macroData, options);
                 await File.WriteAllTextAsync(filePath, json);
+                _logger?.Info($"Macro '{macro.Name}' exportée avec succès vers {filePath}", "MacroStorage");
             }
             catch (Exception ex)
             {
+                _logger?.Error($"Erreur lors de l'export de la macro '{macro.Name}' vers {filePath}", ex, "MacroStorage");
                 throw new Exception($"Erreur lors de l'export de la macro: {ex.Message}", ex);
             }
         }
@@ -167,9 +183,11 @@ namespace MacroEngine.Core.Storage
             {
                 if (!File.Exists(filePath))
                 {
+                    _logger?.Error($"Fichier introuvable lors de l'import: {filePath}", "MacroStorage");
                     throw new FileNotFoundException($"Le fichier '{filePath}' n'existe pas.");
                 }
 
+                _logger?.Info($"Import de la macro depuis {filePath}", "MacroStorage");
                 string json = await File.ReadAllTextAsync(filePath);
                 var options = new JsonSerializerOptions
                 {
@@ -181,6 +199,7 @@ namespace MacroEngine.Core.Storage
                 var macroData = JsonSerializer.Deserialize<MacroData>(json, options);
                 if (macroData == null)
                 {
+                    _logger?.Error($"Impossible de désérialiser la macro depuis {filePath}", "MacroStorage");
                     throw new Exception("Impossible de désérialiser la macro depuis le fichier JSON.");
                 }
 
@@ -198,10 +217,12 @@ namespace MacroEngine.Core.Storage
                     ModifiedAt = DateTime.Now
                 };
 
+                _logger?.Info($"Macro '{importedMacro.Name}' importée avec succès depuis {filePath}", "MacroStorage");
                 return importedMacro;
             }
             catch (Exception ex)
             {
+                _logger?.Error($"Erreur lors de l'import de la macro depuis {filePath}", ex, "MacroStorage");
                 throw new Exception($"Erreur lors de l'import de la macro: {ex.Message}", ex);
             }
         }

@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using Microsoft.Win32;
 using MacroEngine.Core.Engine;
+using MacroEngine.Core.Logging;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Profiles;
 using MacroEngine.Core.Hooks;
@@ -17,12 +19,15 @@ namespace MacroEngine.UI
 {
     public partial class MainWindow : Window
     {
+        private readonly ILogger _logger;
         private readonly IMacroEngine _macroEngine;
         private readonly IProfileProvider _profileProvider;
         private readonly MacroStorage _macroStorage;
+        private readonly ObservableCollection<LogEntry> _logEntries;
         private List<Macro> _macros;
         private Macro _selectedMacro;
         private MacroEditor _macroEditor;
+        private LogsWindow? _logsWindow;
         
         // Hooks pour l'enregistrement
         private KeyboardHook _keyboardHook;
@@ -54,9 +59,24 @@ namespace MacroEngine.UI
         {
             InitializeComponent();
             
-            _macroEngine = new Engine.MacroEngine();
+            // Initialiser le système de logging
+            _logEntries = new ObservableCollection<LogEntry>();
+            _logger = new Logger
+            {
+                MinimumLevel = LogLevel.Info // Niveau par défaut, configurable
+            };
+            
+            // Ajouter les writers de logs
+            var fileWriter = new FileLogWriter("Logs", LogLevel.Debug);
+            var uiWriter = new UiLogWriter(_logEntries, Dispatcher, LogLevel.Debug);
+            _logger.AddWriter(fileWriter);
+            _logger.AddWriter(uiWriter);
+            
+            _logger.Info("Application démarrée", "MainWindow");
+            
+            _macroEngine = new Engine.MacroEngine(_logger);
             _profileProvider = new AppProfileProvider();
-            _macroStorage = new MacroStorage();
+            _macroStorage = new MacroStorage("Data/macros.json", _logger);
             _macros = new List<Macro>();
 
             // Initialiser l'éditeur de macro
@@ -551,6 +571,7 @@ namespace MacroEngine.UI
             if (_isRecording)
                 return;
 
+            _logger.Info($"Démarrage de l'enregistrement pour la macro '{_selectedMacro?.Name ?? "inconnue"}'", "MainWindow");
             _isRecording = true;
             _lastActionTime = DateTime.Now;
             _lastKeyRecorded = DateTime.MinValue;
@@ -600,6 +621,8 @@ namespace MacroEngine.UI
             PauseButton.Content = "⏸ Pause";
             StopButton.IsEnabled = true;
             _isRecordingPaused = false;
+            
+            _logger.Info("Hooks d'enregistrement installés avec succès", "MainWindow");
         }
 
         private void StopRecording()
@@ -607,11 +630,13 @@ namespace MacroEngine.UI
             if (!_isRecording)
                 return;
 
+            _logger.Info($"Arrêt de l'enregistrement. {_selectedMacro?.Actions?.Count ?? 0} action(s) enregistrée(s)", "MainWindow");
             _isRecording = false;
 
             // Désinstaller les hooks
             _keyboardHook.Uninstall();
             _mouseHook.Uninstall();
+            _logger.Debug("Hooks d'enregistrement désinstallés", "MainWindow");
 
             // Réinstaller le hook global F10 après l'enregistrement
             InitializeGlobalExecuteHook();
@@ -1145,7 +1170,18 @@ namespace MacroEngine.UI
 
         private void Settings_Click(object sender, RoutedEventArgs e)
         {
-            // Ouvrir les paramètres
+            // Configuration
+            MessageBox.Show("Configuration à implémenter", "Configuration", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void ShowLogs_Click(object sender, RoutedEventArgs e)
+        {
+            if (_logsWindow == null)
+            {
+                _logsWindow = new LogsWindow(_logEntries, _logger);
+            }
+            _logsWindow.Show();
+            _logsWindow.Activate();
         }
 
         private void OpenMacro_Click(object sender, RoutedEventArgs e)
@@ -1293,6 +1329,8 @@ namespace MacroEngine.UI
 
         private void Exit_Click(object sender, RoutedEventArgs e)
         {
+            _logger.Info("Arrêt de l'application demandé", "MainWindow");
+            
             // Arrêter l'enregistrement si actif
             if (_isRecording)
             {
@@ -1303,6 +1341,12 @@ namespace MacroEngine.UI
             _keyboardHook?.Dispose();
             _mouseHook?.Dispose();
             _globalExecuteHook?.Dispose();
+            
+            // Fermer la fenêtre de logs si ouverte
+            _logsWindow?.Close();
+
+            _logger.Info("Application arrêtée", "MainWindow");
+            _logger.Dispose();
 
             Application.Current.Shutdown();
         }

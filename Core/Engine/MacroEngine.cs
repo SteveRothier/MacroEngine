@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MacroEngine.Core.Inputs;
+using MacroEngine.Core.Logging;
 using MacroEngine.Core.Models;
 
 namespace MacroEngine.Core.Engine
@@ -18,10 +19,18 @@ namespace MacroEngine.Core.Engine
         private CancellationTokenSource _cancellationTokenSource;
         private readonly TimingEngine _timingEngine;
         private readonly object _lockObject = new object();
+        private readonly ILogger? _logger;
 
         public event EventHandler<MacroEngineEventArgs> StateChanged;
         public event EventHandler<MacroEngineErrorEventArgs> ErrorOccurred;
         public event EventHandler<ActionExecutedEventArgs> ActionExecuted;
+
+        public MacroEngine(ILogger? logger = null)
+        {
+            _logger = logger;
+            _timingEngine = new TimingEngine(Config.MaxCPS);
+            _logger?.Info("MacroEngine initialisé", "MacroEngine");
+        }
 
         public MacroEngineState State
         {
@@ -38,6 +47,13 @@ namespace MacroEngine.Core.Engine
                 {
                     var previousState = _state;
                     _state = value;
+                    
+                    // Logger les transitions d'état importantes
+                    if (previousState != value)
+                    {
+                        _logger?.Info($"État changé: {previousState} → {value}", "MacroEngine");
+                    }
+                    
                     StateChanged?.Invoke(this, new MacroEngineEventArgs
                     {
                         PreviousState = previousState,
@@ -51,26 +67,28 @@ namespace MacroEngine.Core.Engine
         public Macro CurrentMacro => _currentMacro;
         public MacroEngineConfig Config { get; set; } = new MacroEngineConfig();
 
-        public MacroEngine()
-        {
-            _timingEngine = new TimingEngine(Config.MaxCPS);
-        }
-
         public async Task<bool> StartMacroAsync(Macro macro)
         {
             if (macro == null)
+            {
+                _logger?.Warning("Tentative de démarrage avec une macro null", "MacroEngine");
                 return false;
+            }
 
             lock (_lockObject)
             {
                 if (_state != MacroEngineState.Idle)
+                {
+                    _logger?.Warning($"Tentative de démarrage alors que l'état est {_state}", "MacroEngine");
                     return false;
+                }
 
                 _currentMacro = macro;
                 _cancellationTokenSource = new CancellationTokenSource();
                 State = MacroEngineState.Running;
             }
 
+            _logger?.Info($"Démarrage de la macro '{macro.Name}' ({macro.Actions?.Count ?? 0} actions)", "MacroEngine");
             _timingEngine.Reset();
 
             try
@@ -80,10 +98,12 @@ namespace MacroEngine.Core.Engine
             }
             catch (OperationCanceledException)
             {
+                _logger?.Info($"Macro '{macro.Name}' arrêtée par l'utilisateur", "MacroEngine");
                 return true;
             }
             catch (Exception ex)
             {
+                _logger?.Error($"Erreur lors de l'exécution de la macro '{macro.Name}'", ex, "MacroEngine");
                 ErrorOccurred?.Invoke(this, new MacroEngineErrorEventArgs
                 {
                     Exception = ex,
@@ -96,6 +116,7 @@ namespace MacroEngine.Core.Engine
             {
                 lock (_lockObject)
                 {
+                    _logger?.Info($"Macro '{macro.Name}' terminée", "MacroEngine");
                     State = MacroEngineState.Idle;
                     _currentMacro = null;
                     _cancellationTokenSource?.Dispose();
@@ -111,6 +132,7 @@ namespace MacroEngine.Core.Engine
                 if (_state == MacroEngineState.Idle)
                     return;
 
+                _logger?.Info($"Arrêt d'urgence de la macro '{_currentMacro?.Name ?? "inconnue"}'", "MacroEngine");
                 State = MacroEngineState.Stopping;
             }
 
@@ -130,6 +152,7 @@ namespace MacroEngine.Core.Engine
                 if (_state != MacroEngineState.Running)
                     return;
 
+                _logger?.Info($"Pause de la macro '{_currentMacro?.Name ?? "inconnue"}'", "MacroEngine");
                 State = MacroEngineState.Paused;
             }
         }
@@ -141,6 +164,7 @@ namespace MacroEngine.Core.Engine
                 if (_state != MacroEngineState.Paused)
                     return;
 
+                _logger?.Info($"Reprise de la macro '{_currentMacro?.Name ?? "inconnue"}'", "MacroEngine");
                 State = MacroEngineState.Running;
             }
         }
@@ -216,6 +240,7 @@ namespace MacroEngine.Core.Engine
                 }
                 catch (Exception ex)
                 {
+                    _logger?.Error($"Erreur lors de l'exécution de l'action '{action.Name}'", ex, "MacroEngine");
                     ErrorOccurred?.Invoke(this, new MacroEngineErrorEventArgs
                     {
                         Exception = ex,

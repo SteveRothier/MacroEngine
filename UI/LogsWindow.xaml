@@ -1,0 +1,96 @@
+<Window x:Class="MacroEngine.UI.LogsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Journaux (Logs) - MacroEngine" 
+        Height="600" Width="1000"
+        WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Barre d'outils -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
+            <TextBlock Text="Niveau de log minimum:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <ComboBox x:Name="LogLevelComboBox" 
+                      Width="120" 
+                      SelectionChanged="LogLevelComboBox_SelectionChanged"
+                      VerticalAlignment="Center" Margin="0,0,10,0">
+                <ComboBoxItem Content="Debug" Tag="Debug"/>
+                <ComboBoxItem Content="Info" Tag="Info" IsSelected="True"/>
+                <ComboBoxItem Content="Warning" Tag="Warning"/>
+                <ComboBoxItem Content="Error" Tag="Error"/>
+            </ComboBox>
+            <Button Content="Effacer" 
+                    Click="ClearLogs_Click" 
+                    Padding="10,5" 
+                    Margin="5,0,5,0"/>
+            <Button Content="Actualiser" 
+                    Click="RefreshLogs_Click" 
+                    Padding="10,5" 
+                    Margin="5,0,5,0"/>
+            <CheckBox x:Name="AutoScrollCheckBox" 
+                      Content="Défilement automatique" 
+                      IsChecked="True"
+                      VerticalAlignment="Center" 
+                      Margin="10,0,0,0"/>
+        </StackPanel>
+
+        <!-- Liste des logs -->
+        <DataGrid Grid.Row="1" 
+                  x:Name="LogsDataGrid"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="All"
+                  HeadersVisibility="Column"
+                  SelectionMode="Single"
+                  SelectionUnit="FullRow"
+                  CanUserResizeColumns="True"
+                  CanUserReorderColumns="False"
+                  Margin="10">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Heure" Binding="{Binding Timestamp, StringFormat='HH:mm:ss.fff'}" Width="100"/>
+                <DataGridTextColumn Header="Niveau" Binding="{Binding Level}" Width="80">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Level}" Value="Error">
+                                    <Setter Property="Foreground" Value="Red"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Level}" Value="Warning">
+                                    <Setter Property="Foreground" Value="Orange"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Level}" Value="Info">
+                                    <Setter Property="Foreground" Value="Blue"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Level}" Value="Debug">
+                                    <Setter Property="Foreground" Value="Gray"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="150"/>
+                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Zone de détails (stack trace pour les exceptions) -->
+        <GroupBox Grid.Row="2" Header="Détails" Margin="10,5,10,10">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="150">
+                <TextBlock x:Name="DetailsTextBlock" 
+                           TextWrapping="Wrap" 
+                           Padding="5"
+                           FontFamily="Consolas"
+                           FontSize="11"/>
+            </ScrollViewer>
+        </GroupBox>
+    </Grid>
+</Window>
+

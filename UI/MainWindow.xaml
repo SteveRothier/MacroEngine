@@ -33,6 +33,8 @@
             </MenuItem>
             <MenuItem Header="Paramètres">
                 <MenuItem Header="Configuration" Click="Settings_Click"/>
+                <Separator/>
+                <MenuItem Header="Journaux (Logs)" Click="ShowLogs_Click"/>
             </MenuItem>
         </Menu>
 
