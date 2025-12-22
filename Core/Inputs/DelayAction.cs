@@ -10,8 +10,6 @@ namespace MacroEngine.Core.Inputs
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Delay";
         public InputActionType Type => InputActionType.Delay;
-        public int DelayBefore { get; set; } = 0;
-        public int DelayAfter { get; set; } = 0;
 
         /// <summary>
         /// Durée du délai en millisecondes
@@ -20,14 +18,8 @@ namespace MacroEngine.Core.Inputs
 
         public void Execute()
         {
-            if (DelayBefore > 0)
-                System.Threading.Thread.Sleep(DelayBefore);
-
             if (Duration > 0)
                 System.Threading.Thread.Sleep(Duration);
-
-            if (DelayAfter > 0)
-                System.Threading.Thread.Sleep(DelayAfter);
         }
 
         public IInputAction Clone()
@@ -36,8 +28,6 @@ namespace MacroEngine.Core.Inputs
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = this.Name,
-                DelayBefore = this.DelayBefore,
-                DelayAfter = this.DelayAfter,
                 Duration = this.Duration
             };
         }

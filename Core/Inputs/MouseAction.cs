@@ -12,8 +12,6 @@ namespace MacroEngine.Core.Inputs
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Mouse Action";
         public InputActionType Type => InputActionType.Mouse;
-        public int DelayBefore { get; set; } = 0;
-        public int DelayAfter { get; set; } = 0;
 
         /// <summary>
         /// Type d'action souris
@@ -37,9 +35,6 @@ namespace MacroEngine.Core.Inputs
 
         public void Execute()
         {
-            if (DelayBefore > 0)
-                System.Threading.Thread.Sleep(DelayBefore);
-
             // Déplacer la souris si nécessaire
             if (X >= 0 && Y >= 0)
             {
@@ -92,9 +87,6 @@ namespace MacroEngine.Core.Inputs
                     MouseEvent(MOUSEEVENTF_WHEEL, Delta);
                     break;
             }
-
-            if (DelayAfter > 0)
-                System.Threading.Thread.Sleep(DelayAfter);
         }
 
         private void MouseEvent(uint dwFlags, int dwData = 0)
@@ -122,8 +114,6 @@ namespace MacroEngine.Core.Inputs
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = this.Name,
-                DelayBefore = this.DelayBefore,
-                DelayAfter = this.DelayAfter,
                 ActionType = this.ActionType,
                 X = this.X,
                 Y = this.Y,

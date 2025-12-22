@@ -23,16 +23,6 @@ namespace MacroEngine.Core.Inputs
         InputActionType Type { get; }
 
         /// <summary>
-        /// Délai avant l'exécution (en millisecondes)
-        /// </summary>
-        int DelayBefore { get; set; }
-
-        /// <summary>
-        /// Délai après l'exécution (en millisecondes)
-        /// </summary>
-        int DelayAfter { get; set; }
-
-        /// <summary>
         /// Exécute l'action
         /// </summary>
         void Execute();

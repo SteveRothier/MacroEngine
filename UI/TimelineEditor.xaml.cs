@@ -55,8 +55,12 @@ namespace MacroEngine.UI
 
             foreach (var action in _currentMacro.Actions)
             {
-                // Calculer la largeur basée sur les délais
-                double width = (action.DelayBefore + action.DelayAfter) * _timeScale * _zoomLevel;
+                // Largeur fixe pour chaque action (si DelayAction, utiliser Duration)
+                double width = 50 * _zoomLevel;
+                if (action is DelayAction delayAction)
+                {
+                    width = delayAction.Duration * _timeScale * _zoomLevel;
+                }
                 if (width < 20) width = 20;
 
                 // Dessiner le rectangle de l'action

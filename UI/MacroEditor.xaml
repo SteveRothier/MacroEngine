@@ -45,8 +45,6 @@
                 <DataGridTextColumn Header="Nom" Binding="{Binding Name}" Width="*"/>
                 <DataGridTextColumn Header="Code Touche" Binding="{Binding VirtualKeyCode, StringFormat='0x{0:X2}', TargetNullValue='-', FallbackValue='-'}" Width="100" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Action" Binding="{Binding ActionType, TargetNullValue='-', FallbackValue='-'}" Width="120" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Délai Avant (ms)" Binding="{Binding DelayBefore}" Width="100"/>
-                <DataGridTextColumn Header="Délai Après (ms)" Binding="{Binding DelayAfter}" Width="100"/>
             </DataGrid.Columns>
         </DataGrid>
 

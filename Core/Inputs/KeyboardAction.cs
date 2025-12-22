@@ -12,8 +12,6 @@ namespace MacroEngine.Core.Inputs
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public string Name { get; set; } = "Keyboard Action";
         public InputActionType Type => InputActionType.Keyboard;
-        public int DelayBefore { get; set; } = 0;
-        public int DelayAfter { get; set; } = 0;
 
         /// <summary>
         /// Code de touche virtuelle
@@ -32,9 +30,6 @@ namespace MacroEngine.Core.Inputs
 
         public void Execute()
         {
-            if (DelayBefore > 0)
-                System.Threading.Thread.Sleep(DelayBefore);
-
             if (Modifiers != ModifierKeys.None)
             {
                 SendModifierKeys(Modifiers, true);
@@ -64,9 +59,6 @@ namespace MacroEngine.Core.Inputs
             {
                 SendModifierKeys(Modifiers, false);
             }
-
-            if (DelayAfter > 0)
-                System.Threading.Thread.Sleep(DelayAfter);
         }
 
         private void SendModifierKeys(ModifierKeys modifiers, bool down)
@@ -107,8 +99,6 @@ namespace MacroEngine.Core.Inputs
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = this.Name,
-                DelayBefore = this.DelayBefore,
-                DelayAfter = this.DelayAfter,
                 VirtualKeyCode = this.VirtualKeyCode,
                 ActionType = this.ActionType,
                 Modifiers = this.Modifiers
