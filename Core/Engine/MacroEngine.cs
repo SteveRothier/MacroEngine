@@ -209,32 +209,12 @@ namespace MacroEngine.Core.Engine
                         ActionDescription = description
                     });
                     
-                    // Petit délai pour permettre au système de traiter l'action et à l'UI de se mettre à jour
-                    // Utiliser Task.Delay au lieu de Thread.Sleep pour ne pas bloquer le thread UI
-                    await Task.Delay(10);
+                    // Petit délai pour permettre à l'UI de se mettre à jour (asynchrone, ne ralentit pas l'exécution)
                     await Task.Yield();
                     
-                    // Vérifier si l'action suivante est une DelayAction pour ne pas ajouter de délai supplémentaire
-                    int currentIndex = actionList.IndexOf(action);
-                    bool nextActionIsDelay = currentIndex < actionList.Count - 1 && actionList[currentIndex + 1] is DelayAction;
-                    
-                    // Délai supplémentaire entre les actions pour permettre au système de traiter les touches
-                    // Important pour que les touches soient correctement reçues par les applications
-                    // Ne pas ajouter de délai si l'action courante est une DelayAction ou si la suivante est une DelayAction
-                    if (!(action is DelayAction) && !nextActionIsDelay)
-                    {
-                        if (action is KeyboardAction)
-                        {
-                            // Délai plus long entre les touches pour garantir qu'elles sont traitées
-                            await Task.Delay(150);
-                        }
-                        else
-                        {
-                            // Pour les autres types d'actions (Mouse, etc.), petit délai
-                            await Task.Delay(20);
-                        }
-                    }
-                    // Pas de délai supplémentaire pour DelayAction ou avant une DelayAction car le délai est déjà dans Duration
+                    // Ne pas ajouter de délais supplémentaires entre les actions
+                    // Les délais sont gérés uniquement par les DelayAction enregistrées lors de l'enregistrement
+                    // Cela garantit que l'exécution respecte exactement les mêmes délais que l'enregistrement
                     
                     _timingEngine.WaitForNextInterval();
                 }

@@ -43,7 +43,7 @@ namespace MacroEngine.UI
         private HashSet<int> _pressedKeys = new HashSet<int>();
         private Dictionary<int, DateTime> _keyDownTimes = new Dictionary<int, DateTime>();
         private DateTime _lastEditorRefresh = DateTime.MinValue;
-        private const int EDITOR_REFRESH_INTERVAL_MS = 500; // Rafraîchir l'éditeur max toutes les 500ms
+        private const int EDITOR_REFRESH_INTERVAL_MS = 50; // Rafraîchir l'éditeur max toutes les 50ms pour un affichage réactif
         private DateTime _lastKeyRecorded = DateTime.MinValue;
         private const int MIN_KEY_INTERVAL_MS = 50; // Intervalle minimum entre deux touches enregistrées (50ms = 20 touches/seconde max)
         private int _rapidKeyWarningCount = 0;
