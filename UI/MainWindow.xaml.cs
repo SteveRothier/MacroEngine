@@ -23,19 +23,21 @@ namespace MacroEngine.UI
         private readonly IMacroEngine _macroEngine;
         private readonly IProfileProvider _profileProvider;
         private readonly MacroStorage _macroStorage;
+        private readonly ConfigStorage _configStorage;
         private readonly ObservableCollection<LogEntry> _logEntries;
         private List<Macro> _macros;
         private Macro _selectedMacro;
         private MacroEditor _macroEditor;
         private LogsWindow? _logsWindow;
+        private MacroEngineConfig _appConfig;
         
         // Hooks pour l'enregistrement
         private KeyboardHook _keyboardHook;
         private MouseHook _mouseHook;
         
-        // Hook global pour F10 (exécution de macro)
+        // Hooks globaux pour exécution et arrêt de macro
         private KeyboardHook _globalExecuteHook;
-        private const int VK_F10 = 0x79; // Code virtuel de la touche F10
+        private KeyboardHook _globalStopHook;
         private bool _isRecording = false;
         private bool _isRecordingPaused = false;
         private DateTime _lastActionTime;
@@ -77,7 +79,9 @@ namespace MacroEngine.UI
             _macroEngine = new Engine.MacroEngine(_logger);
             _profileProvider = new AppProfileProvider();
             _macroStorage = new MacroStorage("Data/macros.json", _logger);
+            _configStorage = new ConfigStorage("Data/config.json", _logger);
             _macros = new List<Macro>();
+            _appConfig = new MacroEngineConfig(); // Configuration par défaut en attendant le chargement
 
             // Initialiser l'éditeur de macro
             _macroEditor = new MacroEditor();
@@ -89,13 +93,18 @@ namespace MacroEngine.UI
             _mouseHook = new MouseHook();
             InitializeRecordingHooks();
 
-            // Initialiser le hook global pour F10 (exécution)
+            // Initialiser les hooks globaux pour exécution et arrêt
             _globalExecuteHook = new KeyboardHook();
             _globalExecuteHook.KeyDown += GlobalExecuteHook_KeyDown;
-            InitializeGlobalExecuteHook();
+            _globalStopHook = new KeyboardHook();
+            _globalStopHook.KeyDown += GlobalStopHook_KeyDown;
 
             InitializeEngine();
             InitializeAutoSave();
+            
+            // Charger la configuration et réinitialiser les hooks après
+            _ = LoadConfigAndInitializeHooksAsync();
+            
             LoadMacros();
             LoadProfiles();
             
@@ -114,17 +123,61 @@ namespace MacroEngine.UI
             _mouseHook.MouseUp += MouseHook_MouseUp;
         }
 
-        private void InitializeGlobalExecuteHook()
+        private async System.Threading.Tasks.Task LoadConfigAndInitializeHooksAsync()
         {
-            // Installer le hook global pour F10
             try
             {
-                _globalExecuteHook.Install();
+                _appConfig = await _configStorage.LoadConfigAsync();
+                _logger?.Info($"Configuration chargée - Exécuter: VK{_appConfig.ExecuteMacroKeyCode:X2}, Arrêter: VK{_appConfig.StopMacroKeyCode:X2}", "MainWindow");
             }
             catch (Exception ex)
             {
-                // Si l'installation échoue, on continue quand même
-                System.Diagnostics.Debug.WriteLine($"Impossible d'installer le hook global F10: {ex.Message}");
+                _logger?.Error("Erreur lors du chargement de la configuration", ex, "MainWindow");
+                _appConfig = new MacroEngineConfig(); // Utiliser les valeurs par défaut
+            }
+            
+            // Initialiser les hooks avec la configuration chargée
+            InitializeGlobalHooks();
+        }
+
+        private void InitializeGlobalHooks()
+        {
+            // Désinstaller les hooks existants
+            try
+            {
+                _globalExecuteHook.Uninstall();
+                _globalStopHook.Uninstall();
+            }
+            catch { }
+
+            // Installer les hooks avec les raccourcis de la configuration
+            try
+            {
+                if (_appConfig?.EnableHooks == true)
+                {
+                    _globalExecuteHook.Install();
+                    _globalStopHook.Install();
+                    _logger?.Debug($"Hooks globaux installés - Exécuter: VK{_appConfig?.ExecuteMacroKeyCode:X2}, Arrêter: VK{_appConfig?.StopMacroKeyCode:X2}", "MainWindow");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Impossible d'installer les hooks globaux", ex, "MainWindow");
+            }
+        }
+
+        private void DisableGlobalHooks()
+        {
+            // Désinstaller les hooks globaux
+            try
+            {
+                _globalExecuteHook.Uninstall();
+                _globalStopHook.Uninstall();
+                _logger?.Debug("Hooks globaux désactivés", "MainWindow");
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Erreur lors de la désactivation des hooks globaux", ex, "MainWindow");
             }
         }
 
@@ -177,14 +230,41 @@ namespace MacroEngine.UI
 
         private void GlobalExecuteHook_KeyDown(object sender, KeyboardHookEventArgs e)
         {
-            // Vérifier que c'est F10 et qu'on n'est pas en train d'enregistrer
-            if (e.VirtualKeyCode == VK_F10 && !_isRecording && _macroEngine.State == MacroEngineState.Idle)
+            // Vérifier que c'est le raccourci configuré pour exécuter et qu'on n'est pas en train d'enregistrer
+            if (_appConfig != null && 
+                e.VirtualKeyCode == _appConfig.ExecuteMacroKeyCode && 
+                !_isRecording && 
+                _macroEngine.State == MacroEngineState.Idle)
             {
-                // Bloquer la propagation de F10 pour éviter qu'il ouvre des menus
+                // Bloquer la propagation pour éviter qu'il ouvre des menus
                 e.Handled = true;
                 
                 // Exécuter la macro de manière asynchrone
                 _ = ExecuteMacroAsync();
+            }
+        }
+
+        private void GlobalStopHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        {
+            // Vérifier que c'est le raccourci configuré pour arrêter
+            if (_appConfig != null && e.VirtualKeyCode == _appConfig.StopMacroKeyCode)
+            {
+                // Bloquer la propagation
+                e.Handled = true;
+                
+                // Arrêter la macro ou l'enregistrement
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (_isRecording)
+                    {
+                        StopRecording();
+                    }
+                    else if (_macroEngine.State != MacroEngineState.Idle)
+                    {
+                        _macroEngine.StopMacroAsync();
+                        StatusText.Text = "Macro arrêtée";
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Normal);
             }
         }
 
@@ -595,8 +675,13 @@ namespace MacroEngine.UI
                 // Pour l'instant, on les conserve pour permettre d'ajouter des actions
             }
 
-            // Désinstaller le hook global F10 pendant l'enregistrement
-            _globalExecuteHook.Uninstall();
+            // Désinstaller les hooks globaux pendant l'enregistrement
+            try
+            {
+                _globalExecuteHook.Uninstall();
+                _globalStopHook.Uninstall();
+            }
+            catch { }
 
             // Installer les hooks
             try
@@ -638,8 +723,8 @@ namespace MacroEngine.UI
             _mouseHook.Uninstall();
             _logger.Debug("Hooks d'enregistrement désinstallés", "MainWindow");
 
-            // Réinstaller le hook global F10 après l'enregistrement
-            InitializeGlobalExecuteHook();
+            // Réinstaller les hooks globaux après l'enregistrement
+            InitializeGlobalHooks();
 
             // Traiter les touches restantes appuyées
             ProcessRemainingKeys();
@@ -1168,10 +1253,51 @@ namespace MacroEngine.UI
             // Ouvrir le sélecteur de profil
         }
 
-        private void Settings_Click(object sender, RoutedEventArgs e)
+        private async void Settings_Click(object sender, RoutedEventArgs e)
         {
-            // Configuration
-            MessageBox.Show("Configuration à implémenter", "Configuration", MessageBoxButton.OK, MessageBoxImage.Information);
+            try
+            {
+                // Désactiver les hooks globaux pour empêcher l'exécution des macros pendant la configuration
+                DisableGlobalHooks();
+                
+                var settingsWindow = new SettingsWindow(_appConfig ?? new MacroEngineConfig());
+                settingsWindow.Owner = this;
+                
+                try
+                {
+                    if (settingsWindow.ShowDialog() == true && settingsWindow.Config != null)
+                    {
+                        // Sauvegarder la nouvelle configuration
+                        await _configStorage.SaveConfigAsync(settingsWindow.Config);
+                        _appConfig = settingsWindow.Config;
+                        
+                        // Réinstaller les hooks avec les nouveaux raccourcis
+                        InitializeGlobalHooks();
+                        
+                        _logger?.Info($"Configuration mise à jour - Exécuter: VK{_appConfig.ExecuteMacroKeyCode:X2}, Arrêter: VK{_appConfig.StopMacroKeyCode:X2}", "MainWindow");
+                        
+                        MessageBox.Show("Configuration sauvegardée avec succès.", "Configuration", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        // Réactiver les hooks même si l'utilisateur a annulé
+                        InitializeGlobalHooks();
+                    }
+                }
+                finally
+                {
+                    // S'assurer que les hooks sont réactivés même en cas d'erreur
+                    InitializeGlobalHooks();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Erreur lors de l'ouverture de la fenêtre de configuration", ex, "MainWindow");
+                MessageBox.Show($"Erreur lors de l'ouverture de la configuration: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                
+                // Réactiver les hooks en cas d'erreur
+                InitializeGlobalHooks();
+            }
         }
 
         private void ShowLogs_Click(object sender, RoutedEventArgs e)

@@ -1,0 +1,78 @@
+<Window x:Class="MacroEngine.UI.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Configuration" 
+        Height="400" Width="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="Configuration des Raccourcis" FontSize="18" FontWeight="Bold" Margin="0,0,0,20"/>
+
+        <StackPanel Grid.Row="1">
+            <GroupBox Header="Raccourcis Clavier" Margin="0,0,0,20">
+                <StackPanel Margin="10">
+                    <TextBlock Text="Raccourci pour exécuter la macro sélectionnée:" Margin="0,0,0,5"/>
+                    <Grid Margin="0,0,0,15">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="ExecuteKeyTextBox" 
+                                 Grid.Column="0"
+                                 IsReadOnly="True"
+                                 PreviewKeyDown="ExecuteKeyTextBox_PreviewKeyDown"
+                                 KeyDown="ExecuteKeyTextBox_KeyDown"
+                                 GotFocus="ExecuteKeyTextBox_GotFocus"
+                                 LostFocus="ExecuteKeyTextBox_LostFocus"
+                                 Margin="0,0,10,0"/>
+                        <Button x:Name="CaptureExecuteKeyButton" 
+                                Grid.Column="1"
+                                Content="Modifier"
+                                Click="CaptureExecuteKeyButton_Click"
+                                Width="80"/>
+                    </Grid>
+
+                    <TextBlock Text="Raccourci pour arrêter la macro en cours:" Margin="0,0,0,5"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="StopKeyTextBox" 
+                                 Grid.Column="0"
+                                 IsReadOnly="True"
+                                 PreviewKeyDown="StopKeyTextBox_PreviewKeyDown"
+                                 KeyDown="StopKeyTextBox_KeyDown"
+                                 GotFocus="StopKeyTextBox_GotFocus"
+                                 LostFocus="StopKeyTextBox_LostFocus"
+                                 Margin="0,0,10,0"/>
+                        <Button x:Name="CaptureStopKeyButton" 
+                                Grid.Column="1"
+                                Content="Modifier"
+                                Click="CaptureStopKeyButton_Click"
+                                Width="80"/>
+                    </Grid>
+                </StackPanel>
+            </GroupBox>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="OK" 
+                    Click="OkButton_Click" 
+                    Width="80" 
+                    Margin="0,0,10,0"
+                    IsDefault="True"/>
+            <Button Content="Annuler" 
+                    Click="CancelButton_Click" 
+                    Width="80"
+                    IsCancel="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
+

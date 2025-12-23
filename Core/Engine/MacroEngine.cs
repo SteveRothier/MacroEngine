@@ -196,21 +196,42 @@ namespace MacroEngine.Core.Engine
 
                 try
                 {
-                    // Exécuter l'action directement (keybd_event fonctionne sur n'importe quel thread)
-                    // Les Thread.Sleep() dans Execute() bloquent, mais on force la mise à jour de l'UI après
-                    action.Execute();
-                    
-                    // Notifier l'exécution de l'action immédiatement
-                    // L'utilisation de BeginInvoke dans MainWindow permet à l'UI de se mettre à jour
-                    var description = GetActionDescription(action);
-                    ActionExecuted?.Invoke(this, new ActionExecutedEventArgs
+                    // Traiter les DelayAction de manière asynchrone pour permettre à l'UI de se mettre à jour
+                    if (action is DelayAction delayAction)
                     {
-                        Action = action,
-                        ActionDescription = description
-                    });
-                    
-                    // Petit délai pour permettre à l'UI de se mettre à jour (asynchrone, ne ralentit pas l'exécution)
-                    await Task.Yield();
+                        // Notifier le début du délai
+                        var description = GetActionDescription(action);
+                        ActionExecuted?.Invoke(this, new ActionExecutedEventArgs
+                        {
+                            Action = action,
+                            ActionDescription = description
+                        });
+                        
+                        // Utiliser Task.Delay au lieu de Thread.Sleep pour permettre à l'UI de se mettre à jour
+                        if (delayAction.Duration > 0)
+                        {
+                            await Task.Delay(delayAction.Duration);
+                        }
+                    }
+                    else
+                    {
+                        // Exécuter l'action directement (keybd_event fonctionne sur n'importe quel thread)
+                        action.Execute();
+                        
+                        // Notifier l'exécution de l'action immédiatement
+                        // L'utilisation de BeginInvoke dans MainWindow permet à l'UI de se mettre à jour
+                        var description = GetActionDescription(action);
+                        ActionExecuted?.Invoke(this, new ActionExecutedEventArgs
+                        {
+                            Action = action,
+                            ActionDescription = description
+                        });
+                        
+                        // Petit délai pour permettre à l'UI de se mettre à jour (asynchrone)
+                        // Nécessaire pour que les touches s'affichent touche par touche dans l'application
+                        await Task.Delay(10);
+                        await Task.Yield();
+                    }
                     
                     // Ne pas ajouter de délais supplémentaires entre les actions
                     // Les délais sont gérés uniquement par les DelayAction enregistrées lors de l'enregistrement

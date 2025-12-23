@@ -46,6 +46,16 @@ namespace MacroEngine.Core.Models
         public int DefaultDelay { get; set; } = 10; // ms
         public string ActiveProfileId { get; set; } = string.Empty;
         public Dictionary<string, object> GlobalSettings { get; set; } = new Dictionary<string, object>();
+        
+        /// <summary>
+        /// Code virtuel de la touche pour exécuter la macro sélectionnée (par défaut F10 = 0x79)
+        /// </summary>
+        public int ExecuteMacroKeyCode { get; set; } = 0x79; // F10 par défaut
+        
+        /// <summary>
+        /// Code virtuel de la touche pour arrêter la macro en cours (par défaut F11 = 0x7A)
+        /// </summary>
+        public int StopMacroKeyCode { get; set; } = 0x7A; // F11 par défaut
     }
 
     /// <summary>
