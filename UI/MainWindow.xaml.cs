@@ -38,6 +38,10 @@ namespace MacroEngine.UI
         // Hooks globaux pour exécution et arrêt de macro
         private KeyboardHook _globalExecuteHook;
         private KeyboardHook _globalStopHook;
+        
+        // Hook global pour les raccourcis par macro
+        private KeyboardHook _globalMacroShortcutsHook;
+        private Dictionary<int, Macro> _macroShortcuts = new Dictionary<int, Macro>();
         private bool _isRecording = false;
         private bool _isRecordingPaused = false;
         private DateTime _lastActionTime;
@@ -98,6 +102,10 @@ namespace MacroEngine.UI
             _globalExecuteHook.KeyDown += GlobalExecuteHook_KeyDown;
             _globalStopHook = new KeyboardHook();
             _globalStopHook.KeyDown += GlobalStopHook_KeyDown;
+            
+            // Initialiser le hook pour les raccourcis par macro
+            _globalMacroShortcutsHook = new KeyboardHook();
+            _globalMacroShortcutsHook.KeyDown += GlobalMacroShortcutsHook_KeyDown;
 
             InitializeEngine();
             InitializeAutoSave();
@@ -195,6 +203,7 @@ namespace MacroEngine.UI
             {
                 _globalExecuteHook.Uninstall();
                 _globalStopHook.Uninstall();
+                _globalMacroShortcutsHook.Uninstall();
             }
             catch { }
 
@@ -205,12 +214,84 @@ namespace MacroEngine.UI
                 {
                     _globalExecuteHook.Install();
                     _globalStopHook.Install();
+                    UpdateMacroShortcuts();
+                    _globalMacroShortcutsHook.Install();
                     _logger?.Debug($"Hooks globaux installés - Exécuter: VK{_appConfig?.ExecuteMacroKeyCode:X2}, Arrêter: VK{_appConfig?.StopMacroKeyCode:X2}", "MainWindow");
                 }
             }
             catch (Exception ex)
             {
                 _logger?.Error("Impossible d'installer les hooks globaux", ex, "MainWindow");
+            }
+        }
+
+        private void UpdateMacroShortcuts()
+        {
+            _macroShortcuts.Clear();
+            var conflicts = new List<(Macro macro, int keyCode)>();
+            
+            foreach (var macro in _macros)
+            {
+                if (macro.ShortcutKeyCode != 0 && macro.IsEnabled)
+                {
+                    // Vérifier les conflits avec les raccourcis globaux
+                    if (_appConfig != null && 
+                        (macro.ShortcutKeyCode == _appConfig.ExecuteMacroKeyCode || 
+                         macro.ShortcutKeyCode == _appConfig.StopMacroKeyCode))
+                    {
+                        _logger?.Warning($"Le raccourci de la macro '{macro.Name}' (VK{macro.ShortcutKeyCode:X2}) entre en conflit avec un raccourci global", "MainWindow");
+                        continue; // Ne pas ajouter ce raccourci
+                    }
+                    
+                    // Vérifier les conflits entre macros - si plusieurs macros ont le même raccourci, on prend la première
+                    if (!_macroShortcuts.ContainsKey(macro.ShortcutKeyCode))
+                    {
+                        _macroShortcuts[macro.ShortcutKeyCode] = macro;
+                    }
+                    else
+                    {
+                        conflicts.Add((macro, macro.ShortcutKeyCode));
+                        _logger?.Warning($"Conflit de raccourci détecté: plusieurs macros utilisent VK{macro.ShortcutKeyCode:X2}", "MainWindow");
+                    }
+                }
+            }
+            
+            // Afficher un message si des conflits sont détectés
+            if (conflicts.Count > 0)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    var conflictMessage = "Conflits de raccourcis détectés:\n" + 
+                        string.Join("\n", conflicts.Select(c => $"- '{c.macro.Name}' utilise {GetKeyNameForShortcut((ushort)c.keyCode)} (déjà utilisé)"));
+                    MessageBox.Show(conflictMessage, "Avertissement", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }), System.Windows.Threading.DispatcherPriority.Normal);
+            }
+            
+            _logger?.Debug($"{_macroShortcuts.Count} raccourci(s) de macro(s) enregistré(s)", "MainWindow");
+        }
+
+        private void GlobalMacroShortcutsHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        {
+            // Vérifier si cette touche correspond à un raccourci de macro
+            if (_macroShortcuts.TryGetValue(e.VirtualKeyCode, out var macro))
+            {
+                // Ne pas exécuter si on est en train d'enregistrer ou qu'une macro est déjà en cours
+                if (!_isRecording && _macroEngine.State == MacroEngineState.Idle)
+                {
+                    // Vérifier que ce n'est pas le raccourci global d'exécution ou d'arrêt
+                    if (_appConfig != null && 
+                        e.VirtualKeyCode != _appConfig.ExecuteMacroKeyCode && 
+                        e.VirtualKeyCode != _appConfig.StopMacroKeyCode)
+                    {
+                        e.Handled = true;
+                        Dispatcher.BeginInvoke(new Action(async () =>
+                        {
+                            _selectedMacro = macro;
+                            MacrosListBox.SelectedItem = macro;
+                            await ExecuteMacroAsync();
+                        }), System.Windows.Threading.DispatcherPriority.Normal);
+                    }
+                }
             }
         }
 
@@ -221,6 +302,7 @@ namespace MacroEngine.UI
             {
                 _globalExecuteHook.Uninstall();
                 _globalStopHook.Uninstall();
+                _globalMacroShortcutsHook.Uninstall();
                 _logger?.Debug("Hooks globaux désactivés", "MainWindow");
             }
             catch (Exception ex)
@@ -274,6 +356,58 @@ namespace MacroEngine.UI
         {
             // Déclencher la sauvegarde automatique quand la macro est modifiée
             TriggerAutoSave();
+            
+            // Vérifier les conflits de raccourcis avant de mettre à jour
+            if (_selectedMacro != null && _selectedMacro.ShortcutKeyCode != 0)
+            {
+                // Vérifier si le raccourci entre en conflit avec un raccourci global
+                if (_appConfig != null && 
+                    (_selectedMacro.ShortcutKeyCode == _appConfig.ExecuteMacroKeyCode || 
+                     _selectedMacro.ShortcutKeyCode == _appConfig.StopMacroKeyCode))
+                {
+                    _logger?.Warning($"Le raccourci de la macro '{_selectedMacro.Name}' entre en conflit avec un raccourci global", "MainWindow");
+                    MessageBox.Show(
+                        $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par un raccourci global.\nVeuillez choisir un autre raccourci.",
+                        "Conflit de raccourci",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    _selectedMacro.ShortcutKeyCode = 0; // Réinitialiser le raccourci
+                }
+                else
+                {
+                    // Vérifier les conflits avec d'autres macros
+                    var conflictingMacro = _macros.FirstOrDefault(m => 
+                        m.Id != _selectedMacro.Id && 
+                        m.ShortcutKeyCode == _selectedMacro.ShortcutKeyCode && 
+                        m.ShortcutKeyCode != 0);
+                    
+                    if (conflictingMacro != null)
+                    {
+                        _logger?.Warning($"Le raccourci de la macro '{_selectedMacro.Name}' entre en conflit avec '{conflictingMacro.Name}'", "MainWindow");
+                        MessageBox.Show(
+                            $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par la macro '{conflictingMacro.Name}'.\nVeuillez choisir un autre raccourci.",
+                            "Conflit de raccourci",
+                            MessageBoxButton.OK,
+                            MessageBoxImage.Warning);
+                        _selectedMacro.ShortcutKeyCode = 0; // Réinitialiser le raccourci
+                    }
+                }
+            }
+            
+            // Mettre à jour les raccourcis de macros
+            UpdateMacroShortcuts();
+            if (_appConfig?.EnableHooks == true)
+            {
+                try
+                {
+                    _globalMacroShortcutsHook.Uninstall();
+                    _globalMacroShortcutsHook.Install();
+                }
+                catch { }
+            }
+            
+            // Rafraîchir l'affichage de la liste pour mettre à jour les raccourcis
+            MacrosListBox.Items.Refresh();
         }
 
         private void GlobalExecuteHook_KeyDown(object sender, KeyboardHookEventArgs e)
@@ -561,6 +695,22 @@ namespace MacroEngine.UI
             }
         }
 
+        private void ShortcutTextBlock_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBlock textBlock && textBlock.DataContext is Macro macro)
+            {
+                if (macro.ShortcutKeyCode != 0)
+                {
+                    textBlock.Text = $"Raccourci: {GetKeyNameForShortcut((ushort)macro.ShortcutKeyCode)}";
+                }
+                else
+                {
+                    textBlock.Text = "";
+                    textBlock.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
         private void MacrosListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _selectedMacro = MacrosListBox.SelectedItem as Macro;
@@ -584,17 +734,17 @@ namespace MacroEngine.UI
         private async System.Threading.Tasks.Task ExecuteMacroAsync()
         {
             try
+        {
+            if (_selectedMacro == null)
             {
-                if (_selectedMacro == null)
-                {
                     Dispatcher.Invoke(() =>
                     {
                         StatusText.Text = "Aucune macro sélectionnée";
                         StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                        MessageBox.Show("Veuillez sélectionner une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Veuillez sélectionner une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                     });
-                    return;
-                }
+                return;
+            }
 
                 if (_selectedMacro.Actions == null || _selectedMacro.Actions.Count == 0)
                 {

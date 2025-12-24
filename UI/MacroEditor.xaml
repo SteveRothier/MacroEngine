@@ -31,6 +31,27 @@
                 <TextBlock Text="Description:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <TextBox x:Name="MacroDescriptionTextBox" Grid.Column="1" Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}" TextWrapping="Wrap" Height="60"/>
             </Grid>
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Raccourci:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <TextBox x:Name="ShortcutKeyTextBox" 
+                         Grid.Column="1"
+                         IsReadOnly="True"
+                         PreviewKeyDown="ShortcutKeyTextBox_PreviewKeyDown"
+                         KeyDown="ShortcutKeyTextBox_KeyDown"
+                         GotFocus="ShortcutKeyTextBox_GotFocus"
+                         LostFocus="ShortcutKeyTextBox_LostFocus"
+                         Margin="0,0,10,0"/>
+                <Button x:Name="CaptureShortcutKeyButton" 
+                        Grid.Column="2"
+                        Content="Modifier"
+                        Click="CaptureShortcutKeyButton_Click"
+                        Width="80"/>
+            </Grid>
         </StackPanel>
 
         <!-- Liste des actions -->

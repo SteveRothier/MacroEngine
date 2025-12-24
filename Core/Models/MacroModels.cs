@@ -18,6 +18,11 @@ namespace MacroEngine.Core.Models
         public int DelayBetweenRepeats { get; set; } = 0;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime ModifiedAt { get; set; } = DateTime.Now;
+        
+        /// <summary>
+        /// Code virtuel de la touche pour exécuter cette macro (0 = aucun raccourci)
+        /// </summary>
+        public int ShortcutKeyCode { get; set; } = 0;
     }
 
     /// <summary>

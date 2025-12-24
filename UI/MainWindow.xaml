@@ -57,6 +57,7 @@
                                 <StackPanel>
                                     <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
                                     <TextBlock Text="{Binding Description}" FontSize="10" Foreground="Gray"/>
+                                    <TextBlock x:Name="ShortcutTextBlock" FontSize="9" Foreground="Blue" Margin="0,2,0,0" Loaded="ShortcutTextBlock_Loaded"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
