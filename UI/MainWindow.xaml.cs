@@ -26,7 +26,7 @@ namespace MacroEngine.UI
         private readonly ConfigStorage _configStorage;
         private readonly ObservableCollection<LogEntry> _logEntries;
         private List<Macro> _macros;
-        private Macro _selectedMacro;
+        private Macro? _selectedMacro;
         private MacroEditor _macroEditor;
         private LogsWindow? _logsWindow;
         private MacroEngineConfig _appConfig;
@@ -270,7 +270,7 @@ namespace MacroEngine.UI
             _logger?.Debug($"{_macroShortcuts.Count} raccourci(s) de macro(s) enregistré(s)", "MainWindow");
         }
 
-        private void GlobalMacroShortcutsHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        private void GlobalMacroShortcutsHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
             // Vérifier si cette touche correspond à un raccourci de macro
             if (_macroShortcuts.TryGetValue(e.VirtualKeyCode, out var macro))
@@ -318,9 +318,9 @@ namespace MacroEngine.UI
             _autoSaveTimer.Tick += AutoSaveTimer_Tick;
         }
 
-        private async void AutoSaveTimer_Tick(object sender, EventArgs e)
+        private async void AutoSaveTimer_Tick(object? sender, EventArgs e)
         {
-            _autoSaveTimer.Stop();
+            _autoSaveTimer?.Stop();
             
             if (_selectedMacro != null && _macros.Contains(_selectedMacro))
             {
@@ -344,7 +344,7 @@ namespace MacroEngine.UI
 
         private void TriggerAutoSave()
         {
-            if (_selectedMacro == null)
+            if (_selectedMacro == null || _autoSaveTimer == null)
                 return;
 
             // Redémarrer le timer : sauvegarder après AUTO_SAVE_DELAY_MS de non-modification
@@ -352,7 +352,7 @@ namespace MacroEngine.UI
             _autoSaveTimer.Start();
         }
 
-        private void MacroEditor_MacroModified(object sender, EventArgs e)
+        private void MacroEditor_MacroModified(object? sender, EventArgs e)
         {
             // Déclencher la sauvegarde automatique quand la macro est modifiée
             TriggerAutoSave();
@@ -410,7 +410,7 @@ namespace MacroEngine.UI
             MacrosListBox.Items.Refresh();
         }
 
-        private void GlobalExecuteHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        private void GlobalExecuteHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
             // Vérifier que c'est le raccourci configuré pour exécuter et qu'on n'est pas en train d'enregistrer
             if (_appConfig != null && 
@@ -426,7 +426,7 @@ namespace MacroEngine.UI
             }
         }
 
-        private void GlobalStopHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        private void GlobalStopHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
             // Vérifier que c'est le raccourci configuré pour arrêter
             if (_appConfig != null && e.VirtualKeyCode == _appConfig.StopMacroKeyCode)
@@ -457,7 +457,7 @@ namespace MacroEngine.UI
             _macroEngine.ActionExecuted += MacroEngine_ActionExecuted;
         }
 
-        private void MacroEngine_StateChanged(object sender, MacroEngineEventArgs e)
+        private void MacroEngine_StateChanged(object? sender, MacroEngineEventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -475,7 +475,7 @@ namespace MacroEngine.UI
             });
         }
 
-        private void MacroEngine_ErrorOccurred(object sender, MacroEngineErrorEventArgs e)
+        private void MacroEngine_ErrorOccurred(object? sender, MacroEngineErrorEventArgs e)
         {
             Dispatcher.Invoke(() =>
             {
@@ -484,7 +484,7 @@ namespace MacroEngine.UI
             });
         }
 
-        private void MacroEngine_ActionExecuted(object sender, ActionExecutedEventArgs e)
+        private void MacroEngine_ActionExecuted(object? sender, ActionExecutedEventArgs e)
         {
             // Utiliser BeginInvoke avec priorité basse pour permettre à l'UI de se mettre à jour
             // Cela permet au texte de s'afficher touche par touche dans la zone de test
@@ -722,7 +722,7 @@ namespace MacroEngine.UI
             else
             {
                 // Vider l'éditeur si aucune macro sélectionnée
-                _macroEditor.LoadMacro(null);
+                _macroEditor.LoadMacro(null!); // null! car LoadMacro accepte null
             }
         }
 
@@ -863,7 +863,7 @@ namespace MacroEngine.UI
             _keyDownTimes.Clear();
 
             // Initialiser la liste d'actions si nécessaire
-            if (_selectedMacro.Actions == null)
+            if (_selectedMacro?.Actions == null)
             {
                 _selectedMacro.Actions = new List<IInputAction>();
             }
@@ -929,7 +929,7 @@ namespace MacroEngine.UI
 
             // Mettre à jour l'interface
             StartButton.Content = "● Enregistrer";
-            StatusText.Text = $"Enregistrement terminé. {_selectedMacro.Actions.Count} action(s) enregistrée(s)";
+            StatusText.Text = $"Enregistrement terminé. {_selectedMacro?.Actions?.Count ?? 0} action(s) enregistrée(s)";
             ExecuteButton.IsEnabled = _macroEngine.State == MacroEngineState.Idle; // Réactiver l'exécution si le moteur est inactif
             PauseButton.IsEnabled = false;
             StopButton.IsEnabled = false;
@@ -941,11 +941,14 @@ namespace MacroEngine.UI
             }
 
             // Sauvegarder automatiquement après l'enregistrement
-            _selectedMacro.ModifiedAt = DateTime.Now;
-            _ = _macroStorage.SaveMacrosAsync(_macros);
+            if (_selectedMacro != null)
+            {
+                _selectedMacro.ModifiedAt = DateTime.Now;
+                _ = _macroStorage.SaveMacrosAsync(_macros);
+            }
         }
 
-        private void KeyboardHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        private void KeyboardHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
             if (!_isRecording || _isRecordingPaused)
                 return;
@@ -1134,7 +1137,7 @@ namespace MacroEngine.UI
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
-        private void KeyboardHook_KeyUp(object sender, KeyboardHookEventArgs e)
+        private void KeyboardHook_KeyUp(object? sender, KeyboardHookEventArgs e)
         {
             if (!_isRecording || _isRecordingPaused)
                 return;
@@ -1150,7 +1153,7 @@ namespace MacroEngine.UI
             }), System.Windows.Threading.DispatcherPriority.Normal);
         }
 
-        private void MouseHook_MouseDown(object sender, MouseHookEventArgs e)
+        private void MouseHook_MouseDown(object? sender, MouseHookEventArgs e)
         {
             if (!_isRecording || _isRecordingPaused)
                 return;
@@ -1251,7 +1254,7 @@ namespace MacroEngine.UI
             }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
-        private void MouseHook_MouseUp(object sender, MouseHookEventArgs e)
+        private void MouseHook_MouseUp(object? sender, MouseHookEventArgs e)
         {
             // Les clics sont déjà gérés dans MouseDown avec LeftClick/RightClick
         }

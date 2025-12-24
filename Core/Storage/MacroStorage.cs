@@ -58,7 +58,8 @@ namespace MacroEngine.Core.Storage
                     RepeatCount = m.RepeatCount,
                     DelayBetweenRepeats = m.DelayBetweenRepeats,
                     CreatedAt = m.CreatedAt,
-                    ModifiedAt = m.ModifiedAt
+                    ModifiedAt = m.ModifiedAt,
+                    ShortcutKeyCode = m.ShortcutKeyCode
                 }).ToList() ?? new List<Macro>();
                 
                 _logger?.Info($"{macros.Count} macro(s) chargée(s) depuis {_macrosFilePath}", "MacroStorage");
@@ -86,7 +87,7 @@ namespace MacroEngine.Core.Storage
                     _logger?.Debug($"Dossier créé: {directory}", "MacroStorage");
                 }
 
-                var macrosData = macros.Select(m => new MacroData
+                var macrosData = (macros ?? new List<Macro>()).Select(m => new MacroData
                 {
                     Id = m.Id,
                     Name = m.Name,
@@ -96,7 +97,8 @@ namespace MacroEngine.Core.Storage
                     RepeatCount = m.RepeatCount,
                     DelayBetweenRepeats = m.DelayBetweenRepeats,
                     CreatedAt = m.CreatedAt,
-                    ModifiedAt = m.ModifiedAt
+                    ModifiedAt = m.ModifiedAt,
+                    ShortcutKeyCode = m.ShortcutKeyCode
                 }).ToList();
 
                 var options = new JsonSerializerOptions
@@ -107,7 +109,7 @@ namespace MacroEngine.Core.Storage
 
                 string json = JsonSerializer.Serialize(macrosData, options);
                 await File.WriteAllTextAsync(_macrosFilePath, json);
-                _logger?.Info($"{macros.Count} macro(s) sauvegardée(s) avec succès vers {_macrosFilePath}", "MacroStorage");
+                _logger?.Info($"{(macros?.Count ?? 0)} macro(s) sauvegardée(s) avec succès vers {_macrosFilePath}", "MacroStorage");
             }
             catch (Exception ex)
             {
@@ -154,7 +156,8 @@ namespace MacroEngine.Core.Storage
                     RepeatCount = macro.RepeatCount,
                     DelayBetweenRepeats = macro.DelayBetweenRepeats,
                     CreatedAt = macro.CreatedAt,
-                    ModifiedAt = macro.ModifiedAt
+                    ModifiedAt = macro.ModifiedAt,
+                    ShortcutKeyCode = macro.ShortcutKeyCode
                 };
 
                 var options = new JsonSerializerOptions
@@ -214,7 +217,8 @@ namespace MacroEngine.Core.Storage
                     RepeatCount = macroData.RepeatCount,
                     DelayBetweenRepeats = macroData.DelayBetweenRepeats,
                     CreatedAt = macroData.CreatedAt,
-                    ModifiedAt = DateTime.Now
+                    ModifiedAt = DateTime.Now,
+                    ShortcutKeyCode = macroData.ShortcutKeyCode
                 };
 
                 _logger?.Info($"Macro '{importedMacro.Name}' importée avec succès depuis {filePath}", "MacroStorage");
@@ -229,15 +233,16 @@ namespace MacroEngine.Core.Storage
 
         private class MacroData
         {
-            public string Id { get; set; }
-            public string Name { get; set; }
-            public string Description { get; set; }
-            public List<IInputAction> Actions { get; set; }
+            public string Id { get; set; } = string.Empty;
+            public string Name { get; set; } = string.Empty;
+            public string Description { get; set; } = string.Empty;
+            public List<IInputAction> Actions { get; set; } = new List<IInputAction>();
             public bool IsEnabled { get; set; }
             public int RepeatCount { get; set; }
             public int DelayBetweenRepeats { get; set; }
             public DateTime CreatedAt { get; set; }
             public DateTime ModifiedAt { get; set; }
+            public int ShortcutKeyCode { get; set; } = 0;
         }
 
         /// <summary>
@@ -254,11 +259,13 @@ namespace MacroEngine.Core.Storage
                     // Détecter le type en fonction des propriétés présentes
                     if (root.TryGetProperty("VirtualKeyCode", out _))
                     {
-                        return JsonSerializer.Deserialize<KeyboardAction>(root.GetRawText(), options);
+                        return JsonSerializer.Deserialize<KeyboardAction>(root.GetRawText(), options) 
+                            ?? throw new InvalidOperationException("Impossible de désérialiser KeyboardAction");
                     }
                     else if (root.TryGetProperty("Duration", out _))
                     {
-                        return JsonSerializer.Deserialize<DelayAction>(root.GetRawText(), options);
+                        return JsonSerializer.Deserialize<DelayAction>(root.GetRawText(), options)
+                            ?? throw new InvalidOperationException("Impossible de désérialiser DelayAction");
                     }
                     else if (root.TryGetProperty("ActionType", out var actionTypeProp))
                     {
@@ -266,7 +273,8 @@ namespace MacroEngine.Core.Storage
                         var actionTypeStr = actionTypeProp.GetString();
                         if (actionTypeStr != null && Enum.TryParse<MouseActionType>(actionTypeStr, out _))
                         {
-                            return JsonSerializer.Deserialize<MouseAction>(root.GetRawText(), options);
+                            return JsonSerializer.Deserialize<MouseAction>(root.GetRawText(), options)
+                                ?? throw new InvalidOperationException("Impossible de désérialiser MouseAction");
                         }
                     }
                     
