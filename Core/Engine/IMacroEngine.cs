@@ -34,7 +34,7 @@ namespace MacroEngine.Core.Engine
         /// <summary>
         /// Macro actuellement en cours d'exécution
         /// </summary>
-        Macro CurrentMacro { get; }
+        Macro? CurrentMacro { get; }
 
         /// <summary>
         /// Configuration du moteur
@@ -85,7 +85,7 @@ namespace MacroEngine.Core.Engine
     {
         public MacroEngineState PreviousState { get; set; }
         public MacroEngineState CurrentState { get; set; }
-        public Macro Macro { get; set; }
+        public Macro? Macro { get; set; }
     }
 
     /// <summary>
@@ -93,9 +93,9 @@ namespace MacroEngine.Core.Engine
     /// </summary>
     public class MacroEngineErrorEventArgs : EventArgs
     {
-        public Exception Exception { get; set; }
-        public string Message { get; set; }
-        public Macro Macro { get; set; }
+        public Exception? Exception { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public Macro? Macro { get; set; }
     }
 
     /// <summary>
@@ -103,8 +103,8 @@ namespace MacroEngine.Core.Engine
     /// </summary>
     public class ActionExecutedEventArgs : EventArgs
     {
-        public IInputAction Action { get; set; }
-        public string ActionDescription { get; set; }
+        public IInputAction? Action { get; set; }
+        public string ActionDescription { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; } = DateTime.Now;
     }
 }

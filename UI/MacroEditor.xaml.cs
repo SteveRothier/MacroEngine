@@ -45,7 +45,7 @@ namespace MacroEngine.UI
             }
         }
 
-        private void KeyboardHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        private void KeyboardHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
             // Capturer F10 via le hook bas niveau même pendant la capture
             if (_isCapturingShortcutKey && e.VirtualKeyCode == 0x79) // VK_F10

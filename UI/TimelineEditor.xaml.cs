@@ -9,7 +9,7 @@ namespace MacroEngine.UI
 {
     public partial class TimelineEditor : UserControl
     {
-        private Macro _currentMacro;
+        private Macro? _currentMacro;
         private double _zoomLevel = 1.0;
         private double _timeScale = 10.0; // pixels par milliseconde
 

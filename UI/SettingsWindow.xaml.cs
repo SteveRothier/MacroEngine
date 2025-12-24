@@ -15,7 +15,7 @@ namespace MacroEngine.UI
         private bool _isCapturingStopKey = false;
         private KeyboardHook _keyboardHook;
 
-        public MacroEngineConfig Config { get; private set; }
+        public MacroEngineConfig Config { get; private set; } = new MacroEngineConfig();
 
         public SettingsWindow(MacroEngineConfig config)
         {
@@ -45,7 +45,7 @@ namespace MacroEngine.UI
             base.OnClosing(e);
         }
 
-        private void KeyboardHook_KeyDown(object sender, KeyboardHookEventArgs e)
+        private void KeyboardHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
             // Capturer F10 via le hook bas niveau même pendant la capture
             if (_isCapturingExecuteKey && e.VirtualKeyCode == 0x79) // VK_F10

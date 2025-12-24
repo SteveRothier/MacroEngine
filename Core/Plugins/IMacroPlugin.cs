@@ -49,8 +49,8 @@ namespace MacroEngine.Core.Plugins
     /// </summary>
     public class PluginEventArgs : EventArgs
     {
-        public string EventName { get; set; }
-        public object Data { get; set; }
+        public string EventName { get; set; } = string.Empty;
+        public object? Data { get; set; }
     }
 }
 

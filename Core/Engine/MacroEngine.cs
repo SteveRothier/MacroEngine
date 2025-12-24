@@ -64,7 +64,7 @@ namespace MacroEngine.Core.Engine
             }
         }
 
-        public Macro CurrentMacro => _currentMacro;
+        public Macro? CurrentMacro => _currentMacro;
         public MacroEngineConfig Config { get; set; } = new MacroEngineConfig();
 
         public async Task<bool> StartMacroAsync(Macro macro)
@@ -118,7 +118,7 @@ namespace MacroEngine.Core.Engine
                 {
                     _logger?.Info($"Macro '{macro.Name}' terminée", "MacroEngine");
                     State = MacroEngineState.Idle;
-                    _currentMacro = null;
+                    _currentMacro = null!;
                     _cancellationTokenSource?.Dispose();
                     _cancellationTokenSource = null;
                 }

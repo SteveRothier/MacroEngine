@@ -7,8 +7,8 @@ namespace MacroEngine.UI
 {
     public partial class ProfileEditor : UserControl
     {
-        private MacroProfile _currentProfile;
-        private System.Collections.Generic.List<Macro> _availableMacros;
+        private MacroProfile? _currentProfile;
+        private System.Collections.Generic.List<Macro>? _availableMacros;
 
         public ProfileEditor()
         {

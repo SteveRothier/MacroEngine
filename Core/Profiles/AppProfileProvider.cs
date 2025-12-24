@@ -15,7 +15,7 @@ namespace MacroEngine.Core.Profiles
     {
         private readonly string _profilesFilePath;
         private List<MacroProfile> _profiles;
-        private MacroProfile _activeProfile;
+        private MacroProfile? _activeProfile;
 
         public AppProfileProvider(string profilesFilePath = "Data/profiles.json")
         {
@@ -53,7 +53,7 @@ namespace MacroEngine.Core.Profiles
                     ModifiedAt = p.ModifiedAt
                 }).ToList() ?? new List<MacroProfile>();
 
-                _activeProfile = _profiles.FirstOrDefault(p => p.IsActive);
+                _activeProfile = _profiles.FirstOrDefault(p => p.IsActive)!;
 
                 return _profiles;
             }
@@ -114,7 +114,7 @@ namespace MacroEngine.Core.Profiles
         public Task<MacroProfile> GetProfileAsync(string profileId)
         {
             var profile = _profiles.FirstOrDefault(p => p.Id == profileId);
-            return Task.FromResult(profile);
+            return Task.FromResult(profile!);
         }
 
         public async Task<bool> ActivateProfileAsync(string profileId)
@@ -152,7 +152,7 @@ namespace MacroEngine.Core.Profiles
                     profile.IsActive = false;
                 }
 
-                _activeProfile = null;
+                _activeProfile = null!;
                 await SaveAllProfilesAsync();
                 return true;
             }
@@ -200,12 +200,12 @@ namespace MacroEngine.Core.Profiles
 
         private class MacroProfileData
         {
-            public string Id { get; set; }
-            public string Name { get; set; }
-            public string Description { get; set; }
-            public List<string> MacroIds { get; set; }
+            public string Id { get; set; } = string.Empty;
+            public string Name { get; set; } = string.Empty;
+            public string Description { get; set; } = string.Empty;
+            public List<string> MacroIds { get; set; } = new List<string>();
             public bool IsActive { get; set; }
-            public Dictionary<string, object> Settings { get; set; }
+            public Dictionary<string, object> Settings { get; set; } = new Dictionary<string, object>();
             public DateTime CreatedAt { get; set; }
             public DateTime ModifiedAt { get; set; }
         }

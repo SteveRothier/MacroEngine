@@ -18,11 +18,11 @@ namespace MacroEngine.Core.Hooks
         private IntPtr _hookId = IntPtr.Zero;
         private bool _isEnabled = false;
 
-        public event EventHandler<KeyboardHookEventArgs> KeyDown;
-        public event EventHandler<KeyboardHookEventArgs> KeyUp;
-        public event EventHandler<MouseHookEventArgs> MouseDown;
-        public event EventHandler<MouseHookEventArgs> MouseUp;
-        public event EventHandler<MouseHookEventArgs> MouseMove;
+        public event EventHandler<KeyboardHookEventArgs>? KeyDown;
+        public event EventHandler<KeyboardHookEventArgs>? KeyUp;
+        public event EventHandler<MouseHookEventArgs>? MouseDown;
+        public event EventHandler<MouseHookEventArgs>? MouseUp;
+        public event EventHandler<MouseHookEventArgs>? MouseMove;
 
         public bool IsEnabled
         {
@@ -71,7 +71,7 @@ namespace MacroEngine.Core.Hooks
             using (var curModule = curProcess.MainModule)
             {
                 return SetWindowsHookEx(WH_KEYBOARD_LL, proc,
-                    GetModuleHandle(curModule.ModuleName), 0);
+                    GetModuleHandle(curModule?.ModuleName ?? string.Empty), 0);
             }
         }
 

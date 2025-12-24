@@ -565,7 +565,7 @@ namespace MacroEngine.UI
                 if (_macros.Count > 0)
                 {
                     // Forcer la sélection de la première macro
-                    this.Dispatcher.BeginInvoke(new Action(() =>
+                    _ = this.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         MacrosListBox.SelectedIndex = 0;
                         _selectedMacro = _macros[0];
@@ -746,7 +746,7 @@ namespace MacroEngine.UI
                 return;
             }
 
-                if (_selectedMacro.Actions == null || _selectedMacro.Actions.Count == 0)
+                if (_selectedMacro?.Actions == null || _selectedMacro.Actions.Count == 0)
                 {
                     Dispatcher.Invoke(() =>
                     {
@@ -863,7 +863,7 @@ namespace MacroEngine.UI
             _keyDownTimes.Clear();
 
             // Initialiser la liste d'actions si nécessaire
-            if (_selectedMacro?.Actions == null)
+            if (_selectedMacro != null && _selectedMacro.Actions == null)
             {
                 _selectedMacro.Actions = new List<IInputAction>();
             }
@@ -1026,7 +1026,7 @@ namespace MacroEngine.UI
                     }
 
                     // Vérifier que la liste d'actions existe
-                    if (_selectedMacro.Actions == null)
+                    if (_selectedMacro != null && _selectedMacro.Actions == null)
                     {
                         _selectedMacro.Actions = new List<IInputAction>();
                     }
@@ -1176,7 +1176,7 @@ namespace MacroEngine.UI
                         return;
 
                     // Vérifier que la liste d'actions existe
-                    if (_selectedMacro.Actions == null)
+                    if (_selectedMacro != null && _selectedMacro.Actions == null)
                     {
                         _selectedMacro.Actions = new List<IInputAction>();
                     }
@@ -1200,7 +1200,10 @@ namespace MacroEngine.UI
                         Y = y
                     };
 
-                    _selectedMacro.Actions.Add(mouseAction);
+                    if (_selectedMacro != null)
+                    {
+                        _selectedMacro.Actions.Add(mouseAction);
+                    }
                     _lastActionTime = timestamp;
                     
                     // Déclencher la sauvegarde automatique
@@ -1229,7 +1232,7 @@ namespace MacroEngine.UI
                         items.RemoveAt(0);
                     }
 
-                    ActionsCountText.Text = $"{_selectedMacro.Actions.Count} action(s)";
+                    ActionsCountText.Text = $"{_selectedMacro?.Actions?.Count ?? 0} action(s)";
                     
                     // Scroller vers le bas uniquement de temps en temps pour éviter la surcharge
                     if (ActionsListBox.Items.Count > 0 && ActionsListBox.Items.Count % 5 == 0)
@@ -1265,7 +1268,7 @@ namespace MacroEngine.UI
             if (RecordDelaysCheckBox.IsChecked == false)
                 return;
 
-            if (_selectedMacro.Actions.Count > 0)
+            if (_selectedMacro != null && _selectedMacro.Actions?.Count > 0)
             {
                 var elapsed = (DateTime.Now - _lastActionTime).TotalMilliseconds;
                 if (elapsed > 50) // Ajouter un délai si plus de 50ms entre les actions
@@ -1275,7 +1278,10 @@ namespace MacroEngine.UI
                         Name = $"Délai {elapsed:F0}ms",
                         Duration = (int)elapsed
                     };
-                    _selectedMacro.Actions.Add(delayAction);
+                    if (_selectedMacro != null)
+                    {
+                        _selectedMacro.Actions.Add(delayAction);
+                    }
                 }
             }
         }
