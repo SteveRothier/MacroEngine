@@ -597,7 +597,7 @@ namespace MacroEngine.UI
             // Appuyer sur 'H'
             actions.Add(new MacroEngine.Core.Inputs.KeyboardAction
             {
-                Name = "Touche H",
+                Name = "H",
                 VirtualKeyCode = 0x48, // H
                 ActionType = MacroEngine.Core.Inputs.KeyboardActionType.Press
             });
@@ -605,14 +605,14 @@ namespace MacroEngine.UI
             // Délai
             actions.Add(new MacroEngine.Core.Inputs.DelayAction
             {
-                Name = "Délai 200ms",
+                Name = "200ms",
                 Duration = 200
             });
 
             // Appuyer sur 'e'
             actions.Add(new MacroEngine.Core.Inputs.KeyboardAction
             {
-                Name = "Touche E",
+                Name = "E",
                 VirtualKeyCode = 0x45, // E
                 ActionType = MacroEngine.Core.Inputs.KeyboardActionType.Press
             });
@@ -620,14 +620,14 @@ namespace MacroEngine.UI
             // Délai
             actions.Add(new MacroEngine.Core.Inputs.DelayAction
             {
-                Name = "Délai 200ms",
+                Name = "200ms",
                 Duration = 200
             });
 
             // Appuyer sur 'l'
             actions.Add(new MacroEngine.Core.Inputs.KeyboardAction
             {
-                Name = "Touche L",
+                Name = "L",
                 VirtualKeyCode = 0x4C, // L
                 ActionType = MacroEngine.Core.Inputs.KeyboardActionType.Press
             });
@@ -635,14 +635,14 @@ namespace MacroEngine.UI
             // Délai
             actions.Add(new MacroEngine.Core.Inputs.DelayAction
             {
-                Name = "Délai 200ms",
+                Name = "200ms",
                 Duration = 200
             });
 
             // Appuyer sur 'l'
             actions.Add(new MacroEngine.Core.Inputs.KeyboardAction
             {
-                Name = "Touche L",
+                Name = "L",
                 VirtualKeyCode = 0x4C, // L
                 ActionType = MacroEngine.Core.Inputs.KeyboardActionType.Press
             });
@@ -650,14 +650,14 @@ namespace MacroEngine.UI
             // Délai
             actions.Add(new MacroEngine.Core.Inputs.DelayAction
             {
-                Name = "Délai 200ms",
+                Name = "200ms",
                 Duration = 200
             });
 
             // Appuyer sur 'o'
             actions.Add(new MacroEngine.Core.Inputs.KeyboardAction
             {
-                Name = "Touche O",
+                Name = "O",
                 VirtualKeyCode = 0x4F, // O
                 ActionType = MacroEngine.Core.Inputs.KeyboardActionType.Press
             });
@@ -1040,7 +1040,7 @@ namespace MacroEngine.UI
                     // Créer une action clavier
                     var keyboardAction = new KeyboardAction
                     {
-                        Name = $"Touche {GetKeyName((ushort)keyCode)}",
+                        Name = GetKeyName((ushort)keyCode),
                         VirtualKeyCode = (ushort)keyCode,
                         ActionType = KeyboardActionType.Press
                     };
@@ -1275,7 +1275,7 @@ namespace MacroEngine.UI
                 {
                     var delayAction = new DelayAction
                     {
-                        Name = $"Délai {elapsed:F0}ms",
+                        Name = $"{elapsed:F0}ms",
                         Duration = (int)elapsed
                     };
                     if (_selectedMacro != null)
