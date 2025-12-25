@@ -45,12 +45,19 @@ namespace MacroEngine.UI
             var selectedMacros = ProfileMacrosListBox.SelectedItems.Cast<Macro>().ToList();
             foreach (var macro in selectedMacros)
             {
-                _currentProfile.MacroIds.Remove(macro.Id);
+                _currentProfile?.MacroIds.Remove(macro.Id);
             }
 
-            var profileMacros = _availableMacros.Where(m => _currentProfile.MacroIds.Contains(m.Id)).ToList();
-            ProfileMacrosListBox.ItemsSource = null;
-            ProfileMacrosListBox.ItemsSource = profileMacros;
+            if (_availableMacros != null && _currentProfile != null)
+            {
+                var profileMacros = _availableMacros.Where(m => _currentProfile.MacroIds.Contains(m.Id)).ToList();
+                ProfileMacrosListBox.ItemsSource = null;
+                ProfileMacrosListBox.ItemsSource = profileMacros;
+            }
+            else
+            {
+                ProfileMacrosListBox.ItemsSource = null;
+            }
         }
 
         private async void SaveProfile_Click(object sender, RoutedEventArgs e)
@@ -68,7 +75,10 @@ namespace MacroEngine.UI
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
             // Recharger les données
-            LoadProfile(_currentProfile, _availableMacros);
+            if (_currentProfile != null && _availableMacros != null)
+            {
+                LoadProfile(_currentProfile, _availableMacros);
+            }
         }
     }
 }

@@ -12,14 +12,14 @@ namespace MacroEngine.UI
 {
     public partial class MacroEditor : UserControl
     {
-        private Macro _currentMacro;
+        private Macro? _currentMacro;
         private Stack<List<IInputAction>> _undoStack = new Stack<List<IInputAction>>();
         private Stack<List<IInputAction>> _redoStack = new Stack<List<IInputAction>>();
         private bool _isUndoRedo = false;
         private bool _isCapturingShortcutKey = false;
         private KeyboardHook _keyboardHook;
 
-        public event EventHandler MacroModified;
+        public event EventHandler? MacroModified;
 
         public MacroEditor()
         {

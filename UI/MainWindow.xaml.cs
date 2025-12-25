@@ -58,7 +58,7 @@ namespace MacroEngine.UI
         private volatile int _recordingInProgress = 0;
         
         // Timer pour la sauvegarde automatique
-        private System.Windows.Threading.DispatcherTimer _autoSaveTimer;
+        private System.Windows.Threading.DispatcherTimer? _autoSaveTimer;
         private const int AUTO_SAVE_DELAY_MS = 2000; // Sauvegarder 2 secondes après la dernière modification
 
         public MainWindow()
@@ -1045,7 +1045,10 @@ namespace MacroEngine.UI
                         ActionType = KeyboardActionType.Press
                     };
 
-                    _selectedMacro.Actions.Add(keyboardAction);
+                    if (_selectedMacro != null && _selectedMacro.Actions != null)
+                    {
+                        _selectedMacro.Actions.Add(keyboardAction);
+                    }
                     _lastActionTime = timestamp;
 
                     // Afficher dans la zone d'actions
@@ -1075,7 +1078,7 @@ namespace MacroEngine.UI
                         }
 
                         // Mettre à jour le compteur seulement tous les 10 éléments pour réduire la charge
-                        if (items.Count % 10 == 0 && ActionsCountText != null)
+                        if (items.Count % 10 == 0 && ActionsCountText != null && _selectedMacro != null)
                         {
                             try
                             {

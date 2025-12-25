@@ -15,15 +15,15 @@ namespace MacroEngine.Core.Engine
     public class MacroEngine : IMacroEngine
     {
         private MacroEngineState _state = MacroEngineState.Idle;
-        private Macro _currentMacro;
-        private CancellationTokenSource _cancellationTokenSource;
+        private Macro? _currentMacro;
+        private CancellationTokenSource? _cancellationTokenSource;
         private readonly TimingEngine _timingEngine;
         private readonly object _lockObject = new object();
         private readonly ILogger? _logger;
 
-        public event EventHandler<MacroEngineEventArgs> StateChanged;
-        public event EventHandler<MacroEngineErrorEventArgs> ErrorOccurred;
-        public event EventHandler<ActionExecutedEventArgs> ActionExecuted;
+        public event EventHandler<MacroEngineEventArgs>? StateChanged;
+        public event EventHandler<MacroEngineErrorEventArgs>? ErrorOccurred;
+        public event EventHandler<ActionExecutedEventArgs>? ActionExecuted;
 
         public MacroEngine(ILogger? logger = null)
         {
@@ -118,7 +118,7 @@ namespace MacroEngine.Core.Engine
                 {
                     _logger?.Info($"Macro '{macro.Name}' terminée", "MacroEngine");
                     State = MacroEngineState.Idle;
-                    _currentMacro = null!;
+                    _currentMacro = null;
                     _cancellationTokenSource?.Dispose();
                     _cancellationTokenSource = null;
                 }

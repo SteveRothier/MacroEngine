@@ -22,8 +22,10 @@ namespace MacroEngine.Core.Hooks
         private IntPtr _hookId = IntPtr.Zero;
         private bool _isEnabled = false;
 
+#pragma warning disable CS0067 // Event is never used
         public event EventHandler<KeyboardHookEventArgs>? KeyDown;
         public event EventHandler<KeyboardHookEventArgs>? KeyUp;
+#pragma warning restore CS0067
         public event EventHandler<MouseHookEventArgs>? MouseDown;
         public event EventHandler<MouseHookEventArgs>? MouseUp;
         public event EventHandler<MouseHookEventArgs>? MouseMove;
