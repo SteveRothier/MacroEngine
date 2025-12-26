@@ -86,8 +86,7 @@ MacroEngine
 │  ├─ MacroEditor    # Éditeur de macros
 │  ├─ MainWindow     # Fenêtre principale
 │  ├─ ProfileEditor  # Éditeur de profils
-│  ├─ SettingsWindow # Fenêtre de configuration
-│  └─ TimelineEditor # Éditeur de timeline
+│  └─ SettingsWindow # Fenêtre de configuration
 ├─ Data              # Fichiers de données
 │  ├─ macros.json    # Macros sauvegardées
 │  ├─ config.json    # Configuration de l'application
