@@ -60,7 +60,10 @@
                   Margin="10"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
-                  SelectionMode="Single">
+                  SelectionMode="Single"
+                  PreviewKeyDown="ActionsDataGrid_PreviewKeyDown"
+                  CellEditEnding="ActionsDataGrid_CellEditEnding"
+                  BeginningEdit="ActionsDataGrid_BeginningEdit">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="100" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Nom" Binding="{Binding Name}" Width="*"/>

@@ -513,6 +513,210 @@ namespace MacroEngine.UI
             // Cette méthode sera appelée depuis MainWindow après que toutes les macros soient chargées
             // Pour l'instant, on ne fait rien ici - la validation se fera dans MainWindow
         }
+
+        private bool _isEditingCell = false;
+        private IInputAction? _actionBeforeEdit = null;
+
+        private void ActionsDataGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+        {
+            if (_currentMacro == null || e.Row.Item is not IInputAction action)
+                return;
+
+            if (!_isUndoRedo && !_isEditingCell)
+            {
+                SaveState();
+                _isEditingCell = true;
+                // Cloner l'action avant modification pour pouvoir restaurer si nécessaire
+                _actionBeforeEdit = action.Clone();
+            }
+        }
+
+        private void ActionsDataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+        {
+            if (_currentMacro == null || e.Row.Item is not IInputAction action)
+            {
+                _isEditingCell = false;
+                _actionBeforeEdit = null;
+                return;
+            }
+
+            try
+            {
+                var columnHeader = e.Column?.Header?.ToString();
+                if (columnHeader == "Nom" && e.EditingElement is System.Windows.Controls.TextBox textBox)
+                {
+                    string newValue = textBox.Text;
+                    bool isValid = false;
+                    
+                    // Valider et préparer les modifications sans les appliquer immédiatement
+                    if (action is KeyboardAction keyboardAction)
+                    {
+                        int newKeyCode = NameToVirtualKeyCode(newValue);
+                        if (newKeyCode > 0)
+                        {
+                            // Reporter la mise à jour après la fin de l'édition
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                try
+                                {
+                                    keyboardAction.VirtualKeyCode = (ushort)newKeyCode;
+                                    keyboardAction.Name = GetKeyName((ushort)newKeyCode);
+                                    ActionsDataGrid.Items.Refresh();
+                                    OnMacroModified();
+                                    UpdateUndoRedoButtons();
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"Erreur lors de la mise à jour de KeyboardAction: {ex.Message}");
+                                }
+                            }), System.Windows.Threading.DispatcherPriority.Input);
+                            isValid = true;
+                        }
+                    }
+                    else if (action is DelayAction delayAction)
+                    {
+                        int newDuration = ExtractDurationFromText(newValue);
+                        if (newDuration >= 0)
+                        {
+                            // Reporter la mise à jour après la fin de l'édition
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                try
+                                {
+                                    delayAction.Duration = newDuration;
+                                    delayAction.Name = $"{newDuration}ms";
+                                    ActionsDataGrid.Items.Refresh();
+                                    OnMacroModified();
+                                    UpdateUndoRedoButtons();
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"Erreur lors de la mise à jour de DelayAction: {ex.Message}");
+                                }
+                            }), System.Windows.Threading.DispatcherPriority.Input);
+                            isValid = true;
+                        }
+                    }
+
+                    if (!isValid)
+                    {
+                        // Restaurer l'ancien nom si validation échoue
+                        e.Cancel = true;
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            try
+                            {
+                                if (_actionBeforeEdit != null)
+                                {
+                                    if (action is KeyboardAction keyboardAction && _actionBeforeEdit is KeyboardAction oldKeyboardAction)
+                                    {
+                                        keyboardAction.Name = oldKeyboardAction.Name;
+                                        keyboardAction.VirtualKeyCode = oldKeyboardAction.VirtualKeyCode;
+                                    }
+                                    else if (action is DelayAction delayAction && _actionBeforeEdit is DelayAction oldDelayAction)
+                                    {
+                                        delayAction.Name = oldDelayAction.Name;
+                                        delayAction.Duration = oldDelayAction.Duration;
+                                    }
+                                    ActionsDataGrid.Items.Refresh();
+                                }
+                            }
+                            catch { }
+                        }), System.Windows.Threading.DispatcherPriority.Input);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                e.Cancel = true;
+                System.Diagnostics.Debug.WriteLine($"Erreur dans CellEditEnding: {ex.Message}");
+            }
+            finally
+            {
+                _isEditingCell = false;
+                _actionBeforeEdit = null;
+            }
+        }
+
+        private int NameToVirtualKeyCode(string name)
+        {
+            // Conversion du nom en VirtualKeyCode (même logique que GetKeyName mais inverse)
+            return name.Trim().ToUpper() switch
+            {
+                "BACKSPACE" => 0x08,
+                "TAB" => 0x09,
+                "ENTER" => 0x0D,
+                "ENTRÉE" => 0x0D,
+                "SHIFT" => 0x10,
+                "CTRL" => 0x11,
+                "ALT" => 0x12,
+                "ÉCHAP" => 0x1B,
+                "ESC" => 0x1B,
+                "ESPACE" => 0x20,
+                "SPACE" => 0x20,
+                "PAGE UP" => 0x21,
+                "PAGE DOWN" => 0x22,
+                "END" => 0x23,
+                "HOME" => 0x24,
+                "PRINT SCREEN" => 0x2C,
+                "INSERT" => 0x2D,
+                "DELETE" => 0x2E,
+                "SUPPR" => 0x2E,
+                "0" => 0x30, "1" => 0x31, "2" => 0x32, "3" => 0x33, "4" => 0x34,
+                "5" => 0x35, "6" => 0x36, "7" => 0x37, "8" => 0x38, "9" => 0x39,
+                "A" => 0x41, "B" => 0x42, "C" => 0x43, "D" => 0x44, "E" => 0x45,
+                "F" => 0x46, "G" => 0x47, "H" => 0x48, "I" => 0x49, "J" => 0x4A,
+                "K" => 0x4B, "L" => 0x4C, "M" => 0x4D, "N" => 0x4E, "O" => 0x4F,
+                "P" => 0x50, "Q" => 0x51, "R" => 0x52, "S" => 0x53, "T" => 0x54,
+                "U" => 0x55, "V" => 0x56, "W" => 0x57, "X" => 0x58, "Y" => 0x59, "Z" => 0x5A,
+                "F1" => 0x70, "F2" => 0x71, "F3" => 0x72, "F4" => 0x73,
+                "F5" => 0x74, "F6" => 0x75, "F7" => 0x76, "F8" => 0x77,
+                "F9" => 0x78, "F10" => 0x79, "F11" => 0x7A, "F12" => 0x7B,
+                _ => 0
+            };
+        }
+
+        private int ExtractDurationFromText(string text)
+        {
+            // Extraire le nombre du texte (ex: "100ms" -> 100, "100" -> 100)
+            if (string.IsNullOrWhiteSpace(text))
+                return -1;
+                
+            text = text.Trim().ToLower();
+            if (text.EndsWith("ms"))
+            {
+                text = text.Substring(0, text.Length - 2).Trim();
+            }
+            
+            if (int.TryParse(text, out int duration) && duration >= 0)
+            {
+                return duration;
+            }
+            return -1; // Retourner -1 pour indiquer une erreur
+        }
+
+        private void ActionsDataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (ActionsDataGrid.SelectedItem == null)
+                return;
+
+            // Supprimer avec la touche SUPPR
+            if (e.Key == Key.Delete && ActionsDataGrid.SelectedItem is IInputAction action)
+            {
+                e.Handled = true;
+                
+                if (_currentMacro != null)
+                {
+                    if (!_isUndoRedo)
+                        SaveState();
+
+                    _currentMacro.Actions.Remove(action);
+                    ActionsDataGrid.Items.Refresh();
+                    OnMacroModified();
+                    UpdateUndoRedoButtons();
+                }
+            }
+        }
     }
 }
 
