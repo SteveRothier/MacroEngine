@@ -19,7 +19,6 @@
         <Menu Grid.Row="0">
             <MenuItem Header="Fichier">
                 <MenuItem Header="Nouvelle Macro" Click="NewMacro_Click"/>
-                <MenuItem Header="Ouvrir Macro" Click="OpenMacro_Click"/>
                 <MenuItem Header="Sauvegarder" Click="SaveMacro_Click"/>
                 <Separator/>
                 <MenuItem Header="Exporter Macro..." Click="ExportMacro_Click"/>

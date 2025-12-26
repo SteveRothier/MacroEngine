@@ -1794,12 +1794,6 @@ namespace MacroEngine.UI
             _logsWindow.Activate();
         }
 
-        private void OpenMacro_Click(object sender, RoutedEventArgs e)
-        {
-            // Ouvrir une macro (fonctionnalité à implémenter si nécessaire)
-            MessageBox.Show("Utilisez 'Importer Macro' pour importer une macro depuis un fichier JSON", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
-
         private async void SaveMacro_Click(object sender, RoutedEventArgs e)
         {
             try
