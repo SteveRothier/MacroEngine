@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -683,6 +684,11 @@ namespace MacroEngine.UI
 
         private async void LoadProfiles()
         {
+            await LoadProfilesAsync();
+        }
+
+        private async Task LoadProfilesAsync()
+        {
             try
             {
                 var profiles = await _profileProvider.LoadProfilesAsync();
@@ -691,7 +697,9 @@ namespace MacroEngine.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Erreur lors du chargement des profils: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger?.Error("Erreur lors du chargement des profils", ex, "MainWindow");
+                MessageBox.Show($"Erreur lors du chargement des profils: {ex.Message}", 
+                               "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1450,17 +1458,280 @@ namespace MacroEngine.UI
 
         private void NewProfile_Click(object sender, RoutedEventArgs e)
         {
-            // Ouvrir l'éditeur de profil
+            // Créer un nouveau profil
+            var newProfile = new MacroProfile
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = "Nouveau Profil",
+                Description = "",
+                MacroIds = new List<string>(),
+                CreatedAt = DateTime.Now,
+                ModifiedAt = DateTime.Now
+            };
+
+            // Créer une fenêtre pour éditer le profil
+            var profileWindow = new Window
+            {
+                Title = "Nouveau Profil",
+                Width = 600,
+                Height = 500,
+                Owner = this,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+
+            var profileEditor = new ProfileEditor();
+            profileEditor.SetProfileProvider(_profileProvider);
+            profileEditor.LoadProfile(newProfile, _macros, _profileProvider);
+
+            // Gérer la sauvegarde
+            profileEditor.ProfileSaved += async (s, args) =>
+            {
+                // Recharger les profils après sauvegarde
+                await LoadProfilesAsync();
+                profileWindow.Close();
+            };
+
+            profileWindow.Content = profileEditor;
+            profileWindow.ShowDialog();
         }
 
-        private void ManageProfiles_Click(object sender, RoutedEventArgs e)
+        private async void ManageProfiles_Click(object sender, RoutedEventArgs e)
         {
-            // Ouvrir le gestionnaire de profils
+            try
+            {
+                var profilesWindow = new Window
+                {
+                    Title = "Gérer les Profils",
+                    Width = 700,
+                    Height = 500,
+                    Owner = this,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                };
+
+                var grid = new Grid();
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                // ListBox pour afficher les profils
+                var profilesListBox = new ListBox();
+                var profiles = await _profileProvider.LoadProfilesAsync();
+                profilesListBox.ItemsSource = profiles;
+                profilesListBox.DisplayMemberPath = "Name";
+
+                Grid.SetRow(profilesListBox, 0);
+                grid.Children.Add(profilesListBox);
+
+                // Panel de boutons
+                var buttonPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(10)
+                };
+
+                var editButton = new Button { Content = "Modifier", Margin = new Thickness(0, 0, 5, 0), Padding = new Thickness(10, 5, 10, 5) };
+                var deleteButton = new Button { Content = "Supprimer", Margin = new Thickness(0, 0, 5, 0), Padding = new Thickness(10, 5, 10, 5) };
+                var activateButton = new Button { Content = "Activer", Margin = new Thickness(0, 0, 5, 0), Padding = new Thickness(10, 5, 10, 5) };
+                var closeButton = new Button { Content = "Fermer", Padding = new Thickness(10, 5, 10, 5) };
+
+                editButton.Click += async (s, args) =>
+                {
+                    if (profilesListBox.SelectedItem is MacroProfile profile)
+                    {
+                        // Ouvrir l'éditeur
+                        var editWindow = new Window
+                        {
+                            Title = $"Éditer: {profile.Name}",
+                            Width = 600,
+                            Height = 500,
+                            Owner = profilesWindow,
+                            WindowStartupLocation = WindowStartupLocation.CenterOwner
+                        };
+
+                        var editor = new ProfileEditor();
+                        editor.SetProfileProvider(_profileProvider);
+                        editor.LoadProfile(profile, _macros, _profileProvider);
+
+                        editor.ProfileSaved += async (sender, e) =>
+                        {
+                            await RefreshProfilesList(profilesListBox);
+                            editWindow.Close();
+                        };
+
+                        editWindow.Content = editor;
+                        editWindow.ShowDialog();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Veuillez sélectionner un profil à modifier.", 
+                                       "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                };
+
+                deleteButton.Click += async (s, args) =>
+                {
+                    if (profilesListBox.SelectedItem is MacroProfile profile)
+                    {
+                        var result = MessageBox.Show(
+                            $"Êtes-vous sûr de vouloir supprimer le profil '{profile.Name}' ?",
+                            "Confirmation",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Question);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            await _profileProvider.DeleteProfileAsync(profile.Id);
+                            await RefreshProfilesList(profilesListBox);
+                            await LoadProfilesAsync(); // Recharger dans MainWindow
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Veuillez sélectionner un profil à supprimer.", 
+                                       "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                };
+
+                activateButton.Click += async (s, args) =>
+                {
+                    if (profilesListBox.SelectedItem is MacroProfile profile)
+                    {
+                        await _profileProvider.ActivateProfileAsync(profile.Id);
+                        await RefreshProfilesList(profilesListBox);
+                        await LoadProfilesAsync(); // Recharger dans MainWindow
+                        
+                        MessageBox.Show($"Le profil '{profile.Name}' a été activé.", 
+                                       "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Veuillez sélectionner un profil à activer.", 
+                                       "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                };
+
+                closeButton.Click += (s, args) => profilesWindow.Close();
+
+                buttonPanel.Children.Add(editButton);
+                buttonPanel.Children.Add(deleteButton);
+                buttonPanel.Children.Add(activateButton);
+                buttonPanel.Children.Add(closeButton);
+
+                Grid.SetRow(buttonPanel, 1);
+                grid.Children.Add(buttonPanel);
+
+                profilesWindow.Content = grid;
+                profilesWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Erreur lors de la gestion des profils", ex, "MainWindow");
+                MessageBox.Show($"Erreur: {ex.Message}", "Erreur", 
+                               MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
-        private void ChangeProfile_Click(object sender, RoutedEventArgs e)
+        private async Task RefreshProfilesList(ListBox listBox)
         {
-            // Ouvrir le sélecteur de profil
+            try
+            {
+                var profiles = await _profileProvider.LoadProfilesAsync();
+                listBox.ItemsSource = null;
+                listBox.ItemsSource = profiles;
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Erreur lors du rafraîchissement de la liste des profils", ex, "MainWindow");
+            }
+        }
+
+        private async void ChangeProfile_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var profiles = await _profileProvider.LoadProfilesAsync();
+                
+                if (profiles.Count == 0)
+                {
+                    MessageBox.Show("Aucun profil disponible. Créez d'abord un profil.", 
+                                   "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    return;
+                }
+
+                var selectWindow = new Window
+                {
+                    Title = "Sélectionner un Profil",
+                    Width = 400,
+                    Height = 300,
+                    Owner = this,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                };
+
+                var grid = new Grid();
+                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                var profilesListBox = new ListBox();
+                profilesListBox.ItemsSource = profiles;
+                profilesListBox.DisplayMemberPath = "Name";
+
+                Grid.SetRow(profilesListBox, 0);
+                grid.Children.Add(profilesListBox);
+
+                var buttonPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(10)
+                };
+
+                var activateButton = new Button 
+                { 
+                    Content = "Activer", 
+                    Margin = new Thickness(0, 0, 5, 0), 
+                    Padding = new Thickness(10, 5, 10, 5) 
+                };
+                var cancelButton = new Button 
+                { 
+                    Content = "Annuler", 
+                    Padding = new Thickness(10, 5, 10, 5) 
+                };
+
+                activateButton.Click += async (s, args) =>
+                {
+                    if (profilesListBox.SelectedItem is MacroProfile profile)
+                    {
+                        await _profileProvider.ActivateProfileAsync(profile.Id);
+                        await LoadProfilesAsync();
+                        selectWindow.Close();
+                        
+                        MessageBox.Show($"Le profil '{profile.Name}' a été activé.", 
+                                       "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Veuillez sélectionner un profil.", 
+                                       "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                };
+
+                cancelButton.Click += (s, args) => selectWindow.Close();
+
+                buttonPanel.Children.Add(activateButton);
+                buttonPanel.Children.Add(cancelButton);
+
+                Grid.SetRow(buttonPanel, 1);
+                grid.Children.Add(buttonPanel);
+
+                selectWindow.Content = grid;
+                selectWindow.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Erreur lors du changement de profil", ex, "MainWindow");
+                MessageBox.Show($"Erreur: {ex.Message}", "Erreur", 
+                               MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void Settings_Click(object sender, RoutedEventArgs e)
@@ -1676,16 +1947,38 @@ namespace MacroEngine.UI
                 StopRecording();
             }
 
-            // Nettoyer les hooks
-            _keyboardHook?.Dispose();
-            _mouseHook?.Dispose();
-            _globalExecuteHook?.Dispose();
+            // Arrêter le moteur de macro s'il est en cours d'exécution
+            try
+            {
+                if (_macroEngine.State != Engine.MacroEngineState.Idle)
+                {
+                    _ = _macroEngine.StopMacroAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Erreur lors de l'arrêt du moteur de macro", ex, "MainWindow");
+            }
+
+            // Nettoyer tous les hooks
+            try
+            {
+                _keyboardHook?.Dispose();
+                _mouseHook?.Dispose();
+                _globalExecuteHook?.Dispose();
+                _globalStopHook?.Dispose();
+                _globalMacroShortcutsHook?.Dispose();
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Erreur lors du nettoyage des hooks", ex, "MainWindow");
+            }
             
             // Fermer la fenêtre de logs si ouverte
             _logsWindow?.Close();
 
-            _logger.Info("Application arrêtée", "MainWindow");
-            _logger.Dispose();
+            _logger?.Info("Application arrêtée", "MainWindow");
+            _logger?.Dispose();
 
             Application.Current.Shutdown();
         }
