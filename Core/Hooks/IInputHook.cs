@@ -58,6 +58,36 @@ namespace MacroEngine.Core.Hooks
         public bool IsExtended { get; set; }
         public bool IsInjected { get; set; }
         public bool Handled { get; set; }
+        
+        /// <summary>
+        /// Le caractère Unicode produit par cette touche (en tenant compte du layout de clavier)
+        /// </summary>
+        public string? UnicodeCharacter { get; set; }
+        
+        /// <summary>
+        /// Indique si Shift est pressé
+        /// </summary>
+        public bool HasShift { get; set; }
+        
+        /// <summary>
+        /// Indique si Ctrl est pressé
+        /// </summary>
+        public bool HasCtrl { get; set; }
+        
+        /// <summary>
+        /// Indique si Alt est pressé
+        /// </summary>
+        public bool HasAlt { get; set; }
+        
+        /// <summary>
+        /// Indique si Alt Gr est pressé (Ctrl + Alt)
+        /// </summary>
+        public bool HasAltGr { get; set; }
+        
+        /// <summary>
+        /// Le layout de clavier actuel
+        /// </summary>
+        public uint KeyboardLayout { get; set; }
     }
 
     /// <summary>

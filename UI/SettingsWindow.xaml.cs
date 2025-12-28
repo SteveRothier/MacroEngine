@@ -195,7 +195,18 @@ namespace MacroEngine.UI
                 0xA3 => "Ctrl Droit",
                 0xA4 => "Alt Gauche",
                 0xA5 => "Alt Droit",
-                _ => $"VK{virtualKeyCode:X2}"
+                0xBA => ";",      // Point-virgule (AZERTY)
+                0xBB => "=",      // Égal
+                0xBC => ",",      // Virgule
+                0xBD => "-",      // Tiret
+                0xBE => ":",      // Deux-points (produit par Shift + ; sur AZERTY)
+                0xBF => "!",      // Point d'exclamation (produit par Shift + : sur AZERTY)
+                0xC0 => "ù",      // U accent grave
+                0xDB => "[",      // Crochet ouvrant
+                0xDC => "\\",     // Antislash
+                0xDD => "]",      // Crochet fermant
+                0xDE => "^",      // Circonflexe
+                _ => $"Touche {virtualKeyCode}"
             };
         }
         

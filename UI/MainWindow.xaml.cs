@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -178,22 +179,115 @@ namespace MacroEngine.UI
             
             return virtualKeyCode switch
             {
-                0x70 => "F1", 0x71 => "F2", 0x72 => "F3", 0x73 => "F4",
-                0x74 => "F5", 0x75 => "F6", 0x76 => "F7", 0x77 => "F8",
-                0x78 => "F9", 0x79 => "F10", 0x7A => "F11", 0x7B => "F12",
-                0x08 => "Backspace", 0x09 => "Tab", 0x0D => "Enter",
-                0x10 => "Shift", 0x11 => "Ctrl", 0x12 => "Alt", 0x1B => "Esc",
-                0x20 => "Espace", 0x21 => "Page Up", 0x22 => "Page Down",
-                0x23 => "End", 0x24 => "Home", 0x2C => "Print Screen",
-                0x2D => "Insert", 0x2E => "Delete",
-                0x30 => "0", 0x31 => "1", 0x32 => "2", 0x33 => "3", 0x34 => "4",
-                0x35 => "5", 0x36 => "6", 0x37 => "7", 0x38 => "8", 0x39 => "9",
-                0x41 => "A", 0x42 => "B", 0x43 => "C", 0x44 => "D", 0x45 => "E",
-                0x46 => "F", 0x47 => "G", 0x48 => "H", 0x49 => "I", 0x4A => "J",
-                0x4B => "K", 0x4C => "L", 0x4D => "M", 0x4E => "N", 0x4F => "O",
-                0x50 => "P", 0x51 => "Q", 0x52 => "R", 0x53 => "S", 0x54 => "T",
-                0x55 => "U", 0x56 => "V", 0x57 => "W", 0x58 => "X", 0x59 => "Y", 0x5A => "Z",
-                _ => $"VK{virtualKeyCode:X2}"
+                0x08 => "Backspace",
+                0x09 => "Tab",
+                0x0C => "Clear",
+                0x0D => "Enter",
+                0x10 => "Shift",
+                0x11 => "Ctrl",
+                0x12 => "Alt",
+                0x13 => "Pause",
+                0x14 => "Caps Lock",
+                0x1B => "Esc",
+                0x20 => "Espace",
+                0x21 => "Page Up",
+                0x22 => "Page Down",
+                0x23 => "End",
+                0x24 => "Home",
+                0x25 => "Flèche Gauche",
+                0x26 => "Flèche Haut",
+                0x27 => "Flèche Droite",
+                0x28 => "Flèche Bas",
+                0x2C => "Print Screen",
+                0x2D => "Insert",
+                0x2E => "Delete",
+                0x30 => "0",
+                0x31 => "1",
+                0x32 => "2",
+                0x33 => "3",
+                0x34 => "4",
+                0x35 => "5",
+                0x36 => "6",
+                0x37 => "7",
+                0x38 => "8",
+                0x39 => "9",
+                0x41 => "a",
+                0x42 => "b",
+                0x43 => "c",
+                0x44 => "d",
+                0x45 => "e",
+                0x46 => "f",
+                0x47 => "g",
+                0x48 => "h",
+                0x49 => "i",
+                0x4A => "j",
+                0x4B => "k",
+                0x4C => "l",
+                0x4D => "m",
+                0x4E => "n",
+                0x4F => "o",
+                0x50 => "p",
+                0x51 => "q",
+                0x52 => "r",
+                0x53 => "s",
+                0x54 => "t",
+                0x55 => "u",
+                0x56 => "v",
+                0x57 => "w",
+                0x58 => "x",
+                0x59 => "y",
+                0x5A => "z",
+                0x5B => "Windows Gauche",
+                0x5C => "Windows Droit",
+                0x5D => "Menu",
+                0x60 => "Pavé numérique 0",
+                0x61 => "Pavé numérique 1",
+                0x62 => "Pavé numérique 2",
+                0x63 => "Pavé numérique 3",
+                0x64 => "Pavé numérique 4",
+                0x65 => "Pavé numérique 5",
+                0x66 => "Pavé numérique 6",
+                0x67 => "Pavé numérique 7",
+                0x68 => "Pavé numérique 8",
+                0x69 => "Pavé numérique 9",
+                0x6A => "Pavé numérique *",
+                0x6B => "Pavé numérique +",
+                0x6C => "Pavé numérique Entrée",
+                0x6D => "Pavé numérique -",
+                0x6E => "Pavé numérique .",
+                0x6F => "Pavé numérique /",
+                0x70 => "F1",
+                0x71 => "F2",
+                0x72 => "F3",
+                0x73 => "F4",
+                0x74 => "F5",
+                0x75 => "F6",
+                0x76 => "F7",
+                0x77 => "F8",
+                0x78 => "F9",
+                0x79 => "F10",
+                0x7A => "F11",
+                0x7B => "F12",
+                0x90 => "Num Lock",
+                0x91 => "Scroll Lock",
+                0xA0 => "Shift Gauche",
+                0xA1 => "Shift Droit",
+                0xA2 => "Ctrl Gauche",
+                0xA3 => "Ctrl Droit",
+                0xA4 => "Alt Gauche",
+                0xA5 => "Alt Droit",
+                0xBA => ";",      // Point-virgule (AZERTY)
+                0xBB => "=",      // Égal
+                0xBC => ",",      // Virgule
+                0xBD => "8",      // Huit (touche 8 sur AZERTY, pas le tiret)
+                0xBE => ":",      // Deux-points (Shift + ; sur AZERTY)
+                0xBF => "!",      // Point d'exclamation (Shift + : sur AZERTY)
+                0xC0 => "ù",      // U accent grave
+                0xDB => "[",      // Crochet ouvrant
+                0xDC => "\\",     // Antislash
+                0xDD => "]",      // Crochet fermant
+                0xDE => "^",      // Circonflexe
+                _ => $"Touche {virtualKeyCode}"
             };
         }
 
@@ -1045,12 +1139,56 @@ namespace MacroEngine.UI
                     // Ajouter un délai si nécessaire
                     AddDelayIfNeeded();
 
-                    // Créer une action clavier
+                    // Ignorer les touches modificateurs seules (on les détecte avec la touche principale)
+                    if (IsModifierKey(keyCode))
+                    {
+                        lock (_pressedKeysLock)
+                        {
+                            _pressedKeys.Remove(keyCode);
+                        }
+                        return;
+                    }
+
+                    // Utiliser les modificateurs détectés par le hook (plus fiable)
+                    ModifierKeys modifiers = ModifierKeys.None;
+                    if (e.HasShift) modifiers |= ModifierKeys.Shift;
+                    
+                    // Alt Gr = Ctrl + Alt (on les stocke tous les deux pour l'exécution)
+                    if (e.HasAltGr)
+                    {
+                        modifiers |= ModifierKeys.Control;
+                        modifiers |= ModifierKeys.Alt;
+                    }
+                    else
+                    {
+                        // Si ce n'est pas Alt Gr, ajouter Ctrl et Alt séparément
+                        if (e.HasCtrl) modifiers |= ModifierKeys.Control;
+                        if (e.HasAlt) modifiers |= ModifierKeys.Alt;
+                    }
+                    
+                    // Windows keys
+                    if (IsKeyPressed(0x5B) || IsKeyPressed(0x5C))
+                        modifiers |= ModifierKeys.Windows;
+
+                    // Utiliser le caractère Unicode si disponible (plus fiable pour multilingue)
+                    // Sinon, utiliser GetKeyName comme fallback
+                    string keyName;
+                    if (!string.IsNullOrEmpty(e.UnicodeCharacter))
+                    {
+                        keyName = e.UnicodeCharacter;
+                    }
+                    else
+                    {
+                        keyName = GetKeyName((ushort)keyCode);
+                    }
+
+                    // Créer une action clavier avec les modificateurs
                     var keyboardAction = new KeyboardAction
                     {
-                        Name = GetKeyName((ushort)keyCode),
+                        Name = FormatKeyNameWithModifiers(keyName, modifiers),
                         VirtualKeyCode = (ushort)keyCode,
-                        ActionType = KeyboardActionType.Press
+                        ActionType = KeyboardActionType.Press,
+                        Modifiers = modifiers
                     };
 
                     if (_selectedMacro != null && _selectedMacro.Actions != null)
@@ -1059,11 +1197,14 @@ namespace MacroEngine.UI
                     }
                     _lastActionTime = timestamp;
 
+                    // Construire la description avec les modificateurs pour l'affichage
+                    string actionDescription = FormatKeyNameWithModifiers(keyName, modifiers);
+                    
                     // Afficher dans la zone d'actions
                     var actionItem = new ActionLogItem
                     {
                         Timestamp = timestamp.ToString("HH:mm:ss.fff"),
-                        Description = $"Enregistré: {keyboardAction.Name}"
+                        Description = $"Enregistré: {actionDescription}"
                     };
 
                     // Protéger l'accès à ActionsListBox
@@ -1281,7 +1422,15 @@ namespace MacroEngine.UI
 
             if (_selectedMacro != null && _selectedMacro.Actions?.Count > 0)
             {
-                var elapsed = (DateTime.Now - _lastActionTime).TotalMilliseconds;
+                // Ne pas ajouter de délai si la dernière action est déjà un délai
+                var lastAction = _selectedMacro.Actions[_selectedMacro.Actions.Count - 1];
+                if (lastAction is DelayAction)
+                {
+                    return; // Délai déjà ajouté, ne pas en ajouter un autre
+                }
+
+                var now = DateTime.Now;
+                var elapsed = (now - _lastActionTime).TotalMilliseconds;
                 if (elapsed > 50) // Ajouter un délai si plus de 50ms entre les actions
                 {
                     var delayAction = new DelayAction
@@ -1292,6 +1441,8 @@ namespace MacroEngine.UI
                     if (_selectedMacro != null)
                     {
                         _selectedMacro.Actions.Add(delayAction);
+                        // Mettre à jour _lastActionTime après avoir ajouté le délai pour éviter les délais multiples
+                        _lastActionTime = now;
                     }
                 }
             }
@@ -1313,23 +1464,169 @@ namespace MacroEngine.UI
 
         private string GetKeyName(ushort virtualKeyCode)
         {
+            if (virtualKeyCode == 0)
+            {
+                return "Aucune touche";
+            }
+            
             return virtualKeyCode switch
             {
-                0x20 => "Espace",
-                0x0D => "Entrée",
-                0x08 => "Retour",
+                0x08 => "Backspace",
                 0x09 => "Tab",
-                0x1B => "Échap",
-                0x41 => "A", 0x42 => "B", 0x43 => "C", 0x44 => "D", 0x45 => "E",
-                0x46 => "F", 0x47 => "G", 0x48 => "H", 0x49 => "I", 0x4A => "J",
-                0x4B => "K", 0x4C => "L", 0x4D => "M", 0x4E => "N", 0x4F => "O",
-                0x50 => "P", 0x51 => "Q", 0x52 => "R", 0x53 => "S", 0x54 => "T",
-                0x55 => "U", 0x56 => "V", 0x57 => "W", 0x58 => "X", 0x59 => "Y", 0x5A => "Z",
-                0x30 => "0", 0x31 => "1", 0x32 => "2", 0x33 => "3", 0x34 => "4",
-                0x35 => "5", 0x36 => "6", 0x37 => "7", 0x38 => "8", 0x39 => "9",
-                0x10 => "Shift", 0x11 => "Ctrl", 0x12 => "Alt",
-                _ => $"VK{virtualKeyCode:X}"
+                0x0C => "Clear",
+                0x0D => "Enter",
+                0x10 => "Shift",
+                0x11 => "Ctrl",
+                0x12 => "Alt",
+                0x13 => "Pause",
+                0x14 => "Caps Lock",
+                0x1B => "Esc",
+                0x20 => "Espace",
+                0x21 => "Page Up",
+                0x22 => "Page Down",
+                0x23 => "End",
+                0x24 => "Home",
+                0x25 => "Flèche Gauche",
+                0x26 => "Flèche Haut",
+                0x27 => "Flèche Droite",
+                0x28 => "Flèche Bas",
+                0x2C => "Print Screen",
+                0x2D => "Insert",
+                0x2E => "Delete",
+                0x30 => "0",
+                0x31 => "1",
+                0x32 => "2",
+                0x33 => "3",
+                0x34 => "4",
+                0x35 => "5",
+                0x36 => "6",
+                0x37 => "7",
+                0x38 => "8",
+                0x39 => "9",
+                0x41 => "a",
+                0x42 => "b",
+                0x43 => "c",
+                0x44 => "d",
+                0x45 => "e",
+                0x46 => "f",
+                0x47 => "g",
+                0x48 => "h",
+                0x49 => "i",
+                0x4A => "j",
+                0x4B => "k",
+                0x4C => "l",
+                0x4D => "m",
+                0x4E => "n",
+                0x4F => "o",
+                0x50 => "p",
+                0x51 => "q",
+                0x52 => "r",
+                0x53 => "s",
+                0x54 => "t",
+                0x55 => "u",
+                0x56 => "v",
+                0x57 => "w",
+                0x58 => "x",
+                0x59 => "y",
+                0x5A => "z",
+                0x5B => "Windows Gauche",
+                0x5C => "Windows Droit",
+                0x5D => "Menu",
+                0x60 => "Pavé numérique 0",
+                0x61 => "Pavé numérique 1",
+                0x62 => "Pavé numérique 2",
+                0x63 => "Pavé numérique 3",
+                0x64 => "Pavé numérique 4",
+                0x65 => "Pavé numérique 5",
+                0x66 => "Pavé numérique 6",
+                0x67 => "Pavé numérique 7",
+                0x68 => "Pavé numérique 8",
+                0x69 => "Pavé numérique 9",
+                0x6A => "Pavé numérique *",
+                0x6B => "Pavé numérique +",
+                0x6C => "Pavé numérique Entrée",
+                0x6D => "Pavé numérique -",
+                0x6E => "Pavé numérique .",
+                0x6F => "Pavé numérique /",
+                0x70 => "F1",
+                0x71 => "F2",
+                0x72 => "F3",
+                0x73 => "F4",
+                0x74 => "F5",
+                0x75 => "F6",
+                0x76 => "F7",
+                0x77 => "F8",
+                0x78 => "F9",
+                0x79 => "F10",
+                0x7A => "F11",
+                0x7B => "F12",
+                0x90 => "Num Lock",
+                0x91 => "Scroll Lock",
+                0xA0 => "Shift Gauche",
+                0xA1 => "Shift Droit",
+                0xA2 => "Ctrl Gauche",
+                0xA3 => "Ctrl Droit",
+                0xA4 => "Alt Gauche",
+                0xA5 => "Alt Droit",
+                0xBA => ";",      // Point-virgule (AZERTY)
+                0xBB => "=",      // Égal
+                0xBC => ",",      // Virgule
+                0xBD => "8",      // Huit (touche 8 sur AZERTY, pas le tiret)
+                0xBE => ":",      // Deux-points (Shift + ; sur AZERTY)
+                0xBF => "!",      // Point d'exclamation (Shift + : sur AZERTY)
+                0xC0 => "ù",      // U accent grave
+                0xDB => "[",      // Crochet ouvrant
+                0xDC => "\\",     // Antislash
+                0xDD => "]",      // Crochet fermant
+                0xDE => "^",      // Circonflexe
+                _ => $"Touche {virtualKeyCode}"
             };
+        }
+
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
+
+        private bool IsKeyPressed(int virtualKeyCode)
+        {
+            // Vérifier si la touche est actuellement pressée
+            return (GetAsyncKeyState(virtualKeyCode) & 0x8000) != 0;
+        }
+
+        private bool IsModifierKey(int vkCode)
+        {
+            return vkCode == 0x10 || vkCode == 0x11 || vkCode == 0x12 || 
+                   vkCode == 0xA0 || vkCode == 0xA1 || vkCode == 0xA2 || 
+                   vkCode == 0xA3 || vkCode == 0xA4 || vkCode == 0xA5 ||
+                   vkCode == 0x5B || vkCode == 0x5C;
+        }
+
+        private string FormatKeyNameWithModifiers(string keyName, ModifierKeys modifiers)
+        {
+            // Si on a un caractère Unicode (de ToUnicode), il contient déjà le caractère avec les modificateurs
+            // Pas besoin d'afficher les modificateurs car le caractère est déjà le résultat final
+            
+            if (modifiers == ModifierKeys.None)
+                return keyName;
+
+            // Détecter Alt Gr (Ctrl + Alt ensemble) - ne pas afficher les modificateurs dans ce cas
+            bool hasCtrl = (modifiers & ModifierKeys.Control) != 0;
+            bool hasAlt = (modifiers & ModifierKeys.Alt) != 0;
+            bool isAltGr = hasCtrl && hasAlt;
+
+            // Si c'est Alt Gr, ne pas afficher les modificateurs (juste le caractère)
+            if (isAltGr)
+            {
+                return keyName;
+            }
+
+            // Ne pas afficher Shift car le caractère Unicode contient déjà le résultat avec Shift
+            // Ne garder que Ctrl, Alt et Windows si nécessaire
+            var parts = new List<string>();
+            if (hasCtrl) parts.Add("Ctrl");
+            if (hasAlt) parts.Add("Alt");
+            if ((modifiers & ModifierKeys.Windows) != 0) parts.Add("Win");
+
+            return parts.Count > 0 ? string.Join("+", parts) + "+" + keyName : keyName;
         }
 
         private void PauseMacro_Click(object sender, RoutedEventArgs e)
