@@ -271,7 +271,28 @@ namespace MacroEngine.Core.Storage
                 {
                     var root = doc.RootElement;
                     
-                    // Détecter le type en fonction des propriétés présentes
+                    // D'abord essayer de détecter par la propriété "Type" (InputActionType enum)
+                    if (root.TryGetProperty("Type", out var typeProp))
+                    {
+                        int typeValue = typeProp.ValueKind == JsonValueKind.Number 
+                            ? typeProp.GetInt32() 
+                            : (int)Enum.Parse<InputActionType>(typeProp.GetString() ?? "Keyboard");
+                        
+                        var inputActionType = (InputActionType)typeValue;
+                        
+                        return inputActionType switch
+                        {
+                            InputActionType.Keyboard => JsonSerializer.Deserialize<KeyboardAction>(root.GetRawText(), options) 
+                                ?? throw new InvalidOperationException("Impossible de désérialiser KeyboardAction"),
+                            InputActionType.Mouse => JsonSerializer.Deserialize<MouseAction>(root.GetRawText(), options)
+                                ?? throw new InvalidOperationException("Impossible de désérialiser MouseAction"),
+                            InputActionType.Delay => JsonSerializer.Deserialize<DelayAction>(root.GetRawText(), options)
+                                ?? throw new InvalidOperationException("Impossible de désérialiser DelayAction"),
+                            _ => throw new NotSupportedException($"Type d'action non supporté: {inputActionType}")
+                        };
+                    }
+                    
+                    // Fallback: détecter le type en fonction des propriétés présentes
                     if (root.TryGetProperty("VirtualKeyCode", out _))
                     {
                         return JsonSerializer.Deserialize<KeyboardAction>(root.GetRawText(), options) 
@@ -282,15 +303,11 @@ namespace MacroEngine.Core.Storage
                         return JsonSerializer.Deserialize<DelayAction>(root.GetRawText(), options)
                             ?? throw new InvalidOperationException("Impossible de désérialiser DelayAction");
                     }
-                    else if (root.TryGetProperty("ActionType", out var actionTypeProp))
+                    else if (root.TryGetProperty("X", out _) || root.TryGetProperty("Y", out _))
                     {
-                        // Pour MouseAction, vérifier si c'est un MouseActionType
-                        var actionTypeStr = actionTypeProp.GetString();
-                        if (actionTypeStr != null && Enum.TryParse<MouseActionType>(actionTypeStr, out _))
-                        {
-                            return JsonSerializer.Deserialize<MouseAction>(root.GetRawText(), options)
-                                ?? throw new InvalidOperationException("Impossible de désérialiser MouseAction");
-                        }
+                        // MouseAction a des propriétés X et Y
+                        return JsonSerializer.Deserialize<MouseAction>(root.GetRawText(), options)
+                            ?? throw new InvalidOperationException("Impossible de désérialiser MouseAction");
                     }
                     
                     throw new NotSupportedException($"Type d'action non reconnu dans le JSON");

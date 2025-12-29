@@ -563,6 +563,57 @@ namespace MacroEngine.UI
             UpdateUndoRedoButtons();
         }
 
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        private void AddMouseAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            if (!_isUndoRedo)
+                SaveState();
+
+            var action = new Core.Inputs.MouseAction
+            {
+                Name = "Clic gauche",
+                ActionType = Core.Inputs.MouseActionType.LeftClick,
+                X = -1,
+                Y = -1
+            };
+            _currentMacro.Actions.Add(action);
+            ActionsDataGrid.Items.Refresh();
+            OnMacroModified();
+            UpdateUndoRedoButtons();
+        }
+
+        private void AddMouseActionAdvanced_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            var dialog = new MouseActionDialog
+            {
+                Owner = Window.GetWindow(this)
+            };
+
+            if (dialog.ShowDialog() == true && dialog.ResultAction != null)
+            {
+                if (!_isUndoRedo)
+                    SaveState();
+
+                _currentMacro.Actions.Add(dialog.ResultAction);
+                ActionsDataGrid.Items.Refresh();
+                OnMacroModified();
+                UpdateUndoRedoButtons();
+            }
+        }
+
         private void DeleteAction_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMacro == null || ActionsDataGrid.SelectedItem == null) return;

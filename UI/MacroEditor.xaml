@@ -172,6 +172,8 @@
             <Separator Margin="10,0"/>
             <Button Content="Ajouter Touche" Click="AddKeyboardAction_Click" Margin="0,0,5,0"/>
             <Button Content="Ajouter Délai" Click="AddDelayAction_Click" Margin="0,0,5,0"/>
+            <Button Content="Ajouter Clic" Click="AddMouseAction_Click" Margin="0,0,2,0" ToolTip="Ajoute un clic gauche à la position actuelle"/>
+            <Button Content="▼" Click="AddMouseActionAdvanced_Click" Margin="0,0,5,0" Padding="5,5" ToolTip="Options avancées (type de clic, coordonnées...)"/>
             <Separator Margin="10,0"/>
             <Button Content="Supprimer" Click="DeleteAction_Click" Margin="0,0,5,0"/>
             <Button Content="Monter" Click="MoveUpAction_Click" Margin="0,0,5,0"/>

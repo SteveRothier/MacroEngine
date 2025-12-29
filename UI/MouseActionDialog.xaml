@@ -1,0 +1,108 @@
+<Window x:Class="MacroEngine.UI.MouseActionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Ajouter une action souris" 
+        Height="350" Width="400"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Type de clic -->
+        <GroupBox Grid.Row="0" Header="Type d'action" Margin="0,0,0,10">
+            <StackPanel Margin="5">
+                <ComboBox x:Name="ActionTypeComboBox" SelectedIndex="0">
+                    <ComboBoxItem Content="Clic gauche" Tag="LeftClick"/>
+                    <ComboBoxItem Content="Clic droit" Tag="RightClick"/>
+                    <ComboBoxItem Content="Clic molette" Tag="MiddleClick"/>
+                    <ComboBoxItem Content="Double clic gauche" Tag="DoubleLeftClick"/>
+                    <ComboBoxItem Content="Molette vers le haut" Tag="WheelUp"/>
+                    <ComboBoxItem Content="Molette vers le bas" Tag="WheelDown"/>
+                    <ComboBoxItem Content="Déplacer souris" Tag="Move"/>
+                </ComboBox>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- Coordonnées -->
+        <GroupBox Grid.Row="1" Header="Position" Margin="0,0,0,10">
+            <Grid Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="X:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox x:Name="XTextBox" Grid.Column="1" Text="0" Margin="0,0,15,0" Padding="5,3"/>
+                
+                <TextBlock Grid.Column="2" Text="Y:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox x:Name="YTextBox" Grid.Column="3" Text="0" Padding="5,3"/>
+
+                <CheckBox x:Name="UseCurrentPositionCheckBox" 
+                          Grid.Row="1" Grid.ColumnSpan="4"
+                          Content="Utiliser la position actuelle du curseur"
+                          Margin="0,10,0,0"
+                          Checked="UseCurrentPositionCheckBox_Changed"
+                          Unchecked="UseCurrentPositionCheckBox_Changed"/>
+            </Grid>
+        </GroupBox>
+
+        <!-- Capture de position -->
+        <GroupBox Grid.Row="2" Header="Capturer une position" Margin="0,0,0,10">
+            <StackPanel Margin="5">
+                <TextBlock Text="Cliquez sur le bouton puis sur l'écran pour capturer la position."
+                           TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,10"/>
+                <Button x:Name="CapturePositionButton" 
+                        Content="🎯 Capturer position (cliquez puis pointez)"
+                        Click="CapturePositionButton_Click"
+                        Padding="10,8"/>
+                <TextBlock x:Name="CaptureStatusText" 
+                           Text="" 
+                           Foreground="Green" 
+                           Margin="0,5,0,0"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- Nom de l'action -->
+        <Grid Grid.Row="3" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="Nom:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <TextBox x:Name="ActionNameTextBox" Grid.Column="1" Text="Clic souris" Padding="5,3"/>
+        </Grid>
+
+        <!-- Boutons -->
+        <StackPanel Grid.Row="5" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right">
+            <Button Content="Annuler" 
+                    Click="CancelButton_Click" 
+                    Padding="20,8" 
+                    Margin="0,0,10,0"/>
+            <Button Content="Ajouter" 
+                    Click="OkButton_Click" 
+                    Padding="20,8"
+                    IsDefault="True"/>
+        </StackPanel>
+    </Grid>
+</Window>
+
+
