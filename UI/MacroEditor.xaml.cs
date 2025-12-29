@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,6 +8,7 @@ using System.Windows.Input;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Hooks;
+using MacroEngine.Core.Processes;
 
 namespace MacroEngine.UI
 {
@@ -30,6 +32,9 @@ namespace MacroEngine.UI
             // Initialiser le hook clavier pour capturer F10 et autres touches système
             _keyboardHook = new KeyboardHook();
             _keyboardHook.KeyDown += KeyboardHook_KeyDown;
+            
+            // Charger la liste des applications au démarrage
+            RefreshApplicationsComboBox();
             
             this.Unloaded += MacroEditor_Unloaded;
         }
@@ -95,11 +100,18 @@ namespace MacroEngine.UI
                 MacroNameTextBox.Text = macro.Name;
                 MacroDescriptionTextBox.Text = macro.Description;
                 UpdateShortcutDisplay();
+                UpdateTargetAppsDisplay();
                 
                 // Initialiser la liste d'actions si elle est null
                 if (macro.Actions == null)
                 {
                     macro.Actions = new List<IInputAction>();
+                }
+                
+                // Initialiser la liste des applications cibles si elle est null
+                if (macro.TargetApplications == null)
+                {
+                    macro.TargetApplications = new List<string>();
                 }
                 
                 ActionsDataGrid.ItemsSource = macro.Actions;
@@ -119,6 +131,7 @@ namespace MacroEngine.UI
                 _undoStack.Clear();
                 _redoStack.Clear();
                 UpdateUndoRedoButtons();
+                UpdateTargetAppsDisplay();
             }
         }
 
@@ -958,6 +971,184 @@ namespace MacroEngine.UI
                 }
             }
         }
+
+        #region Gestion des Applications Cibles
+
+        private void SelectAppsButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            var dialog = new AppSelectorDialog
+            {
+                Owner = Window.GetWindow(this),
+                SelectedApplications = _currentMacro.TargetApplications?.ToList() ?? new List<string>()
+            };
+
+            if (dialog.ShowDialog() == true)
+            {
+                _currentMacro.TargetApplications = dialog.SelectedApplications;
+                UpdateTargetAppsDisplay();
+                OnMacroModified();
+            }
+        }
+
+        private void UpdateTargetAppsDisplay()
+        {
+            TargetAppsPanel.Children.Clear();
+
+            if (_currentMacro == null || _currentMacro.TargetApplications == null || _currentMacro.TargetApplications.Count == 0)
+            {
+                TargetAppsPanel.Children.Add(new TextBlock
+                {
+                    Text = "Toutes les applications",
+                    Foreground = System.Windows.Media.Brushes.Gray,
+                    FontStyle = FontStyles.Italic,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+            }
+            else
+            {
+                foreach (var app in _currentMacro.TargetApplications.OrderBy(a => a))
+                {
+                    var border = new Border
+                    {
+                        Background = System.Windows.Media.Brushes.LightBlue,
+                        CornerRadius = new CornerRadius(3),
+                        Padding = new Thickness(5, 2, 5, 2),
+                        Margin = new Thickness(0, 0, 5, 0)
+                    };
+
+                    var stack = new StackPanel { Orientation = Orientation.Horizontal };
+                    stack.Children.Add(new TextBlock 
+                    { 
+                        Text = app, 
+                        VerticalAlignment = VerticalAlignment.Center,
+                        FontSize = 11
+                    });
+
+                    var removeButton = new Button
+                    {
+                        Content = "✕",
+                        FontSize = 9,
+                        Padding = new Thickness(3, 0, 3, 0),
+                        Margin = new Thickness(5, 0, 0, 0),
+                        Background = System.Windows.Media.Brushes.Transparent,
+                        BorderThickness = new Thickness(0),
+                        Cursor = System.Windows.Input.Cursors.Hand,
+                        Tag = app
+                    };
+                    removeButton.Click += RemoveTargetApp_Click;
+                    stack.Children.Add(removeButton);
+
+                    border.Child = stack;
+                    TargetAppsPanel.Children.Add(border);
+                }
+            }
+        }
+
+        private void RemoveTargetApp_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            if (sender is Button button && button.Tag is string appName)
+            {
+                _currentMacro.TargetApplications?.Remove(appName);
+                UpdateTargetAppsDisplay();
+                OnMacroModified();
+            }
+        }
+
+        private void ApplicationsComboBox_DropDownOpened(object sender, EventArgs e)
+        {
+            RefreshApplicationsComboBox();
+        }
+
+        private void RefreshAppsComboBox_Click(object sender, RoutedEventArgs e)
+        {
+            RefreshApplicationsComboBox();
+        }
+
+        private void RefreshApplicationsComboBox()
+        {
+            try
+            {
+                var processes = ProcessMonitor.GetRunningProcesses();
+                ApplicationsComboBox.ItemsSource = processes;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'actualisation des applications: {ex.Message}");
+            }
+        }
+
+        private void AddSelectedApp_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            string? processName = null;
+
+            // Vérifier si un élément est sélectionné dans le ComboBox
+            if (ApplicationsComboBox.SelectedItem is ProcessInfo selectedProcess)
+            {
+                processName = selectedProcess.ProcessName;
+            }
+            // Sinon, utiliser le texte saisi manuellement
+            else if (!string.IsNullOrWhiteSpace(ApplicationsComboBox.Text))
+            {
+                processName = ApplicationsComboBox.Text.Trim();
+                
+                // Retirer l'extension .exe si présente
+                if (processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    processName = processName.Substring(0, processName.Length - 4);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(processName))
+            {
+                // Initialiser la liste si nécessaire
+                if (_currentMacro.TargetApplications == null)
+                {
+                    _currentMacro.TargetApplications = new List<string>();
+                }
+
+                // Ajouter seulement si pas déjà présent
+                if (!_currentMacro.TargetApplications.Any(app => 
+                    string.Equals(app, processName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    _currentMacro.TargetApplications.Add(processName);
+                    UpdateTargetAppsDisplay();
+                    OnMacroModified();
+                }
+
+                // Réinitialiser la sélection
+                ApplicationsComboBox.SelectedItem = null;
+                ApplicationsComboBox.Text = string.Empty;
+            }
+        }
+
+        private void ClearAllApps_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            if (_currentMacro.TargetApplications != null && _currentMacro.TargetApplications.Count > 0)
+            {
+                var result = MessageBox.Show(
+                    "Voulez-vous vraiment supprimer toutes les applications cibles ?\nLa macro sera disponible pour toutes les applications.",
+                    "Confirmation",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    _currentMacro.TargetApplications.Clear();
+                    UpdateTargetAppsDisplay();
+                    OnMacroModified();
+                }
+            }
+        }
+
+        #endregion
     }
 }
 

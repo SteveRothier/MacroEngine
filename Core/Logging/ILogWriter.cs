@@ -25,10 +25,3 @@ namespace MacroEngine.Core.Logging
     }
 }
 
-
-
-
-
-
-
-

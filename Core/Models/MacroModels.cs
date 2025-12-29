@@ -23,6 +23,48 @@ namespace MacroEngine.Core.Models
         /// Code virtuel de la touche pour exécuter cette macro (0 = aucun raccourci)
         /// </summary>
         public int ShortcutKeyCode { get; set; } = 0;
+
+        /// <summary>
+        /// Liste des noms de processus pour lesquels cette macro est active
+        /// Si vide, la macro est disponible pour toutes les applications
+        /// </summary>
+        public List<string> TargetApplications { get; set; } = new List<string>();
+
+        /// <summary>
+        /// Mode de déclenchement par application
+        /// </summary>
+        public AppTriggerMode AppTriggerMode { get; set; } = AppTriggerMode.Manual;
+
+        /// <summary>
+        /// Indique si la macro doit s'exécuter automatiquement quand l'application cible passe au premier plan
+        /// </summary>
+        public bool AutoExecuteOnFocus { get; set; } = false;
+    }
+
+    /// <summary>
+    /// Mode de déclenchement par application
+    /// </summary>
+    public enum AppTriggerMode
+    {
+        /// <summary>
+        /// Exécution manuelle uniquement
+        /// </summary>
+        Manual,
+
+        /// <summary>
+        /// Raccourci actif seulement quand l'application cible est au premier plan
+        /// </summary>
+        ActiveOnlyInApp,
+
+        /// <summary>
+        /// Exécution automatique quand l'application passe au premier plan
+        /// </summary>
+        AutoOnFocus,
+
+        /// <summary>
+        /// Exécution automatique quand l'application est lancée
+        /// </summary>
+        AutoOnLaunch
     }
 
     /// <summary>

@@ -1,9 +1,7 @@
-using System;
-
 namespace MacroEngine.Core.Inputs
 {
     /// <summary>
-    /// Interface de base pour toutes les actions d'entrée
+    /// Interface pour toutes les actions d'entrée (clavier, souris, délai)
     /// </summary>
     public interface IInputAction
     {
@@ -13,7 +11,7 @@ namespace MacroEngine.Core.Inputs
         string Id { get; set; }
 
         /// <summary>
-        /// Nom de l'action
+        /// Nom de l'action (pour affichage)
         /// </summary>
         string Name { get; set; }
 
@@ -28,20 +26,29 @@ namespace MacroEngine.Core.Inputs
         void Execute();
 
         /// <summary>
-        /// Clone l'action
+        /// Crée une copie de l'action
         /// </summary>
         IInputAction Clone();
     }
 
     /// <summary>
-    /// Types d'actions d'entrée
+    /// Types d'actions disponibles
     /// </summary>
     public enum InputActionType
     {
+        /// <summary>
+        /// Action clavier
+        /// </summary>
         Keyboard,
+
+        /// <summary>
+        /// Action souris
+        /// </summary>
         Mouse,
-        Delay,
-        Custom
+
+        /// <summary>
+        /// Délai/pause
+        /// </summary>
+        Delay
     }
 }
-

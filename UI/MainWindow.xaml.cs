@@ -15,6 +15,7 @@ using MacroEngine.Core.Profiles;
 using MacroEngine.Core.Hooks;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Storage;
+using MacroEngine.Core.Processes;
 using Engine = MacroEngine.Core.Engine;
 
 namespace MacroEngine.UI
@@ -62,6 +63,10 @@ namespace MacroEngine.UI
         // Timer pour la sauvegarde automatique
         private System.Windows.Threading.DispatcherTimer? _autoSaveTimer;
         private const int AUTO_SAVE_DELAY_MS = 2000; // Sauvegarder 2 secondes après la dernière modification
+
+        // Surveillance des applications (détection d'application active)
+        private ProcessMonitor? _processMonitor;
+        private string _currentForegroundProcess = string.Empty;
 
         public MainWindow()
         {
@@ -112,6 +117,9 @@ namespace MacroEngine.UI
             InitializeEngine();
             InitializeAutoSave();
             
+            // Initialiser la surveillance des applications
+            InitializeProcessMonitor();
+            
             // Charger la configuration et réinitialiser les hooks après
             _ = LoadConfigAndInitializeHooksAsync();
             
@@ -131,6 +139,82 @@ namespace MacroEngine.UI
             _keyboardHook.KeyUp += KeyboardHook_KeyUp;
             _mouseHook.MouseDown += MouseHook_MouseDown;
             _mouseHook.MouseUp += MouseHook_MouseUp;
+        }
+
+        private void InitializeProcessMonitor()
+        {
+            _processMonitor = new ProcessMonitor();
+            _processMonitor.MonitorInterval = 500; // Vérifier toutes les 500ms
+            _processMonitor.ForegroundChanged += ProcessMonitor_ForegroundChanged;
+            _processMonitor.StartMonitoring();
+            _logger?.Info("Surveillance des applications activée", "MainWindow");
+        }
+
+        private void ProcessMonitor_ForegroundChanged(object? sender, ForegroundChangedEventArgs e)
+        {
+            _currentForegroundProcess = e.CurrentProcessName;
+            
+            // Mettre à jour l'affichage de l'application active
+            Dispatcher.Invoke(() =>
+            {
+                UpdateActiveApplicationDisplay(e.CurrentProcessName, e.WindowTitle);
+                
+                // Vérifier si une macro doit être exécutée automatiquement
+                CheckAutoExecuteMacros(e.CurrentProcessName);
+            });
+        }
+
+        private void UpdateActiveApplicationDisplay(string processName, string windowTitle)
+        {
+            // Mettre à jour le texte de l'application active dans la barre latérale
+            if (ActiveAppText != null)
+            {
+                var displayText = !string.IsNullOrEmpty(windowTitle) 
+                    ? $"{processName}\n{windowTitle}" 
+                    : processName;
+                    
+                ActiveAppText.Text = displayText;
+                ActiveAppText.Foreground = System.Windows.Media.Brushes.DarkBlue;
+            }
+        }
+
+        private void CheckAutoExecuteMacros(string processName)
+        {
+            // Chercher les macros qui doivent s'exécuter automatiquement pour cette application
+            foreach (var macro in _macros)
+            {
+                if (macro.AutoExecuteOnFocus && 
+                    macro.TargetApplications != null &&
+                    macro.TargetApplications.Any(app => 
+                        string.Equals(app, processName, StringComparison.OrdinalIgnoreCase)))
+                {
+                    // Exécuter la macro si elle n'est pas déjà en cours
+                    if (_macroEngine.State == MacroEngineState.Idle)
+                    {
+                        _logger?.Info($"Exécution automatique de la macro '{macro.Name}' pour {processName}", "MainWindow");
+                        _selectedMacro = macro;
+                        MacrosListBox.SelectedItem = macro;
+                        _ = ExecuteMacroAsync();
+                    }
+                    break; // Une seule macro auto-exécutée à la fois
+                }
+            }
+        }
+
+        /// <summary>
+        /// Vérifie si le raccourci de la macro est actif pour l'application actuelle
+        /// </summary>
+        private bool IsMacroShortcutActiveForCurrentApp(Macro macro)
+        {
+            // Si pas d'applications cibles, le raccourci est toujours actif
+            if (macro.TargetApplications == null || macro.TargetApplications.Count == 0)
+            {
+                return true;
+            }
+
+            // Vérifier si l'application actuelle est dans la liste des cibles
+            return macro.TargetApplications.Any(app => 
+                string.Equals(app, _currentForegroundProcess, StringComparison.OrdinalIgnoreCase));
         }
 
         private async System.Threading.Tasks.Task LoadConfigAndInitializeHooksAsync()
@@ -378,6 +462,12 @@ namespace MacroEngine.UI
                         e.VirtualKeyCode != _appConfig.ExecuteMacroKeyCode && 
                         e.VirtualKeyCode != _appConfig.StopMacroKeyCode)
                     {
+                        // Vérifier si le raccourci est actif pour l'application actuelle
+                        if (!IsMacroShortcutActiveForCurrentApp(macro))
+                        {
+                            return; // Le raccourci n'est pas actif pour cette application
+                        }
+
                         e.Handled = true;
                         Dispatcher.BeginInvoke(new Action(async () =>
                         {
@@ -2259,6 +2349,7 @@ namespace MacroEngine.UI
                 _globalExecuteHook?.Dispose();
                 _globalStopHook?.Dispose();
                 _globalMacroShortcutsHook?.Dispose();
+                _processMonitor?.Dispose();
             }
             catch (Exception ex)
             {

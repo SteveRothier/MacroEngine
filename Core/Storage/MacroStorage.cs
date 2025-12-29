@@ -59,7 +59,10 @@ namespace MacroEngine.Core.Storage
                     DelayBetweenRepeats = m.DelayBetweenRepeats,
                     CreatedAt = m.CreatedAt,
                     ModifiedAt = m.ModifiedAt,
-                    ShortcutKeyCode = m.ShortcutKeyCode
+                    ShortcutKeyCode = m.ShortcutKeyCode,
+                    TargetApplications = m.TargetApplications ?? new List<string>(),
+                    AppTriggerMode = m.AppTriggerMode,
+                    AutoExecuteOnFocus = m.AutoExecuteOnFocus
                 }).ToList() ?? new List<Macro>();
                 
                 _logger?.Info($"{macros.Count} macro(s) chargée(s) depuis {_macrosFilePath}", "MacroStorage");
@@ -98,7 +101,10 @@ namespace MacroEngine.Core.Storage
                     DelayBetweenRepeats = m.DelayBetweenRepeats,
                     CreatedAt = m.CreatedAt,
                     ModifiedAt = m.ModifiedAt,
-                    ShortcutKeyCode = m.ShortcutKeyCode
+                    ShortcutKeyCode = m.ShortcutKeyCode,
+                    TargetApplications = m.TargetApplications ?? new List<string>(),
+                    AppTriggerMode = m.AppTriggerMode,
+                    AutoExecuteOnFocus = m.AutoExecuteOnFocus
                 }).ToList();
 
                 var options = new JsonSerializerOptions
@@ -157,7 +163,10 @@ namespace MacroEngine.Core.Storage
                     DelayBetweenRepeats = macro.DelayBetweenRepeats,
                     CreatedAt = macro.CreatedAt,
                     ModifiedAt = macro.ModifiedAt,
-                    ShortcutKeyCode = macro.ShortcutKeyCode
+                    ShortcutKeyCode = macro.ShortcutKeyCode,
+                    TargetApplications = macro.TargetApplications ?? new List<string>(),
+                    AppTriggerMode = macro.AppTriggerMode,
+                    AutoExecuteOnFocus = macro.AutoExecuteOnFocus
                 };
 
                 var options = new JsonSerializerOptions
@@ -218,7 +227,10 @@ namespace MacroEngine.Core.Storage
                     DelayBetweenRepeats = macroData.DelayBetweenRepeats,
                     CreatedAt = macroData.CreatedAt,
                     ModifiedAt = DateTime.Now,
-                    ShortcutKeyCode = macroData.ShortcutKeyCode
+                    ShortcutKeyCode = macroData.ShortcutKeyCode,
+                    TargetApplications = macroData.TargetApplications ?? new List<string>(),
+                    AppTriggerMode = macroData.AppTriggerMode,
+                    AutoExecuteOnFocus = macroData.AutoExecuteOnFocus
                 };
 
                 _logger?.Info($"Macro '{importedMacro.Name}' importée avec succès depuis {filePath}", "MacroStorage");
@@ -243,6 +255,9 @@ namespace MacroEngine.Core.Storage
             public DateTime CreatedAt { get; set; }
             public DateTime ModifiedAt { get; set; }
             public int ShortcutKeyCode { get; set; } = 0;
+            public List<string> TargetApplications { get; set; } = new List<string>();
+            public AppTriggerMode AppTriggerMode { get; set; } = AppTriggerMode.Manual;
+            public bool AutoExecuteOnFocus { get; set; } = false;
         }
 
         /// <summary>

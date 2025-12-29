@@ -1,9 +1,10 @@
 using System;
+using System.Threading;
 
 namespace MacroEngine.Core.Inputs
 {
     /// <summary>
-    /// Action pour introduire un délai dans une macro
+    /// Action pour introduire un délai/pause dans une macro
     /// </summary>
     public class DelayAction : IInputAction
     {
@@ -19,7 +20,9 @@ namespace MacroEngine.Core.Inputs
         public void Execute()
         {
             if (Duration > 0)
-                System.Threading.Thread.Sleep(Duration);
+            {
+                Thread.Sleep(Duration);
+            }
         }
 
         public IInputAction Clone()
@@ -33,4 +36,3 @@ namespace MacroEngine.Core.Inputs
         }
     }
 }
-

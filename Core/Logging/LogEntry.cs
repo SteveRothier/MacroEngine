@@ -56,10 +56,3 @@ namespace MacroEngine.Core.Logging
     }
 }
 
-
-
-
-
-
-
-
