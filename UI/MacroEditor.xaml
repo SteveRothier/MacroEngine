@@ -155,6 +155,11 @@
                   AutoGenerateColumns="False"
                   CanUserAddRows="False"
                   SelectionMode="Single"
+                  EnableRowVirtualization="True"
+                  EnableColumnVirtualization="True"
+                  VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling"
+                  VirtualizingPanel.ScrollUnit="Pixel"
                   PreviewKeyDown="ActionsDataGrid_PreviewKeyDown"
                   CellEditEnding="ActionsDataGrid_CellEditEnding"
                   BeginningEdit="ActionsDataGrid_BeginningEdit">

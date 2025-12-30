@@ -368,37 +368,54 @@ namespace MacroEngine.UI
             RestoreState(nextState);
         }
 
+        private DateTime _lastRefreshTime = DateTime.MinValue;
+        private const int MIN_REFRESH_INTERVAL_MS = 1000; // Rafraîchir max 1 fois par seconde
+        private bool _refreshPending = false;
+        
         public void RefreshActions()
         {
             try
             {
-                if (_currentMacro != null && ActionsDataGrid != null && ActionsDataGrid.ItemsSource != null)
+                // Throttle: ne pas rafraîchir trop souvent
+                var now = DateTime.Now;
+                if ((now - _lastRefreshTime).TotalMilliseconds < MIN_REFRESH_INTERVAL_MS)
                 {
-                    // Utiliser BeginInvoke pour éviter les problèmes de thread
-                    ActionsDataGrid.Dispatcher.BeginInvoke(new Action(() =>
+                    // Marquer un rafraîchissement en attente
+                    if (!_refreshPending)
                     {
-                        try
+                        _refreshPending = true;
+                        // Programmer un rafraîchissement différé
+                        Dispatcher.BeginInvoke(new Action(() =>
                         {
-                            ActionsDataGrid.Items.Refresh();
-                            
-                            // Scroller vers la dernière ligne (la plus récente) seulement si nécessaire
-                            if (ActionsDataGrid.Items.Count > 0)
+                            if (_refreshPending)
                             {
-                                var lastItem = ActionsDataGrid.Items[ActionsDataGrid.Items.Count - 1];
-                                ActionsDataGrid.ScrollIntoView(lastItem);
-                                // Ne pas changer la sélection à chaque rafraîchissement
+                                _refreshPending = false;
+                                RefreshActionsInternal();
                             }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Erreur lors du rafraîchissement du DataGrid: {ex.Message}");
-                        }
-                    }), System.Windows.Threading.DispatcherPriority.Background);
+                        }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                    }
+                    return;
                 }
+                    
+                RefreshActionsInternal();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Erreur dans RefreshActions: {ex.Message}");
+            }
+        }
+        
+        private void RefreshActionsInternal()
+        {
+            _lastRefreshTime = DateTime.Now;
+            
+            if (_currentMacro != null && ActionsDataGrid != null && ActionsDataGrid.ItemsSource != null)
+            {
+                // Ne pas rafraîchir si l'utilisateur scrolle (focus sur le DataGrid)
+                if (ActionsDataGrid.IsMouseOver && Mouse.LeftButton == MouseButtonState.Pressed)
+                    return;
+                    
+                ActionsDataGrid.Items.Refresh();
             }
         }
 
@@ -1202,4 +1219,3 @@ namespace MacroEngine.UI
         #endregion
     }
 }
-

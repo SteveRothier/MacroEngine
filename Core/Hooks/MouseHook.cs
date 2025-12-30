@@ -18,9 +18,10 @@ namespace MacroEngine.Core.Hooks
         private const int WM_MOUSEMOVE = 0x0200;
         private const int WM_MOUSEWHEEL = 0x020A;
 
-        private LowLevelMouseProc _proc;
+        private readonly LowLevelMouseProc _proc;
         private IntPtr _hookId = IntPtr.Zero;
         private bool _isEnabled = false;
+        private static MouseHook? _instance; // Empêche le GC de collecter le hook
 
 #pragma warning disable CS0067 // Event is never used
         public event EventHandler<KeyboardHookEventArgs>? KeyDown;
@@ -45,15 +46,30 @@ namespace MacroEngine.Core.Hooks
         public MouseHook()
         {
             _proc = HookCallback;
+            _instance = this; // Empêche le GC de collecter l'instance
         }
 
         public bool Install()
         {
             if (_hookId != IntPtr.Zero)
+            {
+                System.Diagnostics.Debug.WriteLine("[MouseHook] Hook déjà installé");
                 return false;
+            }
 
             _hookId = SetHook(_proc);
             _isEnabled = _hookId != IntPtr.Zero;
+            
+            if (_isEnabled)
+            {
+                System.Diagnostics.Debug.WriteLine($"[MouseHook] Hook installé avec succès, hookId={_hookId}");
+            }
+            else
+            {
+                int error = Marshal.GetLastWin32Error();
+                System.Diagnostics.Debug.WriteLine($"[MouseHook] ÉCHEC installation hook, erreur Win32={error}");
+            }
+            
             return _isEnabled;
         }
 

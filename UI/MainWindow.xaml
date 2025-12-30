@@ -115,8 +115,14 @@
                               IsChecked="True"
                               VerticalAlignment="Center"
                               Margin="5,0,5,0"/>
+                    <CheckBox x:Name="RecordMouseClicksCheckBox" 
+                              Content="Enregistrer clics souris" 
+                              IsChecked="True"
+                              VerticalAlignment="Center"
+                              Margin="5,0,5,0"
+                              ToolTip="Enregistre les clics souris (gauche, droit, milieu)"/>
                     <CheckBox x:Name="RecordMouseMovesCheckBox" 
-                              Content="Enregistrer mouvements souris" 
+                              Content="Enregistrer mouvements" 
                               IsChecked="False"
                               VerticalAlignment="Center"
                               Margin="5,0,5,0"

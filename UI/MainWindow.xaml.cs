@@ -47,14 +47,20 @@ namespace MacroEngine.UI
         private Dictionary<int, Macro> _macroShortcuts = new Dictionary<int, Macro>();
         private bool _isRecording = false;
         private bool _isRecordingPaused = false;
+        private bool _recordMouseClicks = true;
         private DateTime _lastActionTime;
         private readonly object _pressedKeysLock = new object();
         private HashSet<int> _pressedKeys = new HashSet<int>();
         private Dictionary<int, DateTime> _keyDownTimes = new Dictionary<int, DateTime>();
         private DateTime _lastEditorRefresh = DateTime.MinValue;
         private const int EDITOR_REFRESH_INTERVAL_MS = 50; // Rafraîchir l'éditeur max toutes les 50ms pour un affichage réactif
+        private System.Collections.ObjectModel.ObservableCollection<ActionLogItem>? _actionLogItems;
         private DateTime _lastKeyRecorded = DateTime.MinValue;
         private const int MIN_KEY_INTERVAL_MS = 50; // Intervalle minimum entre deux touches enregistrées (50ms = 20 touches/seconde max)
+        
+        // Queue thread-safe pour les événements souris
+        private readonly System.Collections.Concurrent.ConcurrentQueue<(int X, int Y, MouseButton Button, DateTime Time)> _mouseEventQueue = new();
+        private System.Windows.Threading.DispatcherTimer? _mouseEventProcessorTimer;
         private int _rapidKeyWarningCount = 0;
         private DateTime _lastRapidKeyWarning = DateTime.MinValue;
         private readonly object _recordingLock = new object();
@@ -1059,6 +1065,32 @@ namespace MacroEngine.UI
             _lastMouseMoveRecorded = DateTime.MinValue;
             _lastMouseX = -1;
             _lastMouseY = -1;
+            _recordMouseClicks = RecordMouseClicksCheckBox.IsChecked == true;
+            
+            // Initialiser le cache des coordonnées de la fenêtre
+            _cachedWindowHandle = new WindowInteropHelper(this).Handle;
+            if (_cachedWindowHandle != IntPtr.Zero)
+            {
+                GetWindowRect(_cachedWindowHandle, out _cachedWindowRect);
+                System.Diagnostics.Debug.WriteLine($"[StartRecording] Window rect cached: ({_cachedWindowRect.Left},{_cachedWindowRect.Top},{_cachedWindowRect.Right},{_cachedWindowRect.Bottom})");
+            }
+            _lastWindowRectUpdate = DateTime.Now;
+            
+            // Cacher les rectangles des boutons de contrôle
+            CacheControlButtonRects();
+            
+            // Initialiser la collection pour le log d'actions
+            _actionLogItems = new System.Collections.ObjectModel.ObservableCollection<ActionLogItem>();
+            ActionsListBox.ItemsSource = _actionLogItems;
+            
+            // Initialiser le timer pour traiter les événements souris par lots
+            _mouseEventProcessorTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(100) // Traiter tous les 100ms
+            };
+            _mouseEventProcessorTimer.Tick += ProcessMouseEventQueue;
+            _mouseEventProcessorTimer.Start();
+            
             lock (_pressedKeysLock)
             {
                 _pressedKeys.Clear();
@@ -1087,8 +1119,16 @@ namespace MacroEngine.UI
             // Installer les hooks
             try
             {
-                _keyboardHook.Install();
-                _mouseHook.Install();
+                bool keyboardInstalled = _keyboardHook.Install();
+                bool mouseInstalled = _mouseHook.Install();
+                
+                System.Diagnostics.Debug.WriteLine($"[StartRecording] Keyboard hook: {keyboardInstalled}, Mouse hook: {mouseInstalled}, RecordMouseClicks: {_recordMouseClicks}");
+                _logger?.Info($"Hooks installés - Clavier: {keyboardInstalled}, Souris: {mouseInstalled}, Enregistrer clics: {_recordMouseClicks}", "MainWindow");
+                
+                if (!mouseInstalled)
+                {
+                    _logger?.Warning("Le hook souris n'a pas pu être installé!", "MainWindow");
+                }
             }
             catch (Exception ex)
             {
@@ -1123,6 +1163,13 @@ namespace MacroEngine.UI
             _keyboardHook.Uninstall();
             _mouseHook.Uninstall();
             _logger.Debug("Hooks d'enregistrement désinstallés", "MainWindow");
+            
+            // Arrêter le timer de traitement des événements souris
+            _mouseEventProcessorTimer?.Stop();
+            _mouseEventProcessorTimer = null;
+            
+            // Vider la queue restante
+            while (_mouseEventQueue.TryDequeue(out _)) { }
 
             // Réinstaller les hooks globaux après l'enregistrement
             InitializeGlobalHooks();
@@ -1408,106 +1455,78 @@ namespace MacroEngine.UI
 
         private void MouseHook_MouseDown(object? sender, MouseHookEventArgs e)
         {
-            if (!_isRecording || _isRecordingPaused)
+            // Vérifications ultra-rapides - retourner immédiatement
+            if (!_isRecording || _isRecordingPaused || !_recordMouseClicks)
                 return;
 
-            // Vérifier si le clic est dans la fenêtre de l'application (ne pas enregistrer les clics sur les boutons)
-            if (IsClickInApplicationWindow(e.X, e.Y))
+            // Vérifier si le clic est sur un bouton de contrôle
+            if (IsClickOnRecordingControls(e.X, e.Y))
                 return;
 
-            var x = e.X;
-            var y = e.Y;
-            var button = e.Button;
-            var timestamp = DateTime.Now;
-
-            Dispatcher.BeginInvoke(new Action(() =>
+            // Ajouter à la queue et retourner IMMÉDIATEMENT
+            // Le timer traitera les événements par lots
+            _mouseEventQueue.Enqueue((e.X, e.Y, e.Button, DateTime.Now));
+        }
+        
+        private void ProcessMouseEventQueue(object? sender, EventArgs e)
+        {
+            if (!_isRecording || _isRecordingPaused || _selectedMacro == null)
+                return;
+                
+            // Traiter max 10 événements par tick pour éviter les blocages
+            int processed = 0;
+            while (processed < 10 && _mouseEventQueue.TryDequeue(out var evt))
             {
-                try
+                processed++;
+                
+                _selectedMacro.Actions ??= new List<IInputAction>();
+
+                // Ajouter un délai si nécessaire
+                AddDelayIfNeeded();
+
+                var mouseAction = new MouseAction
                 {
-                    // Vérifier à nouveau que l'enregistrement est toujours actif
-                    if (!_isRecording || _isRecordingPaused)
-                        return;
-
-                    // Vérifier que la liste d'actions existe
-                    if (_selectedMacro != null && _selectedMacro.Actions == null)
-                    {
-                        _selectedMacro.Actions = new List<IInputAction>();
-                    }
-
-                    // Ajouter un délai si nécessaire
-                    AddDelayIfNeeded();
-
-                    MouseActionType actionType = button switch
+                    Name = $"Clic {evt.Button}",
+                    ActionType = evt.Button switch
                     {
                         MouseButton.Left => MouseActionType.LeftClick,
                         MouseButton.Right => MouseActionType.RightClick,
                         MouseButton.Middle => MouseActionType.MiddleClick,
                         _ => MouseActionType.LeftClick
-                    };
+                    },
+                    X = evt.X,
+                    Y = evt.Y
+                };
 
-                    var mouseAction = new MouseAction
-                    {
-                        Name = $"Clic {button}",
-                        ActionType = actionType,
-                        X = x,
-                        Y = y
-                    };
-
-                    if (_selectedMacro != null)
-                    {
-                        _selectedMacro.Actions.Add(mouseAction);
-                    }
-                    _lastActionTime = timestamp;
-                    
-                    // Déclencher la sauvegarde automatique
-                    TriggerAutoSave();
-
-                    // Afficher dans la zone d'actions
-                    var actionItem = new ActionLogItem
-                    {
-                        Timestamp = timestamp.ToString("HH:mm:ss.fff"),
-                        Description = $"Enregistré: {mouseAction.Name} à ({x}, {y})"
-                    };
-
-                    var items = ActionsListBox.ItemsSource as System.Collections.ObjectModel.ObservableCollection<ActionLogItem> ??
-                               new System.Collections.ObjectModel.ObservableCollection<ActionLogItem>();
-
-                    if (ActionsListBox.ItemsSource == null)
-                    {
-                        ActionsListBox.ItemsSource = items;
-                    }
-
-                    items.Add(actionItem);
-                    
-                    // Limiter à 100 actions (supprimer les plus anciennes en haut)
-                    while (items.Count > 100)
-                    {
-                        items.RemoveAt(0);
-                    }
-
-                    ActionsCountText.Text = $"{_selectedMacro?.Actions?.Count ?? 0} action(s)";
-                    
-                    // Scroller vers le bas uniquement de temps en temps pour éviter la surcharge
-                    if (ActionsListBox.Items.Count > 0 && ActionsListBox.Items.Count % 5 == 0)
-                    {
-                        ActionsListBox.ScrollIntoView(ActionsListBox.Items[ActionsListBox.Items.Count - 1]);
-                    }
-                    
-                    // Rafraîchir l'éditeur moins fréquemment pour éviter la surcharge
-                    var now = DateTime.Now;
-                    if ((now - _lastEditorRefresh).TotalMilliseconds >= EDITOR_REFRESH_INTERVAL_MS)
-                    {
-                        _lastEditorRefresh = now;
-                        RefreshMacroEditor();
-                    }
-                }
-                catch (Exception ex)
+                _selectedMacro.Actions.Add(mouseAction);
+                _lastActionTime = evt.Time;
+                
+                // Ajouter au log
+                _actionLogItems?.Add(new ActionLogItem
                 {
-                    // Log l'erreur mais ne bloque pas l'enregistrement
-                    System.Diagnostics.Debug.WriteLine($"Erreur lors de l'enregistrement du clic: {ex.Message}");
-                    System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                    Timestamp = evt.Time.ToString("HH:mm:ss.fff"),
+                    Description = $"Clic {evt.Button} à ({evt.X}, {evt.Y})"
+                });
+            }
+            
+            // Mise à jour UI une seule fois après le traitement du lot
+            if (processed > 0)
+            {
+                ActionsCountText.Text = $"{_selectedMacro?.Actions?.Count ?? 0} action(s)";
+                
+                // Limiter le log à 50 entrées
+                while (_actionLogItems?.Count > 50)
+                    _actionLogItems.RemoveAt(0);
+                
+                // Rafraîchir l'éditeur
+                var now = DateTime.Now;
+                if ((now - _lastEditorRefresh).TotalMilliseconds >= 500)
+                {
+                    _lastEditorRefresh = now;
+                    RefreshMacroEditor();
+                    TriggerAutoSave();
                 }
-            }), System.Windows.Threading.DispatcherPriority.Input);
+            }
         }
 
         private void MouseHook_MouseUp(object? sender, MouseHookEventArgs e)
@@ -1525,9 +1544,6 @@ namespace MacroEngine.UI
                 return;
 
             // Vérifier si le mouvement est dans la fenêtre de l'application
-            if (IsClickInApplicationWindow(e.X, e.Y))
-                return;
-
             var now = DateTime.Now;
             var x = e.X;
             var y = e.Y;
@@ -1890,32 +1906,121 @@ namespace MacroEngine.UI
         {
             if (_macroEditor != null && _selectedMacro != null)
             {
-                // Rafraîchir le DataGrid pour afficher les nouvelles actions
-                Dispatcher.Invoke(() =>
-                {
-                    _macroEditor.RefreshActions();
-                });
+                // On est déjà sur le thread UI, pas besoin de Dispatcher.Invoke
+                _macroEditor.RefreshActions();
             }
         }
 
+        // Cache pour les coordonnées de la fenêtre (mis à jour périodiquement)
+        private RECT _cachedWindowRect;
+        private DateTime _lastWindowRectUpdate = DateTime.MinValue;
+        private IntPtr _cachedWindowHandle = IntPtr.Zero;
+        
+        // Cache des rectangles des boutons de contrôle
+        private List<RECT> _controlButtonRects = new List<RECT>();
+        
+        private void CacheControlButtonRects()
+        {
+            _controlButtonRects.Clear();
+            
+            try
+            {
+                // Liste des boutons de contrôle à ignorer
+                var controlButtons = new FrameworkElement[] 
+                { 
+                    StartButton, StopButton, PauseButton, ExecuteButton,
+                    RecordDelaysCheckBox, RecordMouseClicksCheckBox, RecordMouseMovesCheckBox
+                };
+                
+                foreach (var button in controlButtons)
+                {
+                    if (button != null && button.IsVisible)
+                    {
+                        try
+                        {
+                            var transform = button.TransformToAncestor(this);
+                            var topLeft = transform.Transform(new Point(0, 0));
+                            var bottomRight = transform.Transform(new Point(button.ActualWidth, button.ActualHeight));
+                            
+                            // Convertir en coordonnées écran
+                            var screenTopLeft = PointToScreen(topLeft);
+                            var screenBottomRight = PointToScreen(bottomRight);
+                            
+                            _controlButtonRects.Add(new RECT
+                            {
+                                Left = (int)screenTopLeft.X,
+                                Top = (int)screenTopLeft.Y,
+                                Right = (int)screenBottomRight.X,
+                                Bottom = (int)screenBottomRight.Y
+                            });
+                        }
+                        catch { }
+                    }
+                }
+                
+                System.Diagnostics.Debug.WriteLine($"[CacheControlButtonRects] {_controlButtonRects.Count} boutons de contrôle cachés");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[CacheControlButtonRects] Erreur: {ex.Message}");
+            }
+        }
+        
+        private bool IsClickOnRecordingControls(int x, int y)
+        {
+            foreach (var rect in _controlButtonRects)
+            {
+                if (x >= rect.Left && x <= rect.Right && y >= rect.Top && y <= rect.Bottom)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        
         private bool IsClickInApplicationWindow(int x, int y)
         {
             try
             {
-                // Obtenir les limites de la fenêtre de l'application
-                var windowHandle = new WindowInteropHelper(this).Handle;
-                if (windowHandle == IntPtr.Zero)
+                // Mettre à jour le cache toutes les 500ms ou si le handle n'est pas encore récupéré
+                var now = DateTime.Now;
+                if (_cachedWindowHandle == IntPtr.Zero || (now - _lastWindowRectUpdate).TotalMilliseconds > 500)
+                {
+                    // Doit être fait sur le thread UI
+                    if (Dispatcher.CheckAccess())
+                    {
+                        _cachedWindowHandle = new WindowInteropHelper(this).Handle;
+                        if (_cachedWindowHandle != IntPtr.Zero)
+                        {
+                            GetWindowRect(_cachedWindowHandle, out _cachedWindowRect);
+                        }
+                        _lastWindowRectUpdate = now;
+                    }
+                    else
+                    {
+                        // Si on n'est pas sur le thread UI, utiliser le cache existant
+                        // ou ne pas filtrer si pas de cache
+                        if (_cachedWindowHandle == IntPtr.Zero)
+                            return false;
+                    }
+                }
+                
+                if (_cachedWindowHandle == IntPtr.Zero)
                     return false;
 
-                // Obtenir le rectangle de la fenêtre
-                if (GetWindowRect(windowHandle, out RECT rect))
-                {
-                    // Vérifier si le point est dans le rectangle
-                    return x >= rect.Left && x <= rect.Right && y >= rect.Top && y <= rect.Bottom;
-                }
+                // Mettre à jour les coordonnées de la fenêtre (peut être fait depuis n'importe quel thread)
+                GetWindowRect(_cachedWindowHandle, out RECT rect);
+                
+                // Vérifier si le point est dans le rectangle
+                bool isInWindow = x >= rect.Left && x <= rect.Right && y >= rect.Top && y <= rect.Bottom;
+                
+                System.Diagnostics.Debug.WriteLine($"[IsClickInApplicationWindow] Click({x},{y}) Window({rect.Left},{rect.Top},{rect.Right},{rect.Bottom}) InWindow={isInWindow}");
+                
+                return isInWindow;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"[IsClickInApplicationWindow] Erreur: {ex.Message}");
                 // En cas d'erreur, on ne filtre pas (mieux vaut enregistrer que de perdre des actions)
             }
 
