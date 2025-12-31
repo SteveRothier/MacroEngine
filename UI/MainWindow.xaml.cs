@@ -48,6 +48,7 @@ namespace MacroEngine.UI
         private bool _isRecording = false;
         private bool _isRecordingPaused = false;
         private bool _recordMouseClicks = true;
+        private volatile bool _stopRequested = false;
         private DateTime _lastActionTime;
         private readonly object _pressedKeysLock = new object();
         private HashSet<int> _pressedKeys = new HashSet<int>();
@@ -468,28 +469,47 @@ namespace MacroEngine.UI
             // Vérifier si cette touche correspond à un raccourci de macro
             if (_macroShortcuts.TryGetValue(e.VirtualKeyCode, out var macro))
             {
-                // Ne pas exécuter si on est en train d'enregistrer ou qu'une macro est déjà en cours
-                if (!_isRecording && _macroEngine.State == MacroEngineState.Idle)
+                // Ne pas exécuter si on est en train d'enregistrer
+                if (_isRecording)
+                    return;
+                    
+                // Vérifier que ce n'est pas le raccourci global d'exécution ou d'arrêt
+                if (_appConfig != null && 
+                    (e.VirtualKeyCode == _appConfig.ExecuteMacroKeyCode || 
+                     e.VirtualKeyCode == _appConfig.StopMacroKeyCode))
                 {
-                    // Vérifier que ce n'est pas le raccourci global d'exécution ou d'arrêt
-                    if (_appConfig != null && 
-                        e.VirtualKeyCode != _appConfig.ExecuteMacroKeyCode && 
-                        e.VirtualKeyCode != _appConfig.StopMacroKeyCode)
-                    {
-                        // Vérifier si le raccourci est actif pour l'application actuelle
-                        if (!IsMacroShortcutActiveForCurrentApp(macro))
-                        {
-                            return; // Le raccourci n'est pas actif pour cette application
-                        }
+                    return;
+                }
+                
+                // Vérifier si le raccourci est actif pour l'application actuelle
+                if (!IsMacroShortcutActiveForCurrentApp(macro))
+                {
+                    return; // Le raccourci n'est pas actif pour cette application
+                }
 
-                        e.Handled = true;
-                        Dispatcher.BeginInvoke(new Action(async () =>
-                        {
-                            _selectedMacro = macro;
-                            MacrosListBox.SelectedItem = macro;
-                            await ExecuteMacroAsync();
-                        }), System.Windows.Threading.DispatcherPriority.Normal);
-                    }
+                e.Handled = true;
+                
+                // Mode toggle: si la macro est en cours, l'arrêter
+                if (_macroEngine.State != MacroEngineState.Idle && _selectedMacro?.Id == macro.Id)
+                {
+                    // Arrêter la macro en cours
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        _stopRequested = true;
+                        _macroEngine.StopMacroAsync();
+                        StatusText.Text = "Macro arrêtée (raccourci)";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    }), System.Windows.Threading.DispatcherPriority.Normal);
+                }
+                else if (_macroEngine.State == MacroEngineState.Idle)
+                {
+                    // Lancer la macro
+                    Dispatcher.BeginInvoke(new Action(async () =>
+                    {
+                        _selectedMacro = macro;
+                        MacrosListBox.SelectedItem = macro;
+                        await ExecuteMacroAsync();
+                    }), System.Windows.Threading.DispatcherPriority.Normal);
                 }
             }
         }
@@ -627,11 +647,16 @@ namespace MacroEngine.UI
 
         private void GlobalStopHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
-            // Vérifier que c'est le raccourci configuré pour arrêter
-            if (_appConfig != null && e.VirtualKeyCode == _appConfig.StopMacroKeyCode)
+            // Vérifier que c'est le raccourci configuré pour arrêter (F11 par défaut)
+            bool isStopKey = _appConfig != null && e.VirtualKeyCode == _appConfig.StopMacroKeyCode;
+            
+            if (isStopKey)
             {
-                // Bloquer la propagation
-                e.Handled = true;
+                // Bloquer la propagation seulement si une macro est en cours
+                if (_macroEngine.State != MacroEngineState.Idle || _isRecording)
+                {
+                    e.Handled = true;
+                }
                 
                 // Arrêter la macro ou l'enregistrement
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -642,8 +667,9 @@ namespace MacroEngine.UI
                     }
                     else if (_macroEngine.State != MacroEngineState.Idle)
                     {
+                        _stopRequested = true;
                         _macroEngine.StopMacroAsync();
-                        StatusText.Text = "Macro arrêtée";
+                        StatusText.Text = "Macro arrêtée (F11)";
                     }
                 }), System.Windows.Threading.DispatcherPriority.Normal);
             }
@@ -984,26 +1010,108 @@ namespace MacroEngine.UI
                     return;
                 }
 
-                // Exécuter la macro
-                Dispatcher.Invoke(() =>
-                {
-                    StatusText.Text = "Exécution de la macro en cours...";
-                    StatusText.Foreground = System.Windows.Media.Brushes.Black;
-                });
+                // Réinitialiser le flag d'arrêt
+                _stopRequested = false;
                 
-                bool success = await _macroEngine.StartMacroAsync(_selectedMacro);
+                // Déterminer le nombre de répétitions
+                int repeatCount = 1;
+                bool repeatUntilStopped = false;
+                int delayBetween = _selectedMacro.DelayBetweenRepeats;
                 
-                Dispatcher.Invoke(() =>
+                switch (_selectedMacro.RepeatMode)
                 {
-                    if (success)
+                    case RepeatMode.Once:
+                        repeatCount = 1;
+                        break;
+                    case RepeatMode.RepeatCount:
+                        repeatCount = Math.Max(1, _selectedMacro.RepeatCount);
+                        break;
+                    case RepeatMode.UntilStopped:
+                        repeatUntilStopped = true;
+                        repeatCount = int.MaxValue; // Boucle infinie jusqu'à arrêt
+                        break;
+                }
+                
+                // Exécuter la macro avec répétition
+                int currentRepeat = 0;
+                bool success = true;
+                bool wasStopped = false;
+                
+                for (int i = 0; i < repeatCount && !_stopRequested; i++)
+                {
+                    currentRepeat = i + 1;
+                    
+                    string statusText = repeatUntilStopped 
+                        ? $"Exécution en boucle (#{currentRepeat})... Appuyez sur le raccourci ou F11 pour arrêter"
+                        : repeatCount > 1 
+                            ? $"Exécution {currentRepeat}/{repeatCount}..."
+                            : "Exécution de la macro en cours...";
+                    
+                    Dispatcher.Invoke(() =>
                     {
-                        StatusText.Text = "Exécution terminée";
+                        StatusText.Text = statusText;
+                        StatusText.Foreground = System.Windows.Media.Brushes.Black;
+                    });
+                    
+                    success = await _macroEngine.StartMacroAsync(_selectedMacro);
+                    
+                    // Vérifier si arrêt demandé
+                    if (_stopRequested)
+                    {
+                        wasStopped = true;
+                        break;
+                    }
+                    
+                    if (!success)
+                        break;
+                    
+                    // Délai entre les répétitions (sauf pour la dernière)
+                    bool hasMoreIterations = repeatUntilStopped || (i + 1) < repeatCount;
+                    if (hasMoreIterations && delayBetween > 0 && !_stopRequested)
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            StatusText.Text = $"Pause {delayBetween}ms avant répétition...";
+                        });
+                        
+                        // Délai avec vérification d'arrêt toutes les 50ms
+                        int remainingDelay = delayBetween;
+                        while (remainingDelay > 0 && !_stopRequested)
+                        {
+                            int waitTime = Math.Min(50, remainingDelay);
+                            await System.Threading.Tasks.Task.Delay(waitTime);
+                            remainingDelay -= waitTime;
+                        }
+                        
+                        if (_stopRequested)
+                        {
+                            wasStopped = true;
+                            break;
+                        }
+                    }
+                }
+                
+                _stopRequested = false;
+                
+                Dispatcher.Invoke(() =>
+                {
+                    if (wasStopped)
+                    {
+                        StatusText.Text = $"Macro arrêtée après {currentRepeat} répétition(s)";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    }
+                    else if (success)
+                    {
+                        string completedText = repeatCount > 1 || repeatUntilStopped
+                            ? $"Exécution terminée ({currentRepeat} répétition(s))"
+                            : "Exécution terminée";
+                        StatusText.Text = completedText;
                         StatusText.Foreground = System.Windows.Media.Brushes.Green;
                     }
                     else
                     {
-                        StatusText.Text = "Erreur lors de l'exécution";
-                        StatusText.Foreground = System.Windows.Media.Brushes.Red;
+                        StatusText.Text = "Exécution arrêtée";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     }
                 });
             }
@@ -1896,9 +2004,10 @@ namespace MacroEngine.UI
             }
             else
             {
-                // Arrêter l'exécution de macro (si nécessaire dans le futur)
+                // Arrêter l'exécution de macro
+                _stopRequested = true;
                 _macroEngine.StopMacroAsync();
-            StatusText.Text = "Arrêté";
+                StatusText.Text = "Arrêté";
             }
         }
 

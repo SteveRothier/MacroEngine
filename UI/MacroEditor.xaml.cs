@@ -116,6 +116,9 @@ namespace MacroEngine.UI
                 
                 ActionsDataGrid.ItemsSource = macro.Actions;
                 
+                // Charger les options de répétition
+                UpdateRepeatOptionsDisplay();
+                
                 // Réinitialiser l'historique
                 _undoStack.Clear();
                 _redoStack.Clear();
@@ -132,6 +135,7 @@ namespace MacroEngine.UI
                 _redoStack.Clear();
                 UpdateUndoRedoButtons();
                 UpdateTargetAppsDisplay();
+                ResetRepeatOptions();
             }
         }
 
@@ -1113,6 +1117,112 @@ namespace MacroEngine.UI
                 }
             }
         }
+        
+        #region Repeat Options
+        
+        private void UpdateRepeatOptionsDisplay()
+        {
+            if (_currentMacro == null) return;
+            
+            // Sélectionner le mode de répétition
+            switch (_currentMacro.RepeatMode)
+            {
+                case RepeatMode.Once:
+                    RepeatModeComboBox.SelectedIndex = 0;
+                    RepeatCountPanel.Visibility = Visibility.Collapsed;
+                    DelayPanel.Visibility = Visibility.Collapsed;
+                    RepeatInfoText.Visibility = Visibility.Collapsed;
+                    break;
+                case RepeatMode.RepeatCount:
+                    RepeatModeComboBox.SelectedIndex = 1;
+                    RepeatCountPanel.Visibility = Visibility.Visible;
+                    DelayPanel.Visibility = Visibility.Visible;
+                    RepeatInfoText.Visibility = Visibility.Collapsed;
+                    RepeatCountTextBox.Text = _currentMacro.RepeatCount.ToString();
+                    DelayBetweenTextBox.Text = _currentMacro.DelayBetweenRepeats.ToString();
+                    break;
+                case RepeatMode.UntilStopped:
+                    RepeatModeComboBox.SelectedIndex = 2;
+                    RepeatCountPanel.Visibility = Visibility.Collapsed;
+                    DelayPanel.Visibility = Visibility.Visible;
+                    RepeatInfoText.Visibility = Visibility.Visible;
+                    DelayBetweenTextBox.Text = _currentMacro.DelayBetweenRepeats.ToString();
+                    break;
+            }
+        }
+        
+        private void ResetRepeatOptions()
+        {
+            RepeatModeComboBox.SelectedIndex = 0;
+            RepeatCountPanel.Visibility = Visibility.Collapsed;
+            DelayPanel.Visibility = Visibility.Collapsed;
+            RepeatInfoText.Visibility = Visibility.Collapsed;
+            RepeatCountTextBox.Text = "1";
+            DelayBetweenTextBox.Text = "0";
+        }
+        
+        private void RepeatModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_currentMacro == null || RepeatModeComboBox.SelectedItem == null) return;
+            
+            var selectedItem = RepeatModeComboBox.SelectedItem as ComboBoxItem;
+            var tag = selectedItem?.Tag?.ToString();
+            
+            switch (tag)
+            {
+                case "Once":
+                    _currentMacro.RepeatMode = RepeatMode.Once;
+                    _currentMacro.RepeatCount = 1;
+                    RepeatCountPanel.Visibility = Visibility.Collapsed;
+                    DelayPanel.Visibility = Visibility.Collapsed;
+                    RepeatInfoText.Visibility = Visibility.Collapsed;
+                    break;
+                case "RepeatCount":
+                    _currentMacro.RepeatMode = RepeatMode.RepeatCount;
+                    RepeatCountPanel.Visibility = Visibility.Visible;
+                    DelayPanel.Visibility = Visibility.Visible;
+                    RepeatInfoText.Visibility = Visibility.Collapsed;
+                    if (int.TryParse(RepeatCountTextBox.Text, out int count) && count > 0)
+                        _currentMacro.RepeatCount = count;
+                    else
+                        _currentMacro.RepeatCount = 2;
+                    RepeatCountTextBox.Text = _currentMacro.RepeatCount.ToString();
+                    break;
+                case "UntilStopped":
+                    _currentMacro.RepeatMode = RepeatMode.UntilStopped;
+                    _currentMacro.RepeatCount = 0; // 0 = infini
+                    RepeatCountPanel.Visibility = Visibility.Collapsed;
+                    DelayPanel.Visibility = Visibility.Visible;
+                    RepeatInfoText.Visibility = Visibility.Visible;
+                    break;
+            }
+            
+            OnMacroModified();
+        }
+        
+        private void RepeatCountTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+            
+            if (int.TryParse(RepeatCountTextBox.Text, out int count) && count > 0)
+            {
+                _currentMacro.RepeatCount = count;
+                OnMacroModified();
+            }
+        }
+        
+        private void DelayBetweenTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+            
+            if (int.TryParse(DelayBetweenTextBox.Text, out int delay) && delay >= 0)
+            {
+                _currentMacro.DelayBetweenRepeats = delay;
+                OnMacroModified();
+            }
+        }
+        
+        #endregion
 
         private void RemoveTargetApp_Click(object sender, RoutedEventArgs e)
         {

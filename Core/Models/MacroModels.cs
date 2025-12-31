@@ -14,8 +14,21 @@ namespace MacroEngine.Core.Models
         public string Description { get; set; } = string.Empty;
         public List<IInputAction> Actions { get; set; } = new List<IInputAction>();
         public bool IsEnabled { get; set; } = true;
+        
+        /// <summary>
+        /// Nombre de répétitions (1 = une seule exécution, 0 = infini jusqu'à interruption)
+        /// </summary>
         public int RepeatCount { get; set; } = 1;
+        
+        /// <summary>
+        /// Délai en millisecondes entre chaque répétition
+        /// </summary>
         public int DelayBetweenRepeats { get; set; } = 0;
+        
+        /// <summary>
+        /// Mode de répétition
+        /// </summary>
+        public RepeatMode RepeatMode { get; set; } = RepeatMode.Once;
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime ModifiedAt { get; set; } = DateTime.Now;
         
@@ -39,6 +52,27 @@ namespace MacroEngine.Core.Models
         /// Indique si la macro doit s'exécuter automatiquement quand l'application cible passe au premier plan
         /// </summary>
         public bool AutoExecuteOnFocus { get; set; } = false;
+    }
+
+    /// <summary>
+    /// Mode de répétition de la macro
+    /// </summary>
+    public enum RepeatMode
+    {
+        /// <summary>
+        /// Exécuter une seule fois
+        /// </summary>
+        Once,
+
+        /// <summary>
+        /// Répéter X fois (selon RepeatCount)
+        /// </summary>
+        RepeatCount,
+
+        /// <summary>
+        /// Répéter jusqu'à interruption (Échap ou bouton Stop)
+        /// </summary>
+        UntilStopped
     }
 
     /// <summary>

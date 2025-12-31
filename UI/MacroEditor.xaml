@@ -146,6 +146,62 @@
                             Margin="5,0,0,0"/>
                 </Grid>
             </Grid>
+            
+            <!-- Options de répétition -->
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Text="Répétition:" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                
+                <ComboBox x:Name="RepeatModeComboBox" 
+                          Grid.Column="1"
+                          Width="150"
+                          SelectionChanged="RepeatModeComboBox_SelectionChanged"
+                          Margin="0,0,10,0">
+                    <ComboBoxItem Content="Une seule fois" Tag="Once"/>
+                    <ComboBoxItem Content="Répéter X fois" Tag="RepeatCount"/>
+                    <ComboBoxItem Content="Jusqu'à interruption" Tag="UntilStopped"/>
+                </ComboBox>
+                
+                <StackPanel x:Name="RepeatCountPanel" 
+                            Grid.Column="2" 
+                            Orientation="Horizontal" 
+                            Visibility="Collapsed">
+                    <TextBlock Text="Fois:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <TextBox x:Name="RepeatCountTextBox" 
+                             Width="60" 
+                             Text="1"
+                             TextChanged="RepeatCountTextBox_TextChanged"
+                             Margin="0,0,10,0"/>
+                </StackPanel>
+                
+                <StackPanel x:Name="DelayPanel" 
+                            Grid.Column="3" 
+                            Orientation="Horizontal"
+                            Visibility="Collapsed">
+                    <TextBlock Text="Délai entre:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <TextBox x:Name="DelayBetweenTextBox" 
+                             Width="60" 
+                             Text="0"
+                             TextChanged="DelayBetweenTextBox_TextChanged"/>
+                    <TextBlock Text="ms" VerticalAlignment="Center" Margin="3,0,0,0"/>
+                </StackPanel>
+                
+                <TextBlock x:Name="RepeatInfoText" 
+                           Grid.Column="5" 
+                           VerticalAlignment="Center" 
+                           Foreground="Gray" 
+                           FontStyle="Italic"
+                           HorizontalAlignment="Right"
+                           Text="Appuyez sur le raccourci ou F11 pour arrêter"/>
+            </Grid>
         </StackPanel>
 
         <!-- Liste des actions -->

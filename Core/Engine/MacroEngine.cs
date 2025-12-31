@@ -257,18 +257,11 @@ namespace MacroEngine.Core.Engine
             if (macro.Actions == null || macro.Actions.Count == 0)
                 return;
 
-            for (int repeat = 0; repeat < macro.RepeatCount; repeat++)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                    break;
+            // La répétition est gérée par MainWindow, ici on exécute juste une fois
+            if (cancellationToken.IsCancellationRequested)
+                return;
 
-                await ExecuteActionsAsync(macro.Actions);
-
-                if (repeat < macro.RepeatCount - 1 && macro.DelayBetweenRepeats > 0)
-                {
-                    await Task.Delay(macro.DelayBetweenRepeats, cancellationToken);
-                }
-            }
+            await ExecuteActionsAsync(macro.Actions);
         }
 
         private string GetActionDescription(IInputAction action)
