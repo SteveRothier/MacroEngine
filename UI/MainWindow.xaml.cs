@@ -1256,7 +1256,7 @@ namespace MacroEngine.UI
             StopButton.IsEnabled = true;
             _isRecordingPaused = false;
             
-            _logger.Info("Hooks d'enregistrement installés avec succès", "MainWindow");
+            _logger?.Info("Hooks d'enregistrement installés avec succès", "MainWindow");
         }
 
         private void StopRecording()

@@ -14,6 +14,7 @@ Le projet suit une architecture modulaire et extensible avec séparation des res
   - **Hooks**: Hooks système Windows pour capturer les événements globaux
   - **Logging**: Système de logs modulaire et thread-safe
   - **Storage**: Gestion de la persistance (macros, configuration, profils)
+  - **Processes**: Surveillance des applications et détection du premier plan
   - **Profiles**: Système de profils de macros
   - **Plugins**: Architecture extensible avec plugins
   - **Models**: Modèles de données
@@ -25,17 +26,34 @@ Le projet suit une architecture modulaire et extensible avec séparation des res
 
 ### Enregistrement et Exécution
 - ✅ Enregistrement en temps réel des actions clavier et souris
+- ✅ **Enregistrement des clics souris** avec option activable/désactivable
 - ✅ Exécution précise des macros avec préservation des délais
 - ✅ Support haute fréquence (jusqu'à 1000 CPS)
 - ✅ Simulation d'entrées clavier et souris via SendInput
 - ✅ Pause/Reprise de l'exécution
 - ✅ Arrêt d'urgence des macros
 
+### Répétition de Macros
+- ✅ **3 modes de répétition** :
+  - Une seule fois (défaut)
+  - Répéter X fois (nombre configurable)
+  - Jusqu'à interruption (boucle infinie)
+- ✅ **Délai configurable** entre chaque répétition (en ms)
+- ✅ Affichage du statut en temps réel ("Exécution 2/5...")
+- ✅ Arrêt propre à tout moment
+
 ### Raccourcis Clavier
 - ✅ Raccourcis globaux configurables pour exécuter/arrêter les macros (par défaut F10/F11)
 - ✅ Raccourcis individuels par macro
+- ✅ **Mode toggle** : le raccourci de la macro lance ET arrête la macro
 - ✅ Détection automatique des conflits entre raccourcis
 - ✅ Configuration via l'interface de paramètres
+
+### Détection d'Application
+- ✅ **Applications cibles** : limiter une macro à certaines applications
+- ✅ Sélection parmi les processus en cours avec icônes
+- ✅ Raccourcis actifs uniquement dans les applications sélectionnées
+- ✅ Support de plusieurs applications par macro
 
 ### Édition et Gestion
 - ✅ Éditeur de macros visuel avec liste des actions
@@ -79,14 +97,17 @@ MacroEngine
 │  ├─ Logging        # Système de logs modulaire
 │  ├─ Models         # Modèles de données
 │  ├─ Plugins        # Système de plugins
+│  ├─ Processes      # Surveillance des applications
 │  ├─ Profiles       # Gestion des profils
 │  └─ Storage        # Persistance des données
 ├─ UI                # Interface WPF
-│  ├─ LogsWindow     # Fenêtre des journaux
-│  ├─ MacroEditor    # Éditeur de macros
-│  ├─ MainWindow     # Fenêtre principale
-│  ├─ ProfileEditor  # Éditeur de profils
-│  └─ SettingsWindow # Fenêtre de configuration
+│  ├─ AppSelectorDialog   # Dialogue de sélection d'applications
+│  ├─ LogsWindow          # Fenêtre des journaux
+│  ├─ MacroEditor         # Éditeur de macros
+│  ├─ MainWindow          # Fenêtre principale
+│  ├─ MouseActionDialog   # Dialogue d'action souris
+│  ├─ ProfileEditor       # Éditeur de profils
+│  └─ SettingsWindow      # Fenêtre de configuration
 ├─ Data              # Fichiers de données
 │  ├─ macros.json    # Macros sauvegardées
 │  ├─ config.json    # Configuration de l'application
@@ -158,6 +179,25 @@ dotnet run --project MacroEngine.csproj
 3. Appuyez sur la touche souhaitée
 4. Le raccourci est sauvegardé avec la macro
 5. Utilisez ce raccourci depuis n'importe où pour exécuter la macro
+6. **Appuyez à nouveau** sur le même raccourci pour **arrêter** la macro (mode toggle)
+
+### Configuration de la Répétition
+
+1. Ouvrez une macro dans l'éditeur
+2. Dans la section **"Répétition"**, choisissez le mode :
+   - **Une seule fois** : exécution simple
+   - **Répéter X fois** : indiquez le nombre de répétitions
+   - **Jusqu'à interruption** : boucle infinie jusqu'à arrêt manuel
+3. Configurez le **délai entre les répétitions** (en millisecondes)
+4. Pour arrêter : utilisez le raccourci de la macro ou F11
+
+### Applications Cibles
+
+1. Ouvrez une macro dans l'éditeur
+2. Dans la section **"Applications"**, cliquez sur le menu déroulant
+3. Sélectionnez les applications pour lesquelles la macro sera active
+4. Si aucune application n'est sélectionnée, la macro fonctionne partout
+5. Le raccourci de la macro ne fonctionne que dans les applications sélectionnées
 
 ### Consultation des Logs
 
