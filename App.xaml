@@ -5,7 +5,20 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Styles globaux peuvent être ajoutés ici -->
+                <!-- ══════════════════════════════════════════════════════════
+                     MacroEngine - Thèmes et Ressources Globales
+                     Ordre de chargement : Colors → Typography → Controls
+                     ══════════════════════════════════════════════════════════ -->
+                
+                <!-- 1. Palette de couleurs -->
+                <ResourceDictionary Source="Themes/Colors.xaml"/>
+                
+                <!-- 2. Typographie et styles de texte -->
+                <ResourceDictionary Source="Themes/Typography.xaml"/>
+                
+                <!-- 3. Styles des contrôles -->
+                <ResourceDictionary Source="Themes/Controls.xaml"/>
+                
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
