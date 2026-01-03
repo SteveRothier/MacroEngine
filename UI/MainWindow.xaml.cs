@@ -956,6 +956,9 @@ namespace MacroEngine.UI
                 // Vider l'éditeur si aucune macro sélectionnée
                 _macroEditor.LoadMacro(null!); // null! car LoadMacro accepte null
             }
+
+            // Mettre à jour le panneau de propriétés
+            UpdateMacroPropertiesPanel();
         }
 
         private async void ExecuteMacro_Click(object sender, RoutedEventArgs e)
@@ -2647,6 +2650,142 @@ namespace MacroEngine.UI
                 MessageBox.Show($"Erreur lors de l'import de la macro: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        #region Propriétés de la macro (panneau droite)
+
+        private void MacroNameTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_selectedMacro != null && MacroNameTextBox.Text != _selectedMacro.Name)
+            {
+                _selectedMacro.Name = MacroNameTextBox.Text;
+                _selectedMacro.ModifiedAt = DateTime.Now;
+                // Rafraîchir la liste des macros pour montrer le nouveau nom
+                var index = MacrosListBox.SelectedIndex;
+                MacrosListBox.Items.Refresh();
+                MacrosListBox.SelectedIndex = index;
+                _ = _macroStorage.SaveMacrosAsync(_macros);
+            }
+        }
+
+        private void MacroDescriptionTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_selectedMacro != null && MacroDescriptionTextBox.Text != _selectedMacro.Description)
+            {
+                _selectedMacro.Description = MacroDescriptionTextBox.Text;
+                _selectedMacro.ModifiedAt = DateTime.Now;
+                _ = _macroStorage.SaveMacrosAsync(_macros);
+            }
+        }
+
+        private void SetShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null)
+            {
+                MessageBox.Show("Veuillez sélectionner une macro.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Capturer le prochain raccourci
+            StatusText.Text = "Appuyez sur une touche pour définir le raccourci...";
+            StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+
+            // TODO: Implémenter la capture de raccourci
+            MessageBox.Show("Appuyez sur une touche de fonction (F1-F12) pour définir le raccourci.", 
+                "Définir un raccourci", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void SelectApps_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null)
+            {
+                MessageBox.Show("Veuillez sélectionner une macro.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Ouvrir le dialogue de sélection d'applications
+            var dialog = new AppSelectorDialog();
+            dialog.Owner = this;
+            // Charger les applications déjà sélectionnées
+            if (_selectedMacro.TargetApplications != null)
+            {
+                dialog.SelectedApplications = _selectedMacro.TargetApplications;
+            }
+            if (dialog.ShowDialog() == true)
+            {
+                _selectedMacro.TargetApplications = dialog.SelectedApplications;
+                _selectedMacro.ModifiedAt = DateTime.Now;
+                UpdateTargetAppsDisplay();
+                _ = _macroStorage.SaveMacrosAsync(_macros);
+            }
+        }
+
+        private void UpdateTargetAppsDisplay()
+        {
+            if (TargetAppsPanel == null) return;
+
+            TargetAppsPanel.Children.Clear();
+
+            if (_selectedMacro == null || _selectedMacro.TargetApplications == null || _selectedMacro.TargetApplications.Count == 0)
+            {
+                var noAppsText = new System.Windows.Controls.TextBlock
+                {
+                    Text = "Toutes les applications",
+                    Style = (Style)FindResource("TextMuted")
+                };
+                TargetAppsPanel.Children.Add(noAppsText);
+            }
+            else
+            {
+                foreach (var app in _selectedMacro.TargetApplications)
+                {
+                    var appName = System.IO.Path.GetFileNameWithoutExtension(app);
+                    var tag = new Border
+                    {
+                        Background = (System.Windows.Media.Brush)FindResource("AccentPrimaryBrush"),
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(8, 4, 8, 4),
+                        Margin = new Thickness(0, 0, 4, 4)
+                    };
+                    tag.Child = new System.Windows.Controls.TextBlock
+                    {
+                        Text = appName,
+                        Foreground = System.Windows.Media.Brushes.White,
+                        FontSize = 11
+                    };
+                    TargetAppsPanel.Children.Add(tag);
+                }
+            }
+        }
+
+        private void UpdateMacroPropertiesPanel()
+        {
+            if (_selectedMacro != null)
+            {
+                MacroNameTextBox.Text = _selectedMacro.Name;
+                MacroDescriptionTextBox.Text = _selectedMacro.Description ?? "";
+                
+                // Afficher le raccourci
+                if (_selectedMacro.ShortcutKeyCode > 0)
+                {
+                    ShortcutDisplayText.Text = GetKeyName((ushort)_selectedMacro.ShortcutKeyCode);
+                }
+                else
+                {
+                    ShortcutDisplayText.Text = "Non défini";
+                }
+
+                UpdateTargetAppsDisplay();
+            }
+            else
+            {
+                MacroNameTextBox.Text = "";
+                MacroDescriptionTextBox.Text = "";
+                ShortcutDisplayText.Text = "Non défini";
+                UpdateTargetAppsDisplay();
+            }
+        }
+
+        #endregion
 
         private void Exit_Click(object sender, RoutedEventArgs e)
         {

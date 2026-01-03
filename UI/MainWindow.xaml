@@ -192,25 +192,28 @@
             </Grid.ColumnDefinitions>
 
             <!-- ══════════════════════════════════════════════════════════════════
-                 SIDEBAR GAUCHE - Liste des macros
+                 SIDEBAR GAUCHE - Macros + Profils
                  ══════════════════════════════════════════════════════════════════ -->
             <Border Grid.Column="0" 
                     Style="{StaticResource PanelCard}"
                     Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <!-- Titre -->
+                        <!-- Section Macros -->
                         <RowDefinition Height="Auto"/>
-                        <!-- Liste des macros -->
                         <RowDefinition Height="*"/>
-                        <!-- Boutons -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Séparateur -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Section Profils -->
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Titre -->
-                    <StackPanel Grid.Row="0" Margin="0,0,0,12">
-                        <TextBlock Text="Mes Macros" Style="{StaticResource TextSubheading}"/>
-                    </StackPanel>
+                    <!-- Titre Macros -->
+                    <TextBlock Grid.Row="0" 
+                               Text="Mes Macros" 
+                               Style="{StaticResource TextSubheading}"
+                               Margin="0,0,0,12"/>
 
                     <!-- Liste des macros -->
                     <ListBox Grid.Row="1"
@@ -249,26 +252,14 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Name}" 
-                                               FontWeight="SemiBold"
-                                               FontSize="14"/>
-                                    <TextBlock Text="{Binding Description}" 
-                                               FontSize="12" 
-                                               Opacity="0.7"
-                                               TextTrimming="CharacterEllipsis"
-                                               Margin="0,2,0,0"/>
-                                    <TextBlock x:Name="ShortcutTextBlock" 
-                                               FontSize="11" 
-                                               Foreground="{StaticResource AccentSecondaryBrush}"
-                                               Margin="0,4,0,0"
-                                               Loaded="ShortcutTextBlock_Loaded"/>
-                                </StackPanel>
+                                <TextBlock Text="{Binding Name}" 
+                                           FontWeight="SemiBold"
+                                           FontSize="14"/>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- Boutons -->
+                    <!-- Boutons Macros -->
                     <StackPanel Grid.Row="2" Margin="0,12,0,0">
                         <Button Content="＋ Nouvelle Macro"
                                 Style="{StaticResource ButtonPrimary}"
@@ -279,6 +270,37 @@
                                 Click="DeleteMacro_Click"
                                 Margin="0,8,0,0"
                                 HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+
+                    <!-- Séparateur -->
+                    <Border Grid.Row="3" 
+                            Style="{StaticResource SeparatorHorizontal}"
+                            Margin="0,16,0,8"/>
+
+                    <!-- Section Profils -->
+                    <StackPanel Grid.Row="4">
+                        <TextBlock Text="Profil actif" 
+                                   Style="{StaticResource TextSubheading}"
+                                   Margin="0,0,0,8"/>
+                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                                CornerRadius="8"
+                                Padding="12,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="ActiveProfileText" 
+                                           Text="Aucun" 
+                                           Style="{StaticResource TextBody}"
+                                           VerticalAlignment="Center"/>
+                                <Button Grid.Column="1"
+                                        Content="Changer"
+                                        Style="{StaticResource ButtonGhost}"
+                                        Click="ChangeProfile_Click"
+                                        Padding="8,4"/>
+                            </Grid>
+                        </Border>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -385,7 +407,7 @@
             </Border>
 
             <!-- ══════════════════════════════════════════════════════════════════
-                 PANNEAU PROPRIÉTÉS - Droite
+                 PANNEAU PROPRIÉTÉS - Droite (Macro sélectionnée)
                  ══════════════════════════════════════════════════════════════════ -->
             <Border Grid.Column="4" 
                     Style="{StaticResource PanelCard}"
@@ -397,12 +419,72 @@
                                    Style="{StaticResource TextSubheading}"
                                    Margin="0,0,0,16"/>
 
+                        <!-- Nom de la macro -->
+                        <TextBlock Text="Nom" Style="{StaticResource TextLabel}"/>
+                        <TextBox x:Name="MacroNameTextBox"
+                                 Style="{StaticResource TextBoxModern}"
+                                 TextChanged="MacroNameTextBox_TextChanged"
+                                 Margin="0,0,0,12"/>
+
+                        <!-- Description -->
+                        <TextBlock Text="Description" Style="{StaticResource TextLabel}"/>
+                        <TextBox x:Name="MacroDescriptionTextBox"
+                                 Style="{StaticResource TextBoxModern}"
+                                 TextWrapping="Wrap"
+                                 AcceptsReturn="True"
+                                 Height="60"
+                                 TextChanged="MacroDescriptionTextBox_TextChanged"
+                                 Margin="0,0,0,12"/>
+
+                        <!-- Raccourci clavier -->
+                        <TextBlock Text="Raccourci clavier" Style="{StaticResource TextLabel}"/>
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                                    CornerRadius="8"
+                                    Padding="12,10">
+                                <TextBlock x:Name="ShortcutDisplayText" 
+                                           Text="Non défini"
+                                           Style="{StaticResource TextMono}"/>
+                            </Border>
+                            <Button Grid.Column="1"
+                                    Content="Définir"
+                                    Style="{StaticResource ButtonGhost}"
+                                    Click="SetShortcut_Click"
+                                    Margin="8,0,0,0"
+                                    Padding="12,8"/>
+                        </Grid>
+
+                        <!-- Applications cibles -->
+                        <TextBlock Text="Applications cibles" Style="{StaticResource TextLabel}"/>
+                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                                CornerRadius="8"
+                                Padding="12,10"
+                                MinHeight="40"
+                                Margin="0,0,0,8">
+                            <WrapPanel x:Name="TargetAppsPanel">
+                                <TextBlock x:Name="NoAppsText" 
+                                           Text="Toutes les applications" 
+                                           Style="{StaticResource TextMuted}"/>
+                            </WrapPanel>
+                        </Border>
+                        <Button Content="Sélectionner..."
+                                Style="{StaticResource ButtonGhost}"
+                                Click="SelectApps_Click"
+                                HorizontalAlignment="Left"
+                                Margin="0,0,0,16"/>
+
+                        <Border Style="{StaticResource SeparatorHorizontal}"/>
+
                         <!-- État du moteur -->
-                        <TextBlock Text="État" Style="{StaticResource TextLabel}"/>
+                        <TextBlock Text="État" Style="{StaticResource TextLabel}" Margin="0,8,0,0"/>
                         <Border Background="{StaticResource BackgroundTertiaryBrush}"
                                 CornerRadius="8"
                                 Padding="12,8"
-                                Margin="0,0,0,16">
+                                Margin="0,0,0,12">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -419,32 +501,11 @@
                             </Grid>
                         </Border>
 
-                        <Border Style="{StaticResource SeparatorHorizontal}"/>
-
-                        <!-- Profil actif -->
-                        <TextBlock Text="Profil actif" Style="{StaticResource TextLabel}" Margin="0,8,0,0"/>
-                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                                CornerRadius="8"
-                                Padding="12,8"
-                                Margin="0,0,0,8">
-                            <TextBlock x:Name="ActiveProfileText" 
-                                       Text="Aucun" 
-                                       Style="{StaticResource TextMuted}"/>
-                        </Border>
-                        <Button Content="Changer de Profil" 
-                                Style="{StaticResource ButtonSecondary}"
-                                Click="ChangeProfile_Click"
-                                HorizontalAlignment="Stretch"
-                                Margin="0,0,0,16"/>
-
-                        <Border Style="{StaticResource SeparatorHorizontal}"/>
-
                         <!-- Application active -->
-                        <TextBlock Text="Application active" Style="{StaticResource TextLabel}" Margin="0,8,0,0"/>
+                        <TextBlock Text="Application active" Style="{StaticResource TextLabel}"/>
                         <Border Background="{StaticResource BackgroundTertiaryBrush}"
                                 CornerRadius="8"
-                                Padding="12,8"
-                                Margin="0,0,0,16">
+                                Padding="12,8">
                             <TextBlock x:Name="ActiveAppText" 
                                        Text="Aucune" 
                                        Style="{StaticResource TextMuted}"
