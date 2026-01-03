@@ -199,9 +199,13 @@
                     Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <!-- Section Macros -->
+                        <!-- Titre + Boutons -->
                         <RowDefinition Height="Auto"/>
+                        <!-- Boutons Importer/Exporter -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Liste des macros -->
                         <RowDefinition Height="*"/>
+                        <!-- Bouton Supprimer -->
                         <RowDefinition Height="Auto"/>
                         <!-- Séparateur -->
                         <RowDefinition Height="Auto"/>
@@ -209,14 +213,52 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Titre Macros -->
-                    <TextBlock Grid.Row="0" 
-                               Text="Mes Macros" 
-                               Style="{StaticResource TextSubheading}"
-                               Margin="0,0,0,12"/>
+                    <!-- Titre + Bouton Nouvelle Macro -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Mes Macros" 
+                                   Style="{StaticResource TextSubheading}"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Column="1"
+                                Content="➕"
+                                Style="{StaticResource ButtonPrimary}"
+                                Click="NewMacro_Click"
+                                Padding="10,6"
+                                ToolTip="Nouvelle macro"/>
+                    </Grid>
+
+                    <!-- Boutons Importer/Exporter -->
+                    <Grid Grid.Row="1" Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Style="{StaticResource ButtonGhost}"
+                                Click="ImportMacro_Click"
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📂" Margin="0,0,6,0"/>
+                                <TextBlock Text="Importer"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="2"
+                                Style="{StaticResource ButtonGhost}"
+                                Click="ExportMacro_Click"
+                                HorizontalAlignment="Stretch">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="📤" Margin="0,0,6,0"/>
+                                <TextBlock Text="Exporter"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
 
                     <!-- Liste des macros -->
-                    <ListBox Grid.Row="1"
+                    <ListBox Grid.Row="2"
                              x:Name="MacrosListBox" 
                              SelectionChanged="MacrosListBox_SelectionChanged"
                              Background="Transparent"
@@ -259,26 +301,21 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <!-- Boutons Macros -->
-                    <StackPanel Grid.Row="2" Margin="0,12,0,0">
-                        <Button Content="＋ Nouvelle Macro"
-                                Style="{StaticResource ButtonPrimary}"
-                                Click="NewMacro_Click"
-                                HorizontalAlignment="Stretch"/>
-                        <Button Content="Supprimer"
-                                Style="{StaticResource ButtonGhost}"
-                                Click="DeleteMacro_Click"
-                                Margin="0,8,0,0"
-                                HorizontalAlignment="Stretch"/>
-                    </StackPanel>
+                    <!-- Bouton Supprimer -->
+                    <Button Grid.Row="3"
+                            Content="🗑 Supprimer"
+                            Style="{StaticResource ButtonGhost}"
+                            Click="DeleteMacro_Click"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,8,0,0"/>
 
                     <!-- Séparateur -->
-                    <Border Grid.Row="3" 
+                    <Border Grid.Row="4" 
                             Style="{StaticResource SeparatorHorizontal}"
                             Margin="0,16,0,8"/>
 
                     <!-- Section Profils -->
-                    <StackPanel Grid.Row="4">
+                    <StackPanel Grid.Row="5">
                         <TextBlock Text="Profil actif" 
                                    Style="{StaticResource TextSubheading}"
                                    Margin="0,0,0,8"/>
