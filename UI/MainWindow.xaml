@@ -16,214 +16,474 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Barre de menu -->
-        <Menu Grid.Row="0">
-            <MenuItem Header="Fichier">
-                <MenuItem Header="Nouvelle Macro" Click="NewMacro_Click"/>
-                <MenuItem Header="Sauvegarder" Click="SaveMacro_Click"/>
-                <Separator/>
-                <MenuItem Header="Exporter Macro..." Click="ExportMacro_Click"/>
-                <MenuItem Header="Importer Macro..." Click="ImportMacro_Click"/>
-                <Separator/>
-                <MenuItem Header="Quitter" Click="Exit_Click"/>
-            </MenuItem>
-            <MenuItem Header="Profil">
-                <MenuItem Header="Nouveau Profil" Click="NewProfile_Click"/>
-                <MenuItem Header="Gérer les Profils" Click="ManageProfiles_Click"/>
-            </MenuItem>
-            <MenuItem Header="Paramètres">
-                <MenuItem Header="Configuration" Click="Settings_Click"/>
-                <Separator/>
-                <MenuItem Header="Journaux (Logs)" Click="ShowLogs_Click"/>
-            </MenuItem>
-        </Menu>
+        <!-- ══════════════════════════════════════════════════════════════════
+             TOPBAR - Barre supérieure moderne
+             ══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource BackgroundSecondaryBrush}"
+                BorderBrush="{StaticResource BorderLightBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,0"
+                Height="56">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <!-- Logo et titre -->
+                    <ColumnDefinition Width="Auto"/>
+                    <!-- Toolbar centrale -->
+                    <ColumnDefinition Width="*"/>
+                    <!-- Actions droite -->
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-        <!-- Zone principale -->
-        <Grid Grid.Row="1">
+                <!-- Logo et titre -->
+                <StackPanel Grid.Column="0" 
+                            Orientation="Horizontal" 
+                            VerticalAlignment="Center">
+                    <Border Width="32" Height="32" 
+                            CornerRadius="8" 
+                            Background="{StaticResource AccentPrimaryBrush}"
+                            Margin="0,0,12,0">
+                        <TextBlock Text="⌨" 
+                                   FontSize="18" 
+                                   Foreground="White"
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="MacroEngine" 
+                               Style="{StaticResource TextHeading}"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Toolbar centrale - Enregistrement et exécution -->
+                <StackPanel Grid.Column="1" 
+                            Orientation="Horizontal" 
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center">
+                    
+                    <!-- Bouton Exécuter -->
+                    <Button x:Name="ExecuteButton"
+                            Style="{StaticResource ButtonSecondary}"
+                            Click="ExecuteMacro_Click"
+                            Padding="14,8"
+                            Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="▶" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Exécuter" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Bouton Enregistrer -->
+                    <Button x:Name="StartButton"
+                            Style="{StaticResource ButtonPrimary}"
+                            Click="StartMacro_Click"
+                            Padding="14,8"
+                            Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="10" Height="10" Fill="White" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Enregistrer" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Bouton Pause -->
+                    <Button x:Name="PauseButton"
+                            Style="{StaticResource ButtonGhost}"
+                            Click="PauseMacro_Click"
+                            Padding="10,8"
+                            Margin="0,0,4,0"
+                            IsEnabled="False"
+                            ToolTip="Pause">
+                        <TextBlock Text="⏸" FontSize="14"/>
+                    </Button>
+
+                    <!-- Bouton Arrêter -->
+                    <Button x:Name="StopButton"
+                            Style="{StaticResource ButtonGhost}"
+                            Click="StopMacro_Click"
+                            Padding="10,8"
+                            Margin="0,0,12,0"
+                            IsEnabled="False"
+                            ToolTip="Arrêter">
+                        <TextBlock Text="⏹" FontSize="14"/>
+                    </Button>
+
+                    <!-- Séparateur -->
+                    <Border Style="{StaticResource SeparatorVertical}" Height="24"/>
+
+                    <!-- Options d'enregistrement -->
+                    <CheckBox x:Name="RecordDelaysCheckBox" 
+                              Content="Délais" 
+                              IsChecked="True"
+                              VerticalAlignment="Center"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Margin="8,0"/>
+                    <CheckBox x:Name="RecordMouseClicksCheckBox" 
+                              Content="Clics" 
+                              IsChecked="True"
+                              VerticalAlignment="Center"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Margin="8,0"
+                              ToolTip="Enregistrer les clics souris"/>
+                    <CheckBox x:Name="RecordMouseMovesCheckBox" 
+                              Content="Mouvements" 
+                              IsChecked="False"
+                              VerticalAlignment="Center"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              Margin="8,0"
+                              ToolTip="Enregistrer les déplacements souris"/>
+                </StackPanel>
+
+                <!-- Actions droite -->
+                <StackPanel Grid.Column="2" 
+                            Orientation="Horizontal" 
+                            VerticalAlignment="Center">
+                    
+                    <!-- Menu Fichier (dropdown) -->
+                    <Menu Background="Transparent" VerticalAlignment="Center">
+                        <MenuItem Header="Fichier" Padding="8,4">
+                            <MenuItem Header="Nouvelle Macro" Click="NewMacro_Click"/>
+                            <MenuItem Header="Sauvegarder" Click="SaveMacro_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Exporter..." Click="ExportMacro_Click"/>
+                            <MenuItem Header="Importer..." Click="ImportMacro_Click"/>
+                            <Separator/>
+                            <MenuItem Header="Quitter" Click="Exit_Click"/>
+                        </MenuItem>
+                        <MenuItem Header="Profil" Padding="8,4">
+                            <MenuItem Header="Nouveau Profil" Click="NewProfile_Click"/>
+                            <MenuItem Header="Gérer les Profils" Click="ManageProfiles_Click"/>
+                        </MenuItem>
+                    </Menu>
+
+                    <!-- Séparateur -->
+                    <Border Style="{StaticResource SeparatorVertical}" Height="24"/>
+
+                    <!-- Paramètres -->
+                    <Button Style="{StaticResource ButtonIcon}"
+                            Click="Settings_Click"
+                            ToolTip="Paramètres">
+                        <TextBlock Text="⚙" FontSize="16"/>
+                    </Button>
+
+                    <!-- Logs -->
+                    <Button Style="{StaticResource ButtonIcon}"
+                            Click="ShowLogs_Click"
+                            ToolTip="Journaux">
+                        <TextBlock Text="📋" FontSize="16"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             ZONE PRINCIPALE - Layout 3 colonnes
+             ══════════════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1" Margin="12,8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="250"/>
+                <!-- Sidebar gauche -->
+                <ColumnDefinition Width="260"/>
+                <!-- Espace -->
+                <ColumnDefinition Width="12"/>
+                <!-- Zone centrale (éditeur) -->
                 <ColumnDefinition Width="*"/>
+                <!-- Espace -->
+                <ColumnDefinition Width="12"/>
+                <!-- Panneau propriétés -->
+                <ColumnDefinition Width="280"/>
             </Grid.ColumnDefinitions>
 
-            <!-- Panneau latéral -->
+            <!-- ══════════════════════════════════════════════════════════════════
+                 SIDEBAR GAUCHE - Liste des macros
+                 ══════════════════════════════════════════════════════════════════ -->
             <Border Grid.Column="0" 
-                    Background="{StaticResource BackgroundSecondaryBrush}"
-                    CornerRadius="0,14,14,0"
-                    Margin="0,8,0,8">
-                <StackPanel Margin="16">
-                    <TextBlock Text="Macros" FontWeight="Bold" FontSize="16" Margin="0,0,0,10"/>
-                    <ListBox x:Name="MacrosListBox" 
+                    Style="{StaticResource PanelCard}"
+                    Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <!-- Titre -->
+                        <RowDefinition Height="Auto"/>
+                        <!-- Liste des macros -->
+                        <RowDefinition Height="*"/>
+                        <!-- Boutons -->
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Titre -->
+                    <StackPanel Grid.Row="0" Margin="0,0,0,12">
+                        <TextBlock Text="Mes Macros" Style="{StaticResource TextSubheading}"/>
+                    </StackPanel>
+
+                    <!-- Liste des macros -->
+                    <ListBox Grid.Row="1"
+                             x:Name="MacrosListBox" 
                              SelectionChanged="MacrosListBox_SelectionChanged"
-                             Height="300">
+                             Background="Transparent"
+                             BorderThickness="0">
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="12,10"/>
+                                <Setter Property="Margin" Value="0,4,0,0"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Bd"
+                                                    Background="{StaticResource BackgroundPrimaryBrush}"
+                                                    CornerRadius="8"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" 
+                                                            Value="{StaticResource BackgroundTertiaryBrush}"/>
+                                                </Trigger>
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" 
+                                                            Value="{StaticResource AccentPrimaryBrush}"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <StackPanel>
-                                    <TextBlock Text="{Binding Name}" FontWeight="Bold"/>
-                                    <TextBlock Text="{Binding Description}" FontSize="10" Foreground="Gray"/>
-                                    <TextBlock x:Name="ShortcutTextBlock" FontSize="9" Foreground="Blue" Margin="0,2,0,0" Loaded="ShortcutTextBlock_Loaded"/>
+                                    <TextBlock Text="{Binding Name}" 
+                                               FontWeight="SemiBold"
+                                               FontSize="14"/>
+                                    <TextBlock Text="{Binding Description}" 
+                                               FontSize="12" 
+                                               Opacity="0.7"
+                                               TextTrimming="CharacterEllipsis"
+                                               Margin="0,2,0,0"/>
+                                    <TextBlock x:Name="ShortcutTextBlock" 
+                                               FontSize="11" 
+                                               Foreground="{StaticResource AccentSecondaryBrush}"
+                                               Margin="0,4,0,0"
+                                               Loaded="ShortcutTextBlock_Loaded"/>
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <Button Content="＋ Nouvelle Macro" 
-                            Style="{StaticResource ButtonPrimary}"
-                            Click="NewMacro_Click" 
-                            Margin="0,12,0,8"/>
-                    <Button Content="Supprimer" 
-                            Style="{StaticResource ButtonGhost}"
-                            Click="DeleteMacro_Click"/>
-
-                    <Separator Margin="0,20,0,10"/>
-
-                    <TextBlock Text="Profil Actif" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                    <TextBlock x:Name="ActiveProfileText" Text="Aucun" Foreground="Gray" Margin="0,0,0,10"/>
-                    <Button Content="Changer de Profil" 
-                            Style="{StaticResource ButtonSecondary}"
-                            Click="ChangeProfile_Click"/>
-
-                    <Separator Margin="0,20,0,10"/>
-
-                    <TextBlock Text="État" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                    <TextBlock x:Name="EngineStateText" Text="Arrêté" Foreground="Gray"/>
-                    <TextBlock x:Name="CPSText" Text="CPS: 0" Margin="0,5,0,0"/>
-
-                    <Separator Margin="0,20,0,10"/>
-
-                    <TextBlock Text="Application Active" FontWeight="Bold" FontSize="14" Margin="0,0,0,10"/>
-                    <Border Background="#F0F0F0" CornerRadius="3" Padding="5">
-                        <TextBlock x:Name="ActiveAppText" Text="Aucune" Foreground="Gray" FontSize="11" TextWrapping="Wrap"/>
-                    </Border>
-                </StackPanel>
+                    <!-- Boutons -->
+                    <StackPanel Grid.Row="2" Margin="0,12,0,0">
+                        <Button Content="＋ Nouvelle Macro"
+                                Style="{StaticResource ButtonPrimary}"
+                                Click="NewMacro_Click"
+                                HorizontalAlignment="Stretch"/>
+                        <Button Content="Supprimer"
+                                Style="{StaticResource ButtonGhost}"
+                                Click="DeleteMacro_Click"
+                                Margin="0,8,0,0"
+                                HorizontalAlignment="Stretch"/>
+                    </StackPanel>
+                </Grid>
             </Border>
 
-            <!-- Zone d'édition -->
-            <Grid Grid.Column="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <!-- Barre d'outils -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
-                    <Button Content="▶ Exécuter" 
-                            x:Name="ExecuteButton"
-                            Style="{StaticResource ButtonSecondary}"
-                            Click="ExecuteMacro_Click" 
-                            Padding="12,8" 
-                            Margin="0,0,8,0"/>
-                    <Button Content="● Enregistrer" 
-                            x:Name="StartButton"
-                            Style="{StaticResource ButtonPrimary}"
-                            Click="StartMacro_Click" 
-                            Padding="12,8" 
-                            Margin="0,0,8,0"/>
-                    <CheckBox x:Name="RecordDelaysCheckBox" 
-                              Content="Enregistrer les délais" 
-                              IsChecked="True"
-                              VerticalAlignment="Center"
-                              Margin="5,0,5,0"/>
-                    <CheckBox x:Name="RecordMouseClicksCheckBox" 
-                              Content="Enregistrer clics souris" 
-                              IsChecked="True"
-                              VerticalAlignment="Center"
-                              Margin="5,0,5,0"
-                              ToolTip="Enregistre les clics souris (gauche, droit, milieu)"/>
-                    <CheckBox x:Name="RecordMouseMovesCheckBox" 
-                              Content="Enregistrer mouvements" 
-                              IsChecked="False"
-                              VerticalAlignment="Center"
-                              Margin="5,0,5,0"
-                              ToolTip="Enregistre les déplacements de la souris (peut générer beaucoup d'actions)"/>
-                    <Button Content="⏸ Pause" 
-                            x:Name="PauseButton"
-                            Style="{StaticResource ButtonGhost}"
-                            Click="PauseMacro_Click" 
-                            Padding="12,8" 
-                            Margin="0,0,4,0"
-                            IsEnabled="False"/>
-                    <Button Content="⏹ Arrêter" 
-                            x:Name="StopButton"
-                            Style="{StaticResource ButtonGhost}"
-                            Click="StopMacro_Click" 
-                            Padding="12,8" 
-                            Margin="0,0,8,0"
-                            IsEnabled="False"/>
-                </StackPanel>
-
-                <!-- Contenu principal -->
-                <Grid Grid.Row="1">
+            <!-- ══════════════════════════════════════════════════════════════════
+                 ZONE CENTRALE - Éditeur de macros
+                 ══════════════════════════════════════════════════════════════════ -->
+            <Border Grid.Column="2" 
+                    Style="{StaticResource PanelCard}"
+                    Padding="0">
+                <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="200"/>
+                        <RowDefinition Height="180"/>
                     </Grid.RowDefinitions>
                     
-                    <ContentControl x:Name="MacroEditorContainer" Grid.Row="0" Margin="10"/>
+                    <!-- Éditeur de macro -->
+                    <ContentControl x:Name="MacroEditorContainer" Grid.Row="0" Margin="12"/>
                     
                     <!-- Zone d'affichage des actions et zone de test -->
-                    <Grid Grid.Row="1" Margin="10,5,10,10">
+                    <Grid Grid.Row="1" Margin="12,0,12,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="5"/>
+                            <ColumnDefinition Width="12"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         
                         <!-- Actions exécutées -->
-                        <GroupBox Header="Actions exécutées" Grid.Column="0">
+                        <Border Grid.Column="0" 
+                                Background="{StaticResource BackgroundTertiaryBrush}"
+                                CornerRadius="10"
+                                Padding="12">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-                                <StackPanel Orientation="Horizontal" Margin="5" Grid.Row="0">
-                                    <Button Content="Effacer" x:Name="ClearActionsButton" Click="ClearActionsButton_Click" Padding="5,2" Margin="0,0,5,0"/>
-                                    <TextBlock x:Name="ActionsCountText" Text="0 action(s)" VerticalAlignment="Center" Foreground="Gray"/>
+                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                    <TextBlock Text="Actions exécutées" 
+                                               Style="{StaticResource TextSecondary}"
+                                               FontWeight="Medium"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="ActionsCountText" 
+                                               Text=" (0)" 
+                                               Style="{StaticResource TextMuted}"
+                                               VerticalAlignment="Center"
+                                               Margin="4,0,0,0"/>
+                                    <Button Content="Effacer" 
+                                            x:Name="ClearActionsButton" 
+                                            Style="{StaticResource ButtonGhost}"
+                                            Click="ClearActionsButton_Click" 
+                                            Padding="8,4"
+                                            Margin="12,0,0,0"/>
                                 </StackPanel>
-                                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                                    <ListBox x:Name="ActionsListBox" 
-                                             SelectionMode="Single"
-                                             Background="White"
-                                             BorderThickness="0">
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <StackPanel Orientation="Horizontal" Margin="2">
-                                                    <TextBlock Text="{Binding Timestamp}" FontSize="10" Foreground="Gray" Width="80" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{Binding Description}" FontSize="12" VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                                </StackPanel>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </ScrollViewer>
+                                <ListBox x:Name="ActionsListBox" 
+                                         Grid.Row="1"
+                                         SelectionMode="Single"
+                                         Background="Transparent"
+                                         BorderThickness="0">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal" Margin="0,2">
+                                                <TextBlock Text="{Binding Timestamp}" 
+                                                           Style="{StaticResource TextMuted}"
+                                                           Width="70"/>
+                                                <TextBlock Text="{Binding Description}" 
+                                                           Style="{StaticResource TextSecondary}"
+                                                           Margin="8,0,0,0"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
                             </Grid>
-                        </GroupBox>
+                        </Border>
                         
                         <!-- Zone de test -->
-                        <GroupBox Header="Zone de test" Grid.Column="2">
-                            <TextBox x:Name="TestTextBox" 
-                                     TextWrapping="Wrap" 
-                                     AcceptsReturn="True"
-                                     AcceptsTab="False"
-                                     VerticalScrollBarVisibility="Auto"
-                                     FontSize="14"
-                                     Padding="5"
-                                     Text="Tapez ici pour tester vos macros..."
-                                     GotFocus="TestTextBox_GotFocus"/>
-                        </GroupBox>
+                        <Border Grid.Column="2" 
+                                Background="{StaticResource BackgroundTertiaryBrush}"
+                                CornerRadius="10"
+                                Padding="12">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" 
+                                           Text="Zone de test" 
+                                           Style="{StaticResource TextSecondary}"
+                                           FontWeight="Medium"
+                                           Margin="0,0,0,8"/>
+                                <TextBox x:Name="TestTextBox" 
+                                         Grid.Row="1"
+                                         Style="{StaticResource TextBoxModern}"
+                                         TextWrapping="Wrap" 
+                                         AcceptsReturn="True"
+                                         AcceptsTab="False"
+                                         VerticalScrollBarVisibility="Auto"
+                                         Text="Tapez ici pour tester vos macros..."
+                                         GotFocus="TestTextBox_GotFocus"/>
+                            </Grid>
+                        </Border>
                     </Grid>
                 </Grid>
-            </Grid>
+            </Border>
+
+            <!-- ══════════════════════════════════════════════════════════════════
+                 PANNEAU PROPRIÉTÉS - Droite
+                 ══════════════════════════════════════════════════════════════════ -->
+            <Border Grid.Column="4" 
+                    Style="{StaticResource PanelCard}"
+                    Padding="16">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <!-- Titre -->
+                        <TextBlock Text="Propriétés" 
+                                   Style="{StaticResource TextSubheading}"
+                                   Margin="0,0,0,16"/>
+
+                        <!-- État du moteur -->
+                        <TextBlock Text="État" Style="{StaticResource TextLabel}"/>
+                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                                CornerRadius="8"
+                                Padding="12,8"
+                                Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="EngineStateText" 
+                                           Text="Prêt" 
+                                           Foreground="{StaticResource SuccessBrush}"
+                                           FontWeight="Medium"/>
+                                <TextBlock x:Name="CPSText" 
+                                           Grid.Column="1"
+                                           Text="0 CPS" 
+                                           Style="{StaticResource TextMono}"/>
+                            </Grid>
+                        </Border>
+
+                        <Border Style="{StaticResource SeparatorHorizontal}"/>
+
+                        <!-- Profil actif -->
+                        <TextBlock Text="Profil actif" Style="{StaticResource TextLabel}" Margin="0,8,0,0"/>
+                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                                CornerRadius="8"
+                                Padding="12,8"
+                                Margin="0,0,0,8">
+                            <TextBlock x:Name="ActiveProfileText" 
+                                       Text="Aucun" 
+                                       Style="{StaticResource TextMuted}"/>
+                        </Border>
+                        <Button Content="Changer de Profil" 
+                                Style="{StaticResource ButtonSecondary}"
+                                Click="ChangeProfile_Click"
+                                HorizontalAlignment="Stretch"
+                                Margin="0,0,0,16"/>
+
+                        <Border Style="{StaticResource SeparatorHorizontal}"/>
+
+                        <!-- Application active -->
+                        <TextBlock Text="Application active" Style="{StaticResource TextLabel}" Margin="0,8,0,0"/>
+                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                                CornerRadius="8"
+                                Padding="12,8"
+                                Margin="0,0,0,16">
+                            <TextBlock x:Name="ActiveAppText" 
+                                       Text="Aucune" 
+                                       Style="{StaticResource TextMuted}"
+                                       TextWrapping="Wrap"/>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
         </Grid>
 
-        <!-- Barre de statut -->
-        <StatusBar Grid.Row="2">
-            <StatusBarItem>
-                <TextBlock x:Name="StatusText" Text="Prêt"/>
-            </StatusBarItem>
-            <Separator/>
-            <StatusBarItem HorizontalContentAlignment="Right">
-                <TextBlock x:Name="TimeText" Text="00:00:00"/>
-            </StatusBarItem>
-        </StatusBar>
+        <!-- ══════════════════════════════════════════════════════════════════
+             STATUSBAR - Barre de statut
+             ══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="2" 
+                Background="{StaticResource BackgroundSecondaryBrush}"
+                BorderBrush="{StaticResource BorderLightBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="16,0"
+                Height="28">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Message de statut -->
+                <TextBlock x:Name="StatusText" 
+                           Text="Prêt"
+                           Style="{StaticResource TextSecondary}"
+                           VerticalAlignment="Center"/>
+
+                <!-- Heure -->
+                <TextBlock x:Name="TimeText" 
+                           Grid.Column="1"
+                           Text="00:00:00" 
+                           Style="{StaticResource TextMono}"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
     </Grid>
 </Window>
 
