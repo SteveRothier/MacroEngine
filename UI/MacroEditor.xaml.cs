@@ -26,15 +26,10 @@ namespace MacroEngine.UI
         public MacroEditor()
         {
             InitializeComponent();
-            MacroNameTextBox.TextChanged += MacroNameTextBox_TextChanged;
-            MacroDescriptionTextBox.TextChanged += MacroDescriptionTextBox_TextChanged;
             
             // Initialiser le hook clavier pour capturer F10 et autres touches système
             _keyboardHook = new KeyboardHook();
             _keyboardHook.KeyDown += KeyboardHook_KeyDown;
-            
-            // Charger la liste des applications au démarrage
-            RefreshApplicationsComboBox();
             
             this.Unloaded += MacroEditor_Unloaded;
         }
@@ -61,31 +56,14 @@ namespace MacroEngine.UI
                     if (_currentMacro != null)
                     {
                         _currentMacro.ShortcutKeyCode = 0x79;
-                        UpdateShortcutDisplay();
-                        CheckForShortcutConflicts();
-                        ShortcutKeyTextBox.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+                        _isCapturingShortcutKey = false;
+                        OnMacroModified();
                     }
                 });
             }
         }
 
-        private void MacroNameTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
-        {
-            if (_currentMacro != null)
-            {
-                _currentMacro.Name = MacroNameTextBox.Text;
-                OnMacroModified();
-            }
-        }
-
-        private void MacroDescriptionTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
-        {
-            if (_currentMacro != null)
-            {
-                _currentMacro.Description = MacroDescriptionTextBox.Text;
-                OnMacroModified();
-            }
-        }
+        // Note: Les champs Nom et Description sont maintenant gérés dans MainWindow (panneau Propriétés)
 
         private void OnMacroModified()
         {
@@ -97,11 +75,6 @@ namespace MacroEngine.UI
             _currentMacro = macro;
             if (macro != null)
             {
-                MacroNameTextBox.Text = macro.Name;
-                MacroDescriptionTextBox.Text = macro.Description;
-                UpdateShortcutDisplay();
-                UpdateTargetAppsDisplay();
-                
                 // Initialiser la liste d'actions si elle est null
                 if (macro.Actions == null)
                 {
@@ -127,32 +100,15 @@ namespace MacroEngine.UI
             }
             else
             {
-                MacroNameTextBox.Text = string.Empty;
-                MacroDescriptionTextBox.Text = string.Empty;
-                ShortcutKeyTextBox.Text = "Aucune touche";
                 ActionsDataGrid.ItemsSource = null;
                 _undoStack.Clear();
                 _redoStack.Clear();
                 UpdateUndoRedoButtons();
-                UpdateTargetAppsDisplay();
                 ResetRepeatOptions();
             }
         }
 
-        private void UpdateShortcutDisplay()
-        {
-            if (_currentMacro != null)
-            {
-                if (_currentMacro.ShortcutKeyCode != 0)
-                {
-                    ShortcutKeyTextBox.Text = GetKeyName(_currentMacro.ShortcutKeyCode);
-                }
-                else
-                {
-                    ShortcutKeyTextBox.Text = "Aucune touche";
-                }
-            }
-        }
+        // Note: UpdateShortcutDisplay est maintenant géré dans MainWindow (panneau Propriétés)
 
         private string GetKeyName(int virtualKeyCode)
         {
@@ -698,95 +654,7 @@ namespace MacroEngine.UI
             }
         }
 
-        private void CaptureShortcutKeyButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro == null) return;
-            ShortcutKeyTextBox.Focus();
-        }
-
-        private void ShortcutKeyTextBox_GotFocus(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro == null) return;
-            ShortcutKeyTextBox.Text = "Appuyez sur une touche...";
-            _isCapturingShortcutKey = true;
-            
-            try
-            {
-                _keyboardHook.Install();
-            }
-            catch { }
-        }
-
-        private void ShortcutKeyTextBox_LostFocus(object sender, RoutedEventArgs e)
-        {
-            _isCapturingShortcutKey = false;
-            UpdateShortcutDisplay();
-            
-            try
-            {
-                _keyboardHook.Uninstall();
-            }
-            catch { }
-        }
-
-        private void ShortcutKeyTextBox_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (_isCapturingShortcutKey && _currentMacro != null && e.Key == Key.F10)
-            {
-                e.Handled = true;
-                _currentMacro.ShortcutKeyCode = 0x79;
-                UpdateShortcutDisplay();
-                CheckForShortcutConflicts();
-                ShortcutKeyTextBox.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
-            }
-        }
-
-        private void ShortcutKeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (!_isCapturingShortcutKey || _currentMacro == null)
-                return;
-
-            if (e.Key == Key.F10)
-            {
-                e.Handled = true;
-                return;
-            }
-            
-            e.Handled = true;
-            
-            if (e.Key == Key.LeftShift || e.Key == Key.RightShift ||
-                e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
-                e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
-                e.Key == Key.LWin || e.Key == Key.RWin)
-            {
-                return;
-            }
-
-            var keyCode = KeyToVirtualKeyCode(e.Key);
-            if (keyCode == 0)
-            {
-                if (e.Key == Key.F10)
-                {
-                    keyCode = 0x79;
-                }
-                else
-                {
-                    return;
-                }
-            }
-            
-            _currentMacro.ShortcutKeyCode = keyCode;
-            UpdateShortcutDisplay();
-            CheckForShortcutConflicts();
-            OnMacroModified();
-            ShortcutKeyTextBox.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
-        }
-
-        private void CheckForShortcutConflicts()
-        {
-            // Cette méthode sera appelée depuis MainWindow après que toutes les macros soient chargées
-            // Pour l'instant, on ne fait rien ici - la validation se fera dans MainWindow
-        }
+        // Note: Les méthodes de gestion du raccourci sont maintenant dans MainWindow (panneau Propriétés)
 
         private bool _isEditingCell = false;
         private IInputAction? _actionBeforeEdit = null;
@@ -1044,79 +912,9 @@ namespace MacroEngine.UI
             }
         }
 
-        #region Gestion des Applications Cibles
-
-        private void SelectAppsButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro == null) return;
-
-            var dialog = new AppSelectorDialog
-            {
-                Owner = Window.GetWindow(this),
-                SelectedApplications = _currentMacro.TargetApplications?.ToList() ?? new List<string>()
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                _currentMacro.TargetApplications = dialog.SelectedApplications;
-                UpdateTargetAppsDisplay();
-                OnMacroModified();
-            }
-        }
-
-        private void UpdateTargetAppsDisplay()
-        {
-            TargetAppsPanel.Children.Clear();
-
-            if (_currentMacro == null || _currentMacro.TargetApplications == null || _currentMacro.TargetApplications.Count == 0)
-            {
-                TargetAppsPanel.Children.Add(new TextBlock
-                {
-                    Text = "Toutes les applications",
-                    Foreground = System.Windows.Media.Brushes.Gray,
-                    FontStyle = FontStyles.Italic,
-                    VerticalAlignment = VerticalAlignment.Center
-                });
-            }
-            else
-            {
-                foreach (var app in _currentMacro.TargetApplications.OrderBy(a => a))
-                {
-                    var border = new Border
-                    {
-                        Background = System.Windows.Media.Brushes.LightBlue,
-                        CornerRadius = new CornerRadius(3),
-                        Padding = new Thickness(5, 2, 5, 2),
-                        Margin = new Thickness(0, 0, 5, 0)
-                    };
-
-                    var stack = new StackPanel { Orientation = Orientation.Horizontal };
-                    stack.Children.Add(new TextBlock 
-                    { 
-                        Text = app, 
-                        VerticalAlignment = VerticalAlignment.Center,
-                        FontSize = 11
-                    });
-
-                    var removeButton = new Button
-                    {
-                        Content = "✕",
-                        FontSize = 9,
-                        Padding = new Thickness(3, 0, 3, 0),
-                        Margin = new Thickness(5, 0, 0, 0),
-                        Background = System.Windows.Media.Brushes.Transparent,
-                        BorderThickness = new Thickness(0),
-                        Cursor = System.Windows.Input.Cursors.Hand,
-                        Tag = app
-                    };
-                    removeButton.Click += RemoveTargetApp_Click;
-                    stack.Children.Add(removeButton);
-
-                    border.Child = stack;
-                    TargetAppsPanel.Children.Add(border);
-                }
-            }
-        }
+        // Note: La gestion des applications cibles est maintenant dans MainWindow (panneau Propriétés)
+        #region Gestion des Applications Cibles - Désactivé
+        #endregion
         
         #region Repeat Options
         
@@ -1222,110 +1020,6 @@ namespace MacroEngine.UI
             }
         }
         
-        #endregion
-
-        private void RemoveTargetApp_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro == null) return;
-
-            if (sender is Button button && button.Tag is string appName)
-            {
-                _currentMacro.TargetApplications?.Remove(appName);
-                UpdateTargetAppsDisplay();
-                OnMacroModified();
-            }
-        }
-
-        private void ApplicationsComboBox_DropDownOpened(object sender, EventArgs e)
-        {
-            RefreshApplicationsComboBox();
-        }
-
-        private void RefreshAppsComboBox_Click(object sender, RoutedEventArgs e)
-        {
-            RefreshApplicationsComboBox();
-        }
-
-        private void RefreshApplicationsComboBox()
-        {
-            try
-            {
-                var processes = ProcessMonitor.GetRunningProcesses();
-                ApplicationsComboBox.ItemsSource = processes;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'actualisation des applications: {ex.Message}");
-            }
-        }
-
-        private void AddSelectedApp_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro == null) return;
-
-            string? processName = null;
-
-            // Vérifier si un élément est sélectionné dans le ComboBox
-            if (ApplicationsComboBox.SelectedItem is ProcessInfo selectedProcess)
-            {
-                processName = selectedProcess.ProcessName;
-            }
-            // Sinon, utiliser le texte saisi manuellement
-            else if (!string.IsNullOrWhiteSpace(ApplicationsComboBox.Text))
-            {
-                processName = ApplicationsComboBox.Text.Trim();
-                
-                // Retirer l'extension .exe si présente
-                if (processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                {
-                    processName = processName.Substring(0, processName.Length - 4);
-                }
-            }
-
-            if (!string.IsNullOrEmpty(processName))
-            {
-                // Initialiser la liste si nécessaire
-                if (_currentMacro.TargetApplications == null)
-                {
-                    _currentMacro.TargetApplications = new List<string>();
-                }
-
-                // Ajouter seulement si pas déjà présent
-                if (!_currentMacro.TargetApplications.Any(app => 
-                    string.Equals(app, processName, StringComparison.OrdinalIgnoreCase)))
-                {
-                    _currentMacro.TargetApplications.Add(processName);
-                    UpdateTargetAppsDisplay();
-                    OnMacroModified();
-                }
-
-                // Réinitialiser la sélection
-                ApplicationsComboBox.SelectedItem = null;
-                ApplicationsComboBox.Text = string.Empty;
-            }
-        }
-
-        private void ClearAllApps_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro == null) return;
-
-            if (_currentMacro.TargetApplications != null && _currentMacro.TargetApplications.Count > 0)
-            {
-                var result = MessageBox.Show(
-                    "Voulez-vous vraiment supprimer toutes les applications cibles ?\nLa macro sera disponible pour toutes les applications.",
-                    "Confirmation",
-                    MessageBoxButton.YesNo,
-                    MessageBoxImage.Question);
-
-                if (result == MessageBoxResult.Yes)
-                {
-                    _currentMacro.TargetApplications.Clear();
-                    UpdateTargetAppsDisplay();
-                    OnMacroModified();
-                }
-            }
-        }
-
         #endregion
     }
 }
