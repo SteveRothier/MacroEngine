@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Models;
@@ -20,6 +23,10 @@ namespace MacroEngine.UI
         private int _draggedIndex = -1;
         private FrameworkElement? _draggedElement;
         private Point _dragStartPoint;
+        
+        // Popup pour le drag visuel
+        private Popup? _dragPopup;
+        private Point _dragOffset; // Décalage entre le curseur et le coin du bloc
         
         // Largeur maximale des blocs (réduite)
         private const double BLOCK_MAX_WIDTH = 260;
@@ -549,6 +556,9 @@ namespace MacroEngine.UI
                 _dragStartPoint = e.GetPosition(this);
                 _draggedIndex = index;
                 _draggedElement = element;
+                
+                // Stocker le décalage entre le curseur et le coin supérieur gauche du bloc
+                _dragOffset = e.GetPosition(element);
             }
         }
 
@@ -564,14 +574,106 @@ namespace MacroEngine.UI
             if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
                 Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
             {
-                _draggedElement.Opacity = 0.6;
+                // Créer une capture visuelle du bloc
+                CreateDragVisual(_draggedElement);
+                
+                _draggedElement.Opacity = 0.3;
                 
                 DataObject dragData = new DataObject("BlockIndex", _draggedIndex);
+                
+                // S'abonner à l'événement de mise à jour de position
+                _draggedElement.GiveFeedback += DraggedElement_GiveFeedback;
+                
                 DragDrop.DoDragDrop(_draggedElement, dragData, DragDropEffects.Move);
+                
+                // Nettoyer
+                _draggedElement.GiveFeedback -= DraggedElement_GiveFeedback;
+                HideDragVisual();
                 
                 _draggedElement.Opacity = 1.0;
                 _draggedElement = null;
                 _draggedIndex = -1;
+            }
+        }
+
+        private void CreateDragVisual(FrameworkElement element)
+        {
+            double width = element.ActualWidth > 0 ? element.ActualWidth : BLOCK_MAX_WIDTH;
+            double height = element.ActualHeight > 0 ? element.ActualHeight : 60;
+            
+            // Créer un rectangle avec un VisualBrush pour copier l'apparence
+            var visualBrush = new VisualBrush(element)
+            {
+                Opacity = 0.85,
+                Stretch = Stretch.None
+            };
+
+            var dragBorder = new Border
+            {
+                Width = width,
+                Height = height,
+                Background = visualBrush,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Colors.Black,
+                    Opacity = 0.4,
+                    BlurRadius = 15,
+                    ShadowDepth = 5
+                }
+            };
+
+            _dragPopup = new Popup
+            {
+                Child = dragBorder,
+                AllowsTransparency = true,
+                IsHitTestVisible = false,
+                Placement = PlacementMode.Absolute,
+                IsOpen = true
+            };
+            
+            UpdateDragVisualPosition();
+        }
+
+        private void DraggedElement_GiveFeedback(object sender, GiveFeedbackEventArgs e)
+        {
+            UpdateDragVisualPosition();
+            e.Handled = true;
+        }
+
+        private void UpdateDragVisualPosition()
+        {
+            if (_dragPopup != null)
+            {
+                var mousePos = GetMousePositionScreen();
+                // Positionner le bloc en gardant le décalage initial du curseur
+                _dragPopup.HorizontalOffset = mousePos.X - _dragOffset.X;
+                _dragPopup.VerticalOffset = mousePos.Y - _dragOffset.Y;
+            }
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        private Point GetMousePositionScreen()
+        {
+            GetCursorPos(out POINT point);
+            return new Point(point.X, point.Y);
+        }
+
+        private void HideDragVisual()
+        {
+            if (_dragPopup != null)
+            {
+                _dragPopup.IsOpen = false;
+                _dragPopup = null;
             }
         }
 
