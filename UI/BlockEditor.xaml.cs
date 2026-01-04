@@ -779,27 +779,17 @@ namespace MacroEngine.UI
 
         private void AddKeyboard_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentMacro == null) return;
-
-            // Ouvrir un dialogue pour sélectionner la touche
-            var dialog = new KeyCaptureDialog
+            if (_currentMacro == null) return;     
+            // Ajouter directement une action Press sans dialogue (sans touche par défaut)
+            _currentMacro.Actions.Add(new KeyboardAction
             {
-                Owner = Window.GetWindow(this)
-            };
-
-            if (dialog.ShowDialog() == true && dialog.CapturedKey != 0)
-            {
-                // Ajouter UNE SEULE action Press (appuyer + relâcher automatiquement)
-                _currentMacro.Actions.Add(new KeyboardAction
-                {
-                    VirtualKeyCode = (ushort)dialog.CapturedKey,
-                    ActionType = KeyboardActionType.Press
-                });
-                _currentMacro.ModifiedAt = DateTime.Now;
-                
-                RefreshBlocks();
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }
+                VirtualKeyCode = 0, // Pas de touche par défaut
+                ActionType = KeyboardActionType.Press
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void AddMouse_Click(object sender, RoutedEventArgs e)
