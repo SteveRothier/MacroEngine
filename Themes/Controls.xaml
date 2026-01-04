@@ -243,4 +243,152 @@
         <Setter Property="Margin" Value="12,0"/>
     </Style>
 
+    <!-- ══════════════════════════════════════════════════════════════════════
+         BLOCS SCRATCH-LIKE
+         ══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Style de base pour tous les blocs -->
+    <Style x:Key="ActionBlockBase" TargetType="Border">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusActionBlock}"/>
+        <Setter Property="Padding" Value="16,12"/>
+        <Setter Property="Margin" Value="0,4"/>
+        <Setter Property="Effect" Value="{StaticResource ShadowActionBlock}"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="MinHeight" Value="52"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Effect" Value="{StaticResource ShadowActionBlockHover}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Bloc Clavier (Bleu) -->
+    <Style x:Key="BlockKeyboard" TargetType="Border" BasedOn="{StaticResource ActionBlockBase}">
+        <Setter Property="Background" Value="{StaticResource BlockKeyboardBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BlockKeyboardDarkBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,3"/>
+    </Style>
+
+    <!-- Bloc Souris (Vert) -->
+    <Style x:Key="BlockMouse" TargetType="Border" BasedOn="{StaticResource ActionBlockBase}">
+        <Setter Property="Background" Value="{StaticResource BlockMouseBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BlockMouseDarkBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,3"/>
+    </Style>
+
+    <!-- Bloc Délai (Jaune/Orange) -->
+    <Style x:Key="BlockDelay" TargetType="Border" BasedOn="{StaticResource ActionBlockBase}">
+        <Setter Property="Background" Value="{StaticResource BlockDelayBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BlockDelayDarkBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,3"/>
+    </Style>
+
+    <!-- Bloc Boucle/Loop (Violet) -->
+    <Style x:Key="BlockLoop" TargetType="Border" BasedOn="{StaticResource ActionBlockBase}">
+        <Setter Property="Background" Value="{StaticResource BlockLoopBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BlockLoopDarkBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,3"/>
+    </Style>
+
+    <!-- Texte sur les blocs (blanc) -->
+    <Style x:Key="BlockText" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontPrimary}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="Medium"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Texte secondaire sur les blocs -->
+    <Style x:Key="BlockTextSecondary" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="#DDFFFFFF"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontPrimary}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Icône sur les blocs -->
+    <Style x:Key="BlockIcon" TargetType="TextBlock">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="0,0,12,0"/>
+    </Style>
+
+    <!-- Bouton d'ajout de bloc (+) -->
+    <Style x:Key="BlockAddButton" TargetType="Button">
+        <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Width" Value="48"/>
+        <Setter Property="Height" Value="48"/>
+        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="24"
+                            Width="{TemplateBinding Width}"
+                            Height="{TemplateBinding Height}">
+                        <TextBlock Text="+" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"
+                                   FontSize="{TemplateBinding FontSize}"
+                                   FontWeight="{TemplateBinding FontWeight}"
+                                   Foreground="{TemplateBinding Foreground}"
+                                   Margin="0,-2,0,0"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" 
+                                    Value="{StaticResource AccentHoverBrush}"/>
+                            <Setter TargetName="border" Property="Effect" 
+                                    Value="{StaticResource ShadowButtonHover}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" 
+                                    Value="{StaticResource AccentPressedBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Bouton de suppression sur les blocs -->
+    <Style x:Key="BlockDeleteButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#99FFFFFF"/>
+        <Setter Property="Width" Value="24"/>
+        <Setter Property="Height" Value="24"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Visibility" Value="Collapsed"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="12"
+                            Width="{TemplateBinding Width}"
+                            Height="{TemplateBinding Height}">
+                        <TextBlock Text="✕" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center"
+                                   FontSize="{TemplateBinding FontSize}"
+                                   Foreground="{TemplateBinding Foreground}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#33000000"/>
+                            <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </ResourceDictionary>

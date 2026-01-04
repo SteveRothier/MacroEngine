@@ -30,7 +30,7 @@ namespace MacroEngine.UI
         private readonly ObservableCollection<LogEntry> _logEntries;
         private List<Macro> _macros;
         private Macro? _selectedMacro;
-        private MacroEditor _macroEditor;
+        private BlockEditor _blockEditor;
         private LogsWindow? _logsWindow;
         private MacroEngineConfig _appConfig;
         
@@ -108,10 +108,10 @@ namespace MacroEngine.UI
             _macros = new List<Macro>();
             _appConfig = new MacroEngineConfig(); // Configuration par défaut en attendant le chargement
 
-            // Initialiser l'éditeur de macro
-            _macroEditor = new MacroEditor();
-            _macroEditor.MacroModified += MacroEditor_MacroModified;
-            MacroEditorContainer.Content = _macroEditor;
+            // Initialiser l'éditeur de macro en blocs
+            _blockEditor = new BlockEditor();
+            _blockEditor.MacroChanged += BlockEditor_MacroChanged;
+            MacroEditorContainer.Content = _blockEditor;
 
             // Initialiser les hooks pour l'enregistrement
             _keyboardHook = new KeyboardHook();
@@ -629,6 +629,12 @@ namespace MacroEngine.UI
             MacrosListBox.Items.Refresh();
         }
 
+        private void BlockEditor_MacroChanged(object? sender, EventArgs e)
+        {
+            // Appeler la même logique que MacroEditor_MacroModified
+            MacroEditor_MacroModified(sender, e);
+        }
+
         private void GlobalExecuteHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
             // Vérifier que c'est le raccourci configuré pour exécuter et qu'on n'est pas en train d'enregistrer
@@ -794,9 +800,9 @@ namespace MacroEngine.UI
                     {
                         MacrosListBox.SelectedIndex = 0;
                         _selectedMacro = _macros[0];
-                        if (_macroEditor != null)
+                        if (_blockEditor != null)
                         {
-                            _macroEditor.LoadMacro(_selectedMacro);
+                            _blockEditor.LoadMacro(_selectedMacro);
                         }
                     }), System.Windows.Threading.DispatcherPriority.Loaded);
                 }
@@ -949,12 +955,12 @@ namespace MacroEngine.UI
             if (_selectedMacro != null)
             {
                 // Charger l'éditeur avec la macro sélectionnée
-                _macroEditor.LoadMacro(_selectedMacro);
+                _blockEditor.LoadMacro(_selectedMacro);
             }
             else
             {
                 // Vider l'éditeur si aucune macro sélectionnée
-                _macroEditor.LoadMacro(null!); // null! car LoadMacro accepte null
+                _blockEditor.LoadMacro(null!); // null! car LoadMacro accepte null
             }
 
             // Mettre à jour le panneau de propriétés
@@ -1296,9 +1302,9 @@ namespace MacroEngine.UI
             StopButton.IsEnabled = false;
 
             // Rafraîchir l'éditeur
-            if (_macroEditor != null && _selectedMacro != null)
+            if (_blockEditor != null && _selectedMacro != null)
             {
-                _macroEditor.LoadMacro(_selectedMacro);
+                _blockEditor.LoadMacro(_selectedMacro);
             }
 
             // Sauvegarder automatiquement après l'enregistrement
@@ -2016,10 +2022,10 @@ namespace MacroEngine.UI
 
         private void RefreshMacroEditor()
         {
-            if (_macroEditor != null && _selectedMacro != null)
+            if (_blockEditor != null && _selectedMacro != null)
             {
                 // On est déjà sur le thread UI, pas besoin de Dispatcher.Invoke
-                _macroEditor.RefreshActions();
+                _blockEditor.RefreshBlocks();
             }
         }
 

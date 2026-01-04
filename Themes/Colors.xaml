@@ -39,6 +39,29 @@
     <Color x:Key="ShadowHoverColor">#2E000000</Color>
 
     <!-- ══════════════════════════════════════════════════════════════════════
+         Couleurs des Blocs (Scratch-like)
+         ══════════════════════════════════════════════════════════════════════ -->
+    
+    <!-- Bloc Clavier - Bleu -->
+    <Color x:Key="BlockKeyboardColor">#5B8DEF</Color>
+    <Color x:Key="BlockKeyboardDarkColor">#4A7BD9</Color>
+    
+    <!-- Bloc Souris - Vert -->
+    <Color x:Key="BlockMouseColor">#5ABB7A</Color>
+    <Color x:Key="BlockMouseDarkColor">#4AA66A</Color>
+    
+    <!-- Bloc Délai - Jaune/Orange -->
+    <Color x:Key="BlockDelayColor">#F5A623</Color>
+    <Color x:Key="BlockDelayDarkColor">#E09515</Color>
+    
+    <!-- Bloc Boucle/Répétition - Violet -->
+    <Color x:Key="BlockLoopColor">#9B6DD8</Color>
+    <Color x:Key="BlockLoopDarkColor">#8A5DC8</Color>
+    
+    <!-- Fond de l'éditeur avec grille -->
+    <Color x:Key="EditorGridColor">#E0D6C8</Color>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
          Brushes (SolidColorBrush)
          ══════════════════════════════════════════════════════════════════════ -->
     
@@ -69,6 +92,17 @@
     <SolidColorBrush x:Key="BorderLightBrush" Color="{StaticResource BorderLightColor}"/>
     <SolidColorBrush x:Key="BorderMediumBrush" Color="{StaticResource BorderMediumColor}"/>
     <SolidColorBrush x:Key="BorderDarkBrush" Color="{StaticResource BorderDarkColor}"/>
+    
+    <!-- Blocs Scratch-like -->
+    <SolidColorBrush x:Key="BlockKeyboardBrush" Color="{StaticResource BlockKeyboardColor}"/>
+    <SolidColorBrush x:Key="BlockKeyboardDarkBrush" Color="{StaticResource BlockKeyboardDarkColor}"/>
+    <SolidColorBrush x:Key="BlockMouseBrush" Color="{StaticResource BlockMouseColor}"/>
+    <SolidColorBrush x:Key="BlockMouseDarkBrush" Color="{StaticResource BlockMouseDarkColor}"/>
+    <SolidColorBrush x:Key="BlockDelayBrush" Color="{StaticResource BlockDelayColor}"/>
+    <SolidColorBrush x:Key="BlockDelayDarkBrush" Color="{StaticResource BlockDelayDarkColor}"/>
+    <SolidColorBrush x:Key="BlockLoopBrush" Color="{StaticResource BlockLoopColor}"/>
+    <SolidColorBrush x:Key="BlockLoopDarkBrush" Color="{StaticResource BlockLoopDarkColor}"/>
+    <SolidColorBrush x:Key="EditorGridBrush" Color="{StaticResource EditorGridColor}"/>
 
     <!-- ══════════════════════════════════════════════════════════════════════
          Effets d'ombre

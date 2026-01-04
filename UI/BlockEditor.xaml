@@ -1,0 +1,211 @@
+<UserControl x:Class="MacroEngine.UI.BlockEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="600">
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         BlockEditor - Éditeur de macros en blocs Scratch-like
+         ══════════════════════════════════════════════════════════════════════ -->
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <!-- Toolbar d'ajout de blocs -->
+            <RowDefinition Height="Auto"/>
+            <!-- Zone des blocs (scrollable) -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             TOOLBAR - Boutons d'ajout rapide
+             ══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource BackgroundTertiaryBrush}"
+                CornerRadius="10"
+                Padding="12,8"
+                Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <!-- Bouton Ajouter Touche -->
+                <Button x:Name="AddKeyboardButton"
+                        Click="AddKeyboard_Click"
+                        Margin="4,0"
+                        Cursor="Hand"
+                        ToolTip="Ajouter une touche clavier">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd"
+                                                Background="{StaticResource BlockKeyboardBrush}"
+                                                CornerRadius="8"
+                                                Padding="12,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="⌨" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ Touche" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockKeyboardDarkBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Bouton Ajouter Clic -->
+                <Button x:Name="AddMouseButton"
+                        Click="AddMouse_Click"
+                        Margin="4,0"
+                        Cursor="Hand"
+                        ToolTip="Ajouter un clic souris">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd"
+                                                Background="{StaticResource BlockMouseBrush}"
+                                                CornerRadius="8"
+                                                Padding="12,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🖱" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ Clic" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockMouseDarkBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Bouton Ajouter Délai -->
+                <Button x:Name="AddDelayButton"
+                        Click="AddDelay_Click"
+                        Margin="4,0"
+                        Cursor="Hand"
+                        ToolTip="Ajouter un délai">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd"
+                                                Background="{StaticResource BlockDelayBrush}"
+                                                CornerRadius="8"
+                                                Padding="12,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="⏱" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ Délai" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockDelayDarkBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Séparateur vertical -->
+                <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
+
+                <!-- Options de répétition -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Répéter:" 
+                               Style="{StaticResource TextSecondary}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+                    <ComboBox x:Name="RepeatModeComboBox"
+                              SelectionChanged="RepeatModeComboBox_SelectionChanged"
+                              Width="130"
+                              VerticalAlignment="Center">
+                        <ComboBoxItem Content="1 fois" IsSelected="True"/>
+                        <ComboBoxItem Content="X fois"/>
+                        <ComboBoxItem Content="Jusqu'à arrêt"/>
+                    </ComboBox>
+                    <TextBox x:Name="RepeatCountTextBox"
+                             Width="50"
+                             Text="1"
+                             TextChanged="RepeatCountTextBox_TextChanged"
+                             VerticalAlignment="Center"
+                             Margin="8,0,0,0"
+                             Visibility="Collapsed"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             ZONE DES BLOCS - Grille discrète + Liste des blocs
+             ══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="1" 
+                Background="{StaticResource BackgroundPrimaryBrush}"
+                CornerRadius="12"
+                ClipToBounds="True">
+            
+            <!-- Grille de fond discrète -->
+            <Grid>
+                <Canvas x:Name="GridCanvas" ClipToBounds="True"/>
+                
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="16">
+                    <Grid>
+                        <!-- Message si aucune action -->
+                        <StackPanel x:Name="EmptyStatePanel"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Center"
+                                    Visibility="Visible">
+                            <TextBlock Text="🎯" 
+                                       FontSize="48" 
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,16"/>
+                            <TextBlock Text="Aucune action dans cette macro" 
+                                       Style="{StaticResource TextHeading}"
+                                       HorizontalAlignment="Center"
+                                       Margin="0,0,0,8"/>
+                            <TextBlock Text="Utilisez les boutons ci-dessus pour ajouter des blocs" 
+                                       Style="{StaticResource TextMuted}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Liste des blocs (ItemsControl avec drag & drop) -->
+                        <ItemsControl x:Name="BlocksItemsControl"
+                                      AllowDrop="True"
+                                      Drop="BlocksItemsControl_Drop"
+                                      DragOver="BlocksItemsControl_DragOver">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Vertical"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Le contenu sera généré en code-behind -->
+                                    <ContentControl Content="{Binding}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
+
