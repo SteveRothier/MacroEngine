@@ -20,6 +20,9 @@ namespace MacroEngine.UI
         private int _draggedIndex = -1;
         private Border? _draggedBlock;
         private Point _dragStartPoint;
+        
+        // Largeur maximale des blocs (réduite)
+        private const double BLOCK_MAX_WIDTH = 260;
 
         // Événement déclenché quand la macro est modifiée
         public event EventHandler? MacroChanged;
@@ -122,51 +125,18 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée un bloc visuel pour une action
+        /// Crée un bloc visuel pour une action avec des champs éditables inline
         /// </summary>
         private Border CreateBlockForAction(IInputAction action, int index)
         {
             string styleName;
             string icon;
-            string text;
-            string secondaryText = "";
-
-            switch (action)
-            {
-                case KeyboardAction ka:
-                    styleName = "BlockKeyboard";
-                    icon = "⌨";
-                    text = GetKeyName(ka.VirtualKeyCode);
-                    secondaryText = ka.ActionType == KeyboardActionType.Down ? "Appuyer" : 
-                                    ka.ActionType == KeyboardActionType.Up ? "Relâcher" : "Appuyer+Relâcher";
-                    break;
-
-                case Core.Inputs.MouseAction ma:
-                    styleName = "BlockMouse";
-                    icon = "🖱";
-                    text = GetMouseActionText(ma);
-                    if (ma.X >= 0 && ma.Y >= 0)
-                        secondaryText = $"({ma.X}, {ma.Y})";
-                    break;
-
-                case DelayAction da:
-                    styleName = "BlockDelay";
-                    icon = "⏱";
-                    text = $"{da.Duration} ms";
-                    secondaryText = "Attendre";
-                    break;
-
-                default:
-                    styleName = "BlockKeyboard";
-                    icon = "❓";
-                    text = action.Type.ToString();
-                    break;
-            }
-
+            
             var block = new Border();
-            block.Style = (Style)FindResource(styleName);
             block.Tag = index;
             block.AllowDrop = true;
+            block.MaxWidth = BLOCK_MAX_WIDTH;
+            block.HorizontalAlignment = HorizontalAlignment.Left;
 
             // Événements de drag & drop
             block.MouseLeftButtonDown += Block_MouseLeftButtonDown;
@@ -178,40 +148,9 @@ namespace MacroEngine.UI
 
             // Contenu du bloc
             var grid = new Grid();
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            // Icône
-            var iconText = new TextBlock
-            {
-                Text = icon,
-                Style = (Style)FindResource("BlockIcon")
-            };
-            Grid.SetColumn(iconText, 0);
-            grid.Children.Add(iconText);
-
-            // Texte principal et secondaire
-            var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            
-            var mainText = new TextBlock
-            {
-                Text = text,
-                Style = (Style)FindResource("BlockText")
-            };
-            textStack.Children.Add(mainText);
-
-            if (!string.IsNullOrEmpty(secondaryText))
-            {
-                var secText = new TextBlock
-                {
-                    Text = secondaryText,
-                    Style = (Style)FindResource("BlockTextSecondary")
-                };
-                textStack.Children.Add(secText);
-            }
-            Grid.SetColumn(textStack, 1);
-            grid.Children.Add(textStack);
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Icône
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Contenu éditable
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
 
             // Bouton supprimer
             var deleteButton = new Button
@@ -228,10 +167,244 @@ namespace MacroEngine.UI
             block.MouseEnter += (s, e) => deleteButton.Visibility = Visibility.Visible;
             block.MouseLeave += (s, e) => deleteButton.Visibility = Visibility.Collapsed;
 
-            block.Child = grid;
+            switch (action)
+            {
+                case KeyboardAction ka:
+                    styleName = "BlockKeyboard";
+                    icon = "⌨";
+                    block.Style = (Style)FindResource(styleName);
+                    CreateKeyboardBlockContent(grid, icon, ka, index);
+                    break;
 
+                case Core.Inputs.MouseAction ma:
+                    styleName = "BlockMouse";
+                    icon = "🖱";
+                    block.Style = (Style)FindResource(styleName);
+                    CreateMouseBlockContent(grid, icon, ma, index);
+                    break;
+
+                case DelayAction da:
+                    styleName = "BlockDelay";
+                    icon = "⏱";
+                    block.Style = (Style)FindResource(styleName);
+                    CreateDelayBlockContent(grid, icon, da, index);
+                    break;
+
+                default:
+                    styleName = "BlockKeyboard";
+                    icon = "❓";
+                    block.Style = (Style)FindResource(styleName);
+                    CreateDefaultBlockContent(grid, icon, action.Type.ToString());
+                    break;
+            }
+
+            block.Child = grid;
             return block;
         }
+
+        private void CreateKeyboardBlockContent(Grid grid, string icon, KeyboardAction ka, int index)
+        {
+            // Icône
+            var iconText = new TextBlock
+            {
+                Text = icon,
+                Style = (Style)FindResource("BlockIcon")
+            };
+            Grid.SetColumn(iconText, 0);
+            grid.Children.Add(iconText);
+
+            // Contenu avec zone cliquable pour modifier la touche
+            var contentStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            
+            var mainStack = new StackPanel { Orientation = Orientation.Horizontal };
+            
+            var keyTextBox = new TextBox
+            {
+                Text = GetKeyName(ka.VirtualKeyCode),
+                IsReadOnly = true,
+                Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(6, 2, 6, 2),
+                FontWeight = FontWeights.Bold,
+                FontSize = 13,
+                Cursor = Cursors.Hand,
+                Tag = index,
+                MinWidth = 40,
+                TextAlignment = TextAlignment.Center
+            };
+            keyTextBox.PreviewMouseLeftButtonDown += KeyTextBox_Click;
+            mainStack.Children.Add(keyTextBox);
+
+            contentStack.Children.Add(mainStack);
+
+            // Type d'action
+            var typeText = new TextBlock
+            {
+                Text = ka.ActionType == KeyboardActionType.Down ? "Appuyer" : 
+                       ka.ActionType == KeyboardActionType.Up ? "Relâcher" : "Appuyer+Relâcher",
+                Style = (Style)FindResource("BlockTextSecondary")
+            };
+            contentStack.Children.Add(typeText);
+
+            Grid.SetColumn(contentStack, 1);
+            grid.Children.Add(contentStack);
+        }
+
+        private void CreateMouseBlockContent(Grid grid, string icon, Core.Inputs.MouseAction ma, int index)
+        {
+            // Icône
+            var iconText = new TextBlock
+            {
+                Text = icon,
+                Style = (Style)FindResource("BlockIcon")
+            };
+            Grid.SetColumn(iconText, 0);
+            grid.Children.Add(iconText);
+
+            // Contenu
+            var contentStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            
+            var mainText = new TextBlock
+            {
+                Text = GetMouseActionText(ma),
+                Style = (Style)FindResource("BlockText")
+            };
+            contentStack.Children.Add(mainText);
+
+            if (ma.X >= 0 && ma.Y >= 0)
+            {
+                var posText = new TextBlock
+                {
+                    Text = $"({ma.X}, {ma.Y})",
+                    Style = (Style)FindResource("BlockTextSecondary")
+                };
+                contentStack.Children.Add(posText);
+            }
+
+            Grid.SetColumn(contentStack, 1);
+            grid.Children.Add(contentStack);
+        }
+
+        private void CreateDelayBlockContent(Grid grid, string icon, DelayAction da, int index)
+        {
+            // Icône
+            var iconText = new TextBlock
+            {
+                Text = icon,
+                Style = (Style)FindResource("BlockIcon")
+            };
+            Grid.SetColumn(iconText, 0);
+            grid.Children.Add(iconText);
+
+            // Contenu avec TextBox éditable directement
+            var contentStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            
+            var delayTextBox = new TextBox
+            {
+                Text = da.Duration.ToString(),
+                Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(6, 2, 6, 2),
+                FontWeight = FontWeights.Bold,
+                FontSize = 13,
+                Tag = index,
+                Width = 50,
+                TextAlignment = TextAlignment.Center
+            };
+            delayTextBox.LostFocus += DelayTextBox_LostFocus;
+            contentStack.Children.Add(delayTextBox);
+
+            var msText = new TextBlock
+            {
+                Text = " ms",
+                Style = (Style)FindResource("BlockText"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            contentStack.Children.Add(msText);
+
+            Grid.SetColumn(contentStack, 1);
+            grid.Children.Add(contentStack);
+        }
+
+        private void CreateDefaultBlockContent(Grid grid, string icon, string text)
+        {
+            // Icône
+            var iconText = new TextBlock
+            {
+                Text = icon,
+                Style = (Style)FindResource("BlockIcon")
+            };
+            Grid.SetColumn(iconText, 0);
+            grid.Children.Add(iconText);
+
+            // Texte
+            var mainText = new TextBlock
+            {
+                Text = text,
+                Style = (Style)FindResource("BlockText"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(mainText, 1);
+            grid.Children.Add(mainText);
+        }
+
+        #region Édition inline
+
+        private void KeyTextBox_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is TextBox textBox && textBox.Tag is int index && _currentMacro != null)
+            {
+                e.Handled = true;
+                
+                // Ouvrir un dialogue pour capturer la nouvelle touche
+                var dialog = new KeyCaptureDialog
+                {
+                    Owner = Window.GetWindow(this)
+                };
+
+                if (dialog.ShowDialog() == true && dialog.CapturedKey != 0)
+                {
+                    if (index >= 0 && index < _currentMacro.Actions.Count && _currentMacro.Actions[index] is KeyboardAction ka)
+                    {
+                        ka.VirtualKeyCode = (ushort)dialog.CapturedKey;
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            }
+        }
+
+        private void DelayTextBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox textBox && textBox.Tag is int index && _currentMacro != null)
+            {
+                if (int.TryParse(textBox.Text, out int delay) && delay > 0)
+                {
+                    if (index >= 0 && index < _currentMacro.Actions.Count && _currentMacro.Actions[index] is DelayAction da)
+                    {
+                        if (da.Duration != delay)
+                        {
+                            da.Duration = delay;
+                            _currentMacro.ModifiedAt = DateTime.Now;
+                            MacroChanged?.Invoke(this, EventArgs.Empty);
+                        }
+                    }
+                }
+                else
+                {
+                    // Restaurer la valeur précédente si invalide
+                    if (index >= 0 && index < _currentMacro.Actions.Count && _currentMacro.Actions[index] is DelayAction da)
+                    {
+                        textBox.Text = da.Duration.ToString();
+                    }
+                }
+            }
+        }
+
+        #endregion
 
         #region Drag & Drop
 
@@ -380,16 +553,11 @@ namespace MacroEngine.UI
 
             if (dialog.ShowDialog() == true && dialog.CapturedKey != 0)
             {
-                // Ajouter appui + relâchement
+                // Ajouter UNE SEULE action Press (appuyer + relâcher automatiquement)
                 _currentMacro.Actions.Add(new KeyboardAction
                 {
                     VirtualKeyCode = (ushort)dialog.CapturedKey,
-                    ActionType = KeyboardActionType.Down
-                });
-                _currentMacro.Actions.Add(new KeyboardAction
-                {
-                    VirtualKeyCode = (ushort)dialog.CapturedKey,
-                    ActionType = KeyboardActionType.Up
+                    ActionType = KeyboardActionType.Press
                 });
                 _currentMacro.ModifiedAt = DateTime.Now;
                 
@@ -419,24 +587,15 @@ namespace MacroEngine.UI
         {
             if (_currentMacro == null) return;
 
-            // Ouvrir un dialogue pour le délai
-            var dialog = new DelayInputDialog
+            // Ajouter directement un délai de 100ms (éditable inline dans le bloc)
+            _currentMacro.Actions.Add(new DelayAction
             {
-                Owner = Window.GetWindow(this),
-                DelayValue = 100
-            };
-
-            if (dialog.ShowDialog() == true)
-            {
-                _currentMacro.Actions.Add(new DelayAction
-                {
-                    Duration = dialog.DelayValue
-                });
-                _currentMacro.ModifiedAt = DateTime.Now;
-                
-                RefreshBlocks();
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }
+                Duration = 100
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
         private void DeleteBlock_Click(object sender, RoutedEventArgs e)
