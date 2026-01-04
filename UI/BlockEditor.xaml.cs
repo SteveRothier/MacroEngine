@@ -213,7 +213,7 @@ namespace MacroEngine.UI
             Grid.SetColumn(iconText, 0);
             grid.Children.Add(iconText);
 
-            // Contenu avec zone cliquable pour modifier la touche
+            // Contenu avec TextBox qui capture directement la touche
             var contentStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             
             var mainStack = new StackPanel { Orientation = Orientation.Horizontal };
@@ -231,9 +231,13 @@ namespace MacroEngine.UI
                 Cursor = Cursors.Hand,
                 Tag = index,
                 MinWidth = 40,
-                TextAlignment = TextAlignment.Center
+                TextAlignment = TextAlignment.Center,
+                Focusable = true
             };
-            keyTextBox.PreviewMouseLeftButtonDown += KeyTextBox_Click;
+            // Capture directe de la touche quand on appuie
+            keyTextBox.PreviewKeyDown += KeyTextBox_PreviewKeyDown;
+            keyTextBox.GotFocus += KeyTextBox_GotFocus;
+            keyTextBox.LostFocus += KeyTextBox_LostFocus;
             mainStack.Children.Add(keyTextBox);
 
             contentStack.Children.Add(mainStack);
@@ -297,7 +301,7 @@ namespace MacroEngine.UI
             Grid.SetColumn(iconText, 0);
             grid.Children.Add(iconText);
 
-            // Contenu avec TextBox éditable directement
+            // Contenu avec TextBox éditable (chiffres uniquement)
             var contentStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             
             var delayTextBox = new TextBox
@@ -313,7 +317,11 @@ namespace MacroEngine.UI
                 Width = 50,
                 TextAlignment = TextAlignment.Center
             };
+            // N'accepter que les chiffres
+            delayTextBox.PreviewTextInput += DelayTextBox_PreviewTextInput;
             delayTextBox.LostFocus += DelayTextBox_LostFocus;
+            // Empêcher le collage de texte non numérique
+            DataObject.AddPastingHandler(delayTextBox, DelayTextBox_Pasting);
             contentStack.Children.Add(delayTextBox);
 
             var msText = new TextBlock
@@ -352,28 +360,81 @@ namespace MacroEngine.UI
 
         #region Édition inline
 
-        private void KeyTextBox_Click(object sender, MouseButtonEventArgs e)
+        private void KeyTextBox_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (sender is TextBox textBox)
+            {
+                // Indiquer visuellement que le champ attend une touche
+                textBox.Background = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
+                textBox.Text = "...";
+            }
+        }
+
+        private void KeyTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
             if (sender is TextBox textBox && textBox.Tag is int index && _currentMacro != null)
             {
-                e.Handled = true;
-                
-                // Ouvrir un dialogue pour capturer la nouvelle touche
-                var dialog = new KeyCaptureDialog
+                // Restaurer l'affichage de la touche actuelle
+                textBox.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                if (index >= 0 && index < _currentMacro.Actions.Count && _currentMacro.Actions[index] is KeyboardAction ka)
                 {
-                    Owner = Window.GetWindow(this)
-                };
-
-                if (dialog.ShowDialog() == true && dialog.CapturedKey != 0)
-                {
-                    if (index >= 0 && index < _currentMacro.Actions.Count && _currentMacro.Actions[index] is KeyboardAction ka)
-                    {
-                        ka.VirtualKeyCode = (ushort)dialog.CapturedKey;
-                        _currentMacro.ModifiedAt = DateTime.Now;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    }
+                    textBox.Text = GetKeyName(ka.VirtualKeyCode);
                 }
+            }
+        }
+
+        private void KeyTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (sender is TextBox textBox && textBox.Tag is int index && _currentMacro != null)
+            {
+                e.Handled = true; // Empêcher la saisie normale
+                
+                // Ignorer les touches de modification seules
+                if (e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+                    e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
+                    e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
+                    e.Key == Key.LWin || e.Key == Key.RWin ||
+                    e.Key == Key.Tab)
+                {
+                    return;
+                }
+
+                // Capturer la touche
+                int virtualKey = KeyInterop.VirtualKeyFromKey(e.Key);
+                if (virtualKey != 0 && index >= 0 && index < _currentMacro.Actions.Count && _currentMacro.Actions[index] is KeyboardAction ka)
+                {
+                    ka.VirtualKeyCode = (ushort)virtualKey;
+                    textBox.Text = GetKeyName((ushort)virtualKey);
+                    textBox.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                    
+                    // Retirer le focus pour confirmer visuellement
+                    Keyboard.ClearFocus();
+                }
+            }
+        }
+
+        private void DelayTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            // N'accepter que les chiffres
+            e.Handled = !int.TryParse(e.Text, out _);
+        }
+
+        private void DelayTextBox_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            // Empêcher le collage de texte non numérique
+            if (e.DataObject.GetDataPresent(typeof(string)))
+            {
+                string text = (string)e.DataObject.GetData(typeof(string));
+                if (!int.TryParse(text, out _))
+                {
+                    e.CancelCommand();
+                }
+            }
+            else
+            {
+                e.CancelCommand();
             }
         }
 
