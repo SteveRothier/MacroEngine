@@ -247,14 +247,14 @@
          BLOCS SCRATCH-LIKE
          ══════════════════════════════════════════════════════════════════════ -->
 
-    <!-- Style de base pour tous les blocs -->
+    <!-- Style de base pour tous les blocs (avec effet d'imbrication) -->
     <Style x:Key="ActionBlockBase" TargetType="Border">
         <Setter Property="CornerRadius" Value="{StaticResource RadiusActionBlock}"/>
-        <Setter Property="Padding" Value="16,12"/>
-        <Setter Property="Margin" Value="0,4"/>
+        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="Margin" Value="0"/>
         <Setter Property="Effect" Value="{StaticResource ShadowActionBlock}"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="MinHeight" Value="52"/>
+        <Setter Property="MinHeight" Value="48"/>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Effect" Value="{StaticResource ShadowActionBlockHover}"/>

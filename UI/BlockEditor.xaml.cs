@@ -18,7 +18,7 @@ namespace MacroEngine.UI
     {
         private Macro? _currentMacro;
         private int _draggedIndex = -1;
-        private Border? _draggedBlock;
+        private FrameworkElement? _draggedElement;
         private Point _dragStartPoint;
         
         // Largeur maximale des blocs (réduite)
@@ -125,29 +125,102 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée un bloc visuel pour une action avec des champs éditables inline
+        /// Crée un bloc visuel pour une action avec effet d'imbrication Scratch-like
+        /// L'encoche du haut est à l'intérieur du bloc, le connecteur du bas rentre dans l'encoche du bloc suivant
         /// </summary>
-        private Border CreateBlockForAction(IInputAction action, int index)
+        private FrameworkElement CreateBlockForAction(IInputAction action, int index)
         {
             string styleName;
             string icon;
+            SolidColorBrush blockColor;
+            SolidColorBrush darkColor;
             
+            // Couleur de fond de l'éditeur pour créer l'effet d'encoche
+            var bgColor = (SolidColorBrush)FindResource("BackgroundPrimaryBrush");
+            
+            // Déterminer les couleurs selon le type d'action
+            switch (action)
+            {
+                case KeyboardAction:
+                    styleName = "BlockKeyboard";
+                    icon = "⌨";
+                    blockColor = (SolidColorBrush)FindResource("BlockKeyboardBrush");
+                    darkColor = (SolidColorBrush)FindResource("BlockKeyboardDarkBrush");
+                    break;
+                case Core.Inputs.MouseAction:
+                    styleName = "BlockMouse";
+                    icon = "🖱";
+                    blockColor = (SolidColorBrush)FindResource("BlockMouseBrush");
+                    darkColor = (SolidColorBrush)FindResource("BlockMouseDarkBrush");
+                    break;
+                case DelayAction:
+                    styleName = "BlockDelay";
+                    icon = "⏱";
+                    blockColor = (SolidColorBrush)FindResource("BlockDelayBrush");
+                    darkColor = (SolidColorBrush)FindResource("BlockDelayDarkBrush");
+                    break;
+                default:
+                    styleName = "BlockKeyboard";
+                    icon = "❓";
+                    blockColor = (SolidColorBrush)FindResource("BlockKeyboardBrush");
+                    darkColor = (SolidColorBrush)FindResource("BlockKeyboardDarkBrush");
+                    break;
+            }
+
+            // Hauteur du connecteur/encoche pour l'imbrication
+            const double NOTCH_HEIGHT = 8;
+            
+            // Conteneur principal avec effet d'imbrication
+            var container = new Grid();
+            container.Tag = index;
+            container.MaxWidth = BLOCK_MAX_WIDTH;
+            container.HorizontalAlignment = HorizontalAlignment.Left;
+            // Marge négative en bas pour que le connecteur chevauche l'encoche du bloc suivant
+            container.Margin = new Thickness(0, 0, 0, -NOTCH_HEIGHT);
+            // ZIndex pour que le connecteur soit visible au-dessus du bloc suivant
+            Panel.SetZIndex(container, 1000 - index);
+            
+            container.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Bloc principal avec encoche interne
+            container.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Connecteur bas
+
+            // Bloc principal avec encoche intégrée
+            var blockContainer = new Grid();
+            Grid.SetRow(blockContainer, 0);
+            
+            // Le bloc principal
             var block = new Border();
+            block.Style = (Style)FindResource(styleName);
             block.Tag = index;
             block.AllowDrop = true;
-            block.MaxWidth = BLOCK_MAX_WIDTH;
-            block.HorizontalAlignment = HorizontalAlignment.Left;
+            block.Margin = new Thickness(0);
+            blockContainer.Children.Add(block);
+            
+            // Encoche en haut à l'INTÉRIEUR du bloc (trou qui reçoit le connecteur du bloc précédent)
+            var topNotch = new Border
+            {
+                Width = 30,
+                Height = NOTCH_HEIGHT,
+                Background = bgColor,
+                CornerRadius = new CornerRadius(0, 0, 4, 4),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(20, 0, 0, 0)
+            };
+            blockContainer.Children.Add(topNotch);
+            
+            container.Children.Add(blockContainer);
 
             // Événements de drag & drop
-            block.MouseLeftButtonDown += Block_MouseLeftButtonDown;
-            block.MouseMove += Block_MouseMove;
-            block.MouseLeftButtonUp += Block_MouseLeftButtonUp;
+            container.MouseLeftButtonDown += Block_MouseLeftButtonDown;
+            container.MouseMove += Block_MouseMove;
+            container.MouseLeftButtonUp += Block_MouseLeftButtonUp;
             block.Drop += Block_Drop;
             block.DragEnter += Block_DragEnter;
             block.DragLeave += Block_DragLeave;
 
             // Contenu du bloc
             var grid = new Grid();
+            grid.Margin = new Thickness(0, 6, 0, 0); // Décalage pour laisser place à l'encoche
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Icône
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Contenu éditable
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
@@ -164,42 +237,42 @@ namespace MacroEngine.UI
             grid.Children.Add(deleteButton);
 
             // Afficher le bouton au survol
-            block.MouseEnter += (s, e) => deleteButton.Visibility = Visibility.Visible;
-            block.MouseLeave += (s, e) => deleteButton.Visibility = Visibility.Collapsed;
+            container.MouseEnter += (s, e) => deleteButton.Visibility = Visibility.Visible;
+            container.MouseLeave += (s, e) => deleteButton.Visibility = Visibility.Collapsed;
 
+            // Remplir le contenu selon le type
             switch (action)
             {
                 case KeyboardAction ka:
-                    styleName = "BlockKeyboard";
-                    icon = "⌨";
-                    block.Style = (Style)FindResource(styleName);
                     CreateKeyboardBlockContent(grid, icon, ka, index);
                     break;
-
                 case Core.Inputs.MouseAction ma:
-                    styleName = "BlockMouse";
-                    icon = "🖱";
-                    block.Style = (Style)FindResource(styleName);
                     CreateMouseBlockContent(grid, icon, ma, index);
                     break;
-
                 case DelayAction da:
-                    styleName = "BlockDelay";
-                    icon = "⏱";
-                    block.Style = (Style)FindResource(styleName);
                     CreateDelayBlockContent(grid, icon, da, index);
                     break;
-
                 default:
-                    styleName = "BlockKeyboard";
-                    icon = "❓";
-                    block.Style = (Style)FindResource(styleName);
                     CreateDefaultBlockContent(grid, icon, action.Type.ToString());
                     break;
             }
 
             block.Child = grid;
-            return block;
+
+            // Connecteur en bas (languette qui SORT du bloc et rentre dans l'encoche du bloc suivant)
+            var bottomConnector = new Border
+            {
+                Width = 30,
+                Height = NOTCH_HEIGHT,
+                Background = blockColor,
+                CornerRadius = new CornerRadius(0, 0, 4, 4),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(20, 0, 0, 0)
+            };
+            Grid.SetRow(bottomConnector, 1);
+            container.Children.Add(bottomConnector);
+
+            return container;
         }
 
         private void CreateKeyboardBlockContent(Grid grid, string icon, KeyboardAction ka, int index)
@@ -471,17 +544,17 @@ namespace MacroEngine.UI
 
         private void Block_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is Border block && block.Tag is int index)
+            if (sender is FrameworkElement element && element.Tag is int index)
             {
                 _dragStartPoint = e.GetPosition(this);
                 _draggedIndex = index;
-                _draggedBlock = block;
+                _draggedElement = element;
             }
         }
 
         private void Block_MouseMove(object sender, MouseEventArgs e)
         {
-            if (e.LeftButton != MouseButtonState.Pressed || _draggedBlock == null || _draggedIndex < 0)
+            if (e.LeftButton != MouseButtonState.Pressed || _draggedElement == null || _draggedIndex < 0)
                 return;
 
             Point currentPos = e.GetPosition(this);
@@ -491,20 +564,20 @@ namespace MacroEngine.UI
             if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
                 Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
             {
-                _draggedBlock.Opacity = 0.6;
+                _draggedElement.Opacity = 0.6;
                 
                 DataObject dragData = new DataObject("BlockIndex", _draggedIndex);
-                DragDrop.DoDragDrop(_draggedBlock, dragData, DragDropEffects.Move);
+                DragDrop.DoDragDrop(_draggedElement, dragData, DragDropEffects.Move);
                 
-                _draggedBlock.Opacity = 1.0;
-                _draggedBlock = null;
+                _draggedElement.Opacity = 1.0;
+                _draggedElement = null;
                 _draggedIndex = -1;
             }
         }
 
         private void Block_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            _draggedBlock = null;
+            _draggedElement = null;
             _draggedIndex = -1;
         }
 
