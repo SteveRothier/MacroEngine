@@ -213,22 +213,18 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
-                    <!-- Titre + Bouton Nouvelle Macro -->
-                    <Grid Grid.Row="0" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Mes Macros" 
-                                   Style="{StaticResource TextSubheading}"
-                                   VerticalAlignment="Center"/>
-                        <Button Grid.Column="1"
-                                Content="➕"
-                                Style="{StaticResource ButtonPrimary}"
-                                Click="NewMacro_Click"
-                                Padding="10,6"
-                                ToolTip="Nouvelle macro"/>
-                    </Grid>
+                    <!-- Bouton Nouvelle Macro (pleine largeur) -->
+                    <Button Grid.Row="0"
+                            Style="{StaticResource ButtonSidebarPrimary}"
+                            Click="NewMacro_Click"
+                            HorizontalAlignment="Stretch"
+                            Margin="0,0,0,12"
+                            ToolTip="Nouvelle macro">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="➕" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Nouvelle Macro" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
 
                     <!-- Boutons Importer/Exporter -->
                     <Grid Grid.Row="1" Margin="0,0,0,12">
@@ -238,19 +234,19 @@
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0"
-                                Style="{StaticResource ButtonGhost}"
+                                Style="{StaticResource ButtonSidebarSecondary}"
                                 Click="ImportMacro_Click"
                                 HorizontalAlignment="Stretch">
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="📂" Margin="0,0,6,0"/>
                                 <TextBlock Text="Importer"/>
                             </StackPanel>
                         </Button>
                         <Button Grid.Column="2"
-                                Style="{StaticResource ButtonGhost}"
+                                Style="{StaticResource ButtonSidebarSecondary}"
                                 Click="ExportMacro_Click"
                                 HorizontalAlignment="Stretch">
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <TextBlock Text="📤" Margin="0,0,6,0"/>
                                 <TextBlock Text="Exporter"/>
                             </StackPanel>
@@ -258,48 +254,27 @@
                     </Grid>
 
                     <!-- Liste des macros -->
-                    <ListBox Grid.Row="2"
-                             x:Name="MacrosListBox" 
-                             SelectionChanged="MacrosListBox_SelectionChanged"
-                             Background="Transparent"
-                             BorderThickness="0">
-                        <ListBox.ItemContainerStyle>
-                            <Style TargetType="ListBoxItem">
-                                <Setter Property="Padding" Value="12,10"/>
-                                <Setter Property="Margin" Value="0,4,0,0"/>
-                                <Setter Property="Cursor" Value="Hand"/>
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="Bd"
-                                                    Background="{StaticResource BackgroundPrimaryBrush}"
-                                                    CornerRadius="8"
-                                                    Padding="{TemplateBinding Padding}">
-                                                <ContentPresenter/>
-                                            </Border>
-                                            <ControlTemplate.Triggers>
-                                                <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" 
-                                                            Value="{StaticResource BackgroundTertiaryBrush}"/>
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" 
-                                                            Value="{StaticResource AccentPrimaryBrush}"/>
-                                                </Trigger>
-                                            </ControlTemplate.Triggers>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                            </Style>
-                        </ListBox.ItemContainerStyle>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Name}" 
-                                           FontWeight="SemiBold"
-                                           FontSize="14"/>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
+                    <Border Grid.Row="2"
+                            Background="{StaticResource BackgroundPrimaryBrush}"
+                            BorderBrush="{StaticResource BorderLightBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4"
+                            Padding="8">
+                        <ListBox x:Name="MacrosListBox" 
+                                 SelectionChanged="MacrosListBox_SelectionChanged"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 ItemContainerStyle="{StaticResource MacroListItemStyle}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" 
+                                               FontWeight="SemiBold"
+                                               FontSize="14"
+                                               Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Border>
 
                     <!-- Bouton Supprimer -->
                     <Button Grid.Row="3"

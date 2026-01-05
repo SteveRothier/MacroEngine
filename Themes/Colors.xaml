@@ -7,15 +7,21 @@
          ══════════════════════════════════════════════════════════════════════ -->
 
     <!-- Fonds principaux -->
-    <Color x:Key="BackgroundPrimaryColor">#F4EDE4</Color>
-    <Color x:Key="BackgroundSecondaryColor">#EFE6DA</Color>
-    <Color x:Key="BackgroundTertiaryColor">#E8DFD3</Color>
+    <Color x:Key="BackgroundPrimaryColor">#EDE4DB</Color>
+    <Color x:Key="BackgroundSecondaryColor">#E8DFD3</Color>
+    <Color x:Key="BackgroundTertiaryColor">#E1D8CD</Color>
     
     <!-- Accents -->
-    <Color x:Key="AccentPrimaryColor">#6FA8A1</Color>
+    <Color x:Key="AccentPrimaryColor">#7A1E3A</Color> <!-- Rouge pourpre -->
     <Color x:Key="AccentSecondaryColor">#4A6C6F</Color>
-    <Color x:Key="AccentHoverColor">#5D9690</Color>
-    <Color x:Key="AccentPressedColor">#3D5A5D</Color>
+    <Color x:Key="AccentHoverColor">#8B2A45</Color> <!-- Pourpre plus clair pour hover -->
+    <Color x:Key="AccentPressedColor">#5E1629</Color> <!-- Pourpre plus foncé pour pressed -->
+    
+    <!-- Couleurs pourpre spécifiques à la sidebar -->
+    <Color x:Key="SidebarAccentColor">#7A1E3A</Color>
+    <Color x:Key="SidebarAccentLightColor">#F5E6EB</Color> <!-- Beige pourpre très clair -->
+    <Color x:Key="SidebarAccentHoverColor">#E8D4DB</Color> <!-- Beige pourpre clair pour hover -->
+    <Color x:Key="SidebarAccentBorderColor">#7A1E3A</Color> <!-- Pourpre translucide pour bordures (avec alpha) -->
     
     <!-- Texte -->
     <Color x:Key="TextPrimaryColor">#2E2E2E</Color>
@@ -75,6 +81,17 @@
     <SolidColorBrush x:Key="AccentSecondaryBrush" Color="{StaticResource AccentSecondaryColor}"/>
     <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}"/>
     <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource AccentPressedColor}"/>
+    
+    <!-- Sidebar -->
+    <SolidColorBrush x:Key="SidebarAccentBrush" Color="{StaticResource SidebarAccentColor}"/>
+    <SolidColorBrush x:Key="SidebarAccentLightBrush" Color="{StaticResource SidebarAccentLightColor}"/>
+    <SolidColorBrush x:Key="SidebarAccentHoverBrush" Color="{StaticResource SidebarAccentHoverColor}"/>
+    <!-- Bordure pourpre translucide (60% d'opacité) -->
+    <SolidColorBrush x:Key="SidebarAccentBorderBrush">
+        <SolidColorBrush.Color>
+            <Color A="153" R="122" G="30" B="58"/> <!-- 60% d'opacité -->
+        </SolidColorBrush.Color>
+    </SolidColorBrush>
     
     <!-- Texte -->
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
