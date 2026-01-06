@@ -267,10 +267,41 @@
                                  ItemContainerStyle="{StaticResource MacroListItemStyle}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding Name}" 
-                                               FontWeight="SemiBold"
-                                               FontSize="14"
-                                               Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        
+                                        <!-- Nom de la macro -->
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Name}" 
+                                                   FontWeight="SemiBold"
+                                                   FontSize="14"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                        
+                                        <!-- Point d'état (Activé/Désactivé) -->
+                                        <Ellipse Grid.Column="1"
+                                                 Style="{StaticResource StatusDotStyle}"/>
+                                        
+                                        <!-- Badge de raccourci clavier (compact) -->
+                                        <TextBlock Grid.Column="2"
+                                                   FontSize="10"
+                                                   FontWeight="Medium"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="6,0,0,0"
+                                                   Visibility="{Binding ShortcutKeyCode, Converter={StaticResource ShortcutVisibilityConverter}}">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="⌨ {0}">
+                                                    <Binding Path="ShortcutKeyCode" Converter="{StaticResource KeyCodeToNameConverter}"/>
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>

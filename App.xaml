@@ -1,6 +1,7 @@
 <Application x:Class="MacroEngine.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:MacroEngine.Converters"
              StartupUri="UI/MainWindow.xaml">
     <Application.Resources>
         <ResourceDictionary>
@@ -20,6 +21,13 @@
                 <ResourceDictionary Source="Themes/Controls.xaml"/>
                 
             </ResourceDictionary.MergedDictionaries>
+            
+            <!-- ══════════════════════════════════════════════════════════
+                 Converters
+                 ══════════════════════════════════════════════════════════ -->
+            <converters:BoolToStatusConverter x:Key="BoolToStatusConverter"/>
+            <converters:KeyCodeToNameConverter x:Key="KeyCodeToNameConverter"/>
+            <converters:ShortcutVisibilityConverter x:Key="ShortcutVisibilityConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

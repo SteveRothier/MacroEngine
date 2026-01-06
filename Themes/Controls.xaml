@@ -64,6 +64,45 @@
     </Style>
 
     <!-- ══════════════════════════════════════════════════════════════════════
+         BADGES
+         ══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Point d'état (Activé/Désactivé) - Simple point lumineux -->
+    <Style x:Key="StatusDotStyle" TargetType="Ellipse">
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="Height" Value="10"/>
+        <Setter Property="Fill" Value="{StaticResource SuccessBrush}"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="8,0,0,0"/>
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect Color="#5A9F68" Opacity="0.6" BlurRadius="4" ShadowDepth="0"/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                <Setter Property="Fill" Value="{StaticResource TextMutedBrush}"/>
+                <Setter Property="Effect">
+                    <Setter.Value>
+                        <DropShadowEffect Color="#8A8A8A" Opacity="0.4" BlurRadius="3" ShadowDepth="0"/>
+                    </Setter.Value>
+                </Setter>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Badge de raccourci clavier -->
+    <Style x:Key="ShortcutBadgeStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderMediumBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="6,2"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Margin" Value="8,0,0,0"/>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
          BOUTONS
          ══════════════════════════════════════════════════════════════════════ -->
 
