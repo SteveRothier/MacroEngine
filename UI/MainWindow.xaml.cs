@@ -481,6 +481,12 @@ namespace MacroEngine.UI
                     return;
                 }
                 
+                // Vérifier si la macro est activée
+                if (!macro.IsEnabled)
+                {
+                    return; // La macro est désactivée
+                }
+                
                 // Vérifier si le raccourci est actif pour l'application actuelle
                 if (!IsMacroShortcutActiveForCurrentApp(macro))
                 {
@@ -633,6 +639,9 @@ namespace MacroEngine.UI
         {
             // Appeler la même logique que MacroEditor_MacroModified
             MacroEditor_MacroModified(sender, e);
+            
+            // Mettre à jour les raccourcis globaux (au cas où IsEnabled a changé)
+            UpdateMacroShortcuts();
         }
 
         private void GlobalExecuteHook_KeyDown(object? sender, KeyboardHookEventArgs e)
@@ -984,6 +993,18 @@ namespace MacroEngine.UI
                         StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                 MessageBox.Show("Veuillez sélectionner une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                     });
+                return;
+            }
+
+            // Vérifier si la macro est activée
+            if (!_selectedMacro.IsEnabled)
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    StatusText.Text = "La macro est désactivée";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    MessageBox.Show("La macro sélectionnée est désactivée. Veuillez l'activer pour l'exécuter.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                });
                 return;
             }
 
@@ -2790,6 +2811,7 @@ namespace MacroEngine.UI
                 UpdateTargetAppsDisplay();
             }
         }
+
 
         #endregion
 

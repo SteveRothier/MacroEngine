@@ -106,6 +106,7 @@ namespace MacroEngine.UI
             _currentMacro = macro;
             RefreshBlocks();
             UpdateRepeatControls();
+            UpdateMacroEnableToggle();
         }
 
         /// <summary>
@@ -897,6 +898,46 @@ namespace MacroEngine.UI
             if (int.TryParse(RepeatCountTextBox.Text, out int count) && count > 0)
             {
                 _currentMacro.RepeatCount = count;
+                _currentMacro.ModifiedAt = DateTime.Now;
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        #endregion
+
+        #region Toggle Enable/Disable
+
+        private void UpdateMacroEnableToggle()
+        {
+            if (MacroEnableToggle == null) return;
+
+            if (_currentMacro != null)
+            {
+                MacroEnableToggle.IsEnabled = true;
+                MacroEnableToggle.IsChecked = _currentMacro.IsEnabled;
+            }
+            else
+            {
+                MacroEnableToggle.IsEnabled = false;
+                MacroEnableToggle.IsChecked = false;
+            }
+        }
+
+        private void MacroEnableToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro != null)
+            {
+                _currentMacro.IsEnabled = true;
+                _currentMacro.ModifiedAt = DateTime.Now;
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private void MacroEnableToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro != null)
+            {
+                _currentMacro.IsEnabled = false;
                 _currentMacro.ModifiedAt = DateTime.Now;
                 MacroChanged?.Invoke(this, EventArgs.Empty);
             }
