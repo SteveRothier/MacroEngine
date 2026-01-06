@@ -152,6 +152,27 @@
                 <!-- Séparateur vertical -->
                 <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
 
+                <!-- Boutons Undo/Redo -->
+                <Button x:Name="UndoButton"
+                        Style="{StaticResource ButtonIcon}"
+                        Click="UndoButton_Click"
+                        IsEnabled="False"
+                        Margin="0,0,4,0"
+                        ToolTip="Annuler (Ctrl+Z)">
+                    <TextBlock Text="↶" FontSize="16"/>
+                </Button>
+                <Button x:Name="RedoButton"
+                        Style="{StaticResource ButtonIcon}"
+                        Click="RedoButton_Click"
+                        IsEnabled="False"
+                        Margin="0,0,12,0"
+                        ToolTip="Refaire (Ctrl+Y)">
+                    <TextBlock Text="↷" FontSize="16"/>
+                </Button>
+
+                <!-- Séparateur vertical -->
+                <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="0,0,12,0"/>
+
                 <!-- Toggle Activer/Désactiver Macro -->
                 <ToggleButton x:Name="MacroEnableToggle"
                               Style="{StaticResource ToggleSwitchStyle}"

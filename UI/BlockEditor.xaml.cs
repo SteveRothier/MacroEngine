@@ -31,6 +31,11 @@ namespace MacroEngine.UI
         // Largeur maximale des blocs (réduite)
         private const double BLOCK_MAX_WIDTH = 260;
 
+        // Historique Undo/Redo
+        private Stack<List<IInputAction>> _undoStack = new Stack<List<IInputAction>>();
+        private Stack<List<IInputAction>> _redoStack = new Stack<List<IInputAction>>();
+        private bool _isUndoRedo = false; // Flag pour éviter de sauvegarder lors d'un undo/redo
+
         // Événement déclenché quand la macro est modifiée
         public event EventHandler? MacroChanged;
 
@@ -40,6 +45,25 @@ namespace MacroEngine.UI
             DrawGridPattern();
             Loaded += BlockEditor_Loaded;
             SizeChanged += BlockEditor_SizeChanged;
+            
+            // Ajouter les raccourcis clavier pour Undo/Redo
+            KeyDown += BlockEditor_KeyDown;
+        }
+
+        private void BlockEditor_KeyDown(object sender, KeyEventArgs e)
+        {
+            // Ctrl+Z pour Undo
+            if (e.Key == Key.Z && Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            {
+                Undo();
+                e.Handled = true;
+            }
+            // Ctrl+Y pour Redo
+            else if (e.Key == Key.Y && Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            {
+                Redo();
+                e.Handled = true;
+            }
         }
 
         private void BlockEditor_Loaded(object sender, RoutedEventArgs e)
@@ -107,6 +131,12 @@ namespace MacroEngine.UI
             RefreshBlocks();
             UpdateRepeatControls();
             UpdateMacroEnableToggle();
+            
+            // Réinitialiser l'historique
+            _undoStack.Clear();
+            _redoStack.Clear();
+            SaveState();
+            UpdateUndoRedoButtons();
         }
 
         /// <summary>
@@ -484,6 +514,12 @@ namespace MacroEngine.UI
                 int virtualKey = KeyInterop.VirtualKeyFromKey(e.Key);
                 if (virtualKey != 0 && index >= 0 && index < _currentMacro.Actions.Count && _currentMacro.Actions[index] is KeyboardAction ka)
                 {
+                    // Sauvegarder l'état seulement si la valeur change
+                    if (ka.VirtualKeyCode != (ushort)virtualKey)
+                    {
+                        SaveState();
+                    }
+                    
                     ka.VirtualKeyCode = (ushort)virtualKey;
                     textBox.Text = GetKeyName((ushort)virtualKey);
                     textBox.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
@@ -529,6 +565,8 @@ namespace MacroEngine.UI
                     {
                         if (da.Duration != delay)
                         {
+                            SaveState();
+                            
                             da.Duration = delay;
                             _currentMacro.ModifiedAt = DateTime.Now;
                             MacroChanged?.Invoke(this, EventArgs.Empty);
@@ -731,6 +769,8 @@ namespace MacroEngine.UI
                 
                 if (sourceIndex != targetIndex && _currentMacro != null)
                 {
+                    SaveState();
+                    
                     // Réorganiser les actions
                     var action = _currentMacro.Actions[sourceIndex];
                     _currentMacro.Actions.RemoveAt(sourceIndex);
@@ -761,6 +801,8 @@ namespace MacroEngine.UI
             // Drop à la fin de la liste si on drop sur le conteneur
             if (e.Data.GetDataPresent("BlockIndex") && _currentMacro != null)
             {
+                SaveState();
+                
                 int sourceIndex = (int)e.Data.GetData("BlockIndex");
                 var action = _currentMacro.Actions[sourceIndex];
                 _currentMacro.Actions.RemoveAt(sourceIndex);
@@ -780,7 +822,10 @@ namespace MacroEngine.UI
 
         private void AddKeyboard_Click(object sender, RoutedEventArgs e)
         {
-            if (_currentMacro == null) return;     
+            if (_currentMacro == null) return;
+            
+            SaveState();
+            
             // Ajouter directement une action Press sans dialogue (sans touche par défaut)
             _currentMacro.Actions.Add(new KeyboardAction
             {
@@ -796,6 +841,8 @@ namespace MacroEngine.UI
         private void AddMouse_Click(object sender, RoutedEventArgs e)
         {
             if (_currentMacro == null) return;
+
+            SaveState();
 
             // Ajouter un clic gauche par défaut
             _currentMacro.Actions.Add(new Core.Inputs.MouseAction
@@ -814,6 +861,8 @@ namespace MacroEngine.UI
         {
             if (_currentMacro == null) return;
 
+            SaveState();
+
             // Ajouter directement un délai de 100ms (éditable inline dans le bloc)
             _currentMacro.Actions.Add(new DelayAction
             {
@@ -831,6 +880,8 @@ namespace MacroEngine.UI
             {
                 if (index >= 0 && index < _currentMacro.Actions.Count)
                 {
+                    SaveState();
+                    
                     _currentMacro.Actions.RemoveAt(index);
                     _currentMacro.ModifiedAt = DateTime.Now;
                     
@@ -941,6 +992,114 @@ namespace MacroEngine.UI
                 _currentMacro.ModifiedAt = DateTime.Now;
                 MacroChanged?.Invoke(this, EventArgs.Empty);
             }
+        }
+
+        #endregion
+
+        #region Undo/Redo
+
+        /// <summary>
+        /// Sauvegarde l'état actuel dans l'historique Undo
+        /// </summary>
+        private void SaveState()
+        {
+            if (_currentMacro == null || _isUndoRedo) return;
+
+            var state = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            _undoStack.Push(state);
+            
+            // Limiter la taille de l'historique à 50 états
+            if (_undoStack.Count > 50)
+            {
+                var temp = new Stack<List<IInputAction>>();
+                for (int i = 0; i < 50; i++)
+                {
+                    temp.Push(_undoStack.Pop());
+                }
+                _undoStack = temp;
+            }
+            
+            // Vider le redo stack quand on fait une nouvelle modification
+            _redoStack.Clear();
+            UpdateUndoRedoButtons();
+        }
+
+        /// <summary>
+        /// Annule la dernière modification
+        /// </summary>
+        private void Undo()
+        {
+            if (_currentMacro == null || _undoStack.Count == 0) return;
+
+            // Sauvegarder l'état actuel dans redo
+            var currentState = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            _redoStack.Push(currentState);
+
+            // Restaurer l'état précédent
+            var previousState = _undoStack.Pop();
+            _isUndoRedo = true;
+            
+            _currentMacro.Actions.Clear();
+            _currentMacro.Actions.AddRange(previousState.Select(a => a.Clone()));
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+            
+            _isUndoRedo = false;
+            UpdateUndoRedoButtons();
+        }
+
+        /// <summary>
+        /// Refait la dernière modification annulée
+        /// </summary>
+        private void Redo()
+        {
+            if (_currentMacro == null || _redoStack.Count == 0) return;
+
+            // Sauvegarder l'état actuel dans undo
+            var currentState = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            _undoStack.Push(currentState);
+
+            // Restaurer l'état suivant
+            var nextState = _redoStack.Pop();
+            _isUndoRedo = true;
+            
+            _currentMacro.Actions.Clear();
+            _currentMacro.Actions.AddRange(nextState.Select(a => a.Clone()));
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+            
+            _isUndoRedo = false;
+            UpdateUndoRedoButtons();
+        }
+
+        /// <summary>
+        /// Met à jour l'état des boutons Undo/Redo
+        /// </summary>
+        private void UpdateUndoRedoButtons()
+        {
+            if (UndoButton != null)
+            {
+                UndoButton.IsEnabled = _currentMacro != null && _undoStack.Count > 0;
+            }
+            
+            if (RedoButton != null)
+            {
+                RedoButton.IsEnabled = _currentMacro != null && _redoStack.Count > 0;
+            }
+        }
+
+        private void UndoButton_Click(object sender, RoutedEventArgs e)
+        {
+            Undo();
+        }
+
+        private void RedoButton_Click(object sender, RoutedEventArgs e)
+        {
+            Redo();
         }
 
         #endregion
