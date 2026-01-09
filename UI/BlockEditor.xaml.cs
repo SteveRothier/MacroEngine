@@ -36,6 +36,9 @@ namespace MacroEngine.UI
         private Stack<List<IInputAction>> _redoStack = new Stack<List<IInputAction>>();
         private bool _isUndoRedo = false; // Flag pour éviter de sauvegarder lors d'un undo/redo
 
+        // Sélection de bloc
+        private int _selectedBlockIndex = -1; // Index du bloc sélectionné (-1 si aucun)
+
         // Événement déclenché quand la macro est modifiée
         public event EventHandler? MacroChanged;
 
@@ -128,6 +131,7 @@ namespace MacroEngine.UI
         public void LoadMacro(Macro? macro)
         {
             _currentMacro = macro;
+            _selectedBlockIndex = -1; // Désélectionner lors du chargement d'une nouvelle macro
             RefreshBlocks();
             UpdateRepeatControls();
             UpdateMacroEnableToggle();
@@ -149,10 +153,17 @@ namespace MacroEngine.UI
             if (_currentMacro == null || _currentMacro.Actions.Count == 0)
             {
                 EmptyStatePanel.Visibility = Visibility.Visible;
+                _selectedBlockIndex = -1;
                 return;
             }
 
             EmptyStatePanel.Visibility = Visibility.Collapsed;
+
+            // Ajuster l'index sélectionné si nécessaire
+            if (_selectedBlockIndex >= _currentMacro.Actions.Count)
+            {
+                _selectedBlockIndex = -1;
+            }
 
             for (int i = 0; i < _currentMacro.Actions.Count; i++)
             {
@@ -160,6 +171,9 @@ namespace MacroEngine.UI
                 var block = CreateBlockForAction(action, i);
                 BlocksItemsControl.Items.Add(block);
             }
+
+            // Mettre à jour le feedback visuel après le rafraîchissement
+            UpdateBlockSelectionVisual();
         }
 
         /// <summary>
@@ -592,6 +606,9 @@ namespace MacroEngine.UI
         {
             if (sender is FrameworkElement element && element.Tag is int index)
             {
+                // Sélectionner le bloc
+                SelectBlock(index);
+                
                 _dragStartPoint = e.GetPosition(this);
                 _draggedIndex = index;
                 _draggedElement = element;
@@ -1100,6 +1117,91 @@ namespace MacroEngine.UI
         private void RedoButton_Click(object sender, RoutedEventArgs e)
         {
             Redo();
+        }
+
+        #endregion
+
+        #region Sélection de blocs
+
+        /// <summary>
+        /// Sélectionne un bloc et met à jour le feedback visuel
+        /// </summary>
+        private void SelectBlock(int index)
+        {
+            if (_currentMacro == null || index < 0 || index >= _currentMacro.Actions.Count)
+            {
+                _selectedBlockIndex = -1;
+                UpdateBlockSelectionVisual();
+                return;
+            }
+
+            _selectedBlockIndex = index;
+            UpdateBlockSelectionVisual();
+        }
+
+        /// <summary>
+        /// Met à jour le feedback visuel pour le bloc sélectionné
+        /// </summary>
+        private void UpdateBlockSelectionVisual()
+        {
+            // Parcourir tous les blocs et mettre à jour leur apparence
+            foreach (var item in BlocksItemsControl.Items)
+            {
+                if (item is FrameworkElement container && container.Tag is int index)
+                {
+                    var border = FindBorderInContainer(container);
+                    if (border != null)
+                    {
+                        if (index == _selectedBlockIndex)
+                        {
+                            // Bloc sélectionné : bordure bleue épaisse
+                            border.SetValue(Border.BorderThicknessProperty, new Thickness(4));
+                            border.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Colors.DodgerBlue));
+                            border.Effect = new System.Windows.Media.Effects.DropShadowEffect
+                            {
+                                Color = Colors.DodgerBlue,
+                                Opacity = 0.7,
+                                BlurRadius = 12,
+                                ShadowDepth = 0
+                            };
+                        }
+                        else
+                        {
+                            // Bloc non sélectionné : restaurer le style original
+                            border.ClearValue(Border.BorderThicknessProperty);
+                            border.ClearValue(Border.BorderBrushProperty);
+                            RefreshBlockBorderBrush(border);
+                            border.Effect = null;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Trouve le Border dans un conteneur de bloc
+        /// </summary>
+        private Border? FindBorderInContainer(DependencyObject container)
+        {
+            if (container == null) return null;
+            
+            // Vérifier si le container lui-même est un Border avec un Tag
+            if (container is Border border && border.Tag is int)
+                return border;
+            
+            // Parcourir récursivement les enfants
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(container); i++)
+            {
+                var child = VisualTreeHelper.GetChild(container, i);
+                if (child is Border borderChild && borderChild.Tag is int)
+                    return borderChild;
+                
+                var found = FindBorderInContainer(child);
+                if (found != null)
+                    return found;
+            }
+            
+            return null;
         }
 
         #endregion
