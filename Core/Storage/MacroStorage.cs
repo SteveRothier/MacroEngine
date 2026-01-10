@@ -288,6 +288,8 @@ namespace MacroEngine.Core.Storage
                                 ?? throw new InvalidOperationException("Impossible de désérialiser MouseAction"),
                             InputActionType.Delay => JsonSerializer.Deserialize<DelayAction>(root.GetRawText(), options)
                                 ?? throw new InvalidOperationException("Impossible de désérialiser DelayAction"),
+                            InputActionType.Repeat => JsonSerializer.Deserialize<RepeatAction>(root.GetRawText(), options)
+                                ?? throw new InvalidOperationException("Impossible de désérialiser RepeatAction"),
                             _ => throw new NotSupportedException($"Type d'action non supporté: {inputActionType}")
                         };
                     }
@@ -302,6 +304,12 @@ namespace MacroEngine.Core.Storage
                     {
                         return JsonSerializer.Deserialize<DelayAction>(root.GetRawText(), options)
                             ?? throw new InvalidOperationException("Impossible de désérialiser DelayAction");
+                    }
+                    else if (root.TryGetProperty("Actions", out _) && (root.TryGetProperty("RepeatMode", out _) || root.TryGetProperty("RepeatCount", out _)))
+                    {
+                        // RepeatAction a une propriété Actions et RepeatMode/RepeatCount
+                        return JsonSerializer.Deserialize<RepeatAction>(root.GetRawText(), options)
+                            ?? throw new InvalidOperationException("Impossible de désérialiser RepeatAction");
                     }
                     else if (root.TryGetProperty("X", out _) || root.TryGetProperty("Y", out _))
                     {

@@ -1408,7 +1408,7 @@ namespace MacroEngine.UI
             {
                 Placement = PlacementMode.RelativePoint,
                 PlacementTarget = titleText,
-                StaysOpen = false,
+                StaysOpen = true, // Garder le popup ouvert jusqu'à ce qu'on clique sur OK/Cancel
                 IsOpen = true,
                 PopupAnimation = PopupAnimation.Slide
             };
@@ -1691,10 +1691,62 @@ namespace MacroEngine.UI
             popup.Child = editPanel;
 
             // Positionner le popup près du titre
-            var titlePos = titleText.PointToScreen(new Point(0, 0));
-            var parentPos = Application.Current.MainWindow.PointToScreen(new Point(0, 0));
-            popup.HorizontalOffset = titlePos.X - parentPos.X;
-            popup.VerticalOffset = titlePos.Y - parentPos.Y + titleText.ActualHeight + 4;
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                var titlePos = titleText.PointToScreen(new Point(0, 0));
+                var parentPos = Application.Current.MainWindow.PointToScreen(new Point(0, 0));
+                popup.HorizontalOffset = titlePos.X - parentPos.X;
+                popup.VerticalOffset = titlePos.Y - parentPos.Y + titleText.ActualHeight + 4;
+                
+                // Ajouter un événement pour fermer le popup avec Escape
+                editPanel.KeyDown += (s, e) =>
+                {
+                    if (e.Key == Key.Escape)
+                    {
+                        e.Handled = true;
+                        if (!dialogSaved)
+                        {
+                            ra.RepeatMode = originalMode;
+                            ra.RepeatCount = originalCount;
+                            ra.KeyCodeToMonitor = originalKeyCode;
+                            ra.ClickTypeToMonitor = originalClickType;
+                        }
+                        tempKeyHook?.Uninstall();
+                        popup.IsOpen = false;
+                    }
+                };
+
+                // Focusable pour recevoir les événements clavier
+                editPanel.Focusable = true;
+                editPanel.Focus();
+            }));
+
+            // Ajouter un événement pour fermer le popup avec Escape
+            editPanel.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    if (!dialogSaved)
+                    {
+                        ra.RepeatMode = originalMode;
+                        ra.RepeatCount = originalCount;
+                        ra.KeyCodeToMonitor = originalKeyCode;
+                        ra.ClickTypeToMonitor = originalClickType;
+                    }
+                    tempKeyHook?.Uninstall();
+                    popup.IsOpen = false;
+                }
+            };
+
+            // Focusable pour recevoir les événements clavier
+            editPanel.Focusable = true;
+            
+            // Mettre le focus sur le panel pour capturer Escape
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                editPanel.Focus();
+            }));
         }
 
         #endregion
