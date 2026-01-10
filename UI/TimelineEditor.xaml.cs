@@ -119,19 +119,29 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateActionCardWithButtons(IInputAction action, int index)
         {
-            // Conteneur horizontal pour la carte et les boutons
-            var container = new StackPanel
+            // Conteneur horizontal pour la carte et les boutons - largeur fixe pour toutes les actions
+            // Utiliser un Grid pour un meilleur contrôle de la largeur
+            var container = new Grid
             {
-                Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                Margin = new Thickness(0, 0, 0, 2)
+                HorizontalAlignment = HorizontalAlignment.Stretch, // S'étend pour prendre toute la largeur
+                Margin = new Thickness(0, 0, 0, 2),
+                MinWidth = 400 // Largeur minimale pour toutes les actions
             };
+            
+            // Définir les colonnes : carte prend tout l'espace disponible, boutons ont une largeur fixe
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Carte - prend tout l'espace disponible
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Boutons monter/descendre - largeur automatique
             
             // Créer la carte d'action (sans les boutons monter/descendre)
             var card = CreateActionCard(action, index);
+            card.HorizontalAlignment = HorizontalAlignment.Stretch; // S'étend pour prendre toute la largeur de sa colonne
             
             // Créer le conteneur des boutons monter/descendre séparé à droite
             var buttonsContainer = CreateMoveButtonsContainer(action, index);
+            
+            Grid.SetColumn(card, 0);
+            Grid.SetColumn(buttonsContainer, 1);
             
             container.Children.Add(card);
             container.Children.Add(buttonsContainer);
@@ -199,12 +209,12 @@ namespace MacroEngine.UI
                     break;
             }
 
-            // Carte Timeline avec fond coloré enrichi
+            // Carte Timeline avec fond coloré enrichi - largeur fixe pour toutes les actions
             var card = new Border
             {
                 Background = new SolidColorBrush(backgroundColor),
                 BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B)),
-                BorderThickness = new Thickness(0, 0, 0, 2), // Ligne de séparation plus visible
+                BorderThickness = new Thickness(0, 0, 0, 2), // Ligne de séparation plus visible - toujours la même épaisseur
                 Padding = new Thickness(14, 12, 14, 12),
                 Margin = new Thickness(0, 0, 0, 2),
                 Tag = index,
@@ -212,6 +222,8 @@ namespace MacroEngine.UI
                 Cursor = Cursors.Hand,
                 MinHeight = 56,
                 MaxHeight = 64,
+                MinWidth = 400, // Largeur minimale pour toutes les actions
+                HorizontalAlignment = HorizontalAlignment.Stretch, // S'étend pour prendre toute la largeur disponible
                 VerticalAlignment = VerticalAlignment.Stretch,
                 CornerRadius = new CornerRadius(8),
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
@@ -230,8 +242,7 @@ namespace MacroEngine.UI
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge icône
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Texte
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge info optionnel
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Boutons monter/descendre
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) }); // Largeur fixe pour le bouton supprimer (toujours réservée pour éviter changement de largeur)
 
             // Barre colorée à gauche (timeline) - avec effet lumineux enrichi
             var timelineBar = new Border
@@ -374,7 +385,7 @@ namespace MacroEngine.UI
             Grid.SetColumn(infoBadge, 3);
             contentGrid.Children.Add(infoBadge);
 
-            // Bouton supprimer avec style enrichi (visible au survol)
+            // Bouton supprimer avec style enrichi (visible au survol mais toujours présent pour ne pas changer la largeur)
             var deleteBtnContainer = new Border
             {
                 Background = Brushes.Transparent,
@@ -386,7 +397,8 @@ namespace MacroEngine.UI
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Cursor = Cursors.Hand,
                 Tag = index,
-                Visibility = Visibility.Collapsed
+                Opacity = 0, // Invisible par défaut mais toujours présent pour ne pas changer la largeur
+                Visibility = Visibility.Visible // Toujours visible pour réserver l'espace
             };
             
             var deleteBtn = new Button
@@ -418,21 +430,19 @@ namespace MacroEngine.UI
             };
             
             deleteBtnContainer.Child = deleteBtn;
-            Grid.SetColumn(deleteBtnContainer, 5);
+            Grid.SetColumn(deleteBtnContainer, 4); // Colonne 4 (les boutons monter/descendre sont maintenant séparés)
             contentGrid.Children.Add(deleteBtnContainer);
 
             card.Child = contentGrid;
 
-            // Effets hover : uniquement ajout d'une bordure, pas de changement de taille
+            // Effets hover : changement de couleur uniquement, pas de changement de taille ni de bordure
             card.MouseEnter += (s, e) =>
             {
-                deleteBtnContainer.Visibility = Visibility.Visible;
+                deleteBtnContainer.Opacity = 1; // Rendre visible sans changer Visibility pour ne pas changer la largeur
                 infoBadge.Visibility = Visibility.Visible;
                 card.Background = new SolidColorBrush(backgroundColorHover);
                 timelineBar.Background = new SolidColorBrush(hoverColor);
-                // Ajouter uniquement une bordure au hover, pas de changement de taille
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B));
-                card.BorderThickness = new Thickness(2); // Bordure uniforme au hover
+                // Pas de changement de bordure pour garder la même taille
                 if (detailsBlock != null && detailsBadge != null)
                 {
                     detailsBadge.Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B));
@@ -443,13 +453,11 @@ namespace MacroEngine.UI
 
             card.MouseLeave += (s, e) =>
             {
-                deleteBtnContainer.Visibility = Visibility.Collapsed;
+                deleteBtnContainer.Opacity = 0; // Rendre invisible sans changer Visibility pour ne pas changer la largeur
                 infoBadge.Visibility = Visibility.Collapsed;
                 card.Background = new SolidColorBrush(backgroundColor);
                 timelineBar.Background = new SolidColorBrush(primaryColor);
-                // Retirer la bordure au hover, revenir à l'état initial
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
-                card.BorderThickness = new Thickness(0, 0, 0, 2); // Bordure seulement en bas
+                // Pas de changement de bordure pour garder la même taille
                 if (detailsBlock != null && detailsBadge != null)
                 {
                     detailsBadge.Background = new SolidColorBrush(Color.FromArgb(15, primaryColor.R, primaryColor.G, primaryColor.B));
@@ -867,9 +875,9 @@ namespace MacroEngine.UI
         {
             if (sender is Border card && card.Tag is int index)
             {
-                // Mettre en surbrillance la carte cible
+                // Mettre en surbrillance la carte cible sans changer la taille
                 card.Background = new SolidColorBrush(Color.FromRgb(245, 242, 240)); // Fond légèrement grisé
-                card.BorderThickness = new Thickness(2);
+                // BorderThickness reste constante pour ne pas changer la taille
                 card.BorderBrush = new SolidColorBrush(Color.FromRgb(122, 30, 58)); // Bordure pourpre
             }
         }
@@ -890,8 +898,18 @@ namespace MacroEngine.UI
                         _ => Color.FromRgb(255, 255, 255)
                     };
                     card.Background = new SolidColorBrush(bgColor);
-                    card.BorderThickness = new Thickness(0, 0, 0, 1); // Ligne de séparation
-                    card.BorderBrush = new SolidColorBrush(Color.FromArgb(30, 122, 30, 58));
+                    // Restaurer la BorderThickness initiale pour ne pas changer la taille
+                    card.BorderThickness = new Thickness(0, 0, 0, 2); // Ligne de séparation - même épaisseur que l'initial
+                    // Restaurer la BorderBrush selon le type d'action
+                    var restoredAction = _currentMacro.Actions[index];
+                    Color primaryColor = restoredAction switch
+                    {
+                        KeyboardAction => Color.FromRgb(122, 30, 58),
+                        Core.Inputs.MouseAction => Color.FromRgb(90, 138, 201),
+                        DelayAction => Color.FromRgb(216, 162, 74),
+                        _ => Color.FromRgb(122, 30, 58)
+                    };
+                    card.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
                 }
             }
         }
