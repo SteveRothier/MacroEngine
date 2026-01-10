@@ -110,8 +110,17 @@ namespace MacroEngine.UI
             for (int i = 0; i < _currentMacro.Actions.Count; i++)
             {
                 var action = _currentMacro.Actions[i];
-                var actionContainer = CreateActionCardWithButtons(action, i);
-                TimelineStackPanel.Children.Add(actionContainer);
+                if (action is RepeatAction ra)
+                {
+                    // Pour RepeatAction, créer un conteneur avec les actions imbriquées
+                    var repeatContainer = CreateRepeatActionContainer(ra, i);
+                    TimelineStackPanel.Children.Add(repeatContainer);
+                }
+                else
+                {
+                    var actionContainer = CreateActionCardWithButtons(action, i);
+                    TimelineStackPanel.Children.Add(actionContainer);
+                }
             }
         }
 
@@ -1651,6 +1660,267 @@ namespace MacroEngine.UI
         {
             // Cette méthode n'est plus utilisée, les contrôles sont créés directement dans CreateActionCard
             // Gardée pour compatibilité mais ne devrait pas être appelée
+        }
+
+        /// <summary>
+        /// Crée un conteneur pour une RepeatAction avec ses actions imbriquées
+        /// </summary>
+        private FrameworkElement CreateRepeatActionContainer(RepeatAction ra, int index)
+        {
+            var container = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            // Ajouter la carte principale de l'action RepeatAction
+            var actionContainer = CreateActionCardWithButtons(ra, index);
+            container.Children.Add(actionContainer);
+
+            // Créer un conteneur pour les actions imbriquées avec indentation
+            if (ra.Actions != null && ra.Actions.Count > 0)
+            {
+                var nestedContainer = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    Margin = new Thickness(20, 4, 0, 4), // Indentation
+                    Background = new SolidColorBrush(Color.FromArgb(10, 138, 43, 226)) // Fond léger violet
+                };
+
+                for (int i = 0; i < ra.Actions.Count; i++)
+                {
+                    var nestedAction = ra.Actions[i];
+                    var nestedCard = CreateNestedActionCard(nestedAction, index, i);
+                    nestedContainer.Children.Add(nestedCard);
+                }
+                container.Children.Add(nestedContainer);
+            }
+
+            // Ajouter un panel pour ajouter de nouvelles actions dans le RepeatAction
+            var addActionsPanel = CreateAddActionsPanel(ra, index);
+            container.Children.Add(addActionsPanel);
+
+            return container;
+        }
+
+        /// <summary>
+        /// Crée une carte pour une action imbriquée dans un RepeatAction
+        /// </summary>
+        private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex)
+        {
+            var card = CreateActionCard(action, parentIndex); // Réutiliser la création de carte
+            if (card is FrameworkElement fe)
+            {
+                fe.Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex };
+            }
+
+            // Conteneur Grid pour la carte + bouton supprimer
+            var container = new Grid
+            {
+                VerticalAlignment = VerticalAlignment.Stretch,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 2),
+                MinWidth = 400
+            };
+
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
+
+            card.HorizontalAlignment = HorizontalAlignment.Stretch;
+            Grid.SetColumn(card, 0);
+            container.Children.Add(card);
+
+            // Bouton supprimer pour les actions imbriquées
+            var deleteBtn = new Border
+            {
+                Width = 28,
+                Height = 28,
+                Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69)), // Rouge pour supprimer
+                CornerRadius = new CornerRadius(4),
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex },
+                Visibility = Visibility.Visible
+            };
+
+            var deleteText = new TextBlock
+            {
+                Text = "✕",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            deleteBtn.Child = deleteText;
+            deleteBtn.MouseLeftButtonDown += DeleteNestedAction_Click;
+
+            deleteBtn.MouseEnter += (s, e) =>
+            {
+                deleteBtn.Background = new SolidColorBrush(Color.FromRgb(200, 35, 51));
+            };
+            deleteBtn.MouseLeave += (s, e) =>
+            {
+                deleteBtn.Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69));
+            };
+
+            Grid.SetColumn(deleteBtn, 1);
+            container.Children.Add(deleteBtn);
+
+            return container;
+        }
+
+        /// <summary>
+        /// Crée un panel avec des boutons pour ajouter des actions dans un RepeatAction
+        /// </summary>
+        private FrameworkElement CreateAddActionsPanel(RepeatAction ra, int repeatActionIndex)
+        {
+            var panel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(20, 4, 0, 8) // Indentation
+            };
+
+            // Fonction helper pour créer un bouton d'ajout
+            Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
+            {
+                var button = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    Margin = new Thickness(0, 0, 4, 0),
+                    Cursor = Cursors.Hand,
+                    Tag = new RepeatActionInfo { RepeatActionIndex = repeatActionIndex, ActionType = actionInstance.Type.ToString() }
+                };
+                button.MouseLeftButtonDown += AddActionToRepeat_Click;
+
+                var textBlock = new TextBlock
+                {
+                    Text = $"{icon} {text}",
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)),
+                    FontWeight = FontWeights.Medium
+                };
+                button.Child = textBlock;
+
+                button.MouseEnter += (s, e) =>
+                {
+                    button.Background = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                };
+                button.MouseLeave += (s, e) =>
+                {
+                    button.Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0));
+                };
+
+                return button;
+            };
+
+            panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
+            panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
+            panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
+
+            return panel;
+        }
+
+        /// <summary>
+        /// Ajoute une action dans un RepeatAction
+        /// </summary>
+        private void AddActionToRepeat_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            var button = sender as Border;
+            if (button?.Tag is not RepeatActionInfo info) return;
+
+            var repeatActionIndex = info.RepeatActionIndex;
+            if (repeatActionIndex < 0 || repeatActionIndex >= _currentMacro.Actions.Count) return;
+
+            if (_currentMacro.Actions[repeatActionIndex] is not RepeatAction repeatAction) return;
+
+            SaveState();
+
+            IInputAction? newAction = info.ActionType switch
+            {
+                "Keyboard" => new KeyboardAction
+                {
+                    VirtualKeyCode = 0,
+                    ActionType = KeyboardActionType.Press
+                },
+                "Mouse" => new Core.Inputs.MouseAction
+                {
+                    ActionType = Core.Inputs.MouseActionType.LeftClick,
+                    X = -1,
+                    Y = -1
+                },
+                "Delay" => new DelayAction
+                {
+                    Duration = 100
+                },
+                _ => null
+            };
+
+            if (newAction != null)
+            {
+                if (repeatAction.Actions == null)
+                {
+                    repeatAction.Actions = new List<IInputAction>();
+                }
+                repeatAction.Actions.Add(newAction);
+                _currentMacro.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// Supprime une action imbriquée d'un RepeatAction
+        /// </summary>
+        private void DeleteNestedAction_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            var button = sender as Border;
+            if (button?.Tag is not NestedActionInfo info) return;
+
+            var parentIndex = info.ParentIndex;
+            var nestedIndex = info.NestedIndex;
+
+            if (parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count) return;
+            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction) return;
+            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count) return;
+
+            SaveState();
+
+            repeatAction.Actions.RemoveAt(nestedIndex);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// Informations sur une action imbriquée (pour passer le contexte aux event handlers)
+        /// </summary>
+        private class NestedActionInfo
+        {
+            public int ParentIndex { get; set; }
+            public int NestedIndex { get; set; }
+        }
+
+        /// <summary>
+        /// Informations sur un RepeatAction (pour passer le contexte aux event handlers)
+        /// </summary>
+        private class RepeatActionInfo
+        {
+            public int RepeatActionIndex { get; set; }
+            public string ActionType { get; set; } = "";
         }
 
         #endregion
