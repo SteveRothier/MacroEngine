@@ -444,12 +444,20 @@ namespace MacroEngine.UI
             if (action is KeyboardAction ka2)
             {
                 titleBlock.Cursor = Cursors.Hand;
-                titleBlock.MouseLeftButtonDown += (s, e) => EditKeyboardAction(ka2, index, titleBlock);
+                titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                {
+                    e.Handled = true; // Empêcher le drag & drop
+                    EditKeyboardAction(ka2, index, titleBlock);
+                };
             }
             else if (action is DelayAction da)
             {
                 titleBlock.Cursor = Cursors.Hand;
-                titleBlock.MouseLeftButtonDown += (s, e) => EditDelayAction(da, index, titleBlock);
+                titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                {
+                    e.Handled = true; // Empêcher le drag & drop
+                    EditDelayAction(da, index, titleBlock);
+                };
             }
 
             return card;
@@ -839,39 +847,201 @@ namespace MacroEngine.UI
 
         private void EditKeyboardAction(KeyboardAction ka, int index, TextBlock titleText)
         {
-            // Ouvrir un dialogue ou permettre l'édition inline
-            // Utiliser KeyCaptureDialog depuis BlockEditor si disponible, sinon créer inline
-            var dialog = new TimelineKeyCaptureDialog();
-            if (dialog.ShowDialog() == true)
+            // Édition inline : remplacer le TextBlock par un TextBox qui capture la touche
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
             {
-                SaveState();
-                ka.VirtualKeyCode = (ushort)dialog.CapturedKey;
-                _currentMacro!.ModifiedAt = DateTime.Now;
-                RefreshBlocks();
-                MacroChanged?.Invoke(this, EventArgs.Empty);
+                System.Diagnostics.Debug.WriteLine("EditKeyboardAction: parentPanel is null");
+                return;
             }
+            
+            bool keyCaptured = false;
+            
+            // Sauvegarder les propriétés du TextBlock pour restaurer plus tard
+            var originalMargin = titleText.Margin;
+            var originalWidth = titleText.Width;
+            
+            var textBox = new TextBox
+            {
+                Text = "Appuyez sur une touche...",
+                MinWidth = 150,
+                MaxWidth = 300,
+                TextAlignment = TextAlignment.Center,
+                IsReadOnly = true,
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 200)), // Fond jaune clair pour être visible
+                BorderBrush = new SolidColorBrush(Color.FromRgb(255, 165, 0)), // Bordure orange pour être visible
+                BorderThickness = new Thickness(2),
+                Padding = new Thickness(4),
+                Margin = originalMargin, // Conserver la même marge
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Cursor = Cursors.IBeam,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold
+            };
+            
+            // Empêcher le TextBox de déclencher le drag & drop
+            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
+            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
+            
+            // Événement PreviewKeyDown pour capturer la touche avant qu'elle ne soit traitée
+            textBox.PreviewKeyDown += (s, e) =>
+            {
+                // Ignorer les touches de modification seules
+                if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
+                    e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+                    e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
+                    e.Key == Key.LWin || e.Key == Key.RWin)
+                {
+                    e.Handled = true;
+                    return;
+                }
+                
+                // Ignorer Escape pour annuler
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    Keyboard.ClearFocus();
+                    // Restaurer le TextBlock si on annule
+                    if (parentPanel.Children.Contains(textBox) && !keyCaptured)
+                    {
+                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
+                        parentPanel.Children.RemoveAt(textBoxIdx);
+                        parentPanel.Children.Insert(textBoxIdx, titleText);
+                    }
+                    return;
+                }
+                
+                // Capturer la touche
+                try
+                {
+                    int virtualKeyCode = KeyInterop.VirtualKeyFromKey(e.Key);
+                    SaveState();
+                    ka.VirtualKeyCode = (ushort)virtualKeyCode;
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    keyCaptured = true;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                    Keyboard.ClearFocus();
+                }
+                catch
+                {
+                    // Ignorer les erreurs de conversion
+                    e.Handled = true;
+                }
+            };
+            
+            // Nettoyer si on perd le focus sans avoir capturé de touche
+            textBox.LostFocus += (s, e) =>
+            {
+                if (parentPanel.Children.Contains(textBox) && !keyCaptured)
+                {
+                    // Restaurer le TextBlock si on n'a pas capturé de touche
+                    int textBoxIdx = parentPanel.Children.IndexOf(textBox);
+                    parentPanel.Children.RemoveAt(textBoxIdx);
+                    parentPanel.Children.Insert(textBoxIdx, titleText);
+                }
+            };
+            
+            // Remplacer le TextBlock par le TextBox
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+            {
+                System.Diagnostics.Debug.WriteLine("EditKeyboardAction: titleText not found in parentPanel");
+                return;
+            }
+            
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, textBox);
+            
+            // Mettre le focus de manière asynchrone pour s'assurer que le layout est mis à jour
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+            }));
         }
 
         private void EditDelayAction(DelayAction da, int index, TextBlock titleText)
         {
-            // Permettre l'édition inline
+            // Édition inline : remplacer le TextBlock par un TextBox qui capture le délai
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+            {
+                System.Diagnostics.Debug.WriteLine("EditDelayAction: parentPanel is null");
+                return;
+            }
+            
+            bool delaySaved = false;
+            int originalDelay = da.Duration; // Sauvegarder la valeur originale pour restauration si annulé
+            
+            // Sauvegarder les propriétés du TextBlock pour restaurer plus tard
+            var originalMargin = titleText.Margin;
+            
             var textBox = new TextBox
             {
                 Text = da.Duration.ToString(),
-                Width = 80,
-                TextAlignment = TextAlignment.Center
+                MinWidth = 60,
+                MaxWidth = 120,
+                TextAlignment = TextAlignment.Center,
+                Background = new SolidColorBrush(Color.FromRgb(250, 250, 250)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(4),
+                Margin = originalMargin,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Cursor = Cursors.IBeam,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold
             };
             
+            // Validation : n'accepter que les nombres entiers
             textBox.PreviewTextInput += (s, e) => e.Handled = !int.TryParse(e.Text, out _);
-            textBox.KeyDown += (s, e) =>
+            
+            // Empêcher le TextBox de déclencher le drag & drop
+            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
+            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
+            
+            // Sauvegarder automatiquement quand on perd le focus (clic ailleurs)
+            textBox.LostFocus += (s, e) =>
+            {
+                if (delaySaved) return; // Déjà sauvegardé, ne rien faire
+                
+                if (int.TryParse(textBox.Text, out int delay) && delay > 0)
+                {
+                    SaveState();
+                    da.Duration = delay;
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    delaySaved = true;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                {
+                    // Valeur invalide : restaurer le TextBlock avec la valeur originale
+                    if (parentPanel.Children.Contains(textBox))
+                    {
+                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
+                        parentPanel.Children.RemoveAt(textBoxIdx);
+                        parentPanel.Children.Insert(textBoxIdx, titleText);
+                    }
+                }
+            };
+            
+            // Gestion des touches : Enter pour confirmer, Escape pour annuler
+            textBox.PreviewKeyDown += (s, e) =>
             {
                 if (e.Key == Key.Enter)
                 {
+                    e.Handled = true;
                     if (int.TryParse(textBox.Text, out int delay) && delay > 0)
                     {
                         SaveState();
                         da.Duration = delay;
                         _currentMacro!.ModifiedAt = DateTime.Now;
+                        delaySaved = true;
                         RefreshBlocks();
                         MacroChanged?.Invoke(this, EventArgs.Empty);
                     }
@@ -879,20 +1049,35 @@ namespace MacroEngine.UI
                 }
                 else if (e.Key == Key.Escape)
                 {
+                    e.Handled = true;
                     Keyboard.ClearFocus();
+                    // Restaurer le TextBlock avec la valeur originale si on annule
+                    if (parentPanel.Children.Contains(textBox) && !delaySaved)
+                    {
+                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
+                        parentPanel.Children.RemoveAt(textBoxIdx);
+                        parentPanel.Children.Insert(textBoxIdx, titleText);
+                    }
                 }
             };
             
-            // Remplacer temporairement le TextBlock par le TextBox
-            var parent = titleText.Parent as Panel;
-            if (parent != null)
+            // Remplacer le TextBlock par le TextBox
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
             {
-                int idx = parent.Children.IndexOf(titleText);
-                parent.Children.RemoveAt(idx);
-                parent.Children.Insert(idx, textBox);
+                System.Diagnostics.Debug.WriteLine("EditDelayAction: titleText not found in parentPanel");
+                return;
+            }
+            
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, textBox);
+            
+            // Mettre le focus de manière asynchrone pour s'assurer que le layout est mis à jour
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
                 textBox.Focus();
                 textBox.SelectAll();
-            }
+            }));
         }
 
         #endregion
