@@ -793,6 +793,28 @@ namespace MacroEngine.UI
 
         private void ActionCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            // Ne pas démarrer le drag si on clique sur un contrôle interactif (ComboBox, TextBox, Button, etc.)
+            // Vérifier aussi les parents au cas où OriginalSource est un élément enfant (ex: ToggleButton dans ComboBox)
+            DependencyObject? current = e.OriginalSource as DependencyObject;
+            while (current != null && current != sender)
+            {
+                if (current is ComboBox || current is TextBox || 
+                    current is Button || current is ToggleButton ||
+                    current is CheckBox || current is RadioButton ||
+                    current is ComboBoxItem || current is Popup)
+                {
+                    // C'est un contrôle interactif, ne pas démarrer le drag
+                    return;
+                }
+                // Si c'est un TextBlock qui est le titre (éditable), permettre l'édition mais pas le drag
+                if (current is TextBlock textBlock && textBlock.Cursor == Cursors.Hand)
+                {
+                    // C'est un titre éditable, laisser le handler du titre gérer l'événement
+                    return;
+                }
+                current = System.Windows.Media.VisualTreeHelper.GetParent(current);
+            }
+            
             if (sender is FrameworkElement element && element.Tag is int index)
             {
                 _dragStartPoint = e.GetPosition(this);
@@ -1540,11 +1562,12 @@ namespace MacroEngine.UI
             {
                 if (modeComboBox.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is RepeatMode selectedMode)
                 {
+                    // Mettre à jour la visibilité des inputs sans recréer tous les blocs
                     repeatCountTextBox.Visibility = selectedMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed;
                     keyCodeTextBox.Visibility = selectedMode == RepeatMode.WhileKeyPressed ? Visibility.Visible : Visibility.Collapsed;
                     clickTypeComboBox.Visibility = selectedMode == RepeatMode.WhileClickPressed ? Visibility.Visible : Visibility.Collapsed;
                     
-                    // Sauvegarder automatiquement le changement de mode
+                    // Sauvegarder le changement de mode
                     SaveState();
                     ra.RepeatMode = selectedMode;
                     
@@ -1558,9 +1581,14 @@ namespace MacroEngine.UI
                     }
                     
                     _currentMacro!.ModifiedAt = DateTime.Now;
-                    RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
                 }
+            };
+            
+            // Rafraîchir les blocs après la fermeture du ComboBox
+            modeComboBox.DropDownClosed += (s, e) =>
+            {
+                RefreshBlocks();
             };
 
             // Sauvegarder automatiquement le nombre de répétitions lors de la perte de focus
@@ -1595,16 +1623,18 @@ namespace MacroEngine.UI
                     ra.ClickTypeToMonitor = clickTypeComboBox.SelectedIndex;
                     _currentMacro!.ModifiedAt = DateTime.Now;
                     repeatSaved = true;
-                    RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
+                    
                 }
             };
+            
+            // Rafraîchir les blocs seulement après la fermeture du ComboBox de type de clic
+            clickTypeComboBox.DropDownClosed += (s, e) =>
+            {
+                RefreshBlocks();
+            };
 
-            // Empêcher le ComboBox et les TextBox de déclencher le drag & drop
-            modeComboBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
-            modeComboBox.PreviewMouseMove += (s, e) => e.Handled = true;
-            clickTypeComboBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
-            clickTypeComboBox.PreviewMouseMove += (s, e) => e.Handled = true;
+            // Empêcher les TextBox de déclencher le drag & drop (les ComboBox peuvent être cliqués normalement)
 
             // Gestion des touches : Enter pour confirmer le nombre de répétitions, Escape pour annuler
             repeatCountTextBox.PreviewKeyDown += (s, e) =>
