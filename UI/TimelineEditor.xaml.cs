@@ -160,49 +160,54 @@ namespace MacroEngine.UI
             Color backgroundColor;
             Color backgroundColorHover;
             Color textColor;
+            Color iconColor; // Couleur de l'icône (peut être différente du texte)
             string icon;
             string title;
             string details;
             
-            // Déterminer les couleurs selon le type d'action avec fonds colorés
+            // Déterminer les couleurs selon le type d'action avec les couleurs spécifiées
             switch (action)
             {
                 case KeyboardAction ka:
-                    primaryColor = Color.FromRgb(122, 30, 58); // Pourpre #7A1E3A
-                    hoverColor = Color.FromRgb(139, 42, 69); // Pourpre hover #8B2A45
-                    backgroundColor = Color.FromRgb(245, 230, 235); // Beige pourpre clair #F5E6EB
-                    backgroundColorHover = Color.FromRgb(248, 238, 243); // Beige pourpre plus clair
-                    textColor = Color.FromRgb(122, 30, 58); // Texte pourpre pour contraster
+                    primaryColor = Color.FromRgb(123, 30, 58); // Rouge pourpre foncé #7B1E3A
+                    hoverColor = Color.FromRgb(143, 39, 72); // Dégradé hover #8F2748
+                    backgroundColor = Color.FromRgb(123, 30, 58); // Fond #7B1E3A
+                    backgroundColorHover = Color.FromRgb(143, 39, 72); // Dégradé hover #8F2748
+                    textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
+                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
                     icon = "⌨";
                     title = GetKeyboardActionTitle(ka);
                     details = GetKeyboardActionDetails(ka);
                     break;
                 case Core.Inputs.MouseAction ma:
-                    primaryColor = Color.FromRgb(90, 138, 201); // Bleu #5A8AC9
-                    hoverColor = Color.FromRgb(74, 122, 185); // Bleu hover #4A7AB9
-                    backgroundColor = Color.FromRgb(232, 240, 248); // Bleu très clair #E8F0F8
-                    backgroundColorHover = Color.FromRgb(240, 245, 252); // Bleu plus clair
-                    textColor = Color.FromRgb(74, 122, 185); // Texte bleu foncé pour contraster
+                    primaryColor = Color.FromRgb(95, 124, 122); // Bleu-gris désaturé #5F7C7A
+                    hoverColor = Color.FromRgb(111, 143, 140); // Dégradé hover #6F8F8C
+                    backgroundColor = Color.FromRgb(95, 124, 122); // Fond #5F7C7A
+                    backgroundColorHover = Color.FromRgb(111, 143, 140); // Dégradé hover #6F8F8C
+                    textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
+                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
                     icon = "🖱";
                     title = GetMouseActionTitle(ma);
                     details = GetMouseActionDetails(ma);
                     break;
                 case DelayAction da:
-                    primaryColor = Color.FromRgb(216, 162, 74); // Ocre #D8A24A
-                    hoverColor = Color.FromRgb(200, 146, 58); // Ocre hover #C8923A
-                    backgroundColor = Color.FromRgb(255, 244, 230); // Ocre très clair #FFF4E6
-                    backgroundColorHover = Color.FromRgb(255, 248, 240); // Ocre plus clair
-                    textColor = Color.FromRgb(200, 146, 58); // Texte ocre foncé pour contraster
+                    primaryColor = Color.FromRgb(200, 169, 106); // Beige doré / ocre doux #C8A96A
+                    hoverColor = Color.FromRgb(214, 185, 125); // Dégradé hover #D6B97D
+                    backgroundColor = Color.FromRgb(200, 169, 106); // Fond #C8A96A
+                    backgroundColorHover = Color.FromRgb(214, 185, 125); // Dégradé hover #D6B97D
+                    textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
+                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
                     icon = "⏱";
                     title = $"{da.Duration} ms";
                     details = "Pause";
                     break;
                 default:
-                    primaryColor = Color.FromRgb(122, 30, 58);
-                    hoverColor = Color.FromRgb(139, 42, 69);
-                    backgroundColor = Color.FromRgb(245, 240, 235); // Beige neutre
-                    backgroundColorHover = Color.FromRgb(248, 245, 242);
-                    textColor = Color.FromRgb(122, 30, 58);
+                    primaryColor = Color.FromRgb(123, 30, 58); // Rouge pourpre foncé par défaut
+                    hoverColor = Color.FromRgb(143, 39, 72);
+                    backgroundColor = Color.FromRgb(123, 30, 58);
+                    backgroundColorHover = Color.FromRgb(143, 39, 72);
+                    textColor = Color.FromRgb(248, 239, 234);
+                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé par défaut
                     icon = "❓";
                     title = action.Type.ToString();
                     details = "";
@@ -267,13 +272,13 @@ namespace MacroEngine.UI
             // Badge icône avec fond coloré plus prononcé
             var iconBadge = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B)), // Fond plus visible
+                Background = new SolidColorBrush(Color.FromArgb(25, iconColor.R, iconColor.G, iconColor.B)), // Fond avec teinte de l'icône
                 CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(9, 7, 9, 7),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 12, 0),
                 BorderThickness = new Thickness(1.5),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(35, primaryColor.R, primaryColor.G, primaryColor.B)), // Bordure plus visible
+                BorderBrush = new SolidColorBrush(Color.FromArgb(35, iconColor.R, iconColor.G, iconColor.B)), // Bordure avec teinte de l'icône
                 MinWidth = 36,
                 MinHeight = 36,
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
@@ -290,7 +295,7 @@ namespace MacroEngine.UI
             {
                 Text = icon,
                 FontSize = 18,
-                Foreground = new SolidColorBrush(primaryColor),
+                Foreground = new SolidColorBrush(iconColor),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 FontFamily = new FontFamily("Segoe UI Emoji"),
@@ -314,7 +319,7 @@ namespace MacroEngine.UI
                 Text = title,
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(primaryColor), // Texte avec couleur principale pour plus de contraste
+                Foreground = new SolidColorBrush(textColor), // Texte avec la couleur spécifiée
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0), // Marge à droite pour séparer du badge détails
                 FontFamily = new FontFamily("Segoe UI Semibold")
@@ -330,20 +335,20 @@ namespace MacroEngine.UI
                 // Badge pour les détails avec fond coloré
                 detailsBadge = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(15, primaryColor.R, primaryColor.G, primaryColor.B)), // Fond avec teinte de la couleur principale
+                    Background = new SolidColorBrush(Color.FromArgb(15, textColor.R, textColor.G, textColor.B)), // Fond avec teinte du texte
                     CornerRadius = new CornerRadius(4),
                     Padding = new Thickness(6, 3, 6, 3),
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(0, 0, 0, 0),
                     BorderThickness = new Thickness(1),
-                    BorderBrush = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B))
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(20, textColor.R, textColor.G, textColor.B))
                 };
                 
                 detailsBlock = new TextBlock
                 {
                     Text = details,
                     FontSize = 10,
-                    Foreground = new SolidColorBrush(Color.FromArgb(200, primaryColor.R, primaryColor.G, primaryColor.B)), // Texte avec teinte de la couleur principale
+                    Foreground = new SolidColorBrush(Color.FromArgb(200, textColor.R, textColor.G, textColor.B)), // Texte avec teinte du texte avec opacité
                     VerticalAlignment = VerticalAlignment.Center,
                     FontWeight = FontWeights.Medium,
                     FontFamily = new FontFamily("Segoe UI")
@@ -445,9 +450,9 @@ namespace MacroEngine.UI
                 // Pas de changement de bordure pour garder la même taille
                 if (detailsBlock != null && detailsBadge != null)
                 {
-                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B));
-                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(35, primaryColor.R, primaryColor.G, primaryColor.B));
-                    detailsBlock.Foreground = new SolidColorBrush(primaryColor); // Texte plus foncé au survol
+                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(25, textColor.R, textColor.G, textColor.B));
+                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(35, textColor.R, textColor.G, textColor.B));
+                    detailsBlock.Foreground = new SolidColorBrush(textColor); // Texte avec opacité complète au survol
                 }
             };
 
@@ -460,9 +465,9 @@ namespace MacroEngine.UI
                 // Pas de changement de bordure pour garder la même taille
                 if (detailsBlock != null && detailsBadge != null)
                 {
-                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(15, primaryColor.R, primaryColor.G, primaryColor.B));
-                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B));
-                    detailsBlock.Foreground = new SolidColorBrush(Color.FromArgb(200, primaryColor.R, primaryColor.G, primaryColor.B)); // Texte normal
+                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(15, textColor.R, textColor.G, textColor.B));
+                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(20, textColor.R, textColor.G, textColor.B));
+                    detailsBlock.Foreground = new SolidColorBrush(Color.FromArgb(200, textColor.R, textColor.G, textColor.B)); // Texte normal avec opacité
                 }
             };
 
