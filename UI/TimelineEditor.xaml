@@ -1,0 +1,228 @@
+<UserControl x:Class="MacroEngine.UI.TimelineEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignHeight="500" d:DesignWidth="600">
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         TimelineEditor - Éditeur de macros basé sur une Timeline verticale
+         ══════════════════════════════════════════════════════════════════════ -->
+
+    <Grid Background="{StaticResource BackgroundPrimaryBrush}">
+        <Grid.RowDefinitions>
+            <!-- Toolbar d'ajout d'actions -->
+            <RowDefinition Height="Auto"/>
+            <!-- Timeline verticale (scrollable) -->
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             TOOLBAR - Boutons d'ajout rapide
+             ══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0" 
+                Background="{StaticResource BackgroundTertiaryBrush}"
+                CornerRadius="10"
+                Padding="12,8"
+                Margin="0,0,0,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <!-- Bouton Ajouter Touche -->
+                <Button x:Name="AddKeyboardButton"
+                        Click="AddKeyboard_Click"
+                        Margin="4,0"
+                        Cursor="Hand"
+                        ToolTip="Ajouter une touche clavier">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd"
+                                                Background="{StaticResource AccentPrimaryBrush}"
+                                                CornerRadius="8"
+                                                Padding="12,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="⌨" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ Touche" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Bouton Ajouter Clic -->
+                <Button x:Name="AddMouseButton"
+                        Click="AddMouse_Click"
+                        Margin="4,0"
+                        Cursor="Hand"
+                        ToolTip="Ajouter un clic souris">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd"
+                                                Background="#5A8AC9"
+                                                CornerRadius="8"
+                                                Padding="12,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="🖱" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ Clic" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#4A7AB9"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Bouton Ajouter Délai -->
+                <Button x:Name="AddDelayButton"
+                        Click="AddDelay_Click"
+                        Margin="4,0"
+                        Cursor="Hand"
+                        ToolTip="Ajouter un délai">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd"
+                                                Background="#D8A24A"
+                                                CornerRadius="8"
+                                                Padding="12,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="⏱" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ Délai" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#C8923A"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Séparateur vertical -->
+                <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
+
+                <!-- Options de répétition -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Répéter:" 
+                               Style="{StaticResource TextSecondary}"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"/>
+                    <ComboBox x:Name="RepeatModeComboBox"
+                              SelectionChanged="RepeatModeComboBox_SelectionChanged"
+                              Width="130"
+                              VerticalAlignment="Center">
+                        <ComboBoxItem Content="1 fois" IsSelected="True"/>
+                        <ComboBoxItem Content="X fois"/>
+                        <ComboBoxItem Content="Jusqu'à arrêt"/>
+                    </ComboBox>
+                    <TextBox x:Name="RepeatCountTextBox"
+                             Width="50"
+                             Text="1"
+                             TextChanged="RepeatCountTextBox_TextChanged"
+                             VerticalAlignment="Center"
+                             Margin="8,0,0,0"
+                             Visibility="Collapsed"/>
+                </StackPanel>
+
+                <!-- Séparateur vertical -->
+                <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
+
+                <!-- Boutons Undo/Redo -->
+                <Button x:Name="UndoButton"
+                        Style="{StaticResource ButtonIcon}"
+                        Click="UndoButton_Click"
+                        IsEnabled="False"
+                        Margin="0,0,4,0"
+                        ToolTip="Annuler (Ctrl+Z)">
+                    <TextBlock Text="↶" FontSize="16"/>
+                </Button>
+                <Button x:Name="RedoButton"
+                        Style="{StaticResource ButtonIcon}"
+                        Click="RedoButton_Click"
+                        IsEnabled="False"
+                        Margin="0,0,12,0"
+                        ToolTip="Refaire (Ctrl+Y)">
+                    <TextBlock Text="↷" FontSize="16"/>
+                </Button>
+
+                <!-- Séparateur vertical -->
+                <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="0,0,12,0"/>
+
+                <!-- Toggle Activer/Désactiver Macro -->
+                <ToggleButton x:Name="MacroEnableToggle"
+                              Style="{StaticResource ToggleSwitchStyle}"
+                              Checked="MacroEnableToggle_Checked"
+                              Unchecked="MacroEnableToggle_Unchecked"
+                              IsEnabled="False"
+                              Margin="0,0,0,0"
+                              ToolTip="Activer/Désactiver la macro"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════════════════════════
+             TIMELINE - Liste verticale des actions
+             ══════════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="1" 
+                Background="{StaticResource BackgroundPrimaryBrush}"
+                CornerRadius="12"
+                ClipToBounds="True">
+            
+            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="12">
+                <StackPanel x:Name="TimelineStackPanel" 
+                           Orientation="Vertical"
+                           AllowDrop="True"
+                           Drop="TimelineStackPanel_Drop"
+                           DragOver="TimelineStackPanel_DragOver">
+                    
+                    <!-- Message si aucune action -->
+                    <StackPanel x:Name="EmptyStatePanel"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center"
+                                Visibility="Visible"
+                                Margin="0,100,0,0">
+                        <TextBlock Text="🎯" 
+                                   FontSize="48" 
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,16"/>
+                        <TextBlock Text="Aucune action dans cette macro" 
+                                   Style="{StaticResource TextHeading}"
+                                   HorizontalAlignment="Center"
+                                   Margin="0,0,0,8"/>
+                        <TextBlock Text="Utilisez les boutons ci-dessus pour ajouter des actions" 
+                                   Style="{StaticResource TextMuted}"
+                                   HorizontalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Les cartes d'action seront ajoutées dynamiquement ici -->
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

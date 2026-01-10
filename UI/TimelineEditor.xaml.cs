@@ -1,0 +1,1027 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using MacroEngine.Core.Inputs;
+using MacroEngine.Core.Models;
+
+namespace MacroEngine.UI
+{
+    /// <summary>
+    /// Éditeur de macros basé sur une Timeline verticale
+    /// </summary>
+    public partial class TimelineEditor : UserControl
+    {
+        private Macro? _currentMacro;
+        private int _draggedIndex = -1;
+        private FrameworkElement? _draggedElement;
+        private Point _dragStartPoint;
+        private Point _dragOffset;
+        
+        // Popup pour le drag visuel
+        private Popup? _dragPopup;
+        
+        // Historique Undo/Redo
+        private Stack<List<IInputAction>> _undoStack = new Stack<List<IInputAction>>();
+        private Stack<List<IInputAction>> _redoStack = new Stack<List<IInputAction>>();
+        private bool _isUndoRedo = false;
+
+        // Événement déclenché quand la macro est modifiée
+        public event EventHandler? MacroChanged;
+
+        public TimelineEditor()
+        {
+            InitializeComponent();
+            Loaded += TimelineEditor_Loaded;
+            
+            // Ajouter les raccourcis clavier pour Undo/Redo
+            KeyDown += TimelineEditor_KeyDown;
+        }
+
+        private void TimelineEditor_KeyDown(object sender, KeyEventArgs e)
+        {
+            // Ctrl+Z pour Undo
+            if (e.Key == Key.Z && Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            {
+                Undo();
+                e.Handled = true;
+            }
+            // Ctrl+Y pour Redo
+            else if (e.Key == Key.Y && Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            {
+                Redo();
+                e.Handled = true;
+            }
+        }
+
+        private void TimelineEditor_Loaded(object sender, RoutedEventArgs e)
+        {
+            // Initialisation si nécessaire
+        }
+
+        /// <summary>
+        /// Charge une macro dans l'éditeur
+        /// </summary>
+        public void LoadMacro(Macro? macro)
+        {
+            _currentMacro = macro;
+            RefreshBlocks();
+            UpdateRepeatControls();
+            UpdateMacroEnableToggle();
+            
+            // Réinitialiser l'historique
+            _undoStack.Clear();
+            _redoStack.Clear();
+            SaveState();
+            UpdateUndoRedoButtons();
+        }
+
+        /// <summary>
+        /// Rafraîchit l'affichage des actions dans la Timeline
+        /// </summary>
+        public void RefreshBlocks()
+        {
+            // Retirer toutes les cartes existantes (sauf EmptyStatePanel)
+            var childrenToRemove = TimelineStackPanel.Children.Cast<UIElement>()
+                .Where(c => c != EmptyStatePanel)
+                .ToList();
+            
+            foreach (var child in childrenToRemove)
+            {
+                TimelineStackPanel.Children.Remove(child);
+            }
+
+            if (_currentMacro == null || _currentMacro.Actions.Count == 0)
+            {
+                EmptyStatePanel.Visibility = Visibility.Visible;
+                return;
+            }
+
+            EmptyStatePanel.Visibility = Visibility.Collapsed;
+
+            // Créer une carte pour chaque action
+            for (int i = 0; i < _currentMacro.Actions.Count; i++)
+            {
+                var action = _currentMacro.Actions[i];
+                var card = CreateActionCard(action, i);
+                TimelineStackPanel.Children.Add(card);
+            }
+        }
+
+        /// <summary>
+        /// Crée une carte d'action pour la Timeline (style Timeline compact et professionnel)
+        /// </summary>
+        private FrameworkElement CreateActionCard(IInputAction action, int index)
+        {
+            // Couleurs définies directement (pas de FindResource pour éviter les conflits)
+            Color primaryColor;
+            Color hoverColor;
+            Color backgroundColor;
+            Color backgroundColorHover;
+            Color textColor;
+            string icon;
+            string title;
+            string details;
+            
+            // Déterminer les couleurs selon le type d'action
+            switch (action)
+            {
+                case KeyboardAction ka:
+                    primaryColor = Color.FromRgb(122, 30, 58); // Pourpre #7A1E3A
+                    hoverColor = Color.FromRgb(139, 42, 69); // Pourpre hover #8B2A45
+                    backgroundColor = Color.FromRgb(255, 252, 250); // Blanc cassé
+                    backgroundColorHover = Color.FromRgb(250, 248, 246); // Blanc cassé hover
+                    textColor = Color.FromRgb(46, 46, 46); // Texte foncé
+                    icon = "⌨";
+                    title = GetKeyboardActionTitle(ka);
+                    details = GetKeyboardActionDetails(ka);
+                    break;
+                case Core.Inputs.MouseAction ma:
+                    primaryColor = Color.FromRgb(90, 138, 201); // Bleu #5A8AC9
+                    hoverColor = Color.FromRgb(74, 122, 185); // Bleu hover #4A7AB9
+                    backgroundColor = Color.FromRgb(250, 252, 255); // Blanc bleuté
+                    backgroundColorHover = Color.FromRgb(248, 250, 253); // Blanc bleuté hover
+                    textColor = Color.FromRgb(46, 46, 46); // Texte foncé
+                    icon = "🖱";
+                    title = GetMouseActionTitle(ma);
+                    details = GetMouseActionDetails(ma);
+                    break;
+                case DelayAction da:
+                    primaryColor = Color.FromRgb(216, 162, 74); // Ocre #D8A24A
+                    hoverColor = Color.FromRgb(200, 146, 58); // Ocre hover #C8923A
+                    backgroundColor = Color.FromRgb(255, 252, 248); // Blanc ocré
+                    backgroundColorHover = Color.FromRgb(253, 250, 246); // Blanc ocré hover
+                    textColor = Color.FromRgb(46, 46, 46); // Texte foncé
+                    icon = "⏱";
+                    title = $"{da.Duration} ms";
+                    details = "Pause";
+                    break;
+                default:
+                    primaryColor = Color.FromRgb(122, 30, 58);
+                    hoverColor = Color.FromRgb(139, 42, 69);
+                    backgroundColor = Color.FromRgb(255, 255, 255);
+                    backgroundColorHover = Color.FromRgb(250, 250, 250);
+                    textColor = Color.FromRgb(46, 46, 46);
+                    icon = "❓";
+                    title = action.Type.ToString();
+                    details = "";
+                    break;
+            }
+
+            // Carte Timeline compacte - design minimaliste
+            var card = new Border
+            {
+                Background = new SolidColorBrush(backgroundColor),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B)),
+                BorderThickness = new Thickness(0, 0, 0, 1), // Ligne de séparation fine en bas
+                Padding = new Thickness(12, 10, 12, 10),
+                Margin = new Thickness(0, 0, 0, 0),
+                Tag = index,
+                AllowDrop = true,
+                Cursor = Cursors.Hand,
+                MinHeight = 44,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+
+            // Contenu horizontal compact
+            var contentGrid = new Grid();
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) }); // Barre colorée gauche
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Icône
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Texte
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
+
+            // Barre colorée à gauche (timeline)
+            var timelineBar = new Border
+            {
+                Background = new SolidColorBrush(primaryColor),
+                Width = 3,
+                Margin = new Thickness(0, 2, 8, 2),
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+            Grid.SetColumn(timelineBar, 0);
+            contentGrid.Children.Add(timelineBar);
+
+            // Icône compacte
+            var iconBlock = new TextBlock
+            {
+                Text = icon,
+                FontSize = 16,
+                Foreground = new SolidColorBrush(primaryColor),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0),
+                FontFamily = new FontFamily("Segoe UI Emoji")
+            };
+            Grid.SetColumn(iconBlock, 1);
+            contentGrid.Children.Add(iconBlock);
+
+            // Texte (titre + détails en ligne)
+            var textPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var titleBlock = new TextBlock
+            {
+                Text = title,
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(textColor),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            textPanel.Children.Add(titleBlock);
+
+            if (!string.IsNullOrEmpty(details))
+            {
+                var separator = new TextBlock
+                {
+                    Text = " • ",
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(6, 0, 6, 0)
+                };
+                textPanel.Children.Add(separator);
+
+                var detailsBlock = new TextBlock
+                {
+                    Text = details,
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Color.FromRgb(120, 120, 120)),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                textPanel.Children.Add(detailsBlock);
+            }
+
+            Grid.SetColumn(textPanel, 2);
+            contentGrid.Children.Add(textPanel);
+
+            // Bouton supprimer (visible au survol)
+            var deleteBtn = new Button
+            {
+                Content = "✕",
+                Width = 18,
+                Height = 18,
+                Padding = new Thickness(0),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150)),
+                FontSize = 11,
+                Tag = index,
+                Visibility = Visibility.Collapsed,
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0)
+            };
+            deleteBtn.Click += DeleteAction_Click;
+            deleteBtn.MouseEnter += (s, e) => deleteBtn.Foreground = new SolidColorBrush(Color.FromRgb(201, 74, 74)); // Rouge
+            deleteBtn.MouseLeave += (s, e) => deleteBtn.Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150));
+            
+            Grid.SetColumn(deleteBtn, 3);
+            contentGrid.Children.Add(deleteBtn);
+
+            card.Child = contentGrid;
+
+            // Effets hover
+            card.MouseEnter += (s, e) =>
+            {
+                deleteBtn.Visibility = Visibility.Visible;
+                card.Background = new SolidColorBrush(backgroundColorHover);
+                timelineBar.Background = new SolidColorBrush(hoverColor);
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
+            };
+
+            card.MouseLeave += (s, e) =>
+            {
+                deleteBtn.Visibility = Visibility.Collapsed;
+                card.Background = new SolidColorBrush(backgroundColor);
+                timelineBar.Background = new SolidColorBrush(primaryColor);
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B));
+            };
+
+            // Événements drag & drop
+            card.MouseLeftButtonDown += ActionCard_MouseLeftButtonDown;
+            card.MouseMove += ActionCard_MouseMove;
+            card.MouseLeftButtonUp += ActionCard_MouseLeftButtonUp;
+            card.Drop += ActionCard_Drop;
+            card.DragEnter += ActionCard_DragEnter;
+            card.DragLeave += ActionCard_DragLeave;
+
+            // Édition inline
+            if (action is KeyboardAction ka2)
+            {
+                titleBlock.Cursor = Cursors.Hand;
+                titleBlock.MouseLeftButtonDown += (s, e) => EditKeyboardAction(ka2, index, titleBlock);
+            }
+            else if (action is DelayAction da)
+            {
+                titleBlock.Cursor = Cursors.Hand;
+                titleBlock.MouseLeftButtonDown += (s, e) => EditDelayAction(da, index, titleBlock);
+            }
+
+            return card;
+        }
+
+        private string GetKeyboardActionTitle(KeyboardAction ka)
+        {
+            if (ka.VirtualKeyCode == 0) return "Touche ?";
+            return GetKeyName(ka.VirtualKeyCode);
+        }
+
+        private string GetKeyboardActionDetails(KeyboardAction ka)
+        {
+            var actionType = ka.ActionType == KeyboardActionType.Down ? "Appuyer" :
+                           ka.ActionType == KeyboardActionType.Up ? "Relâcher" : "Presser";
+            
+            if (ka.Modifiers != Core.Inputs.ModifierKeys.None)
+            {
+                var mods = string.Join(" + ", 
+                    (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Control) ? "Ctrl" : ""),
+                    (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Shift) ? "Shift" : ""),
+                    (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Alt) ? "Alt" : ""),
+                    (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Windows) ? "Win" : "")
+                ).Replace("  ", " ").Trim();
+                return $"{actionType} ({mods})";
+            }
+            
+            return actionType;
+        }
+
+        private string GetMouseActionTitle(Core.Inputs.MouseAction ma)
+        {
+            return ma.ActionType switch
+            {
+                MouseActionType.LeftClick => "Clic gauche",
+                MouseActionType.RightClick => "Clic droit",
+                MouseActionType.MiddleClick => "Clic milieu",
+                MouseActionType.Move => "Déplacer",
+                MouseActionType.LeftDown => "Appuyer gauche",
+                MouseActionType.LeftUp => "Relâcher gauche",
+                MouseActionType.RightDown => "Appuyer droit",
+                MouseActionType.RightUp => "Relâcher droit",
+                MouseActionType.WheelUp => "Molette haut",
+                MouseActionType.WheelDown => "Molette bas",
+                MouseActionType.Wheel => "Molette",
+                _ => ma.ActionType.ToString()
+            };
+        }
+
+        private string GetMouseActionDetails(Core.Inputs.MouseAction ma)
+        {
+            if (ma.X >= 0 && ma.Y >= 0)
+            {
+                return $"Position: ({ma.X}, {ma.Y})";
+            }
+            return "Position actuelle";
+        }
+
+        private string GetKeyName(ushort virtualKeyCode)
+        {
+            if (virtualKeyCode == 0) return "?";
+            try
+            {
+                var key = KeyInterop.KeyFromVirtualKey(virtualKeyCode);
+                return key.ToString();
+            }
+            catch
+            {
+                return $"0x{virtualKeyCode:X2}";
+            }
+        }
+
+        #region Drag & Drop
+
+        private void ActionCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.Tag is int index)
+            {
+                _dragStartPoint = e.GetPosition(this);
+                _draggedIndex = index;
+                _draggedElement = element;
+                _dragOffset = e.GetPosition(element);
+            }
+        }
+
+        private void ActionCard_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton != MouseButtonState.Pressed || _draggedElement == null || _draggedIndex < 0)
+                return;
+
+            Point currentPos = e.GetPosition(this);
+            Vector diff = _dragStartPoint - currentPos;
+
+            // Démarrer le drag si on a bougé assez
+            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
+                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
+            {
+                CreateDragVisual(_draggedElement);
+                _draggedElement.Opacity = 0.3;
+                
+                DataObject dragData = new DataObject("ActionIndex", _draggedIndex);
+                
+                _draggedElement.GiveFeedback += DraggedElement_GiveFeedback;
+                
+                DragDrop.DoDragDrop(_draggedElement, dragData, DragDropEffects.Move);
+                
+                _draggedElement.GiveFeedback -= DraggedElement_GiveFeedback;
+                HideDragVisual();
+                
+                _draggedElement.Opacity = 1.0;
+                _draggedElement = null;
+                _draggedIndex = -1;
+            }
+        }
+
+        private void ActionCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            _draggedElement = null;
+            _draggedIndex = -1;
+        }
+
+        private void CreateDragVisual(FrameworkElement element)
+        {
+            double width = element.ActualWidth > 0 ? element.ActualWidth : 500;
+            double height = element.ActualHeight > 0 ? element.ActualHeight : 44; // Hauteur Timeline compacte
+            
+            var visualBrush = new VisualBrush(element)
+            {
+                Opacity = 0.9,
+                Stretch = Stretch.None
+            };
+
+            var dragBorder = new Border
+            {
+                Width = width,
+                Height = height,
+                Background = visualBrush,
+                CornerRadius = new CornerRadius(4),
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Colors.Black,
+                    Opacity = 0.3,
+                    BlurRadius = 8,
+                    ShadowDepth = 3
+                }
+            };
+
+            _dragPopup = new Popup
+            {
+                Child = dragBorder,
+                AllowsTransparency = true,
+                IsHitTestVisible = false,
+                Placement = PlacementMode.Absolute,
+                IsOpen = true
+            };
+            
+            UpdateDragVisualPosition();
+        }
+
+        private void DraggedElement_GiveFeedback(object sender, GiveFeedbackEventArgs e)
+        {
+            UpdateDragVisualPosition();
+            e.Handled = true;
+        }
+
+        private void UpdateDragVisualPosition()
+        {
+            if (_dragPopup != null)
+            {
+                var mousePos = GetMousePositionScreen();
+                _dragPopup.HorizontalOffset = mousePos.X - _dragOffset.X;
+                _dragPopup.VerticalOffset = mousePos.Y - _dragOffset.Y;
+            }
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public int X;
+            public int Y;
+        }
+
+        private Point GetMousePositionScreen()
+        {
+            GetCursorPos(out POINT point);
+            return new Point(point.X, point.Y);
+        }
+
+        private void HideDragVisual()
+        {
+            if (_dragPopup != null)
+            {
+                _dragPopup.IsOpen = false;
+                _dragPopup = null;
+            }
+        }
+
+        private void ActionCard_DragEnter(object sender, DragEventArgs e)
+        {
+            if (sender is Border card && card.Tag is int index)
+            {
+                // Mettre en surbrillance la carte cible
+                card.Background = new SolidColorBrush(Color.FromRgb(245, 242, 240)); // Fond légèrement grisé
+                card.BorderThickness = new Thickness(2);
+                card.BorderBrush = new SolidColorBrush(Color.FromRgb(122, 30, 58)); // Bordure pourpre
+            }
+        }
+
+        private void ActionCard_DragLeave(object sender, DragEventArgs e)
+        {
+            if (sender is Border card && card.Tag is int index && _currentMacro != null)
+            {
+                // Restaurer le style normal
+                if (index < _currentMacro.Actions.Count)
+                {
+                    var action = _currentMacro.Actions[index];
+                    Color bgColor = action switch
+                    {
+                        KeyboardAction => Color.FromRgb(255, 252, 250),
+                        Core.Inputs.MouseAction => Color.FromRgb(250, 252, 255),
+                        DelayAction => Color.FromRgb(255, 252, 248),
+                        _ => Color.FromRgb(255, 255, 255)
+                    };
+                    card.Background = new SolidColorBrush(bgColor);
+                    card.BorderThickness = new Thickness(0, 0, 0, 1); // Ligne de séparation
+                    card.BorderBrush = new SolidColorBrush(Color.FromArgb(30, 122, 30, 58));
+                }
+            }
+        }
+
+        private void ActionCard_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent("ActionIndex") && sender is Border targetCard)
+            {
+                // Trouver l'index de la carte cible via son Tag
+                int targetIndex = -1;
+                if (targetCard.Tag is int idx)
+                {
+                    targetIndex = idx;
+                }
+                else
+                {
+                    // Si le Tag n'est pas sur le Border, chercher dans le parent
+                    var parent = targetCard.Parent as FrameworkElement;
+                    while (parent != null && targetIndex == -1)
+                    {
+                        if (parent.Tag is int i)
+                        {
+                            targetIndex = i;
+                            break;
+                        }
+                        parent = parent.Parent as FrameworkElement;
+                    }
+                }
+
+                if (targetIndex >= 0)
+                {
+                    int sourceIndex = (int)e.Data.GetData("ActionIndex");
+                    
+                    if (sourceIndex != targetIndex && _currentMacro != null)
+                    {
+                        SaveState();
+                        
+                        var action = _currentMacro.Actions[sourceIndex];
+                        _currentMacro.Actions.RemoveAt(sourceIndex);
+                        
+                        if (sourceIndex < targetIndex)
+                            targetIndex--;
+                        
+                        _currentMacro.Actions.Insert(targetIndex, action);
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            }
+            
+            e.Handled = true;
+        }
+
+        private void TimelineStackPanel_DragOver(object sender, DragEventArgs e)
+        {
+            e.Effects = e.Data.GetDataPresent("ActionIndex") ? DragDropEffects.Move : DragDropEffects.None;
+            e.Handled = true;
+        }
+
+        private void TimelineStackPanel_Drop(object sender, DragEventArgs e)
+        {
+            // Drop à la fin de la liste si on drop sur le conteneur
+            if (e.Data.GetDataPresent("ActionIndex") && _currentMacro != null)
+            {
+                SaveState();
+                
+                int sourceIndex = (int)e.Data.GetData("ActionIndex");
+                var action = _currentMacro.Actions[sourceIndex];
+                _currentMacro.Actions.RemoveAt(sourceIndex);
+                _currentMacro.Actions.Add(action);
+                _currentMacro.ModifiedAt = DateTime.Now;
+                
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+            
+            e.Handled = true;
+        }
+
+        #endregion
+
+        #region Boutons d'ajout
+
+        private void AddKeyboard_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+            
+            SaveState();
+            
+            _currentMacro.Actions.Add(new KeyboardAction
+            {
+                VirtualKeyCode = 0,
+                ActionType = KeyboardActionType.Press
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void AddMouse_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            SaveState();
+
+            _currentMacro.Actions.Add(new Core.Inputs.MouseAction
+            {
+                ActionType = Core.Inputs.MouseActionType.LeftClick,
+                X = -1,
+                Y = -1
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void AddDelay_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            SaveState();
+
+            _currentMacro.Actions.Add(new DelayAction
+            {
+                Duration = 100
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void DeleteAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is int index && _currentMacro != null)
+            {
+                if (index >= 0 && index < _currentMacro.Actions.Count)
+                {
+                    SaveState();
+                    
+                    _currentMacro.Actions.RemoveAt(index);
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+        }
+
+        #endregion
+
+        #region Édition inline
+
+        private void EditKeyboardAction(KeyboardAction ka, int index, TextBlock titleText)
+        {
+            // Ouvrir un dialogue ou permettre l'édition inline
+            // Utiliser KeyCaptureDialog depuis BlockEditor si disponible, sinon créer inline
+            var dialog = new TimelineKeyCaptureDialog();
+            if (dialog.ShowDialog() == true)
+            {
+                SaveState();
+                ka.VirtualKeyCode = (ushort)dialog.CapturedKey;
+                _currentMacro!.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private void EditDelayAction(DelayAction da, int index, TextBlock titleText)
+        {
+            // Permettre l'édition inline
+            var textBox = new TextBox
+            {
+                Text = da.Duration.ToString(),
+                Width = 80,
+                TextAlignment = TextAlignment.Center
+            };
+            
+            textBox.PreviewTextInput += (s, e) => e.Handled = !int.TryParse(e.Text, out _);
+            textBox.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    if (int.TryParse(textBox.Text, out int delay) && delay > 0)
+                    {
+                        SaveState();
+                        da.Duration = delay;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    Keyboard.ClearFocus();
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    Keyboard.ClearFocus();
+                }
+            };
+            
+            // Remplacer temporairement le TextBlock par le TextBox
+            var parent = titleText.Parent as Panel;
+            if (parent != null)
+            {
+                int idx = parent.Children.IndexOf(titleText);
+                parent.Children.RemoveAt(idx);
+                parent.Children.Insert(idx, textBox);
+                textBox.Focus();
+                textBox.SelectAll();
+            }
+        }
+
+        #endregion
+
+        #region Options de répétition
+
+        private void UpdateRepeatControls()
+        {
+            if (_currentMacro == null) return;
+
+            switch (_currentMacro.RepeatMode)
+            {
+                case RepeatMode.Once:
+                    RepeatModeComboBox.SelectedIndex = 0;
+                    RepeatCountTextBox.Visibility = Visibility.Collapsed;
+                    break;
+                case RepeatMode.RepeatCount:
+                    RepeatModeComboBox.SelectedIndex = 1;
+                    RepeatCountTextBox.Visibility = Visibility.Visible;
+                    RepeatCountTextBox.Text = _currentMacro.RepeatCount.ToString();
+                    break;
+                case RepeatMode.UntilStopped:
+                    RepeatModeComboBox.SelectedIndex = 2;
+                    RepeatCountTextBox.Visibility = Visibility.Collapsed;
+                    break;
+            }
+        }
+
+        private void RepeatModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            switch (RepeatModeComboBox.SelectedIndex)
+            {
+                case 0:
+                    _currentMacro.RepeatMode = RepeatMode.Once;
+                    _currentMacro.RepeatCount = 1;
+                    RepeatCountTextBox.Visibility = Visibility.Collapsed;
+                    break;
+                case 1:
+                    _currentMacro.RepeatMode = RepeatMode.RepeatCount;
+                    RepeatCountTextBox.Visibility = Visibility.Visible;
+                    break;
+                case 2:
+                    _currentMacro.RepeatMode = RepeatMode.UntilStopped;
+                    RepeatCountTextBox.Visibility = Visibility.Collapsed;
+                    break;
+            }
+
+            _currentMacro.ModifiedAt = DateTime.Now;
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void RepeatCountTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            if (int.TryParse(RepeatCountTextBox.Text, out int count) && count > 0)
+            {
+                _currentMacro.RepeatCount = count;
+                _currentMacro.ModifiedAt = DateTime.Now;
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        #endregion
+
+        #region Toggle Enable/Disable
+
+        private void UpdateMacroEnableToggle()
+        {
+            if (MacroEnableToggle == null) return;
+
+            if (_currentMacro != null)
+            {
+                MacroEnableToggle.IsEnabled = true;
+                MacroEnableToggle.IsChecked = _currentMacro.IsEnabled;
+            }
+            else
+            {
+                MacroEnableToggle.IsEnabled = false;
+                MacroEnableToggle.IsChecked = false;
+            }
+        }
+
+        private void MacroEnableToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro != null)
+            {
+                _currentMacro.IsEnabled = true;
+                _currentMacro.ModifiedAt = DateTime.Now;
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private void MacroEnableToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro != null)
+            {
+                _currentMacro.IsEnabled = false;
+                _currentMacro.ModifiedAt = DateTime.Now;
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        #endregion
+
+        #region Undo/Redo
+
+        private void SaveState()
+        {
+            if (_currentMacro == null || _isUndoRedo) return;
+
+            var state = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            _undoStack.Push(state);
+            
+            if (_undoStack.Count > 50)
+            {
+                var temp = new Stack<List<IInputAction>>();
+                for (int i = 0; i < 50; i++)
+                {
+                    temp.Push(_undoStack.Pop());
+                }
+                _undoStack = temp;
+            }
+            
+            _redoStack.Clear();
+            UpdateUndoRedoButtons();
+        }
+
+        private void Undo()
+        {
+            if (_currentMacro == null || _undoStack.Count == 0) return;
+
+            var currentState = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            _redoStack.Push(currentState);
+
+            var previousState = _undoStack.Pop();
+            _isUndoRedo = true;
+            
+            _currentMacro.Actions.Clear();
+            _currentMacro.Actions.AddRange(previousState.Select(a => a.Clone()));
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+            
+            _isUndoRedo = false;
+            UpdateUndoRedoButtons();
+        }
+
+        private void Redo()
+        {
+            if (_currentMacro == null || _redoStack.Count == 0) return;
+
+            var currentState = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            _undoStack.Push(currentState);
+
+            var nextState = _redoStack.Pop();
+            _isUndoRedo = true;
+            
+            _currentMacro.Actions.Clear();
+            _currentMacro.Actions.AddRange(nextState.Select(a => a.Clone()));
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+            
+            _isUndoRedo = false;
+            UpdateUndoRedoButtons();
+        }
+
+        private void UpdateUndoRedoButtons()
+        {
+            if (UndoButton != null)
+            {
+                UndoButton.IsEnabled = _currentMacro != null && _undoStack.Count > 0;
+            }
+            
+            if (RedoButton != null)
+            {
+                RedoButton.IsEnabled = _currentMacro != null && _redoStack.Count > 0;
+            }
+        }
+
+        private void UndoButton_Click(object sender, RoutedEventArgs e)
+        {
+            Undo();
+        }
+
+        private void RedoButton_Click(object sender, RoutedEventArgs e)
+        {
+            Redo();
+        }
+
+        #endregion
+    }
+
+    /// <summary>
+    /// Dialogue simple pour capturer une touche (pour TimelineEditor)
+    /// </summary>
+    public class TimelineKeyCaptureDialog : Window
+    {
+        public int CapturedKey { get; private set; }
+        private TextBlock _instructionText;
+
+        public TimelineKeyCaptureDialog()
+        {
+            Title = "Capturer une touche";
+            Width = 300;
+            Height = 150;
+            WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            ResizeMode = ResizeMode.NoResize;
+            Background = (SolidColorBrush)Application.Current.Resources["BackgroundPrimaryBrush"];
+
+            var grid = new Grid { Margin = new Thickness(20) };
+            
+            _instructionText = new TextBlock
+            {
+                Text = "Appuyez sur une touche...",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 16,
+                Style = (Style)Application.Current.Resources["TextBody"]
+            };
+            grid.Children.Add(_instructionText);
+
+            Content = grid;
+            KeyDown += Dialog_KeyDown;
+        }
+
+        private void Dialog_KeyDown(object sender, KeyEventArgs e)
+        {
+            CapturedKey = KeyInterop.VirtualKeyFromKey(e.Key);
+            _instructionText.Text = $"Touche: {e.Key}";
+            DialogResult = true;
+            Close();
+        }
+    }
+
+    /// <summary>
+    /// Helper pour parcourir l'arbre visuel
+    /// </summary>
+    public static class VisualTreeHelperExtensions
+    {
+        public static IEnumerable<DependencyObject> GetDescendants(DependencyObject element)
+        {
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(element); i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(element, i);
+                yield return child;
+                foreach (var descendant in GetDescendants(child))
+                {
+                    yield return descendant;
+                }
+            }
+        }
+    }
+}

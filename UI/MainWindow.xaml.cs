@@ -30,7 +30,7 @@ namespace MacroEngine.UI
         private readonly ObservableCollection<LogEntry> _logEntries;
         private List<Macro> _macros;
         private Macro? _selectedMacro;
-        private BlockEditor _blockEditor;
+        private TimelineEditor _blockEditor;
         private LogsWindow? _logsWindow;
         private MacroEngineConfig _appConfig;
         
@@ -108,8 +108,8 @@ namespace MacroEngine.UI
             _macros = new List<Macro>();
             _appConfig = new MacroEngineConfig(); // Configuration par défaut en attendant le chargement
 
-            // Initialiser l'éditeur de macro en blocs
-            _blockEditor = new BlockEditor();
+            // Initialiser l'éditeur de macro en Timeline
+            _blockEditor = new TimelineEditor();
             _blockEditor.MacroChanged += BlockEditor_MacroChanged;
             MacroEditorContainer.Content = _blockEditor;
 
