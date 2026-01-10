@@ -213,6 +213,45 @@ namespace MacroEngine.Core.Engine
                             await Task.Delay(delayAction.Duration);
                         }
                     }
+                    else if (action is RepeatAction repeatAction)
+                    {
+                        // Notifier le début de la répétition
+                        var description = GetActionDescription(action);
+                        ActionExecuted?.Invoke(this, new ActionExecutedEventArgs
+                        {
+                            Action = action,
+                            ActionDescription = description
+                        });
+                        
+                        // Exécuter les actions répétées de manière récursive
+                        int iterations = repeatAction.RepeatCount == 0 ? int.MaxValue : repeatAction.RepeatCount;
+                        
+                        for (int i = 0; i < iterations; i++)
+                        {
+                            if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                                break;
+
+                            // Attendre si en pause
+                            while (State == MacroEngineState.Paused)
+                            {
+                                await Task.Delay(10);
+                                if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                                    return;
+                            }
+
+                            if (State == MacroEngineState.Stopping)
+                                break;
+
+                            // Exécuter toutes les actions dans le groupe de manière récursive
+                            await ExecuteActionsAsync(repeatAction.Actions);
+
+                            // Délai entre les répétitions (sauf après la dernière)
+                            if (i < iterations - 1 && repeatAction.DelayBetweenRepeats > 0)
+                            {
+                                await Task.Delay(repeatAction.DelayBetweenRepeats);
+                            }
+                        }
+                    }
                     else
                     {
                         // Exécuter l'action directement (keybd_event fonctionne sur n'importe quel thread)
@@ -319,6 +358,15 @@ namespace MacroEngine.Core.Engine
                         return $"Délai: {delayAction.Duration}ms";
                     }
                     return $"Délai: {action.Name}";
+
+                case InputActionType.Repeat:
+                    if (action is RepeatAction repeatAction)
+                    {
+                        var countText = repeatAction.RepeatCount == 0 ? "∞" : repeatAction.RepeatCount.ToString();
+                        var actionsCount = repeatAction.Actions?.Count ?? 0;
+                        return $"Répéter {countText}x ({actionsCount} action{(actionsCount > 1 ? "s" : "")})";
+                    }
+                    return $"Répéter: {action.Name}";
 
                 default:
                     return action.Name;

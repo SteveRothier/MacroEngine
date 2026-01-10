@@ -201,6 +201,19 @@ namespace MacroEngine.UI
                     title = $"{da.Duration} ms";
                     details = "Pause";
                     break;
+                case RepeatAction ra:
+                    primaryColor = Color.FromRgb(138, 43, 226); // Violet #8A2BE2
+                    hoverColor = Color.FromRgb(153, 50, 204); // Violet hover #9932CC
+                    backgroundColor = Color.FromRgb(138, 43, 226); // Fond #8A2BE2
+                    backgroundColorHover = Color.FromRgb(153, 50, 204); // Dégradé hover #9932CC
+                    textColor = Color.FromRgb(248, 239, 234); // Texte #F8EFEA
+                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    icon = "🔁";
+                    var countText = ra.RepeatCount == 0 ? "∞" : ra.RepeatCount.ToString();
+                    var actionsCount = ra.Actions?.Count ?? 0;
+                    title = $"Répéter {countText}x";
+                    details = $"{actionsCount} action{(actionsCount > 1 ? "s" : "")}";
+                    break;
                 default:
                     primaryColor = Color.FromRgb(123, 30, 58); // Rouge pourpre foncé par défaut
                     hoverColor = Color.FromRgb(143, 39, 72);
@@ -498,6 +511,15 @@ namespace MacroEngine.UI
                     EditDelayAction(da, index, titleBlock);
                 };
             }
+            else if (action is RepeatAction ra)
+            {
+                titleBlock.Cursor = Cursors.Hand;
+                titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                {
+                    e.Handled = true; // Empêcher le drag & drop
+                    EditRepeatAction(ra, index, titleBlock);
+                };
+            }
 
             return card;
         }
@@ -513,6 +535,7 @@ namespace MacroEngine.UI
                 KeyboardAction => Color.FromRgb(122, 30, 58),
                 Core.Inputs.MouseAction => Color.FromRgb(90, 138, 201),
                 DelayAction => Color.FromRgb(216, 162, 74),
+                RepeatAction => Color.FromRgb(138, 43, 226),
                 _ => Color.FromRgb(122, 30, 58)
             };
 
@@ -1051,6 +1074,24 @@ namespace MacroEngine.UI
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        private void AddRepeat_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            SaveState();
+
+            _currentMacro.Actions.Add(new RepeatAction
+            {
+                RepeatCount = 1,
+                DelayBetweenRepeats = 0,
+                Actions = new List<IInputAction>()
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         private void MoveActionUp(int index)
         {
             if (_currentMacro == null || index <= 0 || index >= _currentMacro.Actions.Count)
@@ -1334,6 +1375,136 @@ namespace MacroEngine.UI
             parentPanel.Children.Insert(idx, textBox);
             
             // Mettre le focus de manière asynchrone pour s'assurer que le layout est mis à jour
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+            }));
+        }
+
+        private void EditRepeatAction(RepeatAction ra, int index, TextBlock titleText)
+        {
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+            {
+                System.Diagnostics.Debug.WriteLine("EditRepeatAction: parentPanel is null");
+                return;
+            }
+            
+            bool repeatSaved = false;
+            int originalRepeatCount = ra.RepeatCount;
+            var originalMargin = titleText.Margin;
+            
+            var textBox = new TextBox
+            {
+                Text = ra.RepeatCount == 0 ? "∞" : ra.RepeatCount.ToString(),
+                MinWidth = 60,
+                MaxWidth = 120,
+                TextAlignment = TextAlignment.Center,
+                Background = new SolidColorBrush(Color.FromRgb(250, 250, 250)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(4),
+                Margin = originalMargin,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Cursor = Cursors.IBeam,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold
+            };
+            
+            textBox.PreviewTextInput += (s, e) =>
+            {
+                if (e.Text == "∞" || char.IsDigit(e.Text, 0))
+                    e.Handled = false;
+                else
+                    e.Handled = true;
+            };
+            
+            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
+            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
+            
+            textBox.LostFocus += (s, e) =>
+            {
+                if (repeatSaved) return;
+                
+                if (textBox.Text == "∞" || textBox.Text.ToLower() == "inf" || textBox.Text.ToLower() == "infini")
+                {
+                    SaveState();
+                    ra.RepeatCount = 0;
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    repeatSaved = true;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                else if (int.TryParse(textBox.Text, out int count) && count >= 0)
+                {
+                    SaveState();
+                    ra.RepeatCount = count;
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    repeatSaved = true;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                {
+                    if (parentPanel.Children.Contains(textBox))
+                    {
+                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
+                        parentPanel.Children.RemoveAt(textBoxIdx);
+                        parentPanel.Children.Insert(textBoxIdx, titleText);
+                    }
+                }
+            };
+            
+            textBox.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    e.Handled = true;
+                    if (textBox.Text == "∞" || textBox.Text.ToLower() == "inf" || textBox.Text.ToLower() == "infini")
+                    {
+                        SaveState();
+                        ra.RepeatCount = 0;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        repeatSaved = true;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    else if (int.TryParse(textBox.Text, out int count) && count >= 0)
+                    {
+                        SaveState();
+                        ra.RepeatCount = count;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        repeatSaved = true;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    Keyboard.ClearFocus();
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    Keyboard.ClearFocus();
+                    if (parentPanel.Children.Contains(textBox) && !repeatSaved)
+                    {
+                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
+                        parentPanel.Children.RemoveAt(textBoxIdx);
+                        parentPanel.Children.Insert(textBoxIdx, titleText);
+                    }
+                }
+            };
+            
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+            {
+                System.Diagnostics.Debug.WriteLine("EditRepeatAction: titleText not found in parentPanel");
+                return;
+            }
+            
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, textBox);
+            
             Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
             {
                 textBox.Focus();

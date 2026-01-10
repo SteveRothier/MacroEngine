@@ -49,6 +49,11 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Délai/pause
         /// </summary>
-        Delay
+        Delay,
+
+        /// <summary>
+        /// Répétition d'actions (groupe d'actions répétées)
+        /// </summary>
+        Repeat
     }
 }
