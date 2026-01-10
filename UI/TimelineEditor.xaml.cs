@@ -205,6 +205,7 @@ namespace MacroEngine.UI
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge icône
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Texte
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge info optionnel
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Boutons monter/descendre
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
 
             // Barre colorée à gauche (timeline) - avec effet lumineux enrichi
@@ -348,6 +349,138 @@ namespace MacroEngine.UI
             Grid.SetColumn(infoBadge, 3);
             contentGrid.Children.Add(infoBadge);
 
+            // Boutons monter/descendre pour réorganiser les actions (toujours visibles)
+            var moveButtonsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                Visibility = Visibility.Visible
+            };
+
+            // Bouton monter (▲)
+            bool canMoveUp = index > 0;
+            var moveUpBtnBorder = new Border
+            {
+                Width = 32,
+                Height = 32,
+                Background = canMoveUp
+                    ? new SolidColorBrush(Color.FromArgb(10, primaryColor.R, primaryColor.G, primaryColor.B))
+                    : new SolidColorBrush(Color.FromArgb(5, 150, 150, 150)),
+                BorderThickness = new Thickness(1.5),
+                BorderBrush = canMoveUp
+                    ? new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B))
+                    : new SolidColorBrush(Color.FromArgb(20, 150, 150, 150)),
+                CornerRadius = new CornerRadius(4),
+                Cursor = canMoveUp ? Cursors.Hand : Cursors.Arrow,
+                Margin = new Thickness(0, 0, 4, 0),
+                Tag = index
+            };
+            
+            var moveUpBtnText = new TextBlock
+            {
+                Text = "▲",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = canMoveUp
+                    ? new SolidColorBrush(Color.FromArgb(180, primaryColor.R, primaryColor.G, primaryColor.B))
+                    : new SolidColorBrush(Color.FromArgb(100, 150, 150, 150)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            
+            moveUpBtnBorder.Child = moveUpBtnText;
+            moveUpBtnBorder.MouseLeftButtonDown += (s, e) => 
+            {
+                if (canMoveUp)
+                {
+                    MoveActionUp(index);
+                    e.Handled = true;
+                }
+            };
+            moveUpBtnBorder.MouseEnter += (s, e) => 
+            {
+                if (canMoveUp)
+                {
+                    moveUpBtnText.Foreground = new SolidColorBrush(primaryColor);
+                    moveUpBtnBorder.BorderBrush = new SolidColorBrush(primaryColor);
+                    moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B));
+                }
+            };
+            moveUpBtnBorder.MouseLeave += (s, e) => 
+            {
+                if (canMoveUp)
+                {
+                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromArgb(180, primaryColor.R, primaryColor.G, primaryColor.B));
+                    moveUpBtnBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
+                    moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(10, primaryColor.R, primaryColor.G, primaryColor.B));
+                }
+            };
+
+            // Bouton descendre (▼)
+            bool canMoveDown = _currentMacro != null && index < _currentMacro.Actions.Count - 1;
+            var moveDownBtnBorder = new Border
+            {
+                Width = 32,
+                Height = 32,
+                Background = canMoveDown
+                    ? new SolidColorBrush(Color.FromArgb(10, primaryColor.R, primaryColor.G, primaryColor.B))
+                    : new SolidColorBrush(Color.FromArgb(5, 150, 150, 150)),
+                BorderThickness = new Thickness(1.5),
+                BorderBrush = canMoveDown
+                    ? new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B))
+                    : new SolidColorBrush(Color.FromArgb(20, 150, 150, 150)),
+                CornerRadius = new CornerRadius(4),
+                Cursor = canMoveDown ? Cursors.Hand : Cursors.Arrow,
+                Margin = new Thickness(4, 0, 0, 0),
+                Tag = index
+            };
+            
+            var moveDownBtnText = new TextBlock
+            {
+                Text = "▼",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = canMoveDown
+                    ? new SolidColorBrush(Color.FromArgb(180, primaryColor.R, primaryColor.G, primaryColor.B))
+                    : new SolidColorBrush(Color.FromArgb(100, 150, 150, 150)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            
+            moveDownBtnBorder.Child = moveDownBtnText;
+            moveDownBtnBorder.MouseLeftButtonDown += (s, e) => 
+            {
+                if (canMoveDown)
+                {
+                    MoveActionDown(index);
+                    e.Handled = true;
+                }
+            };
+            moveDownBtnBorder.MouseEnter += (s, e) => 
+            {
+                if (canMoveDown)
+                {
+                    moveDownBtnText.Foreground = new SolidColorBrush(primaryColor);
+                    moveDownBtnBorder.BorderBrush = new SolidColorBrush(primaryColor);
+                    moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B));
+                }
+            };
+            moveDownBtnBorder.MouseLeave += (s, e) => 
+            {
+                if (canMoveDown)
+                {
+                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromArgb(180, primaryColor.R, primaryColor.G, primaryColor.B));
+                    moveDownBtnBorder.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
+                    moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(10, primaryColor.R, primaryColor.G, primaryColor.B));
+                }
+            };
+
+            moveButtonsPanel.Children.Add(moveUpBtnBorder);
+            moveButtonsPanel.Children.Add(moveDownBtnBorder);
+            Grid.SetColumn(moveButtonsPanel, 4);
+            contentGrid.Children.Add(moveButtonsPanel);
+
             // Bouton supprimer avec style enrichi (visible au survol)
             var deleteBtnContainer = new Border
             {
@@ -392,7 +525,7 @@ namespace MacroEngine.UI
             };
             
             deleteBtnContainer.Child = deleteBtn;
-            Grid.SetColumn(deleteBtnContainer, 4);
+            Grid.SetColumn(deleteBtnContainer, 5);
             contentGrid.Children.Add(deleteBtnContainer);
 
             card.Child = contentGrid;
@@ -818,6 +951,40 @@ namespace MacroEngine.UI
             {
                 Duration = 100
             });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void MoveActionUp(int index)
+        {
+            if (_currentMacro == null || index <= 0 || index >= _currentMacro.Actions.Count)
+                return;
+
+            SaveState();
+            
+            // Échanger l'action avec celle au-dessus
+            var action = _currentMacro.Actions[index];
+            _currentMacro.Actions.RemoveAt(index);
+            _currentMacro.Actions.Insert(index - 1, action);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void MoveActionDown(int index)
+        {
+            if (_currentMacro == null || index < 0 || index >= _currentMacro.Actions.Count - 1)
+                return;
+
+            SaveState();
+            
+            // Échanger l'action avec celle en dessous
+            var action = _currentMacro.Actions[index];
+            _currentMacro.Actions.RemoveAt(index);
+            _currentMacro.Actions.Insert(index + 1, action);
             _currentMacro.ModifiedAt = DateTime.Now;
             
             RefreshBlocks();
