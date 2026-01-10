@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Models;
+using MacroEngine.Core.Hooks;
 
 namespace MacroEngine.UI
 {
@@ -209,9 +210,8 @@ namespace MacroEngine.UI
                     textColor = Color.FromRgb(248, 239, 234); // Texte #F8EFEA
                     iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
                     icon = "🔁";
-                    var countText = ra.RepeatCount == 0 ? "∞" : ra.RepeatCount.ToString();
                     var actionsCount = ra.Actions?.Count ?? 0;
-                    title = $"Répéter {countText}x";
+                    title = GetRepeatActionTitle(ra);
                     details = $"{actionsCount} action{(actionsCount > 1 ? "s" : "")}";
                     break;
                 default:
@@ -754,6 +754,25 @@ namespace MacroEngine.UI
                 return $"Position: ({ma.X}, {ma.Y})";
             }
             return "Position actuelle";
+        }
+
+        private string GetRepeatActionTitle(RepeatAction ra)
+        {
+            return ra.RepeatMode switch
+            {
+                RepeatMode.Once => "Répéter 1 fois",
+                RepeatMode.RepeatCount => $"Répéter {ra.RepeatCount}x",
+                RepeatMode.UntilStopped => "Répéter jusqu'à arrêt",
+                RepeatMode.WhileKeyPressed => ra.KeyCodeToMonitor == 0 ? "Répéter tant que touche pressée" : $"Répéter tant que {GetKeyName(ra.KeyCodeToMonitor)} pressée",
+                RepeatMode.WhileClickPressed => ra.ClickTypeToMonitor switch
+                {
+                    0 => "Répéter tant que clic gauche pressé",
+                    1 => "Répéter tant que clic droit pressé",
+                    2 => "Répéter tant que clic milieu pressé",
+                    _ => "Répéter tant que clic pressé"
+                },
+                _ => "Répéter"
+            };
         }
 
         private string GetKeyName(ushort virtualKeyCode)
@@ -1384,132 +1403,298 @@ namespace MacroEngine.UI
 
         private void EditRepeatAction(RepeatAction ra, int index, TextBlock titleText)
         {
-            var parentPanel = titleText.Parent as Panel;
-            if (parentPanel == null)
+            // Ouvrir un Popup avec les options de répétition
+            var popup = new Popup
             {
-                System.Diagnostics.Debug.WriteLine("EditRepeatAction: parentPanel is null");
-                return;
+                Placement = PlacementMode.RelativePoint,
+                PlacementTarget = titleText,
+                StaysOpen = false,
+                IsOpen = true,
+                PopupAnimation = PopupAnimation.Slide
+            };
+
+            var editPanel = new Border
+            {
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+                BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12),
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Colors.Black,
+                    Opacity = 0.3,
+                    BlurRadius = 10,
+                    ShadowDepth = 5
+                }
+            };
+
+            var mainStack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                MinWidth = 280
+            };
+
+            // Label pour le mode de répétition
+            var modeLabel = new TextBlock
+            {
+                Text = "Mode de répétition :",
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 6),
+                Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60))
+            };
+            mainStack.Children.Add(modeLabel);
+
+            // ComboBox pour le mode de répétition
+            var modeComboBox = new ComboBox
+            {
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 8),
+                MinWidth = 250
+            };
+            
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "1 fois", Tag = RepeatMode.Once });
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "X fois", Tag = RepeatMode.RepeatCount });
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "Jusqu'à arrêt", Tag = RepeatMode.UntilStopped });
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "Tant qu'une touche est pressée", Tag = RepeatMode.WhileKeyPressed });
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "Tant qu'un clic est pressé", Tag = RepeatMode.WhileClickPressed });
+
+            // Sélectionner le mode actuel
+            for (int i = 0; i < modeComboBox.Items.Count; i++)
+            {
+                if (modeComboBox.Items[i] is ComboBoxItem item && item.Tag is RepeatMode mode && mode == ra.RepeatMode)
+                {
+                    modeComboBox.SelectedIndex = i;
+                    break;
+                }
             }
-            
-            bool repeatSaved = false;
-            int originalRepeatCount = ra.RepeatCount;
-            var originalMargin = titleText.Margin;
-            
-            var textBox = new TextBox
+
+            mainStack.Children.Add(modeComboBox);
+
+            // Panel pour les inputs conditionnels
+            var inputPanel = new StackPanel
             {
-                Text = ra.RepeatCount == 0 ? "∞" : ra.RepeatCount.ToString(),
-                MinWidth = 60,
-                MaxWidth = 120,
-                TextAlignment = TextAlignment.Center,
-                Background = new SolidColorBrush(Color.FromRgb(250, 250, 250)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(4),
-                Margin = originalMargin,
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+
+            // Input pour le nombre de répétitions (X fois)
+            var repeatCountPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Visibility = ra.RepeatMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            repeatCountPanel.Children.Add(new TextBlock
+            {
+                Text = "Nombre :",
+                FontSize = 11,
                 VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Cursor = Cursors.IBeam,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold
-            };
-            
-            textBox.PreviewTextInput += (s, e) =>
+                Margin = new Thickness(0, 0, 8, 0),
+                Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60))
+            });
+            var repeatCountTextBox = new TextBox
             {
-                if (e.Text == "∞" || char.IsDigit(e.Text, 0))
-                    e.Handled = false;
-                else
-                    e.Handled = true;
+                Text = ra.RepeatCount.ToString(),
+                Width = 80,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center
             };
-            
-            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
-            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
-            
-            textBox.LostFocus += (s, e) =>
+            repeatCountTextBox.PreviewTextInput += (s, e) => e.Handled = !char.IsDigit(e.Text, 0);
+            repeatCountPanel.Children.Add(repeatCountTextBox);
+
+            // Input pour la touche à surveiller (Tant qu'une touche est pressée)
+            var keyCodePanel = new StackPanel
             {
-                if (repeatSaved) return;
-                
-                if (textBox.Text == "∞" || textBox.Text.ToLower() == "inf" || textBox.Text.ToLower() == "infini")
+                Orientation = Orientation.Horizontal,
+                Visibility = ra.RepeatMode == RepeatMode.WhileKeyPressed ? Visibility.Visible : Visibility.Collapsed,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            keyCodePanel.Children.Add(new TextBlock
+            {
+                Text = "Touche :",
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60))
+            });
+            var keyCodeTextBox = new TextBox
+            {
+                Text = ra.KeyCodeToMonitor == 0 ? "Cliquez pour capturer" : GetKeyName(ra.KeyCodeToMonitor),
+                Width = 150,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsReadOnly = true,
+                Cursor = Cursors.Hand,
+                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245))
+            };
+            bool keyCaptureMode = false;
+            KeyboardHook? tempKeyHook = null;
+            keyCodeTextBox.MouseLeftButtonDown += (s, e) =>
+            {
+                if (!keyCaptureMode)
+                {
+                    keyCaptureMode = true;
+                    keyCodeTextBox.Text = "Appuyez sur une touche...";
+                    keyCodeTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
+                    tempKeyHook = new KeyboardHook();
+                    tempKeyHook.KeyDown += (sender, args) =>
+                    {
+                        ra.KeyCodeToMonitor = (ushort)args.VirtualKeyCode;
+                        keyCodeTextBox.Text = GetKeyName(ra.KeyCodeToMonitor);
+                        keyCodeTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+                        keyCaptureMode = false;
+                        tempKeyHook?.Uninstall();
+                        tempKeyHook = null;
+                    };
+                    tempKeyHook.Install();
+                }
+            };
+            keyCodePanel.Children.Add(keyCodeTextBox);
+
+            // ComboBox pour le type de clic (Tant qu'un clic est pressé)
+            var clickTypePanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Visibility = ra.RepeatMode == RepeatMode.WhileClickPressed ? Visibility.Visible : Visibility.Collapsed,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            clickTypePanel.Children.Add(new TextBlock
+            {
+                Text = "Type de clic :",
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60))
+            });
+            var clickTypeComboBox = new ComboBox
+            {
+                Width = 120,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                SelectedIndex = ra.ClickTypeToMonitor
+            };
+            clickTypeComboBox.Items.Add("Gauche");
+            clickTypeComboBox.Items.Add("Droit");
+            clickTypeComboBox.Items.Add("Milieu");
+            clickTypePanel.Children.Add(clickTypeComboBox);
+
+            // Mise à jour de la visibilité des panels selon le mode sélectionné
+            modeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (modeComboBox.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is RepeatMode selectedMode)
+                {
+                    repeatCountPanel.Visibility = selectedMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed;
+                    keyCodePanel.Visibility = selectedMode == RepeatMode.WhileKeyPressed ? Visibility.Visible : Visibility.Collapsed;
+                    clickTypePanel.Visibility = selectedMode == RepeatMode.WhileClickPressed ? Visibility.Visible : Visibility.Collapsed;
+                }
+            };
+
+            inputPanel.Children.Add(repeatCountPanel);
+            inputPanel.Children.Add(keyCodePanel);
+            inputPanel.Children.Add(clickTypePanel);
+            mainStack.Children.Add(inputPanel);
+
+            // Boutons OK/Cancel
+            var buttonsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 12, 0, 0)
+            };
+
+            var cancelButton = new Button
+            {
+                Content = "Annuler",
+                Width = 70,
+                Height = 28,
+                FontSize = 11,
+                Margin = new Thickness(0, 0, 8, 0),
+                Cursor = Cursors.Hand
+            };
+
+            var okButton = new Button
+            {
+                Content = "OK",
+                Width = 70,
+                Height = 28,
+                FontSize = 11,
+                Cursor = Cursors.Hand,
+                IsDefault = true
+            };
+
+            bool dialogSaved = false;
+            RepeatMode originalMode = ra.RepeatMode;
+            int originalCount = ra.RepeatCount;
+            ushort originalKeyCode = ra.KeyCodeToMonitor;
+            int originalClickType = ra.ClickTypeToMonitor;
+
+            okButton.Click += (s, e) =>
+            {
+                if (modeComboBox.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is RepeatMode selectedMode)
                 {
                     SaveState();
-                    ra.RepeatCount = 0;
-                    _currentMacro!.ModifiedAt = DateTime.Now;
-                    repeatSaved = true;
-                    RefreshBlocks();
-                    MacroChanged?.Invoke(this, EventArgs.Empty);
-                }
-                else if (int.TryParse(textBox.Text, out int count) && count >= 0)
-                {
-                    SaveState();
-                    ra.RepeatCount = count;
-                    _currentMacro!.ModifiedAt = DateTime.Now;
-                    repeatSaved = true;
-                    RefreshBlocks();
-                    MacroChanged?.Invoke(this, EventArgs.Empty);
-                }
-                else
-                {
-                    if (parentPanel.Children.Contains(textBox))
+                    ra.RepeatMode = selectedMode;
+                    
+                    if (selectedMode == RepeatMode.RepeatCount && int.TryParse(repeatCountTextBox.Text, out int count) && count > 0)
                     {
-                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
-                        parentPanel.Children.RemoveAt(textBoxIdx);
-                        parentPanel.Children.Insert(textBoxIdx, titleText);
-                    }
-                }
-            };
-            
-            textBox.PreviewKeyDown += (s, e) =>
-            {
-                if (e.Key == Key.Enter)
-                {
-                    e.Handled = true;
-                    if (textBox.Text == "∞" || textBox.Text.ToLower() == "inf" || textBox.Text.ToLower() == "infini")
-                    {
-                        SaveState();
-                        ra.RepeatCount = 0;
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        repeatSaved = true;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    }
-                    else if (int.TryParse(textBox.Text, out int count) && count >= 0)
-                    {
-                        SaveState();
                         ra.RepeatCount = count;
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        repeatSaved = true;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
                     }
-                    Keyboard.ClearFocus();
-                }
-                else if (e.Key == Key.Escape)
-                {
-                    e.Handled = true;
-                    Keyboard.ClearFocus();
-                    if (parentPanel.Children.Contains(textBox) && !repeatSaved)
+                    else if (selectedMode == RepeatMode.Once)
                     {
-                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
-                        parentPanel.Children.RemoveAt(textBoxIdx);
-                        parentPanel.Children.Insert(textBoxIdx, titleText);
+                        ra.RepeatCount = 1;
                     }
+                    else if (selectedMode == RepeatMode.UntilStopped)
+                    {
+                        ra.RepeatCount = 0;
+                    }
+                    
+                    if (selectedMode == RepeatMode.WhileClickPressed && clickTypeComboBox.SelectedIndex >= 0)
+                    {
+                        ra.ClickTypeToMonitor = clickTypeComboBox.SelectedIndex;
+                    }
+
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    dialogSaved = true;
+                    tempKeyHook?.Uninstall();
+                    popup.IsOpen = false;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
                 }
             };
-            
-            int idx = parentPanel.Children.IndexOf(titleText);
-            if (idx < 0)
+
+            cancelButton.Click += (s, e) =>
             {
-                System.Diagnostics.Debug.WriteLine("EditRepeatAction: titleText not found in parentPanel");
-                return;
-            }
-            
-            parentPanel.Children.RemoveAt(idx);
-            parentPanel.Children.Insert(idx, textBox);
-            
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+                // Restaurer les valeurs originales si nécessaire
+                if (!dialogSaved)
+                {
+                    ra.RepeatMode = originalMode;
+                    ra.RepeatCount = originalCount;
+                    ra.KeyCodeToMonitor = originalKeyCode;
+                    ra.ClickTypeToMonitor = originalClickType;
+                }
+                tempKeyHook?.Uninstall();
+                popup.IsOpen = false;
+            };
+
+            popup.Closed += (s, e) =>
             {
-                textBox.Focus();
-                textBox.SelectAll();
-            }));
+                tempKeyHook?.Uninstall();
+            };
+
+            buttonsPanel.Children.Add(cancelButton);
+            buttonsPanel.Children.Add(okButton);
+            mainStack.Children.Add(buttonsPanel);
+
+            editPanel.Child = mainStack;
+            popup.Child = editPanel;
+
+            // Positionner le popup près du titre
+            var titlePos = titleText.PointToScreen(new Point(0, 0));
+            var parentPos = Application.Current.MainWindow.PointToScreen(new Point(0, 0));
+            popup.HorizontalOffset = titlePos.X - parentPos.X;
+            popup.VerticalOffset = titlePos.Y - parentPos.Y + titleText.ActualHeight + 4;
         }
 
         #endregion

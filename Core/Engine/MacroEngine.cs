@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using MacroEngine.Core.Inputs;
@@ -223,33 +224,162 @@ namespace MacroEngine.Core.Engine
                             ActionDescription = description
                         });
                         
-                        // Exécuter les actions répétées de manière récursive
-                        int iterations = repeatAction.RepeatCount == 0 ? int.MaxValue : repeatAction.RepeatCount;
-                        
-                        for (int i = 0; i < iterations; i++)
+                        // Exécuter les actions répétées selon le mode de répétition
+                        switch (repeatAction.RepeatMode)
                         {
-                            if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                            case RepeatMode.Once:
+                                // Exécuter une seule fois
+                                await ExecuteActionsAsync(repeatAction.Actions);
                                 break;
 
-                            // Attendre si en pause
-                            while (State == MacroEngineState.Paused)
-                            {
-                                await Task.Delay(10);
-                                if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
-                                    return;
-                            }
+                            case RepeatMode.RepeatCount:
+                                // Répéter X fois
+                                for (int i = 0; i < repeatAction.RepeatCount; i++)
+                                {
+                                    if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                                        break;
 
-                            if (State == MacroEngineState.Stopping)
+                                    // Attendre si en pause
+                                    while (State == MacroEngineState.Paused)
+                                    {
+                                        await Task.Delay(10);
+                                        if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                                            return;
+                                    }
+
+                                    if (State == MacroEngineState.Stopping)
+                                        break;
+
+                                    // Exécuter toutes les actions dans le groupe
+                                    await ExecuteActionsAsync(repeatAction.Actions);
+
+                                    // Délai entre les répétitions (sauf après la dernière)
+                                    if (i < repeatAction.RepeatCount - 1 && repeatAction.DelayBetweenRepeats > 0)
+                                    {
+                                        await Task.Delay(repeatAction.DelayBetweenRepeats);
+                                    }
+                                }
                                 break;
 
-                            // Exécuter toutes les actions dans le groupe de manière récursive
-                            await ExecuteActionsAsync(repeatAction.Actions);
+                            case RepeatMode.UntilStopped:
+                                // Répéter jusqu'à interruption
+                                while (!(_cancellationTokenSource?.Token.IsCancellationRequested == true) && State != MacroEngineState.Stopping)
+                                {
+                                    // Attendre si en pause
+                                    while (State == MacroEngineState.Paused)
+                                    {
+                                        await Task.Delay(10);
+                                        if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                                            return;
+                                    }
 
-                            // Délai entre les répétitions (sauf après la dernière)
-                            if (i < iterations - 1 && repeatAction.DelayBetweenRepeats > 0)
-                            {
-                                await Task.Delay(repeatAction.DelayBetweenRepeats);
-                            }
+                                    if (State == MacroEngineState.Stopping)
+                                        break;
+
+                                    // Exécuter toutes les actions dans le groupe
+                                    await ExecuteActionsAsync(repeatAction.Actions);
+
+                                    // Délai entre les répétitions
+                                    if (repeatAction.DelayBetweenRepeats > 0)
+                                    {
+                                        await Task.Delay(repeatAction.DelayBetweenRepeats);
+                                    }
+                                }
+                                break;
+
+                            case RepeatMode.WhileKeyPressed:
+                                // Répéter tant que la touche est pressée
+                                if (repeatAction.KeyCodeToMonitor == 0)
+                                {
+                                    // Si aucune touche spécifiée, répéter jusqu'à arrêt
+                                    while (!(_cancellationTokenSource?.Token.IsCancellationRequested == true) && State != MacroEngineState.Stopping)
+                                    {
+                                        // Attendre si en pause
+                                        while (State == MacroEngineState.Paused)
+                                        {
+                                            await Task.Delay(10);
+                                            if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                                                return;
+                                        }
+
+                                        if (State == MacroEngineState.Stopping)
+                                            break;
+
+                                        // Exécuter toutes les actions dans le groupe
+                                        await ExecuteActionsAsync(repeatAction.Actions);
+
+                                        // Délai entre les répétitions
+                                        if (repeatAction.DelayBetweenRepeats > 0)
+                                        {
+                                            await Task.Delay(repeatAction.DelayBetweenRepeats);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    // Répéter tant que la touche spécifiée est pressée
+                                    while (IsKeyCurrentlyPressed(repeatAction.KeyCodeToMonitor) && 
+                                           !(_cancellationTokenSource?.Token.IsCancellationRequested == true) && 
+                                           State != MacroEngineState.Stopping)
+                                    {
+                                        // Attendre si en pause
+                                        while (State == MacroEngineState.Paused)
+                                        {
+                                            await Task.Delay(10);
+                                            if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                                                return;
+                                        }
+
+                                        if (State == MacroEngineState.Stopping)
+                                            break;
+
+                                        // Exécuter toutes les actions dans le groupe
+                                        await ExecuteActionsAsync(repeatAction.Actions);
+
+                                        // Délai entre les répétitions
+                                        if (repeatAction.DelayBetweenRepeats > 0)
+                                        {
+                                            await Task.Delay(repeatAction.DelayBetweenRepeats);
+                                        }
+                                    }
+                                }
+                                break;
+
+                            case RepeatMode.WhileClickPressed:
+                                // Répéter tant que le clic est pressé
+                                int mouseButtonCode = repeatAction.ClickTypeToMonitor switch
+                                {
+                                    0 => 0x01, // VK_LBUTTON - Clic gauche
+                                    1 => 0x02, // VK_RBUTTON - Clic droit
+                                    2 => 0x04, // VK_MBUTTON - Clic milieu
+                                    _ => 0x01  // Par défaut clic gauche
+                                };
+
+                                while (IsKeyCurrentlyPressed((ushort)mouseButtonCode) && 
+                                       !(_cancellationTokenSource?.Token.IsCancellationRequested == true) && 
+                                       State != MacroEngineState.Stopping)
+                                {
+                                    // Attendre si en pause
+                                    while (State == MacroEngineState.Paused)
+                                    {
+                                        await Task.Delay(10);
+                                        if (_cancellationTokenSource?.Token.IsCancellationRequested == true)
+                                            return;
+                                    }
+
+                                    if (State == MacroEngineState.Stopping)
+                                        break;
+
+                                    // Exécuter toutes les actions dans le groupe
+                                    await ExecuteActionsAsync(repeatAction.Actions);
+
+                                    // Délai entre les répétitions
+                                    if (repeatAction.DelayBetweenRepeats > 0)
+                                    {
+                                        await Task.Delay(repeatAction.DelayBetweenRepeats);
+                                    }
+                                }
+                                break;
                         }
                     }
                     else
@@ -362,9 +492,23 @@ namespace MacroEngine.Core.Engine
                 case InputActionType.Repeat:
                     if (action is RepeatAction repeatAction)
                     {
-                        var countText = repeatAction.RepeatCount == 0 ? "∞" : repeatAction.RepeatCount.ToString();
                         var actionsCount = repeatAction.Actions?.Count ?? 0;
-                        return $"Répéter {countText}x ({actionsCount} action{(actionsCount > 1 ? "s" : "")})";
+                        var modeText = repeatAction.RepeatMode switch
+                        {
+                            RepeatMode.Once => "1 fois",
+                            RepeatMode.RepeatCount => $"{repeatAction.RepeatCount}x",
+                            RepeatMode.UntilStopped => "Jusqu'à arrêt",
+                            RepeatMode.WhileKeyPressed => repeatAction.KeyCodeToMonitor == 0 ? "Tant que touche pressée" : $"Tant que {GetKeyName(repeatAction.KeyCodeToMonitor)} pressée",
+                            RepeatMode.WhileClickPressed => repeatAction.ClickTypeToMonitor switch
+                            {
+                                0 => "Tant que clic gauche pressé",
+                                1 => "Tant que clic droit pressé",
+                                2 => "Tant que clic milieu pressé",
+                                _ => "Tant que clic pressé"
+                            },
+                            _ => "Répéter"
+                        };
+                        return $"Répéter: {modeText} ({actionsCount} action{(actionsCount > 1 ? "s" : "")})";
                     }
                     return $"Répéter: {action.Name}";
 
@@ -502,6 +646,18 @@ namespace MacroEngine.Core.Engine
             if ((modifiers & ModifierKeys.Alt) != 0) parts.Add("Alt");
             if ((modifiers & ModifierKeys.Windows) != 0) parts.Add("Win");
             return parts.Count > 0 ? string.Join("+", parts) + "+" : "";
+        }
+
+        [DllImport("user32.dll")]
+        private static extern short GetAsyncKeyState(int vKey);
+
+        /// <summary>
+        /// Vérifie si une touche ou un bouton de souris est actuellement pressé
+        /// </summary>
+        private bool IsKeyCurrentlyPressed(ushort virtualKeyCode)
+        {
+            // GetAsyncKeyState retourne un short où le bit 15 indique si la touche est pressée
+            return (GetAsyncKeyState(virtualKeyCode) & 0x8000) != 0;
         }
     }
 }

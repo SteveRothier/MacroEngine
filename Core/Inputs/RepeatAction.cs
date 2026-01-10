@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using MacroEngine.Core.Models;
 
 namespace MacroEngine.Core.Inputs
 {
@@ -19,7 +20,12 @@ namespace MacroEngine.Core.Inputs
         public List<IInputAction> Actions { get; set; } = new List<IInputAction>();
 
         /// <summary>
-        /// Nombre de répétitions (0 = infini jusqu'à interruption)
+        /// Mode de répétition
+        /// </summary>
+        public RepeatMode RepeatMode { get; set; } = RepeatMode.Once;
+
+        /// <summary>
+        /// Nombre de répétitions (utilisé si RepeatMode = RepeatCount)
         /// </summary>
         public int RepeatCount { get; set; } = 1;
 
@@ -27,6 +33,17 @@ namespace MacroEngine.Core.Inputs
         /// Délai en millisecondes entre chaque répétition
         /// </summary>
         public int DelayBetweenRepeats { get; set; } = 0;
+
+        /// <summary>
+        /// Code virtuel de la touche à surveiller (utilisé si RepeatMode = WhileKeyPressed)
+        /// </summary>
+        public ushort KeyCodeToMonitor { get; set; } = 0;
+
+        /// <summary>
+        /// Type de clic à surveiller (utilisé si RepeatMode = WhileClickPressed)
+        /// 0 = Clic gauche, 1 = Clic droit, 2 = Clic milieu
+        /// </summary>
+        public int ClickTypeToMonitor { get; set; } = 0;
 
         public void Execute()
         {
@@ -60,9 +77,12 @@ namespace MacroEngine.Core.Inputs
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = this.Name,
+                RepeatMode = this.RepeatMode,
                 RepeatCount = this.RepeatCount,
                 DelayBetweenRepeats = this.DelayBetweenRepeats,
-                Actions = this.Actions.Select(a => a?.Clone()).Where(a => a != null).ToList()
+                KeyCodeToMonitor = this.KeyCodeToMonitor,
+                ClickTypeToMonitor = this.ClickTypeToMonitor,
+                Actions = this.Actions.Select(a => a?.Clone()).Where(a => a != null).Cast<IInputAction>().ToList()
             };
         }
     }

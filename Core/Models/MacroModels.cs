@@ -72,7 +72,17 @@ namespace MacroEngine.Core.Models
         /// <summary>
         /// Répéter jusqu'à interruption (Échap ou bouton Stop)
         /// </summary>
-        UntilStopped
+        UntilStopped,
+
+        /// <summary>
+        /// Répéter tant qu'une touche est pressée
+        /// </summary>
+        WhileKeyPressed,
+
+        /// <summary>
+        /// Répéter tant qu'un clic est pressé
+        /// </summary>
+        WhileClickPressed
     }
 
     /// <summary>
