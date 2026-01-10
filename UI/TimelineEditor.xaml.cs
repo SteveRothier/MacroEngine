@@ -129,15 +129,15 @@ namespace MacroEngine.UI
             string title;
             string details;
             
-            // Déterminer les couleurs selon le type d'action
+            // Déterminer les couleurs selon le type d'action avec fonds colorés
             switch (action)
             {
                 case KeyboardAction ka:
                     primaryColor = Color.FromRgb(122, 30, 58); // Pourpre #7A1E3A
                     hoverColor = Color.FromRgb(139, 42, 69); // Pourpre hover #8B2A45
-                    backgroundColor = Color.FromRgb(255, 252, 250); // Blanc cassé
-                    backgroundColorHover = Color.FromRgb(250, 248, 246); // Blanc cassé hover
-                    textColor = Color.FromRgb(46, 46, 46); // Texte foncé
+                    backgroundColor = Color.FromRgb(245, 230, 235); // Beige pourpre clair #F5E6EB
+                    backgroundColorHover = Color.FromRgb(248, 238, 243); // Beige pourpre plus clair
+                    textColor = Color.FromRgb(122, 30, 58); // Texte pourpre pour contraster
                     icon = "⌨";
                     title = GetKeyboardActionTitle(ka);
                     details = GetKeyboardActionDetails(ka);
@@ -145,9 +145,9 @@ namespace MacroEngine.UI
                 case Core.Inputs.MouseAction ma:
                     primaryColor = Color.FromRgb(90, 138, 201); // Bleu #5A8AC9
                     hoverColor = Color.FromRgb(74, 122, 185); // Bleu hover #4A7AB9
-                    backgroundColor = Color.FromRgb(250, 252, 255); // Blanc bleuté
-                    backgroundColorHover = Color.FromRgb(248, 250, 253); // Blanc bleuté hover
-                    textColor = Color.FromRgb(46, 46, 46); // Texte foncé
+                    backgroundColor = Color.FromRgb(232, 240, 248); // Bleu très clair #E8F0F8
+                    backgroundColorHover = Color.FromRgb(240, 245, 252); // Bleu plus clair
+                    textColor = Color.FromRgb(74, 122, 185); // Texte bleu foncé pour contraster
                     icon = "🖱";
                     title = GetMouseActionTitle(ma);
                     details = GetMouseActionDetails(ma);
@@ -155,9 +155,9 @@ namespace MacroEngine.UI
                 case DelayAction da:
                     primaryColor = Color.FromRgb(216, 162, 74); // Ocre #D8A24A
                     hoverColor = Color.FromRgb(200, 146, 58); // Ocre hover #C8923A
-                    backgroundColor = Color.FromRgb(255, 252, 248); // Blanc ocré
-                    backgroundColorHover = Color.FromRgb(253, 250, 246); // Blanc ocré hover
-                    textColor = Color.FromRgb(46, 46, 46); // Texte foncé
+                    backgroundColor = Color.FromRgb(255, 244, 230); // Ocre très clair #FFF4E6
+                    backgroundColorHover = Color.FromRgb(255, 248, 240); // Ocre plus clair
+                    textColor = Color.FromRgb(200, 146, 58); // Texte ocre foncé pour contraster
                     icon = "⏱";
                     title = $"{da.Duration} ms";
                     details = "Pause";
@@ -165,144 +165,271 @@ namespace MacroEngine.UI
                 default:
                     primaryColor = Color.FromRgb(122, 30, 58);
                     hoverColor = Color.FromRgb(139, 42, 69);
-                    backgroundColor = Color.FromRgb(255, 255, 255);
-                    backgroundColorHover = Color.FromRgb(250, 250, 250);
-                    textColor = Color.FromRgb(46, 46, 46);
+                    backgroundColor = Color.FromRgb(245, 240, 235); // Beige neutre
+                    backgroundColorHover = Color.FromRgb(248, 245, 242);
+                    textColor = Color.FromRgb(122, 30, 58);
                     icon = "❓";
                     title = action.Type.ToString();
                     details = "";
                     break;
             }
 
-            // Carte Timeline compacte - design minimaliste
+            // Carte Timeline avec fond coloré enrichi
             var card = new Border
             {
                 Background = new SolidColorBrush(backgroundColor),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B)),
-                BorderThickness = new Thickness(0, 0, 0, 1), // Ligne de séparation fine en bas
-                Padding = new Thickness(12, 10, 12, 10),
-                Margin = new Thickness(0, 0, 0, 0),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B)),
+                BorderThickness = new Thickness(0, 0, 0, 2), // Ligne de séparation plus visible
+                Padding = new Thickness(14, 12, 14, 12),
+                Margin = new Thickness(0, 0, 0, 2),
                 Tag = index,
                 AllowDrop = true,
                 Cursor = Cursors.Hand,
-                MinHeight = 44,
-                VerticalAlignment = VerticalAlignment.Stretch
+                MinHeight = 56,
+                MaxHeight = 64,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                CornerRadius = new CornerRadius(8),
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = primaryColor,
+                    Opacity = 0.08,
+                    BlurRadius = 4,
+                    ShadowDepth = 1,
+                    Direction = 270
+                }
             };
 
-            // Contenu horizontal compact
+            // Contenu horizontal avec style enrichi
             var contentGrid = new Grid();
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) }); // Barre colorée gauche
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Icône
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(5) }); // Barre colorée gauche
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge icône
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Texte
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge info optionnel
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
 
-            // Barre colorée à gauche (timeline)
+            // Barre colorée à gauche (timeline) - avec effet lumineux enrichi
             var timelineBar = new Border
             {
                 Background = new SolidColorBrush(primaryColor),
-                Width = 3,
-                Margin = new Thickness(0, 2, 8, 2),
-                VerticalAlignment = VerticalAlignment.Stretch
+                Width = 5,
+                Margin = new Thickness(0, 4, 12, 4),
+                VerticalAlignment = VerticalAlignment.Stretch,
+                CornerRadius = new CornerRadius(3, 0, 0, 3),
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = primaryColor,
+                    Opacity = 0.35,
+                    BlurRadius = 3,
+                    ShadowDepth = 0,
+                    Direction = 270
+                }
             };
             Grid.SetColumn(timelineBar, 0);
             contentGrid.Children.Add(timelineBar);
 
-            // Icône compacte
+            // Badge icône avec fond coloré plus prononcé
+            var iconBadge = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B)), // Fond plus visible
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(9, 7, 9, 7),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0),
+                BorderThickness = new Thickness(1.5),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(35, primaryColor.R, primaryColor.G, primaryColor.B)), // Bordure plus visible
+                MinWidth = 36,
+                MinHeight = 36,
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = primaryColor,
+                    Opacity = 0.20,
+                    BlurRadius = 4,
+                    ShadowDepth = 1,
+                    Direction = 270
+                }
+            };
+            
             var iconBlock = new TextBlock
             {
                 Text = icon,
-                FontSize = 16,
+                FontSize = 18,
                 Foreground = new SolidColorBrush(primaryColor),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0),
-                FontFamily = new FontFamily("Segoe UI Emoji")
+                HorizontalAlignment = HorizontalAlignment.Center,
+                FontFamily = new FontFamily("Segoe UI Emoji"),
+                FontWeight = FontWeights.Medium
             };
-            Grid.SetColumn(iconBlock, 1);
-            contentGrid.Children.Add(iconBlock);
+            iconBadge.Child = iconBlock;
+            Grid.SetColumn(iconBadge, 1);
+            contentGrid.Children.Add(iconBadge);
 
-            // Texte (titre + détails en ligne)
+            // Texte (titre + détails sur une seule ligne) avec style enrichi
             var textPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
             };
 
+            // Titre principal avec style plus prononcé et enrichi (texte coloré)
             var titleBlock = new TextBlock
             {
                 Text = title,
-                FontSize = 12,
+                FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(textColor),
-                VerticalAlignment = VerticalAlignment.Center
+                Foreground = new SolidColorBrush(primaryColor), // Texte avec couleur principale pour plus de contraste
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0), // Marge à droite pour séparer du badge détails
+                FontFamily = new FontFamily("Segoe UI Semibold")
             };
             textPanel.Children.Add(titleBlock);
 
+            // Détails avec badge optionnel (déclarés en dehors du if pour être accessibles dans les handlers)
+            TextBlock? detailsBlock = null;
+            Border? detailsBadge = null;
+            
             if (!string.IsNullOrEmpty(details))
             {
-                var separator = new TextBlock
+                // Badge pour les détails avec fond coloré
+                detailsBadge = new Border
                 {
-                    Text = " • ",
-                    FontSize = 11,
-                    Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150)),
+                    Background = new SolidColorBrush(Color.FromArgb(15, primaryColor.R, primaryColor.G, primaryColor.B)), // Fond avec teinte de la couleur principale
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 3, 6, 3),
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(6, 0, 6, 0)
+                    Margin = new Thickness(0, 0, 0, 0),
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B))
                 };
-                textPanel.Children.Add(separator);
-
-                var detailsBlock = new TextBlock
+                
+                detailsBlock = new TextBlock
                 {
                     Text = details,
-                    FontSize = 11,
-                    Foreground = new SolidColorBrush(Color.FromRgb(120, 120, 120)),
-                    VerticalAlignment = VerticalAlignment.Center
+                    FontSize = 10,
+                    Foreground = new SolidColorBrush(Color.FromArgb(200, primaryColor.R, primaryColor.G, primaryColor.B)), // Texte avec teinte de la couleur principale
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontWeight = FontWeights.Medium,
+                    FontFamily = new FontFamily("Segoe UI")
                 };
-                textPanel.Children.Add(detailsBlock);
+                detailsBadge.Child = detailsBlock;
+                
+                textPanel.Children.Add(detailsBadge);
             }
 
             Grid.SetColumn(textPanel, 2);
             contentGrid.Children.Add(textPanel);
 
-            // Bouton supprimer (visible au survol)
+            // Badge numéro avec style enrichi
+            var infoBadge = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(12, primaryColor.R, primaryColor.G, primaryColor.B)),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(7, 3, 7, 3),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B)),
+                Visibility = Visibility.Collapsed,
+                MinWidth = 24,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            
+            var infoText = new TextBlock
+            {
+                Text = "#" + (index + 1).ToString(),
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Color.FromArgb(200, primaryColor.R, primaryColor.G, primaryColor.B)),
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontFamily = new FontFamily("Segoe UI Semibold")
+            };
+            infoBadge.Child = infoText;
+            Grid.SetColumn(infoBadge, 3);
+            contentGrid.Children.Add(infoBadge);
+
+            // Bouton supprimer avec style enrichi (visible au survol)
+            var deleteBtnContainer = new Border
+            {
+                Background = Brushes.Transparent,
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(4),
+                Width = 24,
+                Height = 24,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Cursor = Cursors.Hand,
+                Tag = index,
+                Visibility = Visibility.Collapsed
+            };
+            
             var deleteBtn = new Button
             {
                 Content = "✕",
-                Width = 18,
-                Height = 18,
+                Width = 16,
+                Height = 16,
                 Padding = new Thickness(0),
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
-                Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150)),
-                FontSize = 11,
+                Foreground = new SolidColorBrush(Color.FromRgb(160, 160, 160)),
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
                 Tag = index,
-                Visibility = Visibility.Collapsed,
                 Cursor = Cursors.Hand,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Center
             };
             deleteBtn.Click += DeleteAction_Click;
-            deleteBtn.MouseEnter += (s, e) => deleteBtn.Foreground = new SolidColorBrush(Color.FromRgb(201, 74, 74)); // Rouge
-            deleteBtn.MouseLeave += (s, e) => deleteBtn.Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150));
+            deleteBtn.MouseEnter += (s, e) => 
+            {
+                deleteBtn.Foreground = new SolidColorBrush(Color.FromRgb(220, 53, 69)); // Rouge vif
+                deleteBtnContainer.Background = new SolidColorBrush(Color.FromArgb(15, 220, 53, 69));
+            };
+            deleteBtn.MouseLeave += (s, e) => 
+            {
+                deleteBtn.Foreground = new SolidColorBrush(Color.FromRgb(160, 160, 160));
+                deleteBtnContainer.Background = Brushes.Transparent;
+            };
             
-            Grid.SetColumn(deleteBtn, 3);
-            contentGrid.Children.Add(deleteBtn);
+            deleteBtnContainer.Child = deleteBtn;
+            Grid.SetColumn(deleteBtnContainer, 4);
+            contentGrid.Children.Add(deleteBtnContainer);
 
             card.Child = contentGrid;
 
-            // Effets hover
+            // Effets hover : uniquement ajout d'une bordure, pas de changement de taille
             card.MouseEnter += (s, e) =>
             {
-                deleteBtn.Visibility = Visibility.Visible;
+                deleteBtnContainer.Visibility = Visibility.Visible;
+                infoBadge.Visibility = Visibility.Visible;
                 card.Background = new SolidColorBrush(backgroundColorHover);
                 timelineBar.Background = new SolidColorBrush(hoverColor);
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
+                // Ajouter uniquement une bordure au hover, pas de changement de taille
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B));
+                card.BorderThickness = new Thickness(2); // Bordure uniforme au hover
+                if (detailsBlock != null && detailsBadge != null)
+                {
+                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B));
+                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(35, primaryColor.R, primaryColor.G, primaryColor.B));
+                    detailsBlock.Foreground = new SolidColorBrush(primaryColor); // Texte plus foncé au survol
+                }
             };
 
             card.MouseLeave += (s, e) =>
             {
-                deleteBtn.Visibility = Visibility.Collapsed;
+                deleteBtnContainer.Visibility = Visibility.Collapsed;
+                infoBadge.Visibility = Visibility.Collapsed;
                 card.Background = new SolidColorBrush(backgroundColor);
                 timelineBar.Background = new SolidColorBrush(primaryColor);
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B));
+                // Retirer la bordure au hover, revenir à l'état initial
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
+                card.BorderThickness = new Thickness(0, 0, 0, 2); // Bordure seulement en bas
+                if (detailsBlock != null && detailsBadge != null)
+                {
+                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(15, primaryColor.R, primaryColor.G, primaryColor.B));
+                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B));
+                    detailsBlock.Foreground = new SolidColorBrush(Color.FromArgb(200, primaryColor.R, primaryColor.G, primaryColor.B)); // Texte normal
+                }
             };
 
             // Événements drag & drop
