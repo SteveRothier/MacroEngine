@@ -1448,13 +1448,6 @@ namespace MacroEngine.UI
 
             editPanel.Children.Add(modeComboBox);
 
-            // Panel pour les inputs conditionnels
-            var inputPanel = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(0, 4, 0, 0)
-            };
-
             // Input pour le nombre de répétitions (X fois) - inline
             var repeatCountTextBox = new TextBox
             {
