@@ -513,12 +513,11 @@ namespace MacroEngine.UI
             }
             else if (action is RepeatAction ra)
             {
-                titleBlock.Cursor = Cursors.Hand;
-                titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
-                {
-                    e.Handled = true; // Empêcher le drag & drop
-                    EditRepeatAction(ra, index, titleBlock);
-                };
+                // Pour RepeatAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
+                textPanel.Children.Remove(titleBlock);
+                
+                var repeatControlsPanel = CreateRepeatActionControls(ra, index, textPanel);
+                textPanel.Children.Insert(0, repeatControlsPanel);
             }
 
             return card;
@@ -1423,18 +1422,11 @@ namespace MacroEngine.UI
             }));
         }
 
-        private void EditRepeatAction(RepeatAction ra, int index, TextBlock titleText)
+        /// <summary>
+        /// Crée les contrôles inline pour une action RepeatAction (toujours visibles dans la carte)
+        /// </summary>
+        private StackPanel CreateRepeatActionControls(RepeatAction ra, int index, Panel parentPanel)
         {
-            // Édition inline : remplacer le TextBlock par des contrôles inline
-            var parentPanel = titleText.Parent as Panel;
-            if (parentPanel == null)
-            {
-                System.Diagnostics.Debug.WriteLine("EditRepeatAction: parentPanel is null");
-                return;
-            }
-            
-            bool repeatSaved = false;
-
             // Créer un panel horizontal pour le mode et les inputs
             var editPanel = new StackPanel
             {
@@ -1488,9 +1480,8 @@ namespace MacroEngine.UI
                 Padding = new Thickness(4),
                 Cursor = Cursors.IBeam
             };
+            // Validation : n'accepter que les nombres entiers (ne PAS bloquer le clic pour permettre l'édition)
             repeatCountTextBox.PreviewTextInput += (s, e) => e.Handled = !char.IsDigit(e.Text, 0);
-            repeatCountTextBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
-            repeatCountTextBox.PreviewMouseMove += (s, e) => e.Handled = true;
             editPanel.Children.Add(repeatCountTextBox);
 
             // Input pour la touche à surveiller (Tant qu'une touche est pressée) - inline
@@ -1514,11 +1505,11 @@ namespace MacroEngine.UI
             };
             bool keyCaptureMode = false;
             KeyboardHook? tempKeyHook = null;
-            keyCodeTextBox.PreviewMouseLeftButtonDown += (s, e) =>
+            keyCodeTextBox.MouseLeftButtonDown += (s, e) =>
             {
-                e.Handled = true;
                 if (!keyCaptureMode)
                 {
+                    e.Handled = true;
                     keyCaptureMode = true;
                     keyCodeTextBox.Text = "Appuyez sur une touche...";
                     keyCodeTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
@@ -1591,17 +1582,14 @@ namespace MacroEngine.UI
                 RefreshBlocks();
             };
 
-            // Sauvegarder automatiquement le nombre de répétitions lors de la perte de focus
+            // Sauvegarder automatiquement le nombre de répétitions lors de la perte de focus (clic ailleurs)
             repeatCountTextBox.LostFocus += (s, e) =>
             {
-                if (repeatSaved) return;
-                
                 if (int.TryParse(repeatCountTextBox.Text, out int count) && count > 0)
                 {
                     SaveState();
                     ra.RepeatCount = count;
                     _currentMacro!.ModifiedAt = DateTime.Now;
-                    repeatSaved = true;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
                 }
@@ -1615,16 +1603,12 @@ namespace MacroEngine.UI
             // Sauvegarder automatiquement le type de clic lors du changement
             clickTypeComboBox.SelectionChanged += (s, e) =>
             {
-                if (repeatSaved) return;
-                
                 if (clickTypeComboBox.SelectedIndex >= 0)
                 {
                     SaveState();
                     ra.ClickTypeToMonitor = clickTypeComboBox.SelectedIndex;
                     _currentMacro!.ModifiedAt = DateTime.Now;
-                    repeatSaved = true;
                     MacroChanged?.Invoke(this, EventArgs.Empty);
-                    
                 }
             };
             
@@ -1647,7 +1631,6 @@ namespace MacroEngine.UI
                         SaveState();
                         ra.RepeatCount = count;
                         _currentMacro!.ModifiedAt = DateTime.Now;
-                        repeatSaved = true;
                         RefreshBlocks();
                         MacroChanged?.Invoke(this, EventArgs.Empty);
                     }
@@ -1661,22 +1644,13 @@ namespace MacroEngine.UI
                 }
             };
 
-            // Remplacer le TextBlock par le panel d'édition
-            int idx = parentPanel.Children.IndexOf(titleText);
-            if (idx < 0)
-            {
-                System.Diagnostics.Debug.WriteLine("EditRepeatAction: titleText not found in parentPanel");
-                return;
-            }
-            
-            parentPanel.Children.RemoveAt(idx);
-            parentPanel.Children.Insert(idx, editPanel);
-            
-            // Mettre le focus de manière asynchrone pour s'assurer que le layout est mis à jour
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
-            {
-                modeComboBox.Focus();
-            }));
+            return editPanel;
+        }
+
+        private void EditRepeatAction(RepeatAction ra, int index, TextBlock titleText)
+        {
+            // Cette méthode n'est plus utilisée, les contrôles sont créés directement dans CreateActionCard
+            // Gardée pour compatibilité mais ne devrait pas être appelée
         }
 
         #endregion
