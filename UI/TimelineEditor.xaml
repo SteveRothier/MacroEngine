@@ -155,6 +155,38 @@
                     </Button.Style>
                 </Button>
 
+                <!-- Bouton Ajouter If -->
+                <Button x:Name="AddIfButton"
+                        Click="AddIf_Click"
+                        Margin="4,0"
+                        Cursor="Hand"
+                        ToolTip="Ajouter une condition If/Then/Else">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd"
+                                                Background="#228B22"
+                                                CornerRadius="8"
+                                                Padding="12,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="❓" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ If" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#32CD32"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
                 <!-- Séparateur vertical -->
                 <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
 

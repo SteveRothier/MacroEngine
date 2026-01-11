@@ -1,7 +1,7 @@
-namespace MacroEngine.Core.Inputs
+﻿namespace MacroEngine.Core.Inputs
 {
     /// <summary>
-    /// Interface pour toutes les actions d'entrée (clavier, souris, délai)
+    /// Interface pour toutes les actions d'entrÃ©e (clavier, souris, dÃ©lai)
     /// </summary>
     public interface IInputAction
     {
@@ -21,12 +21,12 @@ namespace MacroEngine.Core.Inputs
         InputActionType Type { get; }
 
         /// <summary>
-        /// Exécute l'action
+        /// ExÃ©cute l'action
         /// </summary>
         void Execute();
 
         /// <summary>
-        /// Crée une copie de l'action
+        /// CrÃ©e une copie de l'action
         /// </summary>
         IInputAction Clone();
     }
@@ -47,13 +47,18 @@ namespace MacroEngine.Core.Inputs
         Mouse,
 
         /// <summary>
-        /// Délai/pause
+        /// DÃ©lai/pause
         /// </summary>
         Delay,
 
         /// <summary>
-        /// Répétition d'actions (groupe d'actions répétées)
+        /// RÃ©pÃ©tition d'actions (groupe d'actions rÃ©pÃ©tÃ©es)
         /// </summary>
-        Repeat
+        Repeat,
+
+        /// <summary>
+        /// Action conditionnelle (If/Then/Else)
+        /// </summary>
+        Condition
     }
 }

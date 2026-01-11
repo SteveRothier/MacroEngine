@@ -1141,6 +1141,24 @@ namespace MacroEngine.UI
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        private void AddIf_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            SaveState();
+
+            _currentMacro.Actions.Add(new IfAction
+            {
+                Condition = true,
+                ThenActions = new List<IInputAction>(),
+                ElseActions = new List<IInputAction>()
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         private void MoveActionUp(int index)
         {
             if (_currentMacro == null || index <= 0 || index >= _currentMacro.Actions.Count)
@@ -1432,6 +1450,350 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
+        /// Édition inline d'une KeyboardAction imbriquée dans un RepeatAction
+        /// </summary>
+        private void EditNestedKeyboardAction(int parentIndex, int nestedIndex, TextBlock titleText)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
+                return;
+
+            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
+                return;
+
+            if (repeatAction.Actions[nestedIndex] is not KeyboardAction ka)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            bool keyCaptured = false;
+            var originalMargin = titleText.Margin;
+            var originalWidth = titleText.Width;
+
+            var textBox = new TextBox
+            {
+                Text = "Appuyez sur une touche...",
+                MinWidth = 150,
+                MaxWidth = 300,
+                TextAlignment = TextAlignment.Center,
+                IsReadOnly = true,
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 200)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(255, 165, 0)),
+                BorderThickness = new Thickness(2),
+                Padding = new Thickness(4),
+                Margin = originalMargin,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Cursor = Cursors.IBeam,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold
+            };
+
+            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
+            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
+
+            textBox.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
+                    e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+                    e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
+                    e.Key == Key.LWin || e.Key == Key.RWin)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    Keyboard.ClearFocus();
+                    if (parentPanel.Children.Contains(textBox) && !keyCaptured)
+                    {
+                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
+                        parentPanel.Children.RemoveAt(textBoxIdx);
+                        parentPanel.Children.Insert(textBoxIdx, titleText);
+                    }
+                    return;
+                }
+
+                try
+                {
+                    int virtualKeyCode = KeyInterop.VirtualKeyFromKey(e.Key);
+                    SaveState();
+                    ka.VirtualKeyCode = (ushort)virtualKeyCode;
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    keyCaptured = true;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                    Keyboard.ClearFocus();
+                }
+                catch
+                {
+                    e.Handled = true;
+                }
+            };
+
+            textBox.LostFocus += (s, e) =>
+            {
+                if (parentPanel.Children.Contains(textBox) && !keyCaptured)
+                {
+                    int textBoxIdx = parentPanel.Children.IndexOf(textBox);
+                    parentPanel.Children.RemoveAt(textBoxIdx);
+                    parentPanel.Children.Insert(textBoxIdx, titleText);
+                }
+            };
+
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, textBox);
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+            }));
+        }
+
+        /// <summary>
+        /// Édition inline d'une DelayAction imbriquée dans un RepeatAction
+        /// </summary>
+        private void EditNestedDelayAction(int parentIndex, int nestedIndex, TextBlock titleText)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
+                return;
+
+            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
+                return;
+
+            if (repeatAction.Actions[nestedIndex] is not DelayAction da)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            bool delaySaved = false;
+            int originalDelay = da.Duration;
+            var originalMargin = titleText.Margin;
+
+            var textBox = new TextBox
+            {
+                Text = da.Duration.ToString(),
+                MinWidth = 60,
+                MaxWidth = 120,
+                TextAlignment = TextAlignment.Center,
+                Background = new SolidColorBrush(Color.FromRgb(250, 250, 250)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(4),
+                Margin = originalMargin,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Cursor = Cursors.IBeam,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold
+            };
+
+            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
+            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
+            textBox.PreviewTextInput += (s, e) => e.Handled = !char.IsDigit(e.Text, 0);
+
+            textBox.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    e.Handled = true;
+                    if (int.TryParse(textBox.Text, out int duration) && duration >= 0)
+                    {
+                        SaveState();
+                        da.Duration = duration;
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        delaySaved = true;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                        Keyboard.ClearFocus();
+                    }
+                    else
+                    {
+                        textBox.Text = originalDelay.ToString();
+                    }
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    textBox.Text = originalDelay.ToString();
+                    Keyboard.ClearFocus();
+                }
+            };
+
+            textBox.LostFocus += (s, e) =>
+            {
+                if (!delaySaved)
+                {
+                    if (int.TryParse(textBox.Text, out int duration) && duration >= 0)
+                    {
+                        SaveState();
+                        da.Duration = duration;
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    else
+                    {
+                        textBox.Text = originalDelay.ToString();
+                    }
+                }
+            };
+
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, textBox);
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+            }));
+        }
+
+        /// <summary>
+        /// Édition inline d'une MouseAction imbriquée dans un RepeatAction
+        /// </summary>
+        private void EditNestedMouseAction(int parentIndex, int nestedIndex, TextBlock titleText)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
+                return;
+
+            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
+                return;
+
+            if (repeatAction.Actions[nestedIndex] is not Core.Inputs.MouseAction ma)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            var originalMargin = titleText.Margin;
+
+            // Panel horizontal pour ComboBox (type de clic) + TextBox (position optionnelle)
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = originalMargin
+            };
+
+            // ComboBox pour le type d'action
+            var actionTypeComboBox = new ComboBox
+            {
+                MinWidth = 120,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                SelectedIndex = (int)ma.ActionType
+            };
+
+            actionTypeComboBox.Items.Add("Clic gauche");
+            actionTypeComboBox.Items.Add("Clic droit");
+            actionTypeComboBox.Items.Add("Clic milieu");
+            actionTypeComboBox.Items.Add("Déplacer");
+            actionTypeComboBox.Items.Add("Appuyer gauche");
+            actionTypeComboBox.Items.Add("Relâcher gauche");
+            actionTypeComboBox.Items.Add("Appuyer droit");
+            actionTypeComboBox.Items.Add("Relâcher droit");
+            actionTypeComboBox.Items.Add("Appuyer milieu");
+            actionTypeComboBox.Items.Add("Relâcher milieu");
+            actionTypeComboBox.Items.Add("Molette haut");
+            actionTypeComboBox.Items.Add("Molette bas");
+
+            editPanel.Children.Add(actionTypeComboBox);
+
+            // TextBox pour la position (seulement si nécessaire)
+            var positionTextBox = new TextBox
+            {
+                Text = ma.X >= 0 && ma.Y >= 0 ? $"({ma.X}, {ma.Y})" : "Position actuelle",
+                MinWidth = 120,
+                MaxWidth = 150,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsReadOnly = true,
+                Cursor = Cursors.Hand,
+                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(4),
+                Visibility = ma.ActionType == Core.Inputs.MouseActionType.Move ? Visibility.Visible : Visibility.Collapsed
+            };
+
+            positionTextBox.MouseLeftButtonDown += (s, e) =>
+            {
+                e.Handled = true;
+                // Pour l'instant, on garde "Position actuelle" (-1, -1)
+                // On pourrait ajouter une capture de position ici plus tard
+                SaveState();
+                ma.X = -1;
+                ma.Y = -1;
+                _currentMacro.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            };
+
+            editPanel.Children.Add(positionTextBox);
+
+            // Gestion du changement de type d'action
+            actionTypeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (actionTypeComboBox.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.ActionType = (Core.Inputs.MouseActionType)actionTypeComboBox.SelectedIndex;
+                    positionTextBox.Visibility = ma.ActionType == Core.Inputs.MouseActionType.Move ? Visibility.Visible : Visibility.Collapsed;
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+
+            actionTypeComboBox.DropDownClosed += (s, e) =>
+            {
+                RefreshBlocks();
+            };
+
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, editPanel);
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                actionTypeComboBox.Focus();
+            }));
+        }
+
+        /// <summary>
         /// Crée les contrôles inline pour une action RepeatAction (toujours visibles dans la carte)
         /// </summary>
         private StackPanel CreateRepeatActionControls(RepeatAction ra, int index, Panel parentPanel)
@@ -1708,11 +2070,54 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex)
         {
-            var card = CreateActionCard(action, parentIndex); // Réutiliser la création de carte
-            if (card is FrameworkElement fe)
+            // Créer la carte visuelle avec CreateActionCard
+            var card = CreateActionCard(action, parentIndex);
+            
+            // Trouver le TextBlock titleBlock et ajouter les handlers d'édition appropriés
+            var titleBlock = FindTitleBlockInCard(card);
+            if (titleBlock != null)
             {
-                fe.Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex };
+                // Ajouter les handlers appropriés selon le type d'action
+                // Note: Les handlers d'origine sont toujours attachés mais ne seront pas appelés
+                // car nous utilisons e.Handled = true dans nos handlers
+                if (action is KeyboardAction)
+                {
+                    titleBlock.Cursor = Cursors.Hand;
+                    titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        EditNestedKeyboardAction(parentIndex, nestedIndex, titleBlock);
+                    };
+                }
+                else if (action is DelayAction)
+                {
+                    titleBlock.Cursor = Cursors.Hand;
+                    titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        EditNestedDelayAction(parentIndex, nestedIndex, titleBlock);
+                    };
+                }
+                else if (action is Core.Inputs.MouseAction)
+                {
+                    titleBlock.Cursor = Cursors.Hand;
+                    titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        EditNestedMouseAction(parentIndex, nestedIndex, titleBlock);
+                    };
+                }
             }
+
+            // Retirer les handlers drag & drop de la carte (les actions imbriquées ne doivent pas être déplaçables entre RepeatActions)
+            card.MouseLeftButtonDown -= ActionCard_MouseLeftButtonDown;
+            card.MouseMove -= ActionCard_MouseMove;
+            card.MouseLeftButtonUp -= ActionCard_MouseLeftButtonUp;
+            card.Drop -= ActionCard_Drop;
+            card.DragEnter -= ActionCard_DragEnter;
+            card.DragLeave -= ActionCard_DragLeave;
+            card.AllowDrop = false;
+            card.Cursor = Cursors.Arrow;
 
             // Conteneur Grid pour la carte + boutons flèches + bouton supprimer
             var container = new Grid
@@ -1776,6 +2181,33 @@ namespace MacroEngine.UI
             container.Children.Add(deleteBtn);
 
             return container;
+        }
+
+        /// <summary>
+        /// Trouve le TextBlock titre dans une carte d'action
+        /// </summary>
+        private TextBlock? FindTitleBlockInCard(DependencyObject card)
+        {
+            if (card == null) return null;
+
+            // Parcourir l'arbre visuel pour trouver le TextBlock qui est dans un StackPanel
+            for (int i = 0; i < VisualTreeHelper.GetChildrenCount(card); i++)
+            {
+                var child = VisualTreeHelper.GetChild(card, i);
+                
+                if (child is TextBlock textBlock && textBlock.Cursor == Cursors.Hand)
+                {
+                    // C'est probablement le titleBlock
+                    return textBlock;
+                }
+                
+                // Récursion
+                var found = FindTitleBlockInCard(child);
+                if (found != null)
+                    return found;
+            }
+            
+            return null;
         }
 
         /// <summary>
