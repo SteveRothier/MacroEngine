@@ -290,6 +290,8 @@ namespace MacroEngine.Core.Storage
                                 ?? throw new InvalidOperationException("Impossible de désérialiser DelayAction"),
                             InputActionType.Repeat => JsonSerializer.Deserialize<RepeatAction>(root.GetRawText(), options)
                                 ?? throw new InvalidOperationException("Impossible de désérialiser RepeatAction"),
+                            InputActionType.Condition => JsonSerializer.Deserialize<IfAction>(root.GetRawText(), options)
+                                ?? throw new InvalidOperationException("Impossible de dÃ©sÃ©rialiser IfAction"),
                             _ => throw new NotSupportedException($"Type d'action non supporté: {inputActionType}")
                         };
                     }
@@ -310,6 +312,12 @@ namespace MacroEngine.Core.Storage
                         // RepeatAction a une propriété Actions et RepeatMode/RepeatCount
                         return JsonSerializer.Deserialize<RepeatAction>(root.GetRawText(), options)
                             ?? throw new InvalidOperationException("Impossible de désérialiser RepeatAction");
+                    }
+                    else if (root.TryGetProperty("ThenActions", out _) || root.TryGetProperty("ElseActions", out _))
+                    {
+                        // IfAction a des propriÃ©tÃ©s ThenActions et ElseActions
+                        return JsonSerializer.Deserialize<IfAction>(root.GetRawText(), options)
+                            ?? throw new InvalidOperationException("Impossible de dÃ©sÃ©rialiser IfAction");
                     }
                     else if (root.TryGetProperty("X", out _) || root.TryGetProperty("Y", out _))
                     {
