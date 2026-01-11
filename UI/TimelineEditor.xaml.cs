@@ -116,6 +116,12 @@ namespace MacroEngine.UI
                     var repeatContainer = CreateRepeatActionContainer(ra, i);
                     TimelineStackPanel.Children.Add(repeatContainer);
                 }
+                else if (action is IfAction ifAction)
+                {
+                    // Pour IfAction, créer un conteneur avec les actions imbriquées (Then et Else)
+                    var ifContainer = CreateIfActionContainer(ifAction, i);
+                    TimelineStackPanel.Children.Add(ifContainer);
+                }
                 else
                 {
                     var actionContainer = CreateActionCardWithButtons(action, i);
@@ -222,6 +228,19 @@ namespace MacroEngine.UI
                     var actionsCount = ra.Actions?.Count ?? 0;
                     title = GetRepeatActionTitle(ra);
                     details = $"{actionsCount} action{(actionsCount > 1 ? "s" : "")}";
+                    break;
+                case IfAction ifAction:
+                    primaryColor = Color.FromRgb(34, 139, 34); // Vert #228B22
+                    hoverColor = Color.FromRgb(46, 160, 46); // Vert hover #2EA02E
+                    backgroundColor = Color.FromRgb(34, 139, 34); // Fond #228B22
+                    backgroundColorHover = Color.FromRgb(46, 160, 46); // Dégradé hover #2EA02E
+                    textColor = Color.FromRgb(248, 239, 234); // Texte #F8EFEA
+                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    icon = "🔀";
+                    var thenCount = ifAction.ThenActions?.Count ?? 0;
+                    var elseCount = ifAction.ElseActions?.Count ?? 0;
+                    title = GetIfActionTitle(ifAction);
+                    details = $"Then: {thenCount}, Else: {elseCount}";
                     break;
                 default:
                     primaryColor = Color.FromRgb(123, 30, 58); // Rouge pourpre foncé par défaut
@@ -528,6 +547,14 @@ namespace MacroEngine.UI
                 var repeatControlsPanel = CreateRepeatActionControls(ra, index, textPanel);
                 textPanel.Children.Insert(0, repeatControlsPanel);
             }
+            else if (action is IfAction ifAction)
+            {
+                // Pour IfAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
+                textPanel.Children.Remove(titleBlock);
+                
+                var ifControlsPanel = CreateIfActionControls(ifAction, index, textPanel);
+                textPanel.Children.Insert(0, ifControlsPanel);
+            }
 
             return card;
         }
@@ -544,6 +571,7 @@ namespace MacroEngine.UI
                 Core.Inputs.MouseAction => Color.FromRgb(90, 138, 201),
                 DelayAction => Color.FromRgb(216, 162, 74),
                 RepeatAction => Color.FromRgb(138, 43, 226),
+                IfAction => Color.FromRgb(34, 139, 34),
                 _ => Color.FromRgb(122, 30, 58)
             };
 
@@ -781,6 +809,12 @@ namespace MacroEngine.UI
                 },
                 _ => "Répéter"
             };
+        }
+
+        private string GetIfActionTitle(IfAction ifAction)
+        {
+            var conditionText = ifAction.Condition ? "Vrai" : "Faux";
+            return $"Si ({conditionText})";
         }
 
         private string GetKeyName(ushort virtualKeyCode)
@@ -2025,6 +2059,168 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
+        /// Crée les contrôles inline pour une action IfAction (toujours visibles dans la carte)
+        /// </summary>
+        private StackPanel CreateIfActionControls(IfAction ifAction, int index, Panel parentPanel)
+        {
+            // Créer un panel horizontal pour la condition
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            // Label "Si"
+            var ifLabel = new TextBlock
+            {
+                Text = "Si",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234))
+            };
+            editPanel.Children.Add(ifLabel);
+
+            // CheckBox pour la condition (True/False)
+            var conditionCheckBox = new CheckBox
+            {
+                IsChecked = ifAction.Condition,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Content = ifAction.Condition ? "Vrai" : "Faux"
+            };
+            
+            conditionCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ifAction.Condition = true;
+                conditionCheckBox.Content = "Vrai";
+                _currentMacro!.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            };
+            
+            conditionCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ifAction.Condition = false;
+                conditionCheckBox.Content = "Faux";
+                _currentMacro!.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            };
+            
+            editPanel.Children.Add(conditionCheckBox);
+
+            return editPanel;
+        }
+
+        /// <summary>
+        /// Crée un conteneur pour une IfAction avec ses actions imbriquées (Then et Else)
+        /// </summary>
+        private FrameworkElement CreateIfActionContainer(IfAction ifAction, int index)
+        {
+            var container = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            // Ajouter la carte principale de l'action IfAction
+            var actionContainer = CreateActionCardWithButtons(ifAction, index);
+            container.Children.Add(actionContainer);
+
+            // Section Then
+            var thenSection = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(20, 4, 0, 4)
+            };
+
+            // Header "Then"
+            var thenHeader = new TextBlock
+            {
+                Text = "Then:",
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = new SolidColorBrush(Color.FromRgb(34, 139, 34))
+            };
+            thenSection.Children.Add(thenHeader);
+
+            // Conteneur pour les actions Then avec indentation
+            if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
+            {
+                var thenContainer = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    Margin = new Thickness(0, 0, 0, 4),
+                    Background = new SolidColorBrush(Color.FromArgb(10, 34, 139, 34)) // Fond léger vert
+                };
+
+                for (int i = 0; i < ifAction.ThenActions.Count; i++)
+                {
+                    var nestedAction = ifAction.ThenActions[i];
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, index, i, true); // true = Then
+                    thenContainer.Children.Add(nestedCard);
+                }
+                thenSection.Children.Add(thenContainer);
+            }
+
+            // Panel pour ajouter des actions dans Then
+            var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, index, true);
+            thenSection.Children.Add(addThenActionsPanel);
+            container.Children.Add(thenSection);
+
+            // Section Else
+            var elseSection = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(20, 4, 0, 4)
+            };
+
+            // Header "Else"
+            var elseHeader = new TextBlock
+            {
+                Text = "Else:",
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = new SolidColorBrush(Color.FromRgb(200, 80, 80))
+            };
+            elseSection.Children.Add(elseHeader);
+
+            // Conteneur pour les actions Else avec indentation
+            if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
+            {
+                var elseContainer = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    Margin = new Thickness(0, 0, 0, 4),
+                    Background = new SolidColorBrush(Color.FromArgb(10, 200, 80, 80)) // Fond léger rouge
+                };
+
+                for (int i = 0; i < ifAction.ElseActions.Count; i++)
+                {
+                    var nestedAction = ifAction.ElseActions[i];
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, index, i, false); // false = Else
+                    elseContainer.Children.Add(nestedCard);
+                }
+                elseSection.Children.Add(elseContainer);
+            }
+
+            // Panel pour ajouter des actions dans Else
+            var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, index, false);
+            elseSection.Children.Add(addElseActionsPanel);
+            container.Children.Add(elseSection);
+
+            return container;
+        }
+
+        /// <summary>
         /// Crée un conteneur pour une RepeatAction avec ses actions imbriquées
         /// </summary>
         private FrameworkElement CreateRepeatActionContainer(RepeatAction ra, int index)
@@ -2571,6 +2767,658 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
+        /// Crée une carte pour une action imbriquée dans un IfAction (Then ou Else)
+        /// </summary>
+        private FrameworkElement CreateNestedIfActionCard(IInputAction action, int parentIndex, int nestedIndex, bool isThen)
+        {
+            // Réutiliser CreateNestedActionCard mais adapter pour IfAction
+            // Pour l'instant, on utilise la même structure que RepeatAction
+            var card = CreateActionCard(action, parentIndex);
+            
+            var titleBlock = FindTitleBlockInCard(card);
+            if (titleBlock != null)
+            {
+                if (action is KeyboardAction)
+                {
+                    titleBlock.Cursor = Cursors.Hand;
+                    titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        EditNestedIfKeyboardAction(parentIndex, nestedIndex, isThen, titleBlock);
+                    };
+                }
+                else if (action is DelayAction)
+                {
+                    titleBlock.Cursor = Cursors.Hand;
+                    titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        EditNestedIfDelayAction(parentIndex, nestedIndex, isThen, titleBlock);
+                    };
+                }
+                else if (action is Core.Inputs.MouseAction)
+                {
+                    titleBlock.Cursor = Cursors.Hand;
+                    titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        EditNestedIfMouseAction(parentIndex, nestedIndex, isThen, titleBlock);
+                    };
+                }
+            }
+
+            card.MouseLeftButtonDown -= ActionCard_MouseLeftButtonDown;
+            card.MouseMove -= ActionCard_MouseMove;
+            card.MouseLeftButtonUp -= ActionCard_MouseLeftButtonUp;
+            card.Drop -= ActionCard_Drop;
+            card.DragEnter -= ActionCard_DragEnter;
+            card.DragLeave -= ActionCard_DragLeave;
+            card.AllowDrop = false;
+            card.Cursor = Cursors.Arrow;
+
+            var container = new Grid
+            {
+                VerticalAlignment = VerticalAlignment.Stretch,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 2),
+                MinWidth = 400
+            };
+
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            card.HorizontalAlignment = HorizontalAlignment.Stretch;
+            Grid.SetColumn(card, 0);
+            container.Children.Add(card);
+
+            var moveButtonsContainer = CreateNestedIfMoveButtonsContainer(action, parentIndex, nestedIndex, isThen);
+            Grid.SetColumn(moveButtonsContainer, 1);
+            container.Children.Add(moveButtonsContainer);
+
+            var deleteBtn = new Border
+            {
+                Width = 28,
+                Height = 28,
+                Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69)),
+                CornerRadius = new CornerRadius(4),
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Tag = new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen },
+                Visibility = Visibility.Visible
+            };
+
+            var deleteText = new TextBlock
+            {
+                Text = "✕",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            deleteBtn.Child = deleteText;
+            deleteBtn.MouseLeftButtonDown += DeleteNestedIfAction_Click;
+
+            deleteBtn.MouseEnter += (s, e) => deleteBtn.Background = new SolidColorBrush(Color.FromRgb(200, 35, 51));
+            deleteBtn.MouseLeave += (s, e) => deleteBtn.Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69));
+
+            Grid.SetColumn(deleteBtn, 2);
+            container.Children.Add(deleteBtn);
+
+            return container;
+        }
+
+        /// <summary>
+        /// Crée un panel avec des boutons pour ajouter des actions dans un IfAction (Then ou Else)
+        /// </summary>
+        private FrameworkElement CreateAddIfActionsPanel(IfAction ifAction, int ifActionIndex, bool isThen)
+        {
+            var panel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 4, 0, 8)
+            };
+
+            Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
+            {
+                var button = new Border
+                {
+                    Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    Margin = new Thickness(0, 0, 4, 0),
+                    Cursor = Cursors.Hand,
+                    Tag = new IfActionInfo { IfActionIndex = ifActionIndex, ActionType = actionInstance.Type.ToString(), IsThen = isThen }
+                };
+                button.MouseLeftButtonDown += AddActionToIf_Click;
+
+                var textBlock = new TextBlock
+                {
+                    Text = $"{icon} {text}",
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)),
+                    FontWeight = FontWeights.Medium
+                };
+                button.Child = textBlock;
+
+                button.MouseEnter += (s, e) => button.Background = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                button.MouseLeave += (s, e) => button.Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0));
+
+                return button;
+            };
+
+            panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
+            panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
+            panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
+
+            return panel;
+        }
+
+        /// <summary>
+        /// Crée un conteneur de boutons pour déplacer une action imbriquée dans un IfAction
+        /// </summary>
+        private FrameworkElement CreateNestedIfMoveButtonsContainer(IInputAction action, int parentIndex, int nestedIndex, bool isThen)
+        {
+            var moveButtonsContainer = new Border
+            {
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(1.5),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(2, 2, 2, 2),
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Stretch,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                MinHeight = 48,
+                MaxHeight = 48,
+                Visibility = Visibility.Visible
+            };
+
+            var centeringGrid = new Grid
+            {
+                VerticalAlignment = VerticalAlignment.Stretch,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            var moveButtonsPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Visibility = Visibility.Visible
+            };
+
+            bool canMoveUp = false;
+            bool canMoveDown = false;
+
+            if (_currentMacro != null && parentIndex >= 0 && parentIndex < _currentMacro.Actions.Count)
+            {
+                if (_currentMacro.Actions[parentIndex] is IfAction ifAction)
+                {
+                    var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
+                    if (actionsList != null)
+                    {
+                        canMoveUp = nestedIndex > 0;
+                        canMoveDown = nestedIndex < actionsList.Count - 1;
+                    }
+                }
+            }
+
+            var moveUpBtnBorder = new Border
+            {
+                Width = 30,
+                Height = 30,
+                Background = canMoveUp
+                    ? new SolidColorBrush(Color.FromArgb(180, 70, 130, 180))
+                    : new SolidColorBrush(Color.FromArgb(50, 150, 150, 150)),
+                CornerRadius = new CornerRadius(4),
+                Cursor = canMoveUp ? Cursors.Hand : Cursors.Arrow,
+                Margin = new Thickness(0, 0, 0, 2),
+                Tag = new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen }
+            };
+
+            var moveUpText = new TextBlock
+            {
+                Text = "▲",
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            moveUpBtnBorder.Child = moveUpText;
+
+            if (canMoveUp)
+            {
+                moveUpBtnBorder.MouseLeftButtonDown += (s, e) =>
+                {
+                    e.Handled = true;
+                    MoveNestedIfActionUp(parentIndex, nestedIndex, isThen);
+                };
+                moveUpBtnBorder.MouseEnter += (s, e) => moveUpBtnBorder.Background = new SolidColorBrush(Color.FromRgb(90, 150, 200));
+                moveUpBtnBorder.MouseLeave += (s, e) => moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(180, 70, 130, 180));
+            }
+
+            moveButtonsPanel.Children.Add(moveUpBtnBorder);
+
+            var moveDownBtnBorder = new Border
+            {
+                Width = 30,
+                Height = 30,
+                Background = canMoveDown
+                    ? new SolidColorBrush(Color.FromArgb(180, 70, 130, 180))
+                    : new SolidColorBrush(Color.FromArgb(50, 150, 150, 150)),
+                CornerRadius = new CornerRadius(4),
+                Cursor = canMoveDown ? Cursors.Hand : Cursors.Arrow,
+                Tag = new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen }
+            };
+
+            var moveDownText = new TextBlock
+            {
+                Text = "▼",
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            moveDownBtnBorder.Child = moveDownText;
+
+            if (canMoveDown)
+            {
+                moveDownBtnBorder.MouseLeftButtonDown += (s, e) =>
+                {
+                    e.Handled = true;
+                    MoveNestedIfActionDown(parentIndex, nestedIndex, isThen);
+                };
+                moveDownBtnBorder.MouseEnter += (s, e) => moveDownBtnBorder.Background = new SolidColorBrush(Color.FromRgb(90, 150, 200));
+                moveDownBtnBorder.MouseLeave += (s, e) => moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(180, 70, 130, 180));
+            }
+
+            moveButtonsPanel.Children.Add(moveDownBtnBorder);
+            centeringGrid.Children.Add(moveButtonsPanel);
+            moveButtonsContainer.Child = centeringGrid;
+
+            return moveButtonsContainer;
+        }
+
+        /// <summary>
+        /// Ajoute une action dans un IfAction (Then ou Else)
+        /// </summary>
+        private void AddActionToIf_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            var button = sender as Border;
+            if (button?.Tag is not IfActionInfo info) return;
+
+            var ifActionIndex = info.IfActionIndex;
+            if (ifActionIndex < 0 || ifActionIndex >= _currentMacro.Actions.Count) return;
+
+            if (_currentMacro.Actions[ifActionIndex] is not IfAction ifAction) return;
+
+            SaveState();
+
+            IInputAction? newAction = info.ActionType switch
+            {
+                "Keyboard" => new KeyboardAction { VirtualKeyCode = 0, ActionType = KeyboardActionType.Press },
+                "Mouse" => new Core.Inputs.MouseAction { ActionType = Core.Inputs.MouseActionType.LeftClick, X = -1, Y = -1 },
+                "Delay" => new DelayAction { Duration = 100 },
+                _ => null
+            };
+
+            if (newAction != null)
+            {
+                var actionsList = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
+                if (actionsList == null)
+                {
+                    actionsList = new List<IInputAction>();
+                    if (info.IsThen)
+                        ifAction.ThenActions = actionsList;
+                    else
+                        ifAction.ElseActions = actionsList;
+                }
+                actionsList.Add(newAction);
+                _currentMacro.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// Déplace une action imbriquée vers le haut dans un IfAction
+        /// </summary>
+        private void MoveNestedIfActionUp(int parentIndex, int nestedIndex, bool isThen)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count) return;
+            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction) return;
+
+            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
+            if (actionsList == null || nestedIndex <= 0 || nestedIndex >= actionsList.Count) return;
+
+            SaveState();
+            var action = actionsList[nestedIndex];
+            actionsList.RemoveAt(nestedIndex);
+            actionsList.Insert(nestedIndex - 1, action);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Déplace une action imbriquée vers le bas dans un IfAction
+        /// </summary>
+        private void MoveNestedIfActionDown(int parentIndex, int nestedIndex, bool isThen)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count) return;
+            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction) return;
+
+            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
+            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count - 1) return;
+
+            SaveState();
+            var action = actionsList[nestedIndex];
+            actionsList.RemoveAt(nestedIndex);
+            actionsList.Insert(nestedIndex + 1, action);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Supprime une action imbriquée d'un IfAction
+        /// </summary>
+        private void DeleteNestedIfAction_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            var button = sender as Border;
+            if (button?.Tag is not NestedIfActionInfo info) return;
+
+            var parentIndex = info.ParentIndex;
+            var nestedIndex = info.NestedIndex;
+
+            if (parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count) return;
+            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction) return;
+
+            var actionsList = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
+            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count) return;
+
+            SaveState();
+            actionsList.RemoveAt(nestedIndex);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+
+            e.Handled = true;
+        }
+
+        // Méthodes d'édition inline pour les actions imbriquées dans IfAction
+        private void EditNestedIfKeyboardAction(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction)
+                return;
+
+            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
+            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count)
+                return;
+
+            if (actionsList[nestedIndex] is not KeyboardAction ka)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            bool keyCaptured = false;
+            var originalMargin = titleText.Margin;
+            var originalWidth = titleText.Width;
+
+            var textBox = new TextBox
+            {
+                Text = GetKeyName(ka.VirtualKeyCode),
+                FontSize = titleText.FontSize,
+                FontWeight = titleText.FontWeight,
+                Foreground = titleText.Foreground,
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(100, 149, 237)),
+                BorderThickness = new Thickness(2),
+                Padding = new Thickness(4),
+                Margin = originalMargin,
+                Width = originalWidth != double.NaN ? originalWidth : 200,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+
+            KeyboardHook? tempKeyHook = null;
+            textBox.GotFocus += (s, e) =>
+            {
+                if (!keyCaptured)
+                {
+                    keyCaptured = true;
+                    textBox.Text = "Appuyez sur une touche...";
+                    textBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
+                    tempKeyHook = new KeyboardHook();
+                    tempKeyHook.KeyDown += (sender, args) =>
+                    {
+                        SaveState();
+                        ka.VirtualKeyCode = (ushort)args.VirtualKeyCode;
+                        textBox.Text = GetKeyName(ka.VirtualKeyCode);
+                        textBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+                        keyCaptured = false;
+                        tempKeyHook?.Uninstall();
+                        tempKeyHook = null;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    };
+                    tempKeyHook.Install();
+                }
+            };
+
+            textBox.LostFocus += (s, e) =>
+            {
+                tempKeyHook?.Uninstall();
+                tempKeyHook = null;
+                if (keyCaptured)
+                {
+                    keyCaptured = false;
+                }
+            };
+
+            var idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, textBox);
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+            }));
+        }
+
+        private void EditNestedIfDelayAction(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction)
+                return;
+
+            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
+            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count)
+                return;
+
+            if (actionsList[nestedIndex] is not DelayAction da)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            var originalMargin = titleText.Margin;
+
+            var textBox = new TextBox
+            {
+                Text = da.Duration.ToString(),
+                FontSize = titleText.FontSize,
+                FontWeight = titleText.FontWeight,
+                Foreground = titleText.Foreground,
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(100, 149, 237)),
+                BorderThickness = new Thickness(2),
+                Padding = new Thickness(4),
+                Margin = originalMargin,
+                Width = 100,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+
+            textBox.PreviewTextInput += (s, e) => e.Handled = !char.IsDigit(e.Text, 0);
+
+            textBox.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter)
+                {
+                    e.Handled = true;
+                    if (int.TryParse(textBox.Text, out int duration) && duration >= 0)
+                    {
+                        SaveState();
+                        da.Duration = duration;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    Keyboard.ClearFocus();
+                }
+                else if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    textBox.Text = da.Duration.ToString();
+                    Keyboard.ClearFocus();
+                }
+            };
+
+            textBox.LostFocus += (s, e) =>
+            {
+                if (int.TryParse(textBox.Text, out int duration) && duration >= 0)
+                {
+                    SaveState();
+                    da.Duration = duration;
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                {
+                    textBox.Text = da.Duration.ToString();
+                }
+            };
+
+            var idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, textBox);
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                textBox.Focus();
+                textBox.SelectAll();
+            }));
+        }
+
+        private void EditNestedIfMouseAction(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction)
+                return;
+
+            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
+            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count)
+                return;
+
+            if (actionsList[nestedIndex] is not Core.Inputs.MouseAction ma)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            var originalMargin = titleText.Margin;
+
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = originalMargin
+            };
+
+            var clickTypeComboBox = new ComboBox
+            {
+                MinWidth = 100,
+                FontSize = titleText.FontSize,
+                FontWeight = titleText.FontWeight,
+                VerticalAlignment = VerticalAlignment.Center,
+                SelectedIndex = (int)ma.ActionType
+            };
+
+            clickTypeComboBox.Items.Add("Clic gauche");
+            clickTypeComboBox.Items.Add("Clic droit");
+            clickTypeComboBox.Items.Add("Clic milieu");
+            clickTypeComboBox.Items.Add("Bouton gauche ↓");
+            clickTypeComboBox.Items.Add("Bouton gauche ↑");
+            clickTypeComboBox.Items.Add("Bouton droit ↓");
+            clickTypeComboBox.Items.Add("Bouton droit ↑");
+            clickTypeComboBox.Items.Add("Bouton milieu ↓");
+            clickTypeComboBox.Items.Add("Bouton milieu ↑");
+            clickTypeComboBox.Items.Add("Déplacement");
+            clickTypeComboBox.Items.Add("Molette ↑");
+            clickTypeComboBox.Items.Add("Molette ↓");
+
+            clickTypeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (clickTypeComboBox.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.ActionType = (Core.Inputs.MouseActionType)clickTypeComboBox.SelectedIndex;
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+
+            editPanel.Children.Add(clickTypeComboBox);
+
+            var idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, editPanel);
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                clickTypeComboBox.Focus();
+            }));
+        }
+
+        /// <summary>
         /// Informations sur une action imbriquée (pour passer le contexte aux event handlers)
         /// </summary>
         private class NestedActionInfo
@@ -2580,12 +3428,32 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
+        /// Informations sur une action imbriquée dans un IfAction
+        /// </summary>
+        private class NestedIfActionInfo
+        {
+            public int ParentIndex { get; set; }
+            public int NestedIndex { get; set; }
+            public bool IsThen { get; set; }
+        }
+
+        /// <summary>
         /// Informations sur un RepeatAction (pour passer le contexte aux event handlers)
         /// </summary>
         private class RepeatActionInfo
         {
             public int RepeatActionIndex { get; set; }
             public string ActionType { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Informations sur un IfAction (pour passer le contexte aux event handlers)
+        /// </summary>
+        private class IfActionInfo
+        {
+            public int IfActionIndex { get; set; }
+            public string ActionType { get; set; } = "";
+            public bool IsThen { get; set; }
         }
 
         #endregion

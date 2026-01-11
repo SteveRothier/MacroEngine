@@ -214,6 +214,34 @@ namespace MacroEngine.Core.Engine
                             await Task.Delay(delayAction.Duration);
                         }
                     }
+                    else if (action is IfAction ifAction)
+                    {
+                        // Notifier le début de la condition
+                        var description = GetActionDescription(action);
+                        ActionExecuted?.Invoke(this, new ActionExecutedEventArgs
+                        {
+                            Action = action,
+                            ActionDescription = description
+                        });
+                        
+                        // Évaluer la condition et exécuter les actions appropriées
+                        if (ifAction.Condition)
+                        {
+                            // Exécuter les actions Then
+                            if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
+                            {
+                                await ExecuteActionsAsync(ifAction.ThenActions);
+                            }
+                        }
+                        else
+                        {
+                            // Exécuter les actions Else
+                            if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
+                            {
+                                await ExecuteActionsAsync(ifAction.ElseActions);
+                            }
+                        }
+                    }
                     else if (action is RepeatAction repeatAction)
                     {
                         // Notifier le début de la répétition
@@ -511,6 +539,16 @@ namespace MacroEngine.Core.Engine
                         return $"Répéter: {modeText} ({actionsCount} action{(actionsCount > 1 ? "s" : "")})";
                     }
                     return $"Répéter: {action.Name}";
+
+                case InputActionType.Condition:
+                    if (action is IfAction ifAction)
+                    {
+                        var thenCount = ifAction.ThenActions?.Count ?? 0;
+                        var elseCount = ifAction.ElseActions?.Count ?? 0;
+                        var conditionText = ifAction.Condition ? "Vrai" : "Faux";
+                        return $"Si ({conditionText}): Then={thenCount}, Else={elseCount}";
+                    }
+                    return $"Condition: {action.Name}";
 
                 default:
                     return action.Name;
