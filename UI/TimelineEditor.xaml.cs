@@ -1714,7 +1714,7 @@ namespace MacroEngine.UI
                 fe.Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex };
             }
 
-            // Conteneur Grid pour la carte + bouton supprimer
+            // Conteneur Grid pour la carte + boutons flèches + bouton supprimer
             var container = new Grid
             {
                 VerticalAlignment = VerticalAlignment.Stretch,
@@ -1724,11 +1724,17 @@ namespace MacroEngine.UI
             };
 
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Boutons flèches
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
 
             card.HorizontalAlignment = HorizontalAlignment.Stretch;
             Grid.SetColumn(card, 0);
             container.Children.Add(card);
+
+            // Boutons flèches pour les actions imbriquées
+            var moveButtonsContainer = CreateNestedMoveButtonsContainer(action, parentIndex, nestedIndex);
+            Grid.SetColumn(moveButtonsContainer, 1);
+            container.Children.Add(moveButtonsContainer);
 
             // Bouton supprimer pour les actions imbriquées
             var deleteBtn = new Border
@@ -1766,10 +1772,185 @@ namespace MacroEngine.UI
                 deleteBtn.Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69));
             };
 
-            Grid.SetColumn(deleteBtn, 1);
+            Grid.SetColumn(deleteBtn, 2);
             container.Children.Add(deleteBtn);
 
             return container;
+        }
+
+        /// <summary>
+        /// Crée un conteneur avec les boutons monter/descendre pour les actions imbriquées
+        /// </summary>
+        private FrameworkElement CreateNestedMoveButtonsContainer(IInputAction action, int parentIndex, int nestedIndex)
+        {
+            // Conteneur séparé pour les boutons monter/descendre
+            var moveButtonsContainer = new Border
+            {
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(1.5),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(2, 2, 2, 2),
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Stretch,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                MinHeight = 48,
+                MaxHeight = 48,
+                Visibility = Visibility.Visible
+            };
+            
+            var centeringGrid = new Grid
+            {
+                VerticalAlignment = VerticalAlignment.Stretch,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            
+            var moveButtonsPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Visibility = Visibility.Visible
+            };
+
+            // Vérifier si on peut monter/descendre
+            bool canMoveUp = false;
+            bool canMoveDown = false;
+
+            if (_currentMacro != null && parentIndex >= 0 && parentIndex < _currentMacro.Actions.Count)
+            {
+                if (_currentMacro.Actions[parentIndex] is RepeatAction repeatAction && repeatAction.Actions != null)
+                {
+                    canMoveUp = nestedIndex > 0;
+                    canMoveDown = nestedIndex < repeatAction.Actions.Count - 1;
+                }
+            }
+
+            // Bouton monter (▲)
+            var moveUpBtnBorder = new Border
+            {
+                Width = 30,
+                Height = 30,
+                Background = canMoveUp
+                    ? new SolidColorBrush(Color.FromArgb(5, 0, 0, 0))
+                    : new SolidColorBrush(Color.FromArgb(2, 150, 150, 150)),
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(0),
+                Cursor = canMoveUp ? Cursors.Hand : Cursors.Arrow,
+                Margin = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(0),
+                Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex }
+            };
+            
+            var moveUpBtnText = new TextBlock
+            {
+                Text = "▲",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = canMoveUp
+                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80))
+                    : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                LineHeight = 36,
+                LineStackingStrategy = LineStackingStrategy.BlockLineHeight
+            };
+            
+            moveUpBtnBorder.Child = moveUpBtnText;
+            moveUpBtnBorder.MouseLeftButtonDown += (s, e) => 
+            {
+                if (canMoveUp)
+                {
+                    MoveNestedActionUp(parentIndex, nestedIndex);
+                    e.Handled = true;
+                }
+            };
+            moveUpBtnBorder.MouseEnter += (s, e) => 
+            {
+                if (canMoveUp)
+                {
+                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60));
+                    moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0));
+                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0));
+                }
+            };
+            moveUpBtnBorder.MouseLeave += (s, e) => 
+            {
+                if (canMoveUp)
+                {
+                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+                    moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0));
+                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                }
+            };
+
+            // Bouton descendre (▼)
+            var moveDownBtnBorder = new Border
+            {
+                Width = 30,
+                Height = 30,
+                Background = canMoveDown
+                    ? new SolidColorBrush(Color.FromArgb(5, 0, 0, 0))
+                    : new SolidColorBrush(Color.FromArgb(2, 150, 150, 150)),
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(0),
+                Cursor = canMoveDown ? Cursors.Hand : Cursors.Arrow,
+                Margin = new Thickness(0, 1, 0, 0),
+                Padding = new Thickness(0),
+                Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex }
+            };
+            
+            var moveDownBtnText = new TextBlock
+            {
+                Text = "▼",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = canMoveDown
+                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80))
+                    : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                LineHeight = 1,
+                LineStackingStrategy = LineStackingStrategy.BlockLineHeight
+            };
+            
+            moveDownBtnBorder.Child = moveDownBtnText;
+            moveDownBtnBorder.MouseLeftButtonDown += (s, e) => 
+            {
+                if (canMoveDown)
+                {
+                    MoveNestedActionDown(parentIndex, nestedIndex);
+                    e.Handled = true;
+                }
+            };
+            moveDownBtnBorder.MouseEnter += (s, e) => 
+            {
+                if (canMoveDown)
+                {
+                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60));
+                    moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0));
+                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0));
+                }
+            };
+            moveDownBtnBorder.MouseLeave += (s, e) => 
+            {
+                if (canMoveDown)
+                {
+                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+                    moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0));
+                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                }
+            };
+
+            moveButtonsPanel.Children.Add(moveUpBtnBorder);
+            moveButtonsPanel.Children.Add(moveDownBtnBorder);
+            
+            centeringGrid.Children.Add(moveButtonsPanel);
+            moveButtonsContainer.Child = centeringGrid;
+            
+            return moveButtonsContainer;
         }
 
         /// <summary>
@@ -1876,6 +2057,58 @@ namespace MacroEngine.UI
             }
 
             e.Handled = true;
+        }
+
+        /// <summary>
+        /// Déplace une action imbriquée vers le haut dans un RepeatAction
+        /// </summary>
+        private void MoveNestedActionUp(int parentIndex, int nestedIndex)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
+                return;
+
+            if (repeatAction.Actions == null || nestedIndex <= 0 || nestedIndex >= repeatAction.Actions.Count)
+                return;
+
+            SaveState();
+            
+            // Échanger l'action imbriquée avec celle au-dessus
+            var action = repeatAction.Actions[nestedIndex];
+            repeatAction.Actions.RemoveAt(nestedIndex);
+            repeatAction.Actions.Insert(nestedIndex - 1, action);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Déplace une action imbriquée vers le bas dans un RepeatAction
+        /// </summary>
+        private void MoveNestedActionDown(int parentIndex, int nestedIndex)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
+                return;
+
+            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count - 1)
+                return;
+
+            SaveState();
+            
+            // Échanger l'action imbriquée avec celle en dessous
+            var action = repeatAction.Actions[nestedIndex];
+            repeatAction.Actions.RemoveAt(nestedIndex);
+            repeatAction.Actions.Insert(nestedIndex + 1, action);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
