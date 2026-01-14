@@ -135,16 +135,49 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         private bool EvaluateActiveApplicationCondition()
         {
-            if (ActiveApplicationConfig == null || string.IsNullOrEmpty(ActiveApplicationConfig.ProcessName))
+            if (ActiveApplicationConfig == null || 
+                ActiveApplicationConfig.ProcessNames == null || 
+                ActiveApplicationConfig.ProcessNames.Count == 0)
+            {
+                // Compatibilité avec l'ancien format (un seul processus)
+                if (!string.IsNullOrEmpty(ActiveApplicationConfig?.ProcessName))
+                {
+                    return EvaluateSingleProcess(ActiveApplicationConfig.ProcessName);
+                }
+                return false;
+            }
+
+            try
+            {
+                // Vérifier si au moins un des processus sélectionnés correspond
+                foreach (var processName in ActiveApplicationConfig.ProcessNames)
+                {
+                    if (EvaluateSingleProcess(processName))
+                        return true;
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Évalue si un processus spécifique correspond à la condition
+        /// </summary>
+        private bool EvaluateSingleProcess(string processName)
+        {
+            if (string.IsNullOrEmpty(processName))
                 return false;
 
             try
             {
-                var processes = System.Diagnostics.Process.GetProcessesByName(ActiveApplicationConfig.ProcessName);
+                var processes = System.Diagnostics.Process.GetProcessesByName(processName);
                 if (processes.Length == 0)
                     return false;
 
-                if (ActiveApplicationConfig.AnyWindow)
+                if (ActiveApplicationConfig!.AnyWindow)
                     return true; // Peu importe la fenêtre active, le processus existe
 
                 // Vérifier si une fenêtre du processus est active
@@ -390,7 +423,9 @@ namespace MacroEngine.Core.Inputs
                 Condition = this.Condition,
                 ActiveApplicationConfig = this.ActiveApplicationConfig != null ? new ActiveApplicationCondition
                 {
-                    ProcessName = this.ActiveApplicationConfig.ProcessName,
+                    ProcessNames = this.ActiveApplicationConfig.ProcessNames != null 
+                        ? new List<string>(this.ActiveApplicationConfig.ProcessNames)
+                        : new List<string>(),
                     WindowTitle = this.ActiveApplicationConfig.WindowTitle,
                     TitleMatchMode = this.ActiveApplicationConfig.TitleMatchMode,
                     AnyWindow = this.ActiveApplicationConfig.AnyWindow
