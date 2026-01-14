@@ -2159,6 +2159,33 @@ namespace MacroEngine.UI
             if (Result!.TextOnScreenConfig == null)
                 Result.TextOnScreenConfig = new TextOnScreenCondition();
 
+            // Aperçu de la condition
+            var previewTextBlock = new TextBlock
+            {
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 215)),
+                Margin = new Thickness(0, 0, 0, 15),
+                TextWrapping = TextWrapping.Wrap
+            };
+            ConfigContentPanel.Children.Add(previewTextBlock);
+
+            void UpdatePreview()
+            {
+                var text = Result.TextOnScreenConfig!.Text;
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    previewTextBlock.Text = "Aucun texte défini";
+                    previewTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
+                }
+                else
+                {
+                    var previewText = text.Length > 50 ? text.Substring(0, 50) + "..." : text;
+                    previewTextBlock.Text = $"Rechercher: \"{previewText}\"";
+                    previewTextBlock.Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 215));
+                }
+            }
+
             // Texte à rechercher
             var textLabel = new TextBlock
             {
@@ -2173,16 +2200,112 @@ namespace MacroEngine.UI
             {
                 Text = Result.TextOnScreenConfig.Text,
                 FontSize = 12,
-                MinHeight = 60,
+                MinHeight = 120,
+                MaxHeight = 200,
                 TextWrapping = TextWrapping.Wrap,
                 AcceptsReturn = true,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Margin = new Thickness(0, 0, 0, 12)
             };
             textTextBox.TextChanged += (s, e) =>
             {
                 Result.TextOnScreenConfig!.Text = textTextBox.Text;
+                UpdatePreview();
             };
             ConfigContentPanel.Children.Add(textTextBox);
+
+            // Zone de recherche
+            var searchAreaLabel = new TextBlock
+            {
+                Text = "Zone de recherche (optionnel):",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 8, 0, 4)
+            };
+            ConfigContentPanel.Children.Add(searchAreaLabel);
+
+            var searchAreaPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+
+            var searchAreaInfoText = new TextBlock
+            {
+                Text = "Zone actuelle: " + (Result.TextOnScreenConfig.SearchArea != null && Result.TextOnScreenConfig.SearchArea.Length == 4
+                    ? $"({Result.TextOnScreenConfig.SearchArea[0]}, {Result.TextOnScreenConfig.SearchArea[1]}) - ({Result.TextOnScreenConfig.SearchArea[2]}, {Result.TextOnScreenConfig.SearchArea[3]})"
+                    : "Tout l'écran"),
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Colors.Gray),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+
+            var selectZoneButton = new Button
+            {
+                Content = "📐 Sélectionner une zone",
+                Width = 180,
+                Height = 28,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            selectZoneButton.Click += (s, e) =>
+            {
+                try
+                {
+                    var zoneSelector = new ZoneSelectorWindow
+                    {
+                        Owner = this
+                    };
+                    if (zoneSelector.ShowDialog() == true)
+                    {
+                        Result.TextOnScreenConfig!.SearchArea = new int[]
+                        {
+                            zoneSelector.X1,
+                            zoneSelector.Y1,
+                            zoneSelector.X2,
+                            zoneSelector.Y2
+                        };
+                        searchAreaInfoText.Text = $"Zone: ({Result.TextOnScreenConfig.SearchArea[0]}, {Result.TextOnScreenConfig.SearchArea[1]}) - ({Result.TextOnScreenConfig.SearchArea[2]}, {Result.TextOnScreenConfig.SearchArea[3]})";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erreur lors de la sélection de zone: {ex.Message}", 
+                        "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
+
+            var clearZoneButton = new Button
+            {
+                Content = "Effacer",
+                Width = 80,
+                Height = 28,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            clearZoneButton.Click += (s, e) =>
+            {
+                Result.TextOnScreenConfig!.SearchArea = null;
+                searchAreaInfoText.Text = "Zone actuelle: Tout l'écran";
+            };
+
+            searchAreaPanel.Children.Add(searchAreaInfoText);
+            searchAreaPanel.Children.Add(selectZoneButton);
+            searchAreaPanel.Children.Add(clearZoneButton);
+            ConfigContentPanel.Children.Add(searchAreaPanel);
+
+            // Informations supplémentaires
+            var infoText = new TextBlock
+            {
+                Text = "💡 Astuce: Le texte sera recherché à l'écran en utilisant la reconnaissance optique de caractères (OCR).\nAssurez-vous que le texte est clairement visible et lisible.",
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Colors.Gray),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            ConfigContentPanel.Children.Add(infoText);
+
+            // Initialiser l'aperçu
+            UpdatePreview();
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
