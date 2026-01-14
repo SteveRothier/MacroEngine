@@ -7,6 +7,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MacroEngine.Core.Services;
+using MacroEngine.Core.Hooks;
 
 namespace MacroEngine.UI
 {
@@ -14,6 +15,7 @@ namespace MacroEngine.UI
     {
         private readonly ScreenCaptureService _screenCapture;
         private readonly DispatcherTimer _updateTimer;
+        private readonly MouseHook _mouseHook;
         private System.Drawing.Color _selectedColor;
         private int _selectedX;
         private int _selectedY;
@@ -52,6 +54,11 @@ namespace MacroEngine.UI
             Owner = Application.Current.MainWindow;
             WindowStartupLocation = WindowStartupLocation.Manual;
 
+            // Utiliser un hook global de souris pour détecter les clics (la fenêtre est IsHitTestVisible="False")
+            _mouseHook = new MouseHook();
+            _mouseHook.MouseDown += MouseHook_MouseDown;
+            _mouseHook.Install();
+
             // Timer pour mettre à jour la couleur en temps réel
             _updateTimer = new DispatcherTimer
             {
@@ -60,10 +67,8 @@ namespace MacroEngine.UI
             _updateTimer.Tick += UpdateTimer_Tick;
             _updateTimer.Start();
 
-            // Capturer les clics de souris
-            MouseDown += ColorPickerWindow_MouseDown;
+            // Capturer les événements clavier
             KeyDown += ColorPickerWindow_KeyDown;
-            PreviewMouseDown += ColorPickerWindow_PreviewMouseDown;
 
             // Suivre le curseur
             UpdateColor();
@@ -73,10 +78,46 @@ namespace MacroEngine.UI
             Focusable = true;
         }
 
-        private void ColorPickerWindow_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        private void MouseHook_MouseDown(object? sender, MouseHookEventArgs e)
         {
-            // Capturer le clic même si la fenêtre n'a pas le focus
-            e.Handled = false;
+            // Ne traiter que les clics gauche
+            if (e.Button != Core.Hooks.MouseButton.Left)
+                return;
+
+            // Vérifier si le clic est sur la fenêtre (dans ce cas, on l'ignore car on veut cliquer à travers)
+            // Mais on accepte tous les clics ailleurs sur l'écran
+            Dispatcher.Invoke(() =>
+            {
+                if (!_isSelecting)
+                {
+                    _isSelecting = true;
+                    // Mettre à jour les coordonnées finales
+                    _selectedX = e.X;
+                    _selectedY = e.Y;
+                    
+                    // Capturer la couleur à cette position
+                    var pixelColor = _screenCapture.CapturePixel(e.X, e.Y);
+                    if (pixelColor.HasValue)
+                    {
+                        _selectedColor = pixelColor.Value;
+                    }
+                    else
+                    {
+                        // Fallback sur GetPixel
+                        IntPtr hdc = GetDC(IntPtr.Zero);
+                        uint pixel = GetPixel(hdc, e.X, e.Y);
+                        ReleaseDC(IntPtr.Zero, hdc);
+                        _selectedColor = System.Drawing.Color.FromArgb(
+                            (int)(pixel & 0x000000FF),
+                            (int)((pixel & 0x0000FF00) >> 8),
+                            (int)((pixel & 0x00FF0000) >> 16)
+                        );
+                    }
+                    
+                    DialogResult = true;
+                    Close();
+                }
+            });
         }
 
         private void UpdateTimer_Tick(object? sender, EventArgs e)
@@ -157,13 +198,6 @@ namespace MacroEngine.UI
             catch { }
         }
 
-        private void ColorPickerWindow_MouseDown(object sender, MouseButtonEventArgs e)
-        {
-            _isSelecting = true;
-            DialogResult = true;
-            Close();
-        }
-
         private void ColorPickerWindow_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Escape)
@@ -176,6 +210,8 @@ namespace MacroEngine.UI
         protected override void OnClosed(EventArgs e)
         {
             _updateTimer?.Stop();
+            _mouseHook?.Uninstall();
+            _mouseHook?.Dispose();
             base.OnClosed(e);
         }
     }
