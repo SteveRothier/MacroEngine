@@ -1962,8 +1962,71 @@ namespace MacroEngine.UI
                 }
             };
 
+            var pasteButton = new Button
+            {
+                Content = "📋 Coller",
+                Width = 100,
+                Height = 28,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Coller une image depuis le presse-papiers"
+            };
+            pasteButton.Click += (s, e) =>
+            {
+                try
+                {
+                    if (System.Windows.Clipboard.ContainsImage())
+                    {
+                        var clipboardImage = System.Windows.Clipboard.GetImage();
+                        if (clipboardImage != null)
+                        {
+                            // Créer le dossier Images s'il n'existe pas
+                            var imagesDirectory = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "Images");
+                            if (!System.IO.Directory.Exists(imagesDirectory))
+                            {
+                                System.IO.Directory.CreateDirectory(imagesDirectory);
+                            }
+
+                            // Générer un nom de fichier unique
+                            var fileName = $"image_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.png";
+                            var filePath = System.IO.Path.Combine(imagesDirectory, fileName);
+
+                            // Convertir l'image en BitmapSource et la sauvegarder
+                            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                            encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(clipboardImage));
+
+                            using (var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Create))
+                            {
+                                encoder.Save(fileStream);
+                            }
+
+                            // Mettre à jour le chemin et l'aperçu
+                            pathTextBox.Text = filePath;
+                            MessageBox.Show($"Image collée et sauvegardée avec succès !\n{filePath}", 
+                                "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
+                        else
+                        {
+                            MessageBox.Show("Aucune image trouvée dans le presse-papiers.", 
+                                "Erreur", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Le presse-papiers ne contient pas d'image.\nCopiez d'abord une image (Capture d'écran, image depuis un navigateur, etc.).", 
+                            "Presse-papiers vide", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erreur lors du collage de l'image : {ex.Message}", 
+                        "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
+
             pathPanel.Children.Add(pathTextBox);
             pathPanel.Children.Add(browseButton);
+            pathPanel.Children.Add(pasteButton);
             ConfigContentPanel.Children.Add(pathPanel);
 
             // Sensibilité avec slider
