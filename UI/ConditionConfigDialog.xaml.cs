@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Processes;
@@ -481,16 +482,98 @@ namespace MacroEngine.UI
 
             var keyTextBox = new TextBox
             {
-                Text = Result.KeyboardKeyConfig.VirtualKeyCode.ToString(),
+                Text = Result.KeyboardKeyConfig.VirtualKeyCode == 0 
+                    ? "Appuyez sur une touche..." 
+                    : GetKeyName(Result.KeyboardKeyConfig.VirtualKeyCode),
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 0, 12),
-                ToolTip = "Code virtuel de la touche (ex: 0x10 pour Shift)"
+                IsReadOnly = true,
+                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(5),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = "Cliquez puis appuyez sur une touche pour la sélectionner"
             };
-            keyTextBox.TextChanged += (s, e) =>
+
+            bool keyCaptured = false;
+            keyTextBox.GotFocus += (s, e) =>
             {
-                if (ushort.TryParse(keyTextBox.Text, out ushort keyCode))
-                    Result.KeyboardKeyConfig!.VirtualKeyCode = keyCode;
+                if (!keyCaptured)
+                {
+                    keyTextBox.Text = "Appuyez sur une touche...";
+                    keyTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
+                    keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(255, 165, 0));
+                }
             };
+
+            keyTextBox.PreviewKeyDown += (s, e) =>
+            {
+                // Ignorer les touches de modification seules
+                if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
+                    e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+                    e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
+                    e.Key == Key.LWin || e.Key == Key.RWin)
+                {
+                    e.Handled = true;
+                    return;
+                }
+
+                // Ignorer Escape pour annuler
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    Keyboard.ClearFocus();
+                    if (!keyCaptured && Result.KeyboardKeyConfig.VirtualKeyCode == 0)
+                    {
+                        keyTextBox.Text = "Appuyez sur une touche...";
+                        keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+                        keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+                    }
+                    else
+                    {
+                        keyTextBox.Text = GetKeyName(Result.KeyboardKeyConfig.VirtualKeyCode);
+                        keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+                        keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+                    }
+                    return;
+                }
+
+                // Capturer la touche
+                try
+                {
+                    int virtualKeyCode = KeyInterop.VirtualKeyFromKey(e.Key);
+                    if (virtualKeyCode > 0)
+                    {
+                        Result.KeyboardKeyConfig!.VirtualKeyCode = (ushort)virtualKeyCode;
+                        keyTextBox.Text = GetKeyName(Result.KeyboardKeyConfig.VirtualKeyCode);
+                        keyCaptured = true;
+                        keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+                        keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+                        e.Handled = true;
+                        Keyboard.ClearFocus();
+                    }
+                }
+                catch
+                {
+                    e.Handled = true;
+                }
+            };
+
+            keyTextBox.LostFocus += (s, e) =>
+            {
+                if (!keyCaptured && Result.KeyboardKeyConfig.VirtualKeyCode == 0)
+                {
+                    keyTextBox.Text = "Appuyez sur une touche...";
+                }
+                else if (Result.KeyboardKeyConfig.VirtualKeyCode > 0)
+                {
+                    keyTextBox.Text = GetKeyName(Result.KeyboardKeyConfig.VirtualKeyCode);
+                }
+                keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+                keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+            };
+
             ConfigContentPanel.Children.Add(keyTextBox);
 
             // État de la touche
@@ -557,6 +640,128 @@ namespace MacroEngine.UI
             shiftCheckBox.Checked += (s, e) => Result.KeyboardKeyConfig!.RequireShift = true;
             shiftCheckBox.Unchecked += (s, e) => Result.KeyboardKeyConfig!.RequireShift = false;
             ConfigContentPanel.Children.Add(shiftCheckBox);
+        }
+
+        /// <summary>
+        /// Convertit un code virtuel de touche en nom lisible
+        /// </summary>
+        private string GetKeyName(ushort virtualKeyCode)
+        {
+            if (virtualKeyCode == 0)
+                return "Aucune touche";
+
+            return virtualKeyCode switch
+            {
+                0x08 => "Backspace",
+                0x09 => "Tab",
+                0x0C => "Clear",
+                0x0D => "Enter",
+                0x10 => "Shift",
+                0x11 => "Ctrl",
+                0x12 => "Alt",
+                0x13 => "Pause",
+                0x14 => "Caps Lock",
+                0x1B => "Esc",
+                0x20 => "Espace",
+                0x21 => "Page Up",
+                0x22 => "Page Down",
+                0x23 => "End",
+                0x24 => "Home",
+                0x25 => "Flèche Gauche",
+                0x26 => "Flèche Haut",
+                0x27 => "Flèche Droite",
+                0x28 => "Flèche Bas",
+                0x2C => "Print Screen",
+                0x2D => "Insert",
+                0x2E => "Delete",
+                0x30 => "0",
+                0x31 => "1",
+                0x32 => "2",
+                0x33 => "3",
+                0x34 => "4",
+                0x35 => "5",
+                0x36 => "6",
+                0x37 => "7",
+                0x38 => "8",
+                0x39 => "9",
+                0x41 => "A",
+                0x42 => "B",
+                0x43 => "C",
+                0x44 => "D",
+                0x45 => "E",
+                0x46 => "F",
+                0x47 => "G",
+                0x48 => "H",
+                0x49 => "I",
+                0x4A => "J",
+                0x4B => "K",
+                0x4C => "L",
+                0x4D => "M",
+                0x4E => "N",
+                0x4F => "O",
+                0x50 => "P",
+                0x51 => "Q",
+                0x52 => "R",
+                0x53 => "S",
+                0x54 => "T",
+                0x55 => "U",
+                0x56 => "V",
+                0x57 => "W",
+                0x58 => "X",
+                0x59 => "Y",
+                0x5A => "Z",
+                0x5B => "Windows Gauche",
+                0x5C => "Windows Droit",
+                0x5D => "Menu",
+                0x60 => "Pavé numérique 0",
+                0x61 => "Pavé numérique 1",
+                0x62 => "Pavé numérique 2",
+                0x63 => "Pavé numérique 3",
+                0x64 => "Pavé numérique 4",
+                0x65 => "Pavé numérique 5",
+                0x66 => "Pavé numérique 6",
+                0x67 => "Pavé numérique 7",
+                0x68 => "Pavé numérique 8",
+                0x69 => "Pavé numérique 9",
+                0x6A => "Pavé numérique *",
+                0x6B => "Pavé numérique +",
+                0x6C => "Pavé numérique Entrée",
+                0x6D => "Pavé numérique -",
+                0x6E => "Pavé numérique .",
+                0x6F => "Pavé numérique /",
+                0x70 => "F1",
+                0x71 => "F2",
+                0x72 => "F3",
+                0x73 => "F4",
+                0x74 => "F5",
+                0x75 => "F6",
+                0x76 => "F7",
+                0x77 => "F8",
+                0x78 => "F9",
+                0x79 => "F10",
+                0x7A => "F11",
+                0x7B => "F12",
+                0x90 => "Num Lock",
+                0x91 => "Scroll Lock",
+                0xA0 => "Shift Gauche",
+                0xA1 => "Shift Droit",
+                0xA2 => "Ctrl Gauche",
+                0xA3 => "Ctrl Droit",
+                0xA4 => "Alt Gauche",
+                0xA5 => "Alt Droit",
+                0xBA => ";",
+                0xBB => "=",
+                0xBC => ",",
+                0xBD => "-",
+                0xBE => ":",
+                0xBF => "!",
+                0xC0 => "ù",
+                0xDB => "[",
+                0xDC => "\\",
+                0xDD => "]",
+                0xDE => "^",
+                _ => $"Touche 0x{virtualKeyCode:X2}"
+            };
         }
 
         private void CreateProcessRunningConfig()
