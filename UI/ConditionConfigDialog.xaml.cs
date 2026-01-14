@@ -1864,6 +1864,54 @@ namespace MacroEngine.UI
             if (Result!.ImageOnScreenConfig == null)
                 Result.ImageOnScreenConfig = new ImageOnScreenCondition();
 
+            // Aperçu de l'image
+            var imagePreviewBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Colors.LightGray),
+                BorderThickness = new Thickness(1),
+                Background = new SolidColorBrush(Colors.White),
+                Width = 200,
+                Height = 150,
+                Margin = new Thickness(0, 0, 0, 12),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+
+            var imagePreview = new System.Windows.Controls.Image
+            {
+                Stretch = System.Windows.Media.Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            imagePreviewBorder.Child = imagePreview;
+            ConfigContentPanel.Children.Add(imagePreviewBorder);
+
+            void UpdateImagePreview()
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(Result.ImageOnScreenConfig!.ImagePath) && 
+                        System.IO.File.Exists(Result.ImageOnScreenConfig.ImagePath))
+                    {
+                        var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                        bitmap.BeginInit();
+                        bitmap.UriSource = new Uri(Result.ImageOnScreenConfig.ImagePath, UriKind.Absolute);
+                        bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bitmap.EndInit();
+                        imagePreview.Source = bitmap;
+                        imagePreviewBorder.Visibility = Visibility.Visible;
+                    }
+                    else
+                    {
+                        imagePreview.Source = null;
+                        imagePreviewBorder.Visibility = Visibility.Visible;
+                    }
+                }
+                catch
+                {
+                    imagePreview.Source = null;
+                }
+            }
+
             // Chemin de l'image
             var pathLabel = new TextBlock
             {
@@ -1884,11 +1932,13 @@ namespace MacroEngine.UI
             {
                 Text = Result.ImageOnScreenConfig.ImagePath,
                 FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                MinWidth = 300
             };
             pathTextBox.TextChanged += (s, e) =>
             {
                 Result.ImageOnScreenConfig!.ImagePath = pathTextBox.Text;
+                UpdateImagePreview();
             };
 
             var browseButton = new Button
@@ -1903,7 +1953,8 @@ namespace MacroEngine.UI
             {
                 var dialog = new Microsoft.Win32.OpenFileDialog
                 {
-                    Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif|Tous les fichiers|*.*"
+                    Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif|Tous les fichiers|*.*",
+                    Title = "Sélectionner une image"
                 };
                 if (dialog.ShowDialog() == true)
                 {
@@ -1915,27 +1966,129 @@ namespace MacroEngine.UI
             pathPanel.Children.Add(browseButton);
             ConfigContentPanel.Children.Add(pathPanel);
 
-            // Sensibilité
+            // Sensibilité avec slider
             var sensitivityLabel = new TextBlock
             {
-                Text = "Sensibilité (%):",
+                Text = "Sensibilité:",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 8, 0, 4)
             };
             ConfigContentPanel.Children.Add(sensitivityLabel);
 
-            var sensitivityTextBox = new TextBox
+            var sensitivityPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
+
+            var sensitivitySlider = new Slider
             {
-                Text = Result.ImageOnScreenConfig.Sensitivity.ToString(),
-                FontSize = 12
+                Minimum = 0,
+                Maximum = 100,
+                Value = Result.ImageOnScreenConfig.Sensitivity,
+                Width = 200,
+                TickFrequency = 10,
+                IsSnapToTickEnabled = true,
+                VerticalAlignment = VerticalAlignment.Center
             };
-            sensitivityTextBox.TextChanged += (s, e) =>
+
+            var sensitivityValueText = new TextBlock
             {
-                if (int.TryParse(sensitivityTextBox.Text, out int sensitivity))
-                    Result.ImageOnScreenConfig!.Sensitivity = Math.Max(0, Math.Min(100, sensitivity));
+                Text = $"{Result.ImageOnScreenConfig.Sensitivity}%",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                MinWidth = 50,
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
             };
-            ConfigContentPanel.Children.Add(sensitivityTextBox);
+
+            sensitivitySlider.ValueChanged += (s, e) =>
+            {
+                var value = (int)sensitivitySlider.Value;
+                Result.ImageOnScreenConfig!.Sensitivity = value;
+                sensitivityValueText.Text = $"{value}%";
+            };
+
+            sensitivityPanel.Children.Add(sensitivitySlider);
+            sensitivityPanel.Children.Add(sensitivityValueText);
+            ConfigContentPanel.Children.Add(sensitivityPanel);
+
+            // Zone de recherche
+            var searchAreaLabel = new TextBlock
+            {
+                Text = "Zone de recherche (optionnel):",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 8, 0, 4)
+            };
+            ConfigContentPanel.Children.Add(searchAreaLabel);
+
+            var searchAreaPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+
+            var searchAreaInfoText = new TextBlock
+            {
+                Text = "Zone actuelle: " + (Result.ImageOnScreenConfig.SearchArea != null && Result.ImageOnScreenConfig.SearchArea.Length == 4
+                    ? $"({Result.ImageOnScreenConfig.SearchArea[0]}, {Result.ImageOnScreenConfig.SearchArea[1]}) - ({Result.ImageOnScreenConfig.SearchArea[2]}, {Result.ImageOnScreenConfig.SearchArea[3]})"
+                    : "Tout l'écran"),
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Colors.Gray),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+
+            var selectZoneButton = new Button
+            {
+                Content = "📐 Sélectionner une zone",
+                Width = 180,
+                Height = 28,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            selectZoneButton.Click += (s, e) =>
+            {
+                try
+                {
+                    var zoneSelector = new ZoneSelectorWindow
+                    {
+                        Owner = this
+                    };
+                    if (zoneSelector.ShowDialog() == true)
+                    {
+                        Result.ImageOnScreenConfig!.SearchArea = new int[]
+                        {
+                            zoneSelector.X1,
+                            zoneSelector.Y1,
+                            zoneSelector.X2,
+                            zoneSelector.Y2
+                        };
+                        searchAreaInfoText.Text = $"Zone: ({Result.ImageOnScreenConfig.SearchArea[0]}, {Result.ImageOnScreenConfig.SearchArea[1]}) - ({Result.ImageOnScreenConfig.SearchArea[2]}, {Result.ImageOnScreenConfig.SearchArea[3]})";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.MessageBox.Show($"Erreur lors de la sélection de zone: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
+
+            var clearZoneButton = new Button
+            {
+                Content = "Effacer",
+                Width = 80,
+                Height = 28,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            clearZoneButton.Click += (s, e) =>
+            {
+                Result.ImageOnScreenConfig!.SearchArea = null;
+                searchAreaInfoText.Text = "Zone actuelle: Tout l'écran";
+            };
+
+            searchAreaPanel.Children.Add(searchAreaInfoText);
+            searchAreaPanel.Children.Add(selectZoneButton);
+            searchAreaPanel.Children.Add(clearZoneButton);
+            ConfigContentPanel.Children.Add(searchAreaPanel);
+
+            // Initialiser l'aperçu
+            UpdateImagePreview();
         }
 
         private void CreateTextOnScreenConfig()
