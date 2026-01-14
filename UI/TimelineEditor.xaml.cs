@@ -2631,6 +2631,7 @@ namespace MacroEngine.UI
             panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
             panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
             panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
+            panel.Children.Add(createAddButton("🔀", "Si", new IfAction()));
 
             return panel;
         }
@@ -2668,6 +2669,12 @@ namespace MacroEngine.UI
                 "Delay" => new DelayAction
                 {
                     Duration = 100
+                },
+                "Condition" => new IfAction
+                {
+                    Condition = true,
+                    ThenActions = new List<IInputAction>(),
+                    ElseActions = new List<IInputAction>()
                 },
                 _ => null
             };
@@ -2914,6 +2921,7 @@ namespace MacroEngine.UI
             panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
             panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
             panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
+            panel.Children.Add(createAddButton("🔁", "Répéter", new RepeatAction()));
 
             return panel;
         }
@@ -3068,6 +3076,13 @@ namespace MacroEngine.UI
                 "Keyboard" => new KeyboardAction { VirtualKeyCode = 0, ActionType = KeyboardActionType.Press },
                 "Mouse" => new Core.Inputs.MouseAction { ActionType = Core.Inputs.MouseActionType.LeftClick, X = -1, Y = -1 },
                 "Delay" => new DelayAction { Duration = 100 },
+                "Repeat" => new RepeatAction
+                {
+                    RepeatCount = 1,
+                    DelayBetweenRepeats = 0,
+                    RepeatMode = RepeatMode.Once,
+                    Actions = new List<IInputAction>()
+                },
                 _ => null
             };
 
