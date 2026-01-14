@@ -1,7 +1,9 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using MacroEngine.Core.Logging;
+using MacroEngine.Core.Services;
 using MacroEngine.UI;
 
 namespace MacroEngine
@@ -21,6 +23,19 @@ namespace MacroEngine
             InitializeApplicationLogger();
             
             _appLogger?.Info("Application démarrée", "App");
+            
+            // Télécharger les fichiers Tesseract en arrière-plan si nécessaire
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await EnsureTesseractDataAsync();
+                }
+                catch (Exception ex)
+                {
+                    _appLogger?.Error("Erreur lors du téléchargement des fichiers Tesseract", ex, "App");
+                }
+            });
         }
 
         protected override void OnExit(ExitEventArgs e)
@@ -76,6 +91,40 @@ namespace MacroEngine
             {
                 // Si on ne peut pas initialiser le logger, on continue quand même
                 System.Diagnostics.Debug.WriteLine($"Erreur lors de l'initialisation du logger: {ex.Message}");
+            }
+        }
+
+        private async Task EnsureTesseractDataAsync()
+        {
+            try
+            {
+                string tessdataPath = TesseractDataDownloader.GetTessdataPath();
+                string[] requiredLanguages = { "fra", "eng" };
+
+                // Vérifier si les fichiers existent déjà
+                if (TesseractDataDownloader.CheckTessdataExists(tessdataPath, requiredLanguages))
+                {
+                    _appLogger?.Info("Fichiers Tesseract déjà présents", "App");
+                    return;
+                }
+
+                _appLogger?.Info("Téléchargement des fichiers Tesseract en cours...", "App");
+
+                // Télécharger les fichiers
+                bool success = await TesseractDataDownloader.DownloadTessdataAsync(tessdataPath, requiredLanguages);
+
+                if (success)
+                {
+                    _appLogger?.Info("Fichiers Tesseract téléchargés avec succès", "App");
+                }
+                else
+                {
+                    _appLogger?.Warning("Échec du téléchargement des fichiers Tesseract. L'OCR ne sera pas disponible.", "App");
+                }
+            }
+            catch (Exception ex)
+            {
+                _appLogger?.Error("Erreur lors de la vérification/téléchargement des fichiers Tesseract", ex, "App");
             }
         }
 

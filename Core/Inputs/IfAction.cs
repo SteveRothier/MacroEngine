@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace MacroEngine.Core.Inputs
 {
@@ -229,9 +231,13 @@ namespace MacroEngine.Core.Inputs
 
             try
             {
-                // TODO: Implémenter la capture de pixel et comparaison de couleur
-                // Pour l'instant, retourne false
-                return false;
+                return Core.Services.ConditionEvaluationService.Instance.EvaluatePixelColor(
+                    PixelColorConfig.X,
+                    PixelColorConfig.Y,
+                    PixelColorConfig.ExpectedColor,
+                    PixelColorConfig.Tolerance,
+                    PixelColorConfig.MatchMode
+                );
             }
             catch
             {
@@ -313,8 +319,18 @@ namespace MacroEngine.Core.Inputs
 
             try
             {
-                // TODO: Implémenter la reconnaissance d'image
-                // Pour l'instant, retourne false
+                var task = Core.Services.ConditionEvaluationService.Instance.EvaluateImageOnScreenAsync(
+                    ImageOnScreenConfig.ImagePath,
+                    ImageOnScreenConfig.Sensitivity,
+                    ImageOnScreenConfig.SearchArea
+                );
+                
+                // Attendre avec timeout de 2 secondes
+                if (task.Wait(TimeSpan.FromSeconds(2)))
+                {
+                    return task.Result;
+                }
+                
                 return false;
             }
             catch
@@ -333,8 +349,17 @@ namespace MacroEngine.Core.Inputs
 
             try
             {
-                // TODO: Implémenter la reconnaissance de texte (OCR)
-                // Pour l'instant, retourne false
+                var task = Core.Services.ConditionEvaluationService.Instance.EvaluateTextOnScreenAsync(
+                    TextOnScreenConfig.Text,
+                    TextOnScreenConfig.SearchArea
+                );
+                
+                // Attendre avec timeout de 3 secondes
+                if (task.Wait(TimeSpan.FromSeconds(3)))
+                {
+                    return task.Result;
+                }
+                
                 return false;
             }
             catch
