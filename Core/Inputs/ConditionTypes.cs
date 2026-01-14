@@ -210,14 +210,27 @@ namespace MacroEngine.Core.Inputs
     public class ProcessRunningCondition
     {
         /// <summary>
-        /// Nom du processus (ex: "discord", "chrome")
+        /// Liste des noms de processus (multi-sélection)
         /// </summary>
-        public string ProcessName { get; set; } = "";
+        public List<string> ProcessNames { get; set; } = new List<string>();
 
         /// <summary>
         /// Peu importe la fenêtre active
         /// </summary>
         public bool AnyWindow { get; set; } = true;
+
+        // Propriété de compatibilité pour l'ancien format (un seul processus)
+        [System.Text.Json.Serialization.JsonIgnore]
+        public string ProcessName
+        {
+            get => ProcessNames.FirstOrDefault() ?? "";
+            set
+            {
+                ProcessNames.Clear();
+                if (!string.IsNullOrEmpty(value))
+                    ProcessNames.Add(value);
+            }
+        }
     }
 
     /// <summary>

@@ -240,12 +240,45 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         private bool EvaluateProcessRunningCondition()
         {
-            if (ProcessRunningConfig == null || string.IsNullOrEmpty(ProcessRunningConfig.ProcessName))
+            if (ProcessRunningConfig == null || 
+                ProcessRunningConfig.ProcessNames == null || 
+                ProcessRunningConfig.ProcessNames.Count == 0)
+            {
+                // Compatibilité avec l'ancien format (un seul processus)
+                if (!string.IsNullOrEmpty(ProcessRunningConfig?.ProcessName))
+                {
+                    return EvaluateSingleProcessRunning(ProcessRunningConfig.ProcessName);
+                }
+                return false;
+            }
+
+            try
+            {
+                // Vérifier si au moins un des processus sélectionnés est ouvert
+                foreach (var processName in ProcessRunningConfig.ProcessNames)
+                {
+                    if (EvaluateSingleProcessRunning(processName))
+                        return true;
+                }
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Évalue si un processus spécifique est ouvert
+        /// </summary>
+        private bool EvaluateSingleProcessRunning(string processName)
+        {
+            if (string.IsNullOrEmpty(processName))
                 return false;
 
             try
             {
-                var processes = System.Diagnostics.Process.GetProcessesByName(ProcessRunningConfig.ProcessName);
+                var processes = System.Diagnostics.Process.GetProcessesByName(processName);
                 return processes.Length > 0;
             }
             catch
@@ -440,7 +473,9 @@ namespace MacroEngine.Core.Inputs
                 } : null,
                 ProcessRunningConfig = this.ProcessRunningConfig != null ? new ProcessRunningCondition
                 {
-                    ProcessName = this.ProcessRunningConfig.ProcessName,
+                    ProcessNames = this.ProcessRunningConfig.ProcessNames != null 
+                        ? new List<string>(this.ProcessRunningConfig.ProcessNames)
+                        : new List<string>(),
                     AnyWindow = this.ProcessRunningConfig.AnyWindow
                 } : null,
                 PixelColorConfig = this.PixelColorConfig != null ? new PixelColorCondition
