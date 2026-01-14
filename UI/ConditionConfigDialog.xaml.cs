@@ -1453,10 +1453,77 @@ namespace MacroEngine.UI
             if (Result!.TimeDateConfig == null)
                 Result.TimeDateConfig = new TimeDateCondition();
 
+            // Aperçu de la condition
+            var previewTextBlock = new TextBlock
+            {
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 215)),
+                Margin = new Thickness(0, 0, 0, 15),
+                TextWrapping = TextWrapping.Wrap
+            };
+            ConfigContentPanel.Children.Add(previewTextBlock);
+
+            void UpdatePreview()
+            {
+                var type = Result.TimeDateConfig!.ComparisonType;
+                var op = Result.TimeDateConfig.Operator;
+                var value = Result.TimeDateConfig.Value;
+
+                var operatorSymbol = op switch
+                {
+                    TimeComparisonOperator.Equals => "=",
+                    TimeComparisonOperator.GreaterThan => ">",
+                    TimeComparisonOperator.LessThan => "<",
+                    TimeComparisonOperator.GreaterThanOrEqual => ">=",
+                    TimeComparisonOperator.LessThanOrEqual => "<=",
+                    _ => "="
+                };
+
+                var typeText = type switch
+                {
+                    "Hour" => "heure",
+                    "Minute" => "minute",
+                    "Day" => "jour",
+                    "Month" => "mois",
+                    "Year" => "année",
+                    _ => "heure"
+                };
+
+                string valueText;
+                if (type == "Hour")
+                {
+                    valueText = $"{value:D2}:00";
+                }
+                else if (type == "Minute")
+                {
+                    var hours = value / 60;
+                    var minutes = value % 60;
+                    valueText = $"{hours:D2}:{minutes:D2}";
+                }
+                else if (type == "Day")
+                {
+                    var dayNames = new[] { "Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi" };
+                    if (value >= 0 && value < dayNames.Length)
+                        valueText = dayNames[value];
+                    else
+                        valueText = value.ToString();
+                }
+                else
+                {
+                    valueText = value.ToString();
+                }
+
+                previewTextBlock.Text = $"Si {typeText} {operatorSymbol} {valueText}";
+            }
+
+            // Conteneur pour les contrôles de valeur (déclarer avant UpdateValueControls)
+            var valueContainer = new StackPanel();
+
             // Type de comparaison
             var typeLabel = new TextBlock
             {
-                Text = "Type:",
+                Text = "Type de comparaison:",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 0, 4)
@@ -1485,23 +1552,6 @@ namespace MacroEngine.UI
             };
             typeComboBox.SelectedIndex = typeIndex;
 
-            typeComboBox.SelectionChanged += (s, e) =>
-            {
-                if (typeComboBox.SelectedIndex >= 0)
-                {
-                    Result.TimeDateConfig!.ComparisonType = typeComboBox.SelectedIndex switch
-                    {
-                        0 => "Hour",
-                        1 => "Minute",
-                        2 => "Day",
-                        3 => "Month",
-                        4 => "Year",
-                        _ => "Hour"
-                    };
-                }
-            };
-            ConfigContentPanel.Children.Add(typeComboBox);
-
             // Opérateur
             var operatorLabel = new TextBlock
             {
@@ -1523,34 +1573,290 @@ namespace MacroEngine.UI
             operatorComboBox.Items.Add(">=");
             operatorComboBox.Items.Add("<=");
             operatorComboBox.SelectedIndex = (int)Result.TimeDateConfig.Operator;
+
+            typeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (typeComboBox.SelectedIndex >= 0)
+                {
+                    Result.TimeDateConfig!.ComparisonType = typeComboBox.SelectedIndex switch
+                    {
+                        0 => "Hour",
+                        1 => "Minute",
+                        2 => "Day",
+                        3 => "Month",
+                        4 => "Year",
+                        _ => "Hour"
+                    };
+                    UpdateValueControls();
+                    UpdatePreview();
+                }
+            };
+            ConfigContentPanel.Children.Add(typeComboBox);
+
             operatorComboBox.SelectionChanged += (s, e) =>
             {
                 if (operatorComboBox.SelectedIndex >= 0)
+                {
                     Result.TimeDateConfig!.Operator = (TimeComparisonOperator)operatorComboBox.SelectedIndex;
+                    UpdatePreview();
+                }
             };
             ConfigContentPanel.Children.Add(operatorComboBox);
+            ConfigContentPanel.Children.Add(valueContainer);
 
-            // Valeur
-            var valueLabel = new TextBlock
+            void UpdateValueControls()
             {
-                Text = "Valeur:",
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 8, 0, 4)
-            };
-            ConfigContentPanel.Children.Add(valueLabel);
+                valueContainer.Children.Clear();
 
-            var valueTextBox = new TextBox
-            {
-                Text = Result.TimeDateConfig.Value.ToString(),
-                FontSize = 12
-            };
-            valueTextBox.TextChanged += (s, e) =>
-            {
-                if (int.TryParse(valueTextBox.Text, out int value))
-                    Result.TimeDateConfig!.Value = value;
-            };
-            ConfigContentPanel.Children.Add(valueTextBox);
+                var type = Result.TimeDateConfig!.ComparisonType;
+
+                if (type == "Hour" || type == "Minute")
+                {
+                    // Sélecteur d'heure pour Hour et Minute
+                    var timeLabel = new TextBlock
+                    {
+                        Text = type == "Hour" ? "Heure:" : "Heure (en minutes depuis minuit):",
+                        FontSize = 13,
+                        FontWeight = FontWeights.SemiBold,
+                        Margin = new Thickness(0, 0, 0, 4)
+                    };
+                    valueContainer.Children.Add(timeLabel);
+
+                    var timeGrid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+                    timeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    timeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    timeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    timeGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                    var hourLabel = new TextBlock
+                    {
+                        Text = "H:",
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 5, 0),
+                        FontSize = 12
+                    };
+                    Grid.SetColumn(hourLabel, 0);
+                    timeGrid.Children.Add(hourLabel);
+
+                    var hourTextBox = new TextBox
+                    {
+                        Width = 50,
+                        FontSize = 12,
+                        Margin = new Thickness(0, 0, 10, 0)
+                    };
+                    Grid.SetColumn(hourTextBox, 1);
+                    timeGrid.Children.Add(hourTextBox);
+
+                    var minuteLabel = new TextBlock
+                    {
+                        Text = "M:",
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 5, 0),
+                        FontSize = 12
+                    };
+                    Grid.SetColumn(minuteLabel, 2);
+                    timeGrid.Children.Add(minuteLabel);
+
+                    var minuteTextBox = new TextBox
+                    {
+                        Width = 50,
+                        FontSize = 12
+                    };
+                    Grid.SetColumn(minuteTextBox, 3);
+                    timeGrid.Children.Add(minuteTextBox);
+
+                    // Initialiser les valeurs
+                    if (type == "Hour")
+                    {
+                        hourTextBox.Text = Result.TimeDateConfig.Value.ToString();
+                        minuteTextBox.Text = "0";
+                        minuteTextBox.IsEnabled = false;
+                    }
+                    else // Minute
+                    {
+                        var totalMinutes = Result.TimeDateConfig.Value;
+                        hourTextBox.Text = (totalMinutes / 60).ToString();
+                        minuteTextBox.Text = (totalMinutes % 60).ToString();
+                    }
+
+                    hourTextBox.TextChanged += (s, e) =>
+                    {
+                        if (int.TryParse(hourTextBox.Text, out int hours))
+                        {
+                            if (type == "Hour")
+                            {
+                                Result.TimeDateConfig!.Value = Math.Max(0, Math.Min(23, hours));
+                                hourTextBox.Text = Result.TimeDateConfig.Value.ToString();
+                            }
+                            else // Minute
+                            {
+                                if (int.TryParse(minuteTextBox.Text, out int minutes))
+                                {
+                                    Result.TimeDateConfig!.Value = hours * 60 + Math.Max(0, Math.Min(59, minutes));
+                                    UpdatePreview();
+                                }
+                            }
+                        }
+                    };
+
+                    minuteTextBox.TextChanged += (s, e) =>
+                    {
+                        if (int.TryParse(hourTextBox.Text, out int hours) &&
+                            int.TryParse(minuteTextBox.Text, out int minutes))
+                        {
+                            Result.TimeDateConfig!.Value = hours * 60 + Math.Max(0, Math.Min(59, minutes));
+                            UpdatePreview();
+                        }
+                    };
+
+                    valueContainer.Children.Add(timeGrid);
+                }
+                else if (type == "Day" || type == "Month" || type == "Year")
+                {
+                    // DatePicker pour Day, Month, Year
+                    var dateLabel = new TextBlock
+                    {
+                        Text = type == "Day" ? "Jour:" : type == "Month" ? "Mois:" : "Année:",
+                        FontSize = 13,
+                        FontWeight = FontWeights.SemiBold,
+                        Margin = new Thickness(0, 0, 0, 4)
+                    };
+                    valueContainer.Children.Add(dateLabel);
+
+                    if (type == "Day")
+                    {
+                        // Sélecteur de jour de la semaine
+                        var dayComboBox = new ComboBox
+                        {
+                            FontSize = 12,
+                            Width = 180
+                        };
+                        var dayNames = new[] { "Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi" };
+                        foreach (var dayName in dayNames)
+                            dayComboBox.Items.Add(dayName);
+                        
+                        // Convertir la valeur (0-6 pour DayOfWeek: Dimanche=0, Lundi=1, etc.)
+                        var dayIndex = Math.Max(0, Math.Min(6, Result.TimeDateConfig.Value));
+                        dayComboBox.SelectedIndex = dayIndex;
+                        
+                        dayComboBox.SelectionChanged += (s, e) =>
+                        {
+                            if (dayComboBox.SelectedIndex >= 0)
+                            {
+                                Result.TimeDateConfig!.Value = dayComboBox.SelectedIndex;
+                                UpdatePreview();
+                            }
+                        };
+                        valueContainer.Children.Add(dayComboBox);
+                    }
+                    else if (type == "Month")
+                    {
+                        // Sélecteur de mois (1-12)
+                        var monthComboBox = new ComboBox
+                        {
+                            FontSize = 12,
+                            Width = 150
+                        };
+                        var months = new[] { "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", 
+                                           "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre" };
+                        foreach (var month in months)
+                            monthComboBox.Items.Add(month);
+                        
+                        monthComboBox.SelectedIndex = Math.Max(0, Math.Min(11, Result.TimeDateConfig.Value - 1));
+                        monthComboBox.SelectionChanged += (s, e) =>
+                        {
+                            if (monthComboBox.SelectedIndex >= 0)
+                            {
+                                Result.TimeDateConfig!.Value = monthComboBox.SelectedIndex + 1;
+                                UpdatePreview();
+                            }
+                        };
+                        valueContainer.Children.Add(monthComboBox);
+                    }
+                    else // Year
+                    {
+                        // Sélecteur d'année avec ComboBox pour les années récentes + TextBox pour autres
+                        var yearPanel = new StackPanel { Orientation = Orientation.Horizontal };
+                        
+                        var yearComboBox = new ComboBox
+                        {
+                            FontSize = 12,
+                            Width = 120,
+                            Margin = new Thickness(0, 0, 10, 0)
+                        };
+                        
+                        // Ajouter les années récentes (année actuelle ± 10 ans)
+                        var currentYear = DateTime.Now.Year;
+                        for (int y = currentYear - 10; y <= currentYear + 10; y++)
+                        {
+                            yearComboBox.Items.Add(y.ToString());
+                        }
+                        
+                        // Sélectionner l'année actuelle si elle correspond
+                        var selectedYear = Result.TimeDateConfig.Value;
+                        if (selectedYear >= currentYear - 10 && selectedYear <= currentYear + 10)
+                        {
+                            yearComboBox.SelectedIndex = selectedYear - (currentYear - 10);
+                        }
+                        
+                        yearComboBox.SelectionChanged += (s, e) =>
+                        {
+                            if (yearComboBox.SelectedIndex >= 0 && 
+                                int.TryParse(yearComboBox.SelectedItem?.ToString(), out int year))
+                            {
+                                Result.TimeDateConfig!.Value = year;
+                                UpdatePreview();
+                            }
+                        };
+                        
+                        var yearTextBox = new TextBox
+                        {
+                            Width = 80,
+                            FontSize = 12,
+                            Text = Result.TimeDateConfig.Value.ToString(),
+                            ToolTip = "Ou saisissez une année (1900-2100)"
+                        };
+                        yearTextBox.TextChanged += (s, e) =>
+                        {
+                            if (int.TryParse(yearTextBox.Text, out int year))
+                            {
+                                var validYear = Math.Max(1900, Math.Min(2100, year));
+                                Result.TimeDateConfig!.Value = validYear;
+                                yearTextBox.Text = validYear.ToString();
+                                
+                                // Mettre à jour le ComboBox si l'année est dans la plage
+                                if (validYear >= currentYear - 10 && validYear <= currentYear + 10)
+                                {
+                                    yearComboBox.SelectedIndex = validYear - (currentYear - 10);
+                                }
+                                else
+                                {
+                                    yearComboBox.SelectedIndex = -1;
+                                }
+                                
+                                UpdatePreview();
+                            }
+                        };
+                        
+                        yearPanel.Children.Add(yearComboBox);
+                        yearPanel.Children.Add(new TextBlock
+                        {
+                            Text = "ou",
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Margin = new Thickness(5, 0, 5, 0),
+                            FontSize = 11,
+                            Foreground = new SolidColorBrush(Colors.Gray)
+                        });
+                        yearPanel.Children.Add(yearTextBox);
+                        
+                        valueContainer.Children.Add(yearPanel);
+                    }
+                }
+            }
+
+            // Initialiser les contrôles
+            UpdateValueControls();
+            UpdatePreview();
         }
 
         private void CreateImageOnScreenConfig()

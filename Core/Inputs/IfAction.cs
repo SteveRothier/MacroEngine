@@ -353,7 +353,7 @@ namespace MacroEngine.Core.Inputs
                 {
                     "Hour" => now.Hour,
                     "Minute" => now.Minute,
-                    "Day" => now.Day,
+                    "Day" => (int)now.DayOfWeek, // 0=Dimanche, 1=Lundi, ..., 6=Samedi
                     "Month" => now.Month,
                     "Year" => now.Year,
                     _ => 0
