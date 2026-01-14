@@ -2226,117 +2226,99 @@ namespace MacroEngine.UI
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            switch (ifAction.ConditionType)
+            // Ajouter un bouton "Configurer..." pour toutes les conditions (même les simples)
+            var configButton = new Button
             {
-                case ConditionType.Boolean:
-                    var conditionCheckBox = new CheckBox
-                    {
-                        IsChecked = ifAction.Condition,
-                        FontSize = 13,
-                        FontWeight = FontWeights.SemiBold,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(0, 0, 8, 0),
-                        Content = ifAction.Condition ? "Vrai" : "Faux"
-                    };
+                Content = "Configurer...",
+                Width = 100,
+                Height = 28,
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                Cursor = Cursors.Hand
+            };
+            configButton.Click += (s, e) =>
+            {
+                var dialog = new ConditionConfigDialog(ifAction);
+                dialog.Owner = Window.GetWindow(this);
+                if (dialog.ShowDialog() == true && dialog.Result != null)
+                {
+                    SaveState();
+                    // Copier la configuration depuis le dialogue
+                    var result = dialog.Result;
+                    ifAction.ConditionType = result.ConditionType;
+                    ifAction.Condition = result.Condition;
+                    ifAction.ActiveApplicationConfig = result.ActiveApplicationConfig;
+                    ifAction.KeyboardKeyConfig = result.KeyboardKeyConfig;
+                    ifAction.ProcessRunningConfig = result.ProcessRunningConfig;
+                    ifAction.PixelColorConfig = result.PixelColorConfig;
+                    ifAction.MousePositionConfig = result.MousePositionConfig;
+                    ifAction.TimeDateConfig = result.TimeDateConfig;
+                    ifAction.ImageOnScreenConfig = result.ImageOnScreenConfig;
+                    ifAction.TextOnScreenConfig = result.TextOnScreenConfig;
                     
-                    conditionCheckBox.Checked += (s, e) =>
-                    {
-                        SaveState();
-                        ifAction.Condition = true;
-                        conditionCheckBox.Content = "Vrai";
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    };
-                    
-                    conditionCheckBox.Unchecked += (s, e) =>
-                    {
-                        SaveState();
-                        ifAction.Condition = false;
-                        conditionCheckBox.Content = "Faux";
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    };
-                    
-                    panel.Children.Add(conditionCheckBox);
-                    break;
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+            panel.Children.Add(configButton);
 
-                case ConditionType.ActiveApplication:
-                    if (ifAction.ActiveApplicationConfig == null)
-                        InitializeConditionConfig(ifAction);
-                    
-                    var processNameTextBox = new TextBox
-                    {
-                        Width = 120,
-                        Text = ifAction.ActiveApplicationConfig?.ProcessName ?? "",
-                        FontSize = 12,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(0, 0, 4, 0),
-                        ToolTip = "Nom du processus (ex: chrome, notepad)"
-                    };
-                    
-                    processNameTextBox.TextChanged += (s, e) =>
-                    {
-                        if (ifAction.ActiveApplicationConfig != null)
-                        {
-                            SaveState();
-                            ifAction.ActiveApplicationConfig.ProcessName = processNameTextBox.Text;
-                            _currentMacro!.ModifiedAt = DateTime.Now;
-                            RefreshBlocks();
-                            MacroChanged?.Invoke(this, EventArgs.Empty);
-                        }
-                    };
-                    
-                    panel.Children.Add(new TextBlock { Text = "Processus:", Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234)) });
-                    panel.Children.Add(processNameTextBox);
-                    break;
-
-                case ConditionType.KeyboardKey:
-                    if (ifAction.KeyboardKeyConfig == null)
-                        InitializeConditionConfig(ifAction);
-                    
-                    var keyCodeTextBox = new TextBox
-                    {
-                        Width = 80,
-                        Text = ifAction.KeyboardKeyConfig?.VirtualKeyCode.ToString() ?? "0",
-                        FontSize = 12,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(0, 0, 4, 0),
-                        ToolTip = "Code virtuel de la touche"
-                    };
-                    
-                    keyCodeTextBox.TextChanged += (s, e) =>
-                    {
-                        if (ifAction.KeyboardKeyConfig != null && ushort.TryParse(keyCodeTextBox.Text, out ushort keyCode))
-                        {
-                            SaveState();
-                            ifAction.KeyboardKeyConfig.VirtualKeyCode = keyCode;
-                            _currentMacro!.ModifiedAt = DateTime.Now;
-                            RefreshBlocks();
-                            MacroChanged?.Invoke(this, EventArgs.Empty);
-                        }
-                    };
-                    
-                    panel.Children.Add(new TextBlock { Text = "Touche:", Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234)) });
-                    panel.Children.Add(keyCodeTextBox);
-                    break;
-
-                // Pour les autres types, on affiche juste un message indiquant qu'ils nécessitent une configuration plus avancée
-                default:
-                    panel.Children.Add(new TextBlock 
-                    { 
-                        Text = "(Configuration avancée requise)", 
-                        FontSize = 11, 
-                        FontStyle = FontStyles.Italic,
-                        Foreground = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(8, 0, 0, 0)
-                    });
-                    break;
+            // Afficher un aperçu rapide selon le type
+            var previewText = GetConditionPreview(ifAction);
+            if (!string.IsNullOrEmpty(previewText))
+            {
+                var previewLabel = new TextBlock
+                {
+                    Text = previewText,
+                    FontSize = 11,
+                    FontStyle = FontStyles.Italic,
+                    Foreground = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(8, 0, 0, 0),
+                    MaxWidth = 300,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                panel.Children.Add(previewLabel);
             }
 
             return panel;
+        }
+
+        /// <summary>
+        /// Obtient un aperçu textuel de la condition
+        /// </summary>
+        private string GetConditionPreview(IfAction ifAction)
+        {
+            return ifAction.ConditionType switch
+            {
+                ConditionType.Boolean => ifAction.Condition ? "Vrai" : "Faux",
+                ConditionType.ActiveApplication => ifAction.ActiveApplicationConfig != null && !string.IsNullOrEmpty(ifAction.ActiveApplicationConfig.ProcessName)
+                    ? $"App: {ifAction.ActiveApplicationConfig.ProcessName}"
+                    : "App: (non configuré)",
+                ConditionType.KeyboardKey => ifAction.KeyboardKeyConfig != null && ifAction.KeyboardKeyConfig.VirtualKeyCode != 0
+                    ? $"Touche: {GetKeyName(ifAction.KeyboardKeyConfig.VirtualKeyCode)}"
+                    : "Touche: (non configuré)",
+                ConditionType.ProcessRunning => ifAction.ProcessRunningConfig != null && !string.IsNullOrEmpty(ifAction.ProcessRunningConfig.ProcessName)
+                    ? $"Processus: {ifAction.ProcessRunningConfig.ProcessName}"
+                    : "Processus: (non configuré)",
+                ConditionType.PixelColor => ifAction.PixelColorConfig != null
+                    ? $"Pixel ({ifAction.PixelColorConfig.X},{ifAction.PixelColorConfig.Y}) = {ifAction.PixelColorConfig.ExpectedColor}"
+                    : "Pixel: (non configuré)",
+                ConditionType.MousePosition => ifAction.MousePositionConfig != null
+                    ? $"Zone ({ifAction.MousePositionConfig.X1},{ifAction.MousePositionConfig.Y1})-({ifAction.MousePositionConfig.X2},{ifAction.MousePositionConfig.Y2})"
+                    : "Zone: (non configuré)",
+                ConditionType.TimeDate => ifAction.TimeDateConfig != null
+                    ? $"{ifAction.TimeDateConfig.ComparisonType} {GetTimeOperatorSymbol(ifAction.TimeDateConfig.Operator)} {ifAction.TimeDateConfig.Value}"
+                    : "Temps: (non configuré)",
+                ConditionType.ImageOnScreen => ifAction.ImageOnScreenConfig != null && !string.IsNullOrEmpty(ifAction.ImageOnScreenConfig.ImagePath)
+                    ? $"Image: {System.IO.Path.GetFileName(ifAction.ImageOnScreenConfig.ImagePath)}"
+                    : "Image: (non configuré)",
+                ConditionType.TextOnScreen => ifAction.TextOnScreenConfig != null && !string.IsNullOrEmpty(ifAction.TextOnScreenConfig.Text)
+                    ? $"Texte: \"{ifAction.TextOnScreenConfig.Text.Substring(0, Math.Min(20, ifAction.TextOnScreenConfig.Text.Length))}\"..."
+                    : "Texte: (non configuré)",
+                _ => ""
+            };
         }
 
         /// <summary>
