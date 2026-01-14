@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Input;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Hooks;
+using MacroEngine.Core.Services;
 
 namespace MacroEngine.UI
 {
@@ -31,6 +36,7 @@ namespace MacroEngine.UI
             _keyboardHook.KeyDown += KeyboardHook_KeyDown;
             
             UpdateKeyDisplay();
+            LoadTesseractInfo();
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
@@ -491,6 +497,99 @@ namespace MacroEngine.UI
         {
             DialogResult = false;
             Close();
+        }
+
+        private void LoadTesseractInfo()
+        {
+            try
+            {
+                string tessdataPath = TesseractDataDownloader.GetTessdataPath();
+                TessdataPathTextBox.Text = tessdataPath;
+
+                // Vérifier les fichiers présents
+                string[] requiredLanguages = { "fra", "eng" };
+                List<string> presentFiles = new List<string>();
+                List<string> missingFiles = new List<string>();
+
+                if (Directory.Exists(tessdataPath))
+                {
+                    foreach (var lang in requiredLanguages)
+                    {
+                        string fileName = $"{lang}.traineddata";
+                        string filePath = Path.Combine(tessdataPath, fileName);
+                        
+                        if (File.Exists(filePath))
+                        {
+                            var fileInfo = new FileInfo(filePath);
+                            presentFiles.Add($"{fileName} ({fileInfo.Length / 1024 / 1024.0:F2} MB)");
+                        }
+                        else
+                        {
+                            missingFiles.Add(fileName);
+                        }
+                    }
+
+                    // Afficher tous les fichiers .traineddata présents (pas seulement fra et eng)
+                    var allTrainedDataFiles = Directory.GetFiles(tessdataPath, "*.traineddata")
+                        .Select(f => new FileInfo(f))
+                        .Where(fi => !requiredLanguages.Contains(Path.GetFileNameWithoutExtension(fi.Name)))
+                        .Select(fi => $"{fi.Name} ({fi.Length / 1024 / 1024.0:F2} MB)");
+
+                    presentFiles.AddRange(allTrainedDataFiles);
+                }
+
+                // Mettre à jour la liste
+                TessdataFilesListBox.ItemsSource = presentFiles;
+
+                // Mettre à jour le statut
+                if (missingFiles.Count == 0 && presentFiles.Count > 0)
+                {
+                    TessdataStatusTextBlock.Text = $"✓ Tous les fichiers requis sont présents ({presentFiles.Count} fichier(s))";
+                    TessdataStatusTextBlock.Foreground = System.Windows.Media.Brushes.Green;
+                }
+                else if (missingFiles.Count > 0)
+                {
+                    TessdataStatusTextBlock.Text = $"⚠ Fichiers manquants : {string.Join(", ", missingFiles)}";
+                    TessdataStatusTextBlock.Foreground = System.Windows.Media.Brushes.Orange;
+                }
+                else
+                {
+                    TessdataStatusTextBlock.Text = "Aucun fichier Tesseract trouvé. Les fichiers seront téléchargés automatiquement au démarrage.";
+                    TessdataStatusTextBlock.Foreground = System.Windows.Media.Brushes.Gray;
+                }
+            }
+            catch (Exception ex)
+            {
+                TessdataStatusTextBlock.Text = $"Erreur lors du chargement des informations : {ex.Message}";
+                TessdataStatusTextBlock.Foreground = System.Windows.Media.Brushes.Red;
+            }
+        }
+
+        private void OpenTessdataFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string tessdataPath = TesseractDataDownloader.GetTessdataPath();
+                
+                // Créer le dossier s'il n'existe pas
+                if (!Directory.Exists(tessdataPath))
+                {
+                    Directory.CreateDirectory(tessdataPath);
+                }
+
+                // Ouvrir le dossier dans l'explorateur Windows
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = tessdataPath,
+                    UseShellExecute = true,
+                    Verb = "open"
+                });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Impossible d'ouvrir le dossier : {ex.Message}", 
+                    "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 }
