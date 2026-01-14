@@ -2266,6 +2266,12 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex)
         {
+            // Si c'est un IfAction imbriqué, créer un conteneur récursif au lieu d'une simple carte
+            if (action is IfAction nestedIfAction)
+            {
+                return CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex);
+            }
+
             // Créer la carte visuelle avec CreateActionCard
             var card = CreateActionCard(action, parentIndex);
             
@@ -2778,6 +2784,12 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateNestedIfActionCard(IInputAction action, int parentIndex, int nestedIndex, bool isThen)
         {
+            // Si c'est un RepeatAction imbriqué, créer un conteneur récursif au lieu d'une simple carte
+            if (action is RepeatAction nestedRepeatAction)
+            {
+                return CreateNestedRepeatActionContainer(nestedRepeatAction, parentIndex, nestedIndex, isThen);
+            }
+
             // Réutiliser CreateNestedActionCard mais adapter pour IfAction
             // Pour l'instant, on utilise la même structure que RepeatAction
             var card = CreateActionCard(action, parentIndex);
@@ -3431,6 +3443,143 @@ namespace MacroEngine.UI
             {
                 clickTypeComboBox.Focus();
             }));
+        }
+
+        /// <summary>
+        /// Crée un conteneur récursif pour un IfAction imbriqué dans un RepeatAction
+        /// </summary>
+        private FrameworkElement CreateNestedIfActionContainer(IfAction ifAction, int repeatActionIndex, int nestedIndex)
+        {
+            var container = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            // Créer une carte simple pour l'IfAction (sans boutons monter/descendre car c'est imbriqué)
+            var card = CreateActionCard(ifAction, repeatActionIndex);
+            container.Children.Add(card);
+
+            // Section Then
+            var thenSection = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(20, 4, 0, 4)
+            };
+
+            var thenHeader = new TextBlock
+            {
+                Text = "Then:",
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = new SolidColorBrush(Color.FromRgb(34, 139, 34))
+            };
+            thenSection.Children.Add(thenHeader);
+
+            if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
+            {
+                var thenContainer = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    Margin = new Thickness(0, 0, 0, 4),
+                    Background = new SolidColorBrush(Color.FromArgb(10, 34, 139, 34))
+                };
+
+                for (int i = 0; i < ifAction.ThenActions.Count; i++)
+                {
+                    var nestedAction = ifAction.ThenActions[i];
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, true);
+                    thenContainer.Children.Add(nestedCard);
+                }
+                thenSection.Children.Add(thenContainer);
+            }
+
+            var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, true);
+            thenSection.Children.Add(addThenActionsPanel);
+            container.Children.Add(thenSection);
+
+            // Section Else
+            var elseSection = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(20, 4, 0, 4)
+            };
+
+            var elseHeader = new TextBlock
+            {
+                Text = "Else:",
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 4),
+                Foreground = new SolidColorBrush(Color.FromRgb(200, 80, 80))
+            };
+            elseSection.Children.Add(elseHeader);
+
+            if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
+            {
+                var elseContainer = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    Margin = new Thickness(0, 0, 0, 4),
+                    Background = new SolidColorBrush(Color.FromArgb(10, 200, 80, 80))
+                };
+
+                for (int i = 0; i < ifAction.ElseActions.Count; i++)
+                {
+                    var nestedAction = ifAction.ElseActions[i];
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, false);
+                    elseContainer.Children.Add(nestedCard);
+                }
+                elseSection.Children.Add(elseContainer);
+            }
+
+            var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, false);
+            elseSection.Children.Add(addElseActionsPanel);
+            container.Children.Add(elseSection);
+
+            return container;
+        }
+
+        /// <summary>
+        /// Crée un conteneur récursif pour un RepeatAction imbriqué dans un IfAction
+        /// </summary>
+        private FrameworkElement CreateNestedRepeatActionContainer(RepeatAction repeatAction, int ifActionIndex, int nestedIndex, bool isThen)
+        {
+            var container = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            // Créer une carte simple pour le RepeatAction (sans boutons monter/descendre car c'est imbriqué)
+            var card = CreateActionCard(repeatAction, ifActionIndex);
+            container.Children.Add(card);
+
+            // Créer un conteneur pour les actions imbriquées
+            if (repeatAction.Actions != null && repeatAction.Actions.Count > 0)
+            {
+                var nestedContainer = new StackPanel
+                {
+                    Orientation = Orientation.Vertical,
+                    Margin = new Thickness(20, 4, 0, 4),
+                    Background = new SolidColorBrush(Color.FromArgb(10, 138, 43, 226))
+                };
+
+                for (int i = 0; i < repeatAction.Actions.Count; i++)
+                {
+                    var nestedAction = repeatAction.Actions[i];
+                    var nestedCard = CreateNestedActionCard(nestedAction, ifActionIndex, i);
+                    nestedContainer.Children.Add(nestedCard);
+                }
+                container.Children.Add(nestedContainer);
+            }
+
+            // Ajouter un panel pour ajouter de nouvelles actions
+            var addActionsPanel = CreateAddActionsPanel(repeatAction, ifActionIndex);
+            container.Children.Add(addActionsPanel);
+
+            return container;
         }
 
         /// <summary>
