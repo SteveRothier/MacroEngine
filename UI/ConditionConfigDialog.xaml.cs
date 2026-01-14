@@ -348,7 +348,7 @@ namespace MacroEngine.UI
             if (Result!.PixelColorConfig == null)
                 Result.PixelColorConfig = new PixelColorCondition();
 
-            // Coordonnées X, Y
+            // Coordonnées X, Y (déclarer d'abord pour être accessible dans le handler)
             var coordsPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -386,6 +386,111 @@ namespace MacroEngine.UI
             coordsPanel.Children.Add(yLabel);
             coordsPanel.Children.Add(yTextBox);
 
+            // Couleur (déclarer d'abord pour être accessible dans le handler)
+            var colorPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+
+            var colorPreviewBorder = new Border
+            {
+                Width = 40,
+                Height = 40,
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Colors.Gray),
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            
+            // Initialiser la couleur de prévisualisation
+            try
+            {
+                string hex = Result.PixelColorConfig.ExpectedColor.TrimStart('#');
+                if (hex.Length == 6)
+                {
+                    int r = Convert.ToInt32(hex.Substring(0, 2), 16);
+                    int g = Convert.ToInt32(hex.Substring(2, 2), 16);
+                    int b = Convert.ToInt32(hex.Substring(4, 2), 16);
+                    colorPreviewBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb((byte)r, (byte)g, (byte)b));
+                }
+            }
+            catch
+            {
+                colorPreviewBorder.Background = new SolidColorBrush(System.Windows.Media.Colors.Black);
+            }
+
+            var colorTextBox = new TextBox
+            {
+                Text = Result.PixelColorConfig.ExpectedColor,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                MinWidth = 120,
+                ToolTip = "Format: #FF0000"
+            };
+            colorTextBox.TextChanged += (s, e) =>
+            {
+                Result.PixelColorConfig!.ExpectedColor = colorTextBox.Text;
+                
+                // Mettre à jour la prévisualisation
+                try
+                {
+                    string hex = colorTextBox.Text.TrimStart('#');
+                    if (hex.Length == 6)
+                    {
+                        int r = Convert.ToInt32(hex.Substring(0, 2), 16);
+                        int g = Convert.ToInt32(hex.Substring(2, 2), 16);
+                        int b = Convert.ToInt32(hex.Substring(4, 2), 16);
+                        colorPreviewBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb((byte)r, (byte)g, (byte)b));
+                    }
+                }
+                catch { }
+            };
+
+            colorPanel.Children.Add(colorPreviewBorder);
+            colorPanel.Children.Add(colorTextBox);
+
+            // Bouton pipette (après avoir déclaré les variables)
+            var pipetteButton = new Button
+            {
+                Content = "🎨 Pipette (sélectionner à l'écran)",
+                FontSize = 13,
+                Padding = new Thickness(12, 8, 12, 8),
+                Margin = new Thickness(0, 0, 0, 12),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            pipetteButton.Click += (s, e) =>
+            {
+                try
+                {
+                    var colorPicker = new ColorPickerWindow
+                    {
+                        Owner = this
+                    };
+                    if (colorPicker.ShowDialog() == true)
+                    {
+                        Result.PixelColorConfig!.X = colorPicker.SelectedX;
+                        Result.PixelColorConfig!.Y = colorPicker.SelectedY;
+                        Result.PixelColorConfig!.ExpectedColor = colorPicker.ColorHex;
+                        
+                        // Mettre à jour les champs
+                        xTextBox.Text = colorPicker.SelectedX.ToString();
+                        yTextBox.Text = colorPicker.SelectedY.ToString();
+                        colorTextBox.Text = colorPicker.ColorHex;
+                        colorPreviewBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(
+                            colorPicker.SelectedColor.R,
+                            colorPicker.SelectedColor.G,
+                            colorPicker.SelectedColor.B));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erreur lors de la sélection de couleur : {ex.Message}", 
+                        "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
+            ConfigContentPanel.Children.Add(pipetteButton);
+
             ConfigContentPanel.Children.Add(new TextBlock
             {
                 Text = "Coordonnées:",
@@ -395,28 +500,14 @@ namespace MacroEngine.UI
             });
             ConfigContentPanel.Children.Add(coordsPanel);
 
-            // Couleur
-            var colorLabel = new TextBlock
+            ConfigContentPanel.Children.Add(new TextBlock
             {
                 Text = "Couleur attendue (hex):",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 8, 0, 4)
-            };
-            ConfigContentPanel.Children.Add(colorLabel);
-
-            var colorTextBox = new TextBox
-            {
-                Text = Result.PixelColorConfig.ExpectedColor,
-                FontSize = 12,
-                Margin = new Thickness(0, 0, 0, 12),
-                ToolTip = "Format: #FF0000"
-            };
-            colorTextBox.TextChanged += (s, e) =>
-            {
-                Result.PixelColorConfig!.ExpectedColor = colorTextBox.Text;
-            };
-            ConfigContentPanel.Children.Add(colorTextBox);
+            });
+            ConfigContentPanel.Children.Add(colorPanel);
 
             // Tolérance
             var toleranceLabel = new TextBlock
@@ -471,15 +562,7 @@ namespace MacroEngine.UI
             if (Result!.MousePositionConfig == null)
                 Result.MousePositionConfig = new MousePositionCondition();
 
-            // Zone (X1, Y1) - (X2, Y2)
-            ConfigContentPanel.Children.Add(new TextBlock
-            {
-                Text = "Zone (coin supérieur gauche):",
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 4)
-            });
-
+            // Zone (X1, Y1) - (X2, Y2) (déclarer d'abord pour être accessible dans le handler)
             var topLeftPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -516,15 +599,6 @@ namespace MacroEngine.UI
             topLeftPanel.Children.Add(x1TextBox);
             topLeftPanel.Children.Add(y1Label);
             topLeftPanel.Children.Add(y1TextBox);
-            ConfigContentPanel.Children.Add(topLeftPanel);
-
-            ConfigContentPanel.Children.Add(new TextBlock
-            {
-                Text = "Zone (coin inférieur droit):",
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 8, 0, 4)
-            });
 
             var bottomRightPanel = new StackPanel
             {
@@ -561,6 +635,62 @@ namespace MacroEngine.UI
             bottomRightPanel.Children.Add(x2TextBox);
             bottomRightPanel.Children.Add(y2Label);
             bottomRightPanel.Children.Add(y2TextBox);
+
+            // Bouton sélection graphique (après avoir déclaré les variables)
+            var selectZoneButton = new Button
+            {
+                Content = "📐 Sélectionner une zone à l'écran",
+                FontSize = 13,
+                Padding = new Thickness(12, 8, 12, 8),
+                Margin = new Thickness(0, 0, 0, 12),
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            selectZoneButton.Click += (s, e) =>
+            {
+                try
+                {
+                    var zoneSelector = new ZoneSelectorWindow
+                    {
+                        Owner = this
+                    };
+                    if (zoneSelector.ShowDialog() == true)
+                    {
+                        Result.MousePositionConfig!.X1 = zoneSelector.X1;
+                        Result.MousePositionConfig!.Y1 = zoneSelector.Y1;
+                        Result.MousePositionConfig!.X2 = zoneSelector.X2;
+                        Result.MousePositionConfig!.Y2 = zoneSelector.Y2;
+                        
+                        // Mettre à jour les champs
+                        x1TextBox.Text = zoneSelector.X1.ToString();
+                        y1TextBox.Text = zoneSelector.Y1.ToString();
+                        x2TextBox.Text = zoneSelector.X2.ToString();
+                        y2TextBox.Text = zoneSelector.Y2.ToString();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erreur lors de la sélection de zone : {ex.Message}", 
+                        "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            };
+            ConfigContentPanel.Children.Add(selectZoneButton);
+
+            ConfigContentPanel.Children.Add(new TextBlock
+            {
+                Text = "Zone (coin supérieur gauche):",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 4)
+            });
+            ConfigContentPanel.Children.Add(topLeftPanel);
+
+            ConfigContentPanel.Children.Add(new TextBlock
+            {
+                Text = "Zone (coin inférieur droit):",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 8, 0, 4)
+            });
             ConfigContentPanel.Children.Add(bottomRightPanel);
         }
 
