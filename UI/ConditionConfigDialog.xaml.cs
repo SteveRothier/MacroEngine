@@ -118,6 +118,9 @@ namespace MacroEngine.UI
 
                     if (Result.Conditions.Count > 1)
                     {
+                        // Capturer l'index dans une variable locale pour la closure
+                        var conditionIndex = i;
+                        
                         var removeButton = new Button
                         {
                             Content = "✕",
@@ -130,11 +133,36 @@ namespace MacroEngine.UI
                         };
                         removeButton.Click += (s, e) =>
                         {
-                            Result.Conditions.RemoveAt(i);
-                            if (i > 0 && Result.Operators.Count >= i)
+                            // Supprimer la condition
+                            if (conditionIndex >= 0 && conditionIndex < Result.Conditions.Count)
                             {
-                                Result.Operators.RemoveAt(i - 1);
+                                Result.Conditions.RemoveAt(conditionIndex);
+                                
+                                // Supprimer l'opérateur correspondant
+                                // Les opérateurs sont entre les conditions :
+                                // - op[0] entre cond[0] et cond[1]
+                                // - op[1] entre cond[1] et cond[2]
+                                // Si on supprime cond[i], on supprime op[i] (sauf si c'est la dernière condition)
+                                if (Result.Operators.Count > 0)
+                                {
+                                    if (conditionIndex == 0)
+                                    {
+                                        // Supprimer la première condition : supprimer op[0]
+                                        Result.Operators.RemoveAt(0);
+                                    }
+                                    else if (conditionIndex >= Result.Operators.Count)
+                                    {
+                                        // Supprimer la dernière condition : supprimer le dernier opérateur
+                                        Result.Operators.RemoveAt(Result.Operators.Count - 1);
+                                    }
+                                    else
+                                    {
+                                        // Supprimer une condition au milieu : supprimer op[conditionIndex]
+                                        Result.Operators.RemoveAt(conditionIndex);
+                                    }
+                                }
                             }
+                            
                             RefreshConditionsUI();
                         };
                         headerPanel.Children.Add(removeButton);
