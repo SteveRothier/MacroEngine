@@ -2166,15 +2166,33 @@ namespace MacroEngine.UI
         /// </summary>
         private StackPanel CreateIfActionControls(IfAction ifAction, int index, Panel parentPanel)
         {
-            // Créer un panel vertical pour contenir le type de condition et ses paramètres
-            var mainPanel = new StackPanel
+            // Initialiser Conditions si vide (compatibilité avec l'ancien format)
+            if (ifAction.Conditions == null || ifAction.Conditions.Count == 0)
             {
-                Orientation = Orientation.Vertical,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+                ifAction.Conditions = new List<ConditionItem>();
+                var conditionItem = new ConditionItem
+                {
+                    ConditionType = ifAction.ConditionType,
+                    Condition = ifAction.Condition,
+                    ActiveApplicationConfig = ifAction.ActiveApplicationConfig,
+                    KeyboardKeyConfig = ifAction.KeyboardKeyConfig,
+                    ProcessRunningConfig = ifAction.ProcessRunningConfig,
+                    PixelColorConfig = ifAction.PixelColorConfig,
+                    MousePositionConfig = ifAction.MousePositionConfig,
+                    TimeDateConfig = ifAction.TimeDateConfig,
+                    ImageOnScreenConfig = ifAction.ImageOnScreenConfig,
+                    TextOnScreenConfig = ifAction.TextOnScreenConfig
+                };
+                ifAction.Conditions.Add(conditionItem);
+            }
 
-            // Panel horizontal pour le type de condition
-            var typePanel = new StackPanel
+            if (ifAction.Operators == null)
+            {
+                ifAction.Operators = new List<LogicalOperator>();
+            }
+
+            // Créer un panel horizontal pour afficher toutes les conditions
+            var mainPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center
@@ -2190,56 +2208,290 @@ namespace MacroEngine.UI
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234))
             };
-            typePanel.Children.Add(ifLabel);
+            mainPanel.Children.Add(ifLabel);
 
-            // ComboBox pour sélectionner le type de condition
-            var conditionTypeComboBox = new ComboBox
+            // Afficher toutes les conditions existantes
+            for (int i = 0; i < ifAction.Conditions.Count; i++)
             {
-                Width = 180,
-                FontSize = 12,
+                var condition = ifAction.Conditions[i];
+                var conditionIndex = i; // Capture pour la closure
+
+                // Panel pour une condition
+                var conditionPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 8, 0)
+                };
+
+                // ComboBox pour le type de condition
+                var conditionTypeComboBox = new ComboBox
+                {
+                    Width = 150,
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                conditionTypeComboBox.Items.Add("Booléen");
+                conditionTypeComboBox.Items.Add("Application active");
+                conditionTypeComboBox.Items.Add("Touche clavier");
+                conditionTypeComboBox.Items.Add("Processus ouvert");
+                conditionTypeComboBox.Items.Add("Pixel couleur");
+                conditionTypeComboBox.Items.Add("Position souris");
+                conditionTypeComboBox.Items.Add("Temps/Date");
+                conditionTypeComboBox.Items.Add("Image à l'écran");
+                conditionTypeComboBox.Items.Add("Texte à l'écran");
+                conditionTypeComboBox.SelectedIndex = (int)condition.ConditionType;
+
+                conditionTypeComboBox.SelectionChanged += (s, e) =>
+                {
+                    if (conditionTypeComboBox.SelectedIndex >= 0)
+                    {
+                        SaveState();
+                        condition.ConditionType = (ConditionType)conditionTypeComboBox.SelectedIndex;
+                        // Réinitialiser les configurations
+                        condition.ActiveApplicationConfig = null;
+                        condition.KeyboardKeyConfig = null;
+                        condition.ProcessRunningConfig = null;
+                        condition.PixelColorConfig = null;
+                        condition.MousePositionConfig = null;
+                        condition.TimeDateConfig = null;
+                        condition.ImageOnScreenConfig = null;
+                        condition.TextOnScreenConfig = null;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                };
+                conditionPanel.Children.Add(conditionTypeComboBox);
+
+                // Bouton pour configurer cette condition
+                var configButton = new Button
+                {
+                    Content = "⚙",
+                    Width = 28,
+                    Height = 28,
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 0, 0),
+                    Cursor = Cursors.Hand,
+                    ToolTip = "Configurer cette condition"
+                };
+                configButton.Click += (s, e) =>
+                {
+                    // Créer un IfAction temporaire avec seulement cette condition pour le dialogue
+                    var tempIfAction = new IfAction
+                    {
+                        Conditions = new List<ConditionItem> { condition },
+                        Operators = new List<LogicalOperator>()
+                    };
+                    var dialog = new ConditionConfigDialog(tempIfAction);
+                    dialog.Owner = Window.GetWindow(this);
+                    if (dialog.ShowDialog() == true && dialog.Result != null && dialog.Result.Conditions.Count > 0)
+                    {
+                        SaveState();
+                        // Copier la configuration de la condition
+                        var resultCondition = dialog.Result.Conditions[0];
+                        condition.ConditionType = resultCondition.ConditionType;
+                        condition.Condition = resultCondition.Condition;
+                        condition.ActiveApplicationConfig = resultCondition.ActiveApplicationConfig;
+                        condition.KeyboardKeyConfig = resultCondition.KeyboardKeyConfig;
+                        condition.ProcessRunningConfig = resultCondition.ProcessRunningConfig;
+                        condition.PixelColorConfig = resultCondition.PixelColorConfig;
+                        condition.MousePositionConfig = resultCondition.MousePositionConfig;
+                        condition.TimeDateConfig = resultCondition.TimeDateConfig;
+                        condition.ImageOnScreenConfig = resultCondition.ImageOnScreenConfig;
+                        condition.TextOnScreenConfig = resultCondition.TextOnScreenConfig;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                };
+                conditionPanel.Children.Add(configButton);
+
+                // Bouton pour supprimer cette condition (si plus d'une condition)
+                if (ifAction.Conditions.Count > 1)
+                {
+                    var removeButton = new Button
+                    {
+                        Content = "✕",
+                        Width = 24,
+                        Height = 24,
+                        FontSize = 10,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(4, 0, 0, 0),
+                        Cursor = Cursors.Hand,
+                        ToolTip = "Supprimer cette condition"
+                    };
+                    removeButton.Click += (s, e) =>
+                    {
+                        SaveState();
+                        if (conditionIndex >= 0 && conditionIndex < ifAction.Conditions.Count)
+                        {
+                            ifAction.Conditions.RemoveAt(conditionIndex);
+                            
+                            // Supprimer l'opérateur correspondant
+                            if (ifAction.Operators.Count > 0)
+                            {
+                                if (conditionIndex == 0)
+                                {
+                                    ifAction.Operators.RemoveAt(0);
+                                }
+                                else if (conditionIndex >= ifAction.Operators.Count)
+                                {
+                                    ifAction.Operators.RemoveAt(ifAction.Operators.Count - 1);
+                                }
+                                else
+                                {
+                                    ifAction.Operators.RemoveAt(conditionIndex);
+                                }
+                            }
+                        }
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    };
+                    conditionPanel.Children.Add(removeButton);
+                }
+
+                mainPanel.Children.Add(conditionPanel);
+
+                // Opérateur logique (sauf pour la dernière condition)
+                if (i < ifAction.Conditions.Count - 1)
+                {
+                    var operatorComboBox = new ComboBox
+                    {
+                        Width = 60,
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(4, 0, 4, 0)
+                    };
+                    operatorComboBox.Items.Add("ET");
+                    operatorComboBox.Items.Add("OU");
+
+                    // Initialiser la valeur
+                    if (i < ifAction.Operators.Count)
+                    {
+                        operatorComboBox.SelectedIndex = ifAction.Operators[i] == LogicalOperator.AND ? 0 : 1;
+                    }
+                    else
+                    {
+                        operatorComboBox.SelectedIndex = 0; // AND par défaut
+                        if (ifAction.Operators.Count <= i)
+                        {
+                            while (ifAction.Operators.Count <= i)
+                            {
+                                ifAction.Operators.Add(LogicalOperator.AND);
+                            }
+                        }
+                    }
+
+                    var operatorIndex = i; // Capture pour la closure
+                    operatorComboBox.SelectionChanged += (s, e) =>
+                    {
+                        if (operatorComboBox.SelectedIndex >= 0)
+                        {
+                            SaveState();
+                            if (operatorIndex < ifAction.Operators.Count)
+                            {
+                                ifAction.Operators[operatorIndex] = operatorComboBox.SelectedIndex == 0 
+                                    ? LogicalOperator.AND 
+                                    : LogicalOperator.OR;
+                            }
+                            else
+                            {
+                                while (ifAction.Operators.Count <= operatorIndex)
+                                {
+                                    ifAction.Operators.Add(LogicalOperator.AND);
+                                }
+                                ifAction.Operators[operatorIndex] = operatorComboBox.SelectedIndex == 0 
+                                    ? LogicalOperator.AND 
+                                    : LogicalOperator.OR;
+                            }
+                            _currentMacro!.ModifiedAt = DateTime.Now;
+                            RefreshBlocks();
+                            MacroChanged?.Invoke(this, EventArgs.Empty);
+                        }
+                    };
+                    mainPanel.Children.Add(operatorComboBox);
+                }
+            }
+
+            // Bouton pour ajouter une nouvelle condition
+            var addButton = new Button
+            {
+                Content = "+",
+                Width = 28,
+                Height = 28,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
+                Margin = new Thickness(8, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Ajouter une condition"
             };
-
-            conditionTypeComboBox.Items.Add("Booléen (Vrai/Faux)");
-            conditionTypeComboBox.Items.Add("Application active");
-            conditionTypeComboBox.Items.Add("Touche clavier");
-            conditionTypeComboBox.Items.Add("Processus ouvert");
-            conditionTypeComboBox.Items.Add("Pixel couleur");
-            conditionTypeComboBox.Items.Add("Position souris");
-            conditionTypeComboBox.Items.Add("Temps/Date");
-            conditionTypeComboBox.Items.Add("Image à l'écran");
-            conditionTypeComboBox.Items.Add("Texte à l'écran");
-
-            // Sélectionner l'item correspondant au type actuel (première condition si plusieurs)
-            var currentConditionType = ifAction.Conditions != null && ifAction.Conditions.Count > 0 
-                ? ifAction.Conditions[0].ConditionType 
-                : ifAction.ConditionType;
-            conditionTypeComboBox.SelectedIndex = (int)currentConditionType;
-
-            conditionTypeComboBox.SelectionChanged += (s, e) =>
+            addButton.Click += (s, e) =>
             {
-                if (conditionTypeComboBox.SelectedIndex >= 0)
+                SaveState();
+                var newCondition = new ConditionItem
+                {
+                    ConditionType = ConditionType.Boolean,
+                    Condition = true
+                };
+                ifAction.Conditions.Add(newCondition);
+                
+                // Ajouter un opérateur si nécessaire
+                if (ifAction.Conditions.Count > 1 && ifAction.Operators.Count < ifAction.Conditions.Count - 1)
+                {
+                    ifAction.Operators.Add(LogicalOperator.AND);
+                }
+                
+                _currentMacro!.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            };
+            mainPanel.Children.Add(addButton);
+
+            // Bouton "Configurer..." pour ouvrir le dialogue complet
+            var fullConfigButton = new Button
+            {
+                Content = "Configurer...",
+                Width = 100,
+                Height = 28,
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Ouvrir le dialogue de configuration complet"
+            };
+            fullConfigButton.Click += (s, e) =>
+            {
+                var dialog = new ConditionConfigDialog(ifAction);
+                dialog.Owner = Window.GetWindow(this);
+                if (dialog.ShowDialog() == true && dialog.Result != null)
                 {
                     SaveState();
-                    ifAction.ConditionType = (ConditionType)conditionTypeComboBox.SelectedIndex;
+                    var result = dialog.Result;
+                    ifAction.Conditions = result.Conditions != null ? new List<ConditionItem>(result.Conditions) : new List<ConditionItem>();
+                    ifAction.Operators = result.Operators != null ? new List<LogicalOperator>(result.Operators) : new List<LogicalOperator>();
                     
-                    // Initialiser la configuration selon le type
-                    InitializeConditionConfig(ifAction);
+                    // Copier aussi les anciennes propriétés pour compatibilité
+                    ifAction.ConditionType = result.ConditionType;
+                    ifAction.Condition = result.Condition;
+                    ifAction.ActiveApplicationConfig = result.ActiveApplicationConfig;
+                    ifAction.KeyboardKeyConfig = result.KeyboardKeyConfig;
+                    ifAction.ProcessRunningConfig = result.ProcessRunningConfig;
+                    ifAction.PixelColorConfig = result.PixelColorConfig;
+                    ifAction.MousePositionConfig = result.MousePositionConfig;
+                    ifAction.TimeDateConfig = result.TimeDateConfig;
+                    ifAction.ImageOnScreenConfig = result.ImageOnScreenConfig;
+                    ifAction.TextOnScreenConfig = result.TextOnScreenConfig;
                     
                     _currentMacro!.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
                 }
             };
-
-            typePanel.Children.Add(conditionTypeComboBox);
-
-            // Panel pour les paramètres spécifiques selon le type
-            var configPanel = CreateConditionConfigPanel(ifAction, index);
-            typePanel.Children.Add(configPanel);
-
-            mainPanel.Children.Add(typePanel);
+            mainPanel.Children.Add(fullConfigButton);
 
             return mainPanel;
         }
@@ -2360,20 +2612,25 @@ namespace MacroEngine.UI
         /// </summary>
         private string GetConditionPreview(IfAction ifAction)
         {
-            // Si plusieurs conditions, afficher un résumé
+            // Si plusieurs conditions, afficher toutes les conditions avec leurs opérateurs
             if (ifAction.Conditions != null && ifAction.Conditions.Count > 1)
             {
                 var previews = new List<string>();
-                for (int i = 0; i < Math.Min(ifAction.Conditions.Count, 2); i++) // Limiter à 2 pour l'aperçu
+                for (int i = 0; i < ifAction.Conditions.Count; i++)
                 {
                     var condition = ifAction.Conditions[i];
                     var preview = GetConditionPreviewText(condition);
                     if (!string.IsNullOrEmpty(preview))
                         previews.Add(preview);
+                    
+                    // Ajouter l'opérateur entre les conditions
+                    if (i < ifAction.Conditions.Count - 1 && i < ifAction.Operators.Count)
+                    {
+                        var op = ifAction.Operators[i] == LogicalOperator.AND ? "ET" : "OU";
+                        previews.Add(op);
+                    }
                 }
-                if (ifAction.Conditions.Count > 2)
-                    previews.Add("...");
-                return string.Join(" | ", previews);
+                return string.Join(" ", previews);
             }
             
             // Une seule condition ou compatibilité avec l'ancien format
