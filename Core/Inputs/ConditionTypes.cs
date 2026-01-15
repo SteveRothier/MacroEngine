@@ -347,4 +347,76 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         public int[]? SearchArea { get; set; } = null;
     }
+
+    /// <summary>
+    /// Opérateur logique pour combiner plusieurs conditions
+    /// </summary>
+    public enum LogicalOperator
+    {
+        /// <summary>
+        /// ET logique (toutes les conditions doivent être vraies)
+        /// </summary>
+        AND,
+
+        /// <summary>
+        /// OU logique (au moins une condition doit être vraie)
+        /// </summary>
+        OR
+    }
+
+    /// <summary>
+    /// Représente une condition individuelle avec sa configuration
+    /// </summary>
+    public class ConditionItem
+    {
+        /// <summary>
+        /// Type de condition
+        /// </summary>
+        public ConditionType ConditionType { get; set; } = ConditionType.Boolean;
+
+        /// <summary>
+        /// Condition booléenne simple (pour ConditionType.Boolean)
+        /// </summary>
+        public bool Condition { get; set; } = true;
+
+        /// <summary>
+        /// Configuration pour condition "Application active"
+        /// </summary>
+        public ActiveApplicationCondition? ActiveApplicationConfig { get; set; }
+
+        /// <summary>
+        /// Configuration pour condition "Touche clavier"
+        /// </summary>
+        public KeyboardKeyCondition? KeyboardKeyConfig { get; set; }
+
+        /// <summary>
+        /// Configuration pour condition "Processus ouvert"
+        /// </summary>
+        public ProcessRunningCondition? ProcessRunningConfig { get; set; }
+
+        /// <summary>
+        /// Configuration pour condition "Pixel couleur"
+        /// </summary>
+        public PixelColorCondition? PixelColorConfig { get; set; }
+
+        /// <summary>
+        /// Configuration pour condition "Position souris"
+        /// </summary>
+        public MousePositionCondition? MousePositionConfig { get; set; }
+
+        /// <summary>
+        /// Configuration pour condition "Temps/Date"
+        /// </summary>
+        public TimeDateCondition? TimeDateConfig { get; set; }
+
+        /// <summary>
+        /// Configuration pour condition "Image à l'écran"
+        /// </summary>
+        public ImageOnScreenCondition? ImageOnScreenConfig { get; set; }
+
+        /// <summary>
+        /// Configuration pour condition "Texte à l'écran"
+        /// </summary>
+        public TextOnScreenCondition? TextOnScreenConfig { get; set; }
+    }
 }

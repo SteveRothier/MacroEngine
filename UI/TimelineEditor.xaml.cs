@@ -813,11 +813,38 @@ namespace MacroEngine.UI
 
         private string GetIfActionTitle(IfAction ifAction)
         {
+            // Si plusieurs conditions, afficher un résumé
+            if (ifAction.Conditions != null && ifAction.Conditions.Count > 1)
+            {
+                var conditionTexts = new List<string>();
+                for (int i = 0; i < ifAction.Conditions.Count; i++)
+                {
+                    var condition = ifAction.Conditions[i];
+                    var conditionText = GetConditionText(condition);
+                    conditionTexts.Add(conditionText);
+                    
+                    // Ajouter l'opérateur entre les conditions
+                    if (i < ifAction.Conditions.Count - 1 && i < ifAction.Operators.Count)
+                    {
+                        var op = ifAction.Operators[i] == LogicalOperator.AND ? "ET" : "OU";
+                        conditionTexts.Add(op);
+                    }
+                }
+                return $"Si {string.Join(" ", conditionTexts)}";
+            }
+            
+            // Une seule condition ou compatibilité avec l'ancien format
+            if (ifAction.Conditions != null && ifAction.Conditions.Count == 1)
+            {
+                return GetConditionText(ifAction.Conditions[0]);
+            }
+            
+            // Ancien format (compatibilité)
             return ifAction.ConditionType switch
             {
                 ConditionType.Boolean => ifAction.Condition ? "Si (Vrai)" : "Si (Faux)",
-                ConditionType.ActiveApplication => ifAction.ActiveApplicationConfig != null 
-                    ? $"Si {ifAction.ActiveApplicationConfig.ProcessName} est actif" 
+                ConditionType.ActiveApplication => ifAction.ActiveApplicationConfig != null
+                    ? $"Si {ifAction.ActiveApplicationConfig.ProcessName} est actif"
                     : "Si Application active",
                 ConditionType.KeyboardKey => ifAction.KeyboardKeyConfig != null
                     ? $"Si {GetKeyName(ifAction.KeyboardKeyConfig.VirtualKeyCode)} est pressée"
@@ -839,6 +866,42 @@ namespace MacroEngine.UI
                     : "Si Image à l'écran",
                 ConditionType.TextOnScreen => ifAction.TextOnScreenConfig != null
                     ? $"Si texte \"{ifAction.TextOnScreenConfig.Text}\" visible"
+                    : "Si Texte à l'écran",
+                _ => "Si"
+            };
+        }
+
+        private string GetConditionText(ConditionItem condition)
+        {
+            if (condition == null)
+                return "Si (condition vide)";
+
+            return condition.ConditionType switch
+            {
+                ConditionType.Boolean => condition.Condition ? "Si (Vrai)" : "Si (Faux)",
+                ConditionType.ActiveApplication => condition.ActiveApplicationConfig != null && condition.ActiveApplicationConfig.ProcessNames != null && condition.ActiveApplicationConfig.ProcessNames.Count > 0
+                    ? $"Si {string.Join(" ou ", condition.ActiveApplicationConfig.ProcessNames)} est actif"
+                    : "Si Application active",
+                ConditionType.KeyboardKey => condition.KeyboardKeyConfig != null && condition.KeyboardKeyConfig.VirtualKeyCode != 0
+                    ? $"Si {GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode)} est pressée"
+                    : "Si Touche clavier",
+                ConditionType.ProcessRunning => condition.ProcessRunningConfig != null && condition.ProcessRunningConfig.ProcessNames != null && condition.ProcessRunningConfig.ProcessNames.Count > 0
+                    ? $"Si {string.Join(" ou ", condition.ProcessRunningConfig.ProcessNames)} est ouvert"
+                    : "Si Processus ouvert",
+                ConditionType.PixelColor => condition.PixelColorConfig != null
+                    ? $"Si pixel ({condition.PixelColorConfig.X},{condition.PixelColorConfig.Y}) = {condition.PixelColorConfig.ExpectedColor}"
+                    : "Si Pixel couleur",
+                ConditionType.MousePosition => condition.MousePositionConfig != null
+                    ? $"Si souris dans zone ({condition.MousePositionConfig.X1},{condition.MousePositionConfig.Y1})-({condition.MousePositionConfig.X2},{condition.MousePositionConfig.Y2})"
+                    : "Si Position souris",
+                ConditionType.TimeDate => condition.TimeDateConfig != null
+                    ? $"Si {condition.TimeDateConfig.ComparisonType} {GetTimeOperatorSymbol(condition.TimeDateConfig.Operator)} {condition.TimeDateConfig.Value}"
+                    : "Si Temps/Date",
+                ConditionType.ImageOnScreen => condition.ImageOnScreenConfig != null && !string.IsNullOrEmpty(condition.ImageOnScreenConfig.ImagePath)
+                    ? $"Si image \"{System.IO.Path.GetFileName(condition.ImageOnScreenConfig.ImagePath)}\" visible"
+                    : "Si Image à l'écran",
+                ConditionType.TextOnScreen => condition.TextOnScreenConfig != null && !string.IsNullOrEmpty(condition.TextOnScreenConfig.Text)
+                    ? $"Si texte \"{(condition.TextOnScreenConfig.Text.Length > 30 ? condition.TextOnScreenConfig.Text.Substring(0, 30) + "..." : condition.TextOnScreenConfig.Text)}\" visible"
                     : "Si Texte à l'écran",
                 _ => "Si"
             };
@@ -2148,8 +2211,11 @@ namespace MacroEngine.UI
             conditionTypeComboBox.Items.Add("Image à l'écran");
             conditionTypeComboBox.Items.Add("Texte à l'écran");
 
-            // Sélectionner l'item correspondant au type actuel
-            conditionTypeComboBox.SelectedIndex = (int)ifAction.ConditionType;
+            // Sélectionner l'item correspondant au type actuel (première condition si plusieurs)
+            var currentConditionType = ifAction.Conditions != null && ifAction.Conditions.Count > 0 
+                ? ifAction.Conditions[0].ConditionType 
+                : ifAction.ConditionType;
+            conditionTypeComboBox.SelectedIndex = (int)currentConditionType;
 
             conditionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -2246,6 +2312,10 @@ namespace MacroEngine.UI
                     SaveState();
                     // Copier la configuration depuis le dialogue
                     var result = dialog.Result;
+                    ifAction.Conditions = result.Conditions != null ? new List<ConditionItem>(result.Conditions) : new List<ConditionItem>();
+                    ifAction.Operators = result.Operators != null ? new List<LogicalOperator>(result.Operators) : new List<LogicalOperator>();
+                    
+                    // Copier aussi les anciennes propriétés pour compatibilité
                     ifAction.ConditionType = result.ConditionType;
                     ifAction.Condition = result.Condition;
                     ifAction.ActiveApplicationConfig = result.ActiveApplicationConfig;
@@ -2290,6 +2360,29 @@ namespace MacroEngine.UI
         /// </summary>
         private string GetConditionPreview(IfAction ifAction)
         {
+            // Si plusieurs conditions, afficher un résumé
+            if (ifAction.Conditions != null && ifAction.Conditions.Count > 1)
+            {
+                var previews = new List<string>();
+                for (int i = 0; i < Math.Min(ifAction.Conditions.Count, 2); i++) // Limiter à 2 pour l'aperçu
+                {
+                    var condition = ifAction.Conditions[i];
+                    var preview = GetConditionPreviewText(condition);
+                    if (!string.IsNullOrEmpty(preview))
+                        previews.Add(preview);
+                }
+                if (ifAction.Conditions.Count > 2)
+                    previews.Add("...");
+                return string.Join(" | ", previews);
+            }
+            
+            // Une seule condition ou compatibilité avec l'ancien format
+            if (ifAction.Conditions != null && ifAction.Conditions.Count == 1)
+            {
+                return GetConditionPreviewText(ifAction.Conditions[0]);
+            }
+            
+            // Ancien format (compatibilité)
             return ifAction.ConditionType switch
             {
                 ConditionType.Boolean => ifAction.Condition ? "Vrai" : "Faux",
@@ -2316,6 +2409,42 @@ namespace MacroEngine.UI
                     : "Image: (non configuré)",
                 ConditionType.TextOnScreen => ifAction.TextOnScreenConfig != null && !string.IsNullOrEmpty(ifAction.TextOnScreenConfig.Text)
                     ? $"Texte: \"{ifAction.TextOnScreenConfig.Text.Substring(0, Math.Min(20, ifAction.TextOnScreenConfig.Text.Length))}\"..."
+                    : "Texte: (non configuré)",
+                _ => ""
+            };
+        }
+
+        private string GetConditionPreviewText(ConditionItem condition)
+        {
+            if (condition == null)
+                return "";
+
+            return condition.ConditionType switch
+            {
+                ConditionType.Boolean => condition.Condition ? "Vrai" : "Faux",
+                ConditionType.ActiveApplication => condition.ActiveApplicationConfig != null && condition.ActiveApplicationConfig.ProcessNames != null && condition.ActiveApplicationConfig.ProcessNames.Count > 0
+                    ? $"App: {string.Join(", ", condition.ActiveApplicationConfig.ProcessNames.Take(2))}"
+                    : "App: (non configuré)",
+                ConditionType.KeyboardKey => condition.KeyboardKeyConfig != null && condition.KeyboardKeyConfig.VirtualKeyCode != 0
+                    ? $"Touche: {GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode)}"
+                    : "Touche: (non configuré)",
+                ConditionType.ProcessRunning => condition.ProcessRunningConfig != null && condition.ProcessRunningConfig.ProcessNames != null && condition.ProcessRunningConfig.ProcessNames.Count > 0
+                    ? $"Processus: {string.Join(", ", condition.ProcessRunningConfig.ProcessNames.Take(2))}"
+                    : "Processus: (non configuré)",
+                ConditionType.PixelColor => condition.PixelColorConfig != null
+                    ? $"Pixel ({condition.PixelColorConfig.X},{condition.PixelColorConfig.Y}) = {condition.PixelColorConfig.ExpectedColor}"
+                    : "Pixel: (non configuré)",
+                ConditionType.MousePosition => condition.MousePositionConfig != null
+                    ? $"Zone ({condition.MousePositionConfig.X1},{condition.MousePositionConfig.Y1})-({condition.MousePositionConfig.X2},{condition.MousePositionConfig.Y2})"
+                    : "Zone: (non configuré)",
+                ConditionType.TimeDate => condition.TimeDateConfig != null
+                    ? $"{condition.TimeDateConfig.ComparisonType} {GetTimeOperatorSymbol(condition.TimeDateConfig.Operator)} {condition.TimeDateConfig.Value}"
+                    : "Temps: (non configuré)",
+                ConditionType.ImageOnScreen => condition.ImageOnScreenConfig != null && !string.IsNullOrEmpty(condition.ImageOnScreenConfig.ImagePath)
+                    ? $"Image: {System.IO.Path.GetFileName(condition.ImageOnScreenConfig.ImagePath)}"
+                    : "Image: (non configuré)",
+                ConditionType.TextOnScreen => condition.TextOnScreenConfig != null && !string.IsNullOrEmpty(condition.TextOnScreenConfig.Text)
+                    ? $"Texte: \"{condition.TextOnScreenConfig.Text.Substring(0, Math.Min(20, condition.TextOnScreenConfig.Text.Length))}\"..."
                     : "Texte: (non configuré)",
                 _ => ""
             };

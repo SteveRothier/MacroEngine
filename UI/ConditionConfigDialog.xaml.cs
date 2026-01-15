@@ -38,72 +38,405 @@ namespace MacroEngine.UI
         {
             ConfigContentPanel.Children.Clear();
 
-            switch (Result!.ConditionType)
+            // Initialiser Conditions si vide (compatibilité avec l'ancien format)
+            if (Result!.Conditions == null || Result.Conditions.Count == 0)
             {
-                case ConditionType.Boolean:
-                    CreateBooleanConfig();
-                    break;
-                case ConditionType.ActiveApplication:
-                    CreateActiveApplicationConfig();
-                    break;
-                case ConditionType.KeyboardKey:
-                    CreateKeyboardKeyConfig();
-                    break;
-                case ConditionType.ProcessRunning:
-                    CreateProcessRunningConfig();
-                    break;
-                case ConditionType.PixelColor:
-                    CreatePixelColorConfig();
-                    break;
-                case ConditionType.MousePosition:
-                    CreateMousePositionConfig();
-                    break;
-                case ConditionType.TimeDate:
-                    CreateTimeDateConfig();
-                    break;
-                case ConditionType.ImageOnScreen:
-                    CreateImageOnScreenConfig();
-                    break;
-                case ConditionType.TextOnScreen:
-                    CreateTextOnScreenConfig();
-                    break;
+                Result.Conditions = new List<ConditionItem>();
+                // Créer une condition à partir des anciennes propriétés
+                var conditionItem = new ConditionItem
+                {
+                    ConditionType = Result.ConditionType,
+                    Condition = Result.Condition,
+                    ActiveApplicationConfig = Result.ActiveApplicationConfig,
+                    KeyboardKeyConfig = Result.KeyboardKeyConfig,
+                    ProcessRunningConfig = Result.ProcessRunningConfig,
+                    PixelColorConfig = Result.PixelColorConfig,
+                    MousePositionConfig = Result.MousePositionConfig,
+                    TimeDateConfig = Result.TimeDateConfig,
+                    ImageOnScreenConfig = Result.ImageOnScreenConfig,
+                    TextOnScreenConfig = Result.TextOnScreenConfig
+                };
+                Result.Conditions.Add(conditionItem);
             }
+
+            if (Result.Operators == null)
+            {
+                Result.Operators = new List<LogicalOperator>();
+            }
+
+            // Créer l'interface pour gérer plusieurs conditions
+            CreateMultipleConditionsUI();
+        }
+
+        private void CreateMultipleConditionsUI()
+        {
+            // Titre
+            var titleLabel = new TextBlock
+            {
+                Text = "Conditions composées (AND/OR):",
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            ConfigContentPanel.Children.Add(titleLabel);
+
+            // Conteneur pour les conditions
+            var conditionsContainer = new StackPanel();
+            ConfigContentPanel.Children.Add(conditionsContainer);
+
+            void RefreshConditionsUI()
+            {
+                conditionsContainer.Children.Clear();
+
+                for (int i = 0; i < Result!.Conditions.Count; i++)
+                {
+                    var condition = Result.Conditions[i];
+
+                    // Panel pour une condition
+                    var conditionPanel = new Border
+                    {
+                        BorderBrush = new SolidColorBrush(Colors.LightGray),
+                        BorderThickness = new Thickness(1),
+                        Padding = new Thickness(12),
+                        Margin = new Thickness(0, 0, 0, 12),
+                        Background = new SolidColorBrush(Colors.White)
+                    };
+
+                    var conditionContent = new StackPanel();
+
+                    // En-tête avec type et bouton supprimer
+                    var headerPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+                    
+                    var conditionTypeLabel = new TextBlock
+                    {
+                        Text = $"Condition {i + 1}: {GetConditionTypeName(condition.ConditionType)}",
+                        FontSize = 13,
+                        FontWeight = FontWeights.SemiBold,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    headerPanel.Children.Add(conditionTypeLabel);
+
+                    if (Result.Conditions.Count > 1)
+                    {
+                        var removeButton = new Button
+                        {
+                            Content = "✕",
+                            Width = 24,
+                            Height = 24,
+                            Margin = new Thickness(10, 0, 0, 0),
+                            Padding = new Thickness(0),
+                            FontSize = 12,
+                            VerticalAlignment = VerticalAlignment.Center
+                        };
+                        removeButton.Click += (s, e) =>
+                        {
+                            Result.Conditions.RemoveAt(i);
+                            if (i > 0 && Result.Operators.Count >= i)
+                            {
+                                Result.Operators.RemoveAt(i - 1);
+                            }
+                            RefreshConditionsUI();
+                        };
+                        headerPanel.Children.Add(removeButton);
+                    }
+
+                    conditionContent.Children.Add(headerPanel);
+
+                    // Configuration de la condition
+                    var configPanel = CreateConditionConfigPanel(condition);
+                    conditionContent.Children.Add(configPanel);
+
+                    conditionPanel.Child = conditionContent;
+                    conditionsContainer.Children.Add(conditionPanel);
+
+                    // Opérateur logique (sauf pour la dernière condition)
+                    if (i < Result.Conditions.Count - 1)
+                    {
+                        var operatorPanel = new StackPanel
+                        {
+                            Orientation = Orientation.Horizontal,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            Margin = new Thickness(0, 0, 0, 12)
+                        };
+
+                        var operatorLabel = new TextBlock
+                        {
+                            Text = "Opérateur:",
+                            FontSize = 12,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Margin = new Thickness(0, 0, 8, 0)
+                        };
+                        operatorPanel.Children.Add(operatorLabel);
+
+                        var operatorComboBox = new ComboBox
+                        {
+                            Width = 100,
+                            FontSize = 12
+                        };
+                        operatorComboBox.Items.Add("ET (AND)");
+                        operatorComboBox.Items.Add("OU (OR)");
+
+                        // Initialiser la valeur
+                        if (i < Result.Operators.Count)
+                        {
+                            operatorComboBox.SelectedIndex = Result.Operators[i] == LogicalOperator.AND ? 0 : 1;
+                        }
+                        else
+                        {
+                            operatorComboBox.SelectedIndex = 0; // AND par défaut
+                            if (Result.Operators.Count <= i)
+                            {
+                                while (Result.Operators.Count <= i)
+                                {
+                                    Result.Operators.Add(LogicalOperator.AND);
+                                }
+                            }
+                        }
+
+                        var operatorIndex = i; // Capture pour la closure
+                        operatorComboBox.SelectionChanged += (s, e) =>
+                        {
+                            if (operatorComboBox.SelectedIndex >= 0)
+                            {
+                                if (operatorIndex < Result.Operators.Count)
+                                {
+                                    Result.Operators[operatorIndex] = operatorComboBox.SelectedIndex == 0 
+                                        ? LogicalOperator.AND 
+                                        : LogicalOperator.OR;
+                                }
+                                else
+                                {
+                                    while (Result.Operators.Count <= operatorIndex)
+                                    {
+                                        Result.Operators.Add(LogicalOperator.AND);
+                                    }
+                                    Result.Operators[operatorIndex] = operatorComboBox.SelectedIndex == 0 
+                                        ? LogicalOperator.AND 
+                                        : LogicalOperator.OR;
+                                }
+                            }
+                        };
+
+                        operatorPanel.Children.Add(operatorComboBox);
+                        conditionsContainer.Children.Add(operatorPanel);
+                    }
+                }
+            }
+
+            // Bouton pour ajouter une condition
+            var addConditionButton = new Button
+            {
+                Content = "+ Ajouter une condition",
+                Width = 200,
+                Height = 32,
+                Margin = new Thickness(0, 12, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+            addConditionButton.Click += (s, e) =>
+            {
+                // Créer une nouvelle condition par défaut
+                var newCondition = new ConditionItem
+                {
+                    ConditionType = ConditionType.Boolean,
+                    Condition = true
+                };
+                Result!.Conditions.Add(newCondition);
+                
+                // Ajouter un opérateur si nécessaire
+                if (Result.Conditions.Count > 1 && Result.Operators.Count < Result.Conditions.Count - 1)
+                {
+                    Result.Operators.Add(LogicalOperator.AND);
+                }
+                
+                RefreshConditionsUI();
+            };
+            ConfigContentPanel.Children.Add(addConditionButton);
+
+            // Initialiser l'UI
+            RefreshConditionsUI();
+        }
+
+        private string GetConditionTypeName(ConditionType type)
+        {
+            return type switch
+            {
+                ConditionType.Boolean => "Booléenne",
+                ConditionType.ActiveApplication => "Application active",
+                ConditionType.KeyboardKey => "Touche clavier",
+                ConditionType.ProcessRunning => "Processus ouvert",
+                ConditionType.PixelColor => "Pixel couleur",
+                ConditionType.MousePosition => "Position souris",
+                ConditionType.TimeDate => "Temps/Date",
+                ConditionType.ImageOnScreen => "Image à l'écran",
+                ConditionType.TextOnScreen => "Texte à l'écran",
+                _ => "Inconnue"
+            };
+        }
+
+        private StackPanel CreateConditionConfigPanel(ConditionItem condition)
+        {
+            var panel = new StackPanel();
+            
+            // Sélecteur de type de condition
+            var typeLabel = new TextBlock
+            {
+                Text = "Type:",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            panel.Children.Add(typeLabel);
+
+            var typeComboBox = new ComboBox
+            {
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            typeComboBox.Items.Add("Booléenne");
+            typeComboBox.Items.Add("Application active");
+            typeComboBox.Items.Add("Touche clavier");
+            typeComboBox.Items.Add("Processus ouvert");
+            typeComboBox.Items.Add("Pixel couleur");
+            typeComboBox.Items.Add("Position souris");
+            typeComboBox.Items.Add("Temps/Date");
+            typeComboBox.Items.Add("Image à l'écran");
+            typeComboBox.Items.Add("Texte à l'écran");
+
+            typeComboBox.SelectedIndex = (int)condition.ConditionType;
+            typeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (typeComboBox.SelectedIndex >= 0)
+                {
+                    condition.ConditionType = (ConditionType)typeComboBox.SelectedIndex;
+                    // Réinitialiser les configurations
+                    condition.ActiveApplicationConfig = null;
+                    condition.KeyboardKeyConfig = null;
+                    condition.ProcessRunningConfig = null;
+                    condition.PixelColorConfig = null;
+                    condition.MousePositionConfig = null;
+                    condition.TimeDateConfig = null;
+                    condition.ImageOnScreenConfig = null;
+                    condition.TextOnScreenConfig = null;
+                    // Recharger l'UI
+                    LoadConfiguration();
+                }
+            };
+            panel.Children.Add(typeComboBox);
+
+            // Configuration spécifique selon le type
+            var configPanel = new StackPanel();
+            panel.Children.Add(configPanel);
+
+            // Créer la configuration selon le type en utilisant les méthodes existantes
+            // On modifie temporairement Result pour utiliser cette condition
+            var tempResult = Result;
+            var tempPanel = ConfigContentPanel;
+            
+            // Créer un IfAction temporaire avec cette condition
+            Result = new IfAction { Conditions = new List<ConditionItem> { condition } };
+            ConfigContentPanel = configPanel;
+            
+            try
+            {
+                switch (condition.ConditionType)
+                {
+                    case ConditionType.Boolean:
+                        CreateBooleanConfig();
+                        break;
+                    case ConditionType.ActiveApplication:
+                        CreateActiveApplicationConfig();
+                        break;
+                    case ConditionType.KeyboardKey:
+                        CreateKeyboardKeyConfig();
+                        break;
+                    case ConditionType.ProcessRunning:
+                        CreateProcessRunningConfig();
+                        break;
+                    case ConditionType.PixelColor:
+                        CreatePixelColorConfig();
+                        break;
+                    case ConditionType.MousePosition:
+                        CreateMousePositionConfig();
+                        break;
+                    case ConditionType.TimeDate:
+                        CreateTimeDateConfig();
+                        break;
+                    case ConditionType.ImageOnScreen:
+                        CreateImageOnScreenConfig();
+                        break;
+                    case ConditionType.TextOnScreen:
+                        CreateTextOnScreenConfig();
+                        break;
+                }
+            }
+            finally
+            {
+                // Restaurer les valeurs
+                Result = tempResult;
+                ConfigContentPanel = tempPanel;
+            }
+
+            return panel;
         }
 
         private void CreateBooleanConfig()
         {
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.Boolean };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
             var checkBox = new CheckBox
             {
                 Content = "Condition vraie",
-                IsChecked = Result!.Condition,
+                IsChecked = condition.Condition,
                 FontSize = 14
             };
-            
-            checkBox.Checked += (s, e) => Result!.Condition = true;
-            checkBox.Unchecked += (s, e) => Result!.Condition = false;
-            
+
+            checkBox.Checked += (s, e) => condition.Condition = true;
+            checkBox.Unchecked += (s, e) => condition.Condition = false;
+
             ConfigContentPanel.Children.Add(checkBox);
         }
 
         private void CreateActiveApplicationConfig()
         {
-            if (Result!.ActiveApplicationConfig == null)
-                Result.ActiveApplicationConfig = new ActiveApplicationCondition();
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.ActiveApplication };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.ActiveApplicationConfig == null)
+                condition.ActiveApplicationConfig = new ActiveApplicationCondition();
 
             // Initialiser la liste si vide (compatibilité avec l'ancien format)
-            if (Result.ActiveApplicationConfig.ProcessNames == null || Result.ActiveApplicationConfig.ProcessNames.Count == 0)
+            if (condition.ActiveApplicationConfig.ProcessNames == null || condition.ActiveApplicationConfig.ProcessNames.Count == 0)
             {
-                if (!string.IsNullOrEmpty(Result.ActiveApplicationConfig.ProcessName))
+                if (!string.IsNullOrEmpty(condition.ActiveApplicationConfig.ProcessName))
                 {
-                    Result.ActiveApplicationConfig.ProcessNames = new List<string> { Result.ActiveApplicationConfig.ProcessName };
+                    condition.ActiveApplicationConfig.ProcessNames = new List<string> { condition.ActiveApplicationConfig.ProcessName };
                 }
                 else
                 {
-                    Result.ActiveApplicationConfig.ProcessNames = new List<string>();
+                    condition.ActiveApplicationConfig.ProcessNames = new List<string>();
                 }
             }
 
-            var selectedProcessNames = new HashSet<string>(Result.ActiveApplicationConfig.ProcessNames, StringComparer.OrdinalIgnoreCase);
+            var selectedProcessNames = new HashSet<string>(condition.ActiveApplicationConfig.ProcessNames, StringComparer.OrdinalIgnoreCase);
             var allProcesses = new ObservableCollection<SelectableProcessInfo>();
             var filteredProcesses = new ObservableCollection<SelectableProcessInfo>();
 
@@ -247,7 +580,7 @@ namespace MacroEngine.UI
             void UpdateSelectedAppsDisplay()
             {
                 selectedAppsPanel.Children.Clear();
-                Result.ActiveApplicationConfig!.ProcessNames = selectedProcessNames.ToList();
+                condition.ActiveApplicationConfig!.ProcessNames = selectedProcessNames.ToList();
 
                 if (selectedProcessNames.Count == 0)
                 {
@@ -408,13 +741,13 @@ namespace MacroEngine.UI
 
             var titleTextBox = new TextBox
             {
-                Text = Result.ActiveApplicationConfig.WindowTitle ?? "",
+                Text = condition.ActiveApplicationConfig.WindowTitle ?? "",
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 0, 8)
             };
             titleTextBox.TextChanged += (s, e) =>
             {
-                Result.ActiveApplicationConfig!.WindowTitle = titleTextBox.Text;
+                condition.ActiveApplicationConfig!.WindowTitle = titleTextBox.Text;
             };
             ConfigContentPanel.Children.Add(titleTextBox);
 
@@ -435,11 +768,11 @@ namespace MacroEngine.UI
             };
             matchModeComboBox.Items.Add("Exact");
             matchModeComboBox.Items.Add("Contient");
-            matchModeComboBox.SelectedIndex = (int)Result.ActiveApplicationConfig.TitleMatchMode;
+            matchModeComboBox.SelectedIndex = (int)condition.ActiveApplicationConfig.TitleMatchMode;
             matchModeComboBox.SelectionChanged += (s, e) =>
             {
                 if (matchModeComboBox.SelectedIndex >= 0)
-                    Result.ActiveApplicationConfig!.TitleMatchMode = (TextMatchMode)matchModeComboBox.SelectedIndex;
+                    condition.ActiveApplicationConfig!.TitleMatchMode = (TextMatchMode)matchModeComboBox.SelectedIndex;
             };
             ConfigContentPanel.Children.Add(matchModeComboBox);
 
@@ -447,12 +780,12 @@ namespace MacroEngine.UI
             var anyWindowCheckBox = new CheckBox
             {
                 Content = "Peu importe la fenêtre active (vérifie juste si le processus existe)",
-                IsChecked = Result.ActiveApplicationConfig.AnyWindow,
+                IsChecked = condition.ActiveApplicationConfig.AnyWindow,
                 FontSize = 12,
                 Margin = new Thickness(0, 8, 0, 0)
             };
-            anyWindowCheckBox.Checked += (s, e) => Result.ActiveApplicationConfig!.AnyWindow = true;
-            anyWindowCheckBox.Unchecked += (s, e) => Result.ActiveApplicationConfig!.AnyWindow = false;
+            anyWindowCheckBox.Checked += (s, e) => condition.ActiveApplicationConfig!.AnyWindow = true;
+            anyWindowCheckBox.Unchecked += (s, e) => condition.ActiveApplicationConfig!.AnyWindow = false;
             ConfigContentPanel.Children.Add(anyWindowCheckBox);
 
             // Configurer les événements
@@ -467,8 +800,20 @@ namespace MacroEngine.UI
 
         private void CreateKeyboardKeyConfig()
         {
-            if (Result!.KeyboardKeyConfig == null)
-                Result.KeyboardKeyConfig = new KeyboardKeyCondition();
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.KeyboardKey };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.KeyboardKeyConfig == null)
+                condition.KeyboardKeyConfig = new KeyboardKeyCondition();
 
             // Sélecteur de touche
             var keyLabel = new TextBlock
@@ -482,9 +827,9 @@ namespace MacroEngine.UI
 
             var keyTextBox = new TextBox
             {
-                Text = Result.KeyboardKeyConfig.VirtualKeyCode == 0 
+                Text = condition.KeyboardKeyConfig.VirtualKeyCode == 0 
                     ? "Appuyez sur une touche..." 
-                    : GetKeyName(Result.KeyboardKeyConfig.VirtualKeyCode),
+                    : GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode),
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 0, 12),
                 IsReadOnly = true,
@@ -524,7 +869,7 @@ namespace MacroEngine.UI
                 {
                     e.Handled = true;
                     Keyboard.ClearFocus();
-                    if (!keyCaptured && Result.KeyboardKeyConfig.VirtualKeyCode == 0)
+                    if (!keyCaptured && condition.KeyboardKeyConfig.VirtualKeyCode == 0)
                     {
                         keyTextBox.Text = "Appuyez sur une touche...";
                         keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
@@ -532,7 +877,7 @@ namespace MacroEngine.UI
                     }
                     else
                     {
-                        keyTextBox.Text = GetKeyName(Result.KeyboardKeyConfig.VirtualKeyCode);
+                        keyTextBox.Text = GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode);
                         keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
                         keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
                     }
@@ -545,8 +890,8 @@ namespace MacroEngine.UI
                     int virtualKeyCode = KeyInterop.VirtualKeyFromKey(e.Key);
                     if (virtualKeyCode > 0)
                     {
-                        Result.KeyboardKeyConfig!.VirtualKeyCode = (ushort)virtualKeyCode;
-                        keyTextBox.Text = GetKeyName(Result.KeyboardKeyConfig.VirtualKeyCode);
+                        condition.KeyboardKeyConfig!.VirtualKeyCode = (ushort)virtualKeyCode;
+                        keyTextBox.Text = GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode);
                         keyCaptured = true;
                         keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
                         keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
@@ -562,13 +907,13 @@ namespace MacroEngine.UI
 
             keyTextBox.LostFocus += (s, e) =>
             {
-                if (!keyCaptured && Result.KeyboardKeyConfig.VirtualKeyCode == 0)
+                if (!keyCaptured && condition.KeyboardKeyConfig.VirtualKeyCode == 0)
                 {
                     keyTextBox.Text = "Appuyez sur une touche...";
                 }
-                else if (Result.KeyboardKeyConfig.VirtualKeyCode > 0)
+                else if (condition.KeyboardKeyConfig.VirtualKeyCode > 0)
                 {
-                    keyTextBox.Text = GetKeyName(Result.KeyboardKeyConfig.VirtualKeyCode);
+                    keyTextBox.Text = GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode);
                 }
                 keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
                 keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
@@ -593,11 +938,11 @@ namespace MacroEngine.UI
             };
             stateComboBox.Items.Add("Maintenue");
             stateComboBox.Items.Add("Appuyée");
-            stateComboBox.SelectedIndex = (int)Result.KeyboardKeyConfig.State;
+            stateComboBox.SelectedIndex = (int)condition.KeyboardKeyConfig.State;
             stateComboBox.SelectionChanged += (s, e) =>
             {
                 if (stateComboBox.SelectedIndex >= 0)
-                    Result.KeyboardKeyConfig!.State = (KeyState)stateComboBox.SelectedIndex;
+                    condition.KeyboardKeyConfig!.State = (KeyState)stateComboBox.SelectedIndex;
             };
             ConfigContentPanel.Children.Add(stateComboBox);
 
@@ -614,31 +959,31 @@ namespace MacroEngine.UI
             var ctrlCheckBox = new CheckBox
             {
                 Content = "Ctrl",
-                IsChecked = Result.KeyboardKeyConfig.RequireCtrl,
+                IsChecked = condition.KeyboardKeyConfig.RequireCtrl,
                 FontSize = 12
             };
-            ctrlCheckBox.Checked += (s, e) => Result.KeyboardKeyConfig!.RequireCtrl = true;
-            ctrlCheckBox.Unchecked += (s, e) => Result.KeyboardKeyConfig!.RequireCtrl = false;
+            ctrlCheckBox.Checked += (s, e) => condition.KeyboardKeyConfig!.RequireCtrl = true;
+            ctrlCheckBox.Unchecked += (s, e) => condition.KeyboardKeyConfig!.RequireCtrl = false;
             ConfigContentPanel.Children.Add(ctrlCheckBox);
 
             var altCheckBox = new CheckBox
             {
                 Content = "Alt",
-                IsChecked = Result.KeyboardKeyConfig.RequireAlt,
+                IsChecked = condition.KeyboardKeyConfig.RequireAlt,
                 FontSize = 12
             };
-            altCheckBox.Checked += (s, e) => Result.KeyboardKeyConfig!.RequireAlt = true;
-            altCheckBox.Unchecked += (s, e) => Result.KeyboardKeyConfig!.RequireAlt = false;
+            altCheckBox.Checked += (s, e) => condition.KeyboardKeyConfig!.RequireAlt = true;
+            altCheckBox.Unchecked += (s, e) => condition.KeyboardKeyConfig!.RequireAlt = false;
             ConfigContentPanel.Children.Add(altCheckBox);
 
             var shiftCheckBox = new CheckBox
             {
                 Content = "Shift",
-                IsChecked = Result.KeyboardKeyConfig.RequireShift,
+                IsChecked = condition.KeyboardKeyConfig.RequireShift,
                 FontSize = 12
             };
-            shiftCheckBox.Checked += (s, e) => Result.KeyboardKeyConfig!.RequireShift = true;
-            shiftCheckBox.Unchecked += (s, e) => Result.KeyboardKeyConfig!.RequireShift = false;
+            shiftCheckBox.Checked += (s, e) => condition.KeyboardKeyConfig!.RequireShift = true;
+            shiftCheckBox.Unchecked += (s, e) => condition.KeyboardKeyConfig!.RequireShift = false;
             ConfigContentPanel.Children.Add(shiftCheckBox);
         }
 
@@ -766,23 +1111,35 @@ namespace MacroEngine.UI
 
         private void CreateProcessRunningConfig()
         {
-            if (Result!.ProcessRunningConfig == null)
-                Result.ProcessRunningConfig = new ProcessRunningCondition();
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.ProcessRunning };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.ProcessRunningConfig == null)
+                condition.ProcessRunningConfig = new ProcessRunningCondition();
 
             // Initialiser la liste si vide (compatibilité avec l'ancien format)
-            if (Result.ProcessRunningConfig.ProcessNames == null || Result.ProcessRunningConfig.ProcessNames.Count == 0)
+            if (condition.ProcessRunningConfig.ProcessNames == null || condition.ProcessRunningConfig.ProcessNames.Count == 0)
             {
-                if (!string.IsNullOrEmpty(Result.ProcessRunningConfig.ProcessName))
+                if (!string.IsNullOrEmpty(condition.ProcessRunningConfig.ProcessName))
                 {
-                    Result.ProcessRunningConfig.ProcessNames = new List<string> { Result.ProcessRunningConfig.ProcessName };
+                    condition.ProcessRunningConfig.ProcessNames = new List<string> { condition.ProcessRunningConfig.ProcessName };
                 }
                 else
                 {
-                    Result.ProcessRunningConfig.ProcessNames = new List<string>();
+                    condition.ProcessRunningConfig.ProcessNames = new List<string>();
                 }
             }
 
-            var selectedProcessNames = new HashSet<string>(Result.ProcessRunningConfig.ProcessNames, StringComparer.OrdinalIgnoreCase);
+            var selectedProcessNames = new HashSet<string>(condition.ProcessRunningConfig.ProcessNames, StringComparer.OrdinalIgnoreCase);
             var allProcesses = new ObservableCollection<SelectableProcessInfo>();
             var filteredProcesses = new ObservableCollection<SelectableProcessInfo>();
 
@@ -926,7 +1283,7 @@ namespace MacroEngine.UI
             void UpdateSelectedAppsDisplay()
             {
                 selectedAppsPanel.Children.Clear();
-                Result.ProcessRunningConfig!.ProcessNames = selectedProcessNames.ToList();
+                condition.ProcessRunningConfig!.ProcessNames = selectedProcessNames.ToList();
 
                 if (selectedProcessNames.Count == 0)
                 {
@@ -1079,12 +1436,12 @@ namespace MacroEngine.UI
             var anyWindowCheckBox = new CheckBox
             {
                 Content = "Peu importe la fenêtre active",
-                IsChecked = Result.ProcessRunningConfig.AnyWindow,
+                IsChecked = condition.ProcessRunningConfig.AnyWindow,
                 FontSize = 12,
                 Margin = new Thickness(0, 8, 0, 0)
             };
-            anyWindowCheckBox.Checked += (s, e) => Result.ProcessRunningConfig!.AnyWindow = true;
-            anyWindowCheckBox.Unchecked += (s, e) => Result.ProcessRunningConfig!.AnyWindow = false;
+            anyWindowCheckBox.Checked += (s, e) => condition.ProcessRunningConfig!.AnyWindow = true;
+            anyWindowCheckBox.Unchecked += (s, e) => condition.ProcessRunningConfig!.AnyWindow = false;
             ConfigContentPanel.Children.Add(anyWindowCheckBox);
 
             // Configurer les événements
@@ -1099,8 +1456,20 @@ namespace MacroEngine.UI
 
         private void CreatePixelColorConfig()
         {
-            if (Result!.PixelColorConfig == null)
-                Result.PixelColorConfig = new PixelColorCondition();
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.PixelColor };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.PixelColorConfig == null)
+                condition.PixelColorConfig = new PixelColorCondition();
 
             // Coordonnées X, Y (déclarer d'abord pour être accessible dans le handler)
             var coordsPanel = new StackPanel
@@ -1113,26 +1482,26 @@ namespace MacroEngine.UI
             var xTextBox = new TextBox
             {
                 Width = 80,
-                Text = Result.PixelColorConfig.X.ToString(),
+                Text = condition.PixelColorConfig.X.ToString(),
                 FontSize = 12
             };
             xTextBox.TextChanged += (s, e) =>
             {
                 if (int.TryParse(xTextBox.Text, out int x))
-                    Result.PixelColorConfig!.X = x;
+                    condition.PixelColorConfig!.X = x;
             };
 
             var yLabel = new TextBlock { Text = "Y:", Margin = new Thickness(12, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
             var yTextBox = new TextBox
             {
                 Width = 80,
-                Text = Result.PixelColorConfig.Y.ToString(),
+                Text = condition.PixelColorConfig.Y.ToString(),
                 FontSize = 12
             };
             yTextBox.TextChanged += (s, e) =>
             {
                 if (int.TryParse(yTextBox.Text, out int y))
-                    Result.PixelColorConfig!.Y = y;
+                    condition.PixelColorConfig!.Y = y;
             };
 
             coordsPanel.Children.Add(xLabel);
@@ -1160,7 +1529,7 @@ namespace MacroEngine.UI
             // Initialiser la couleur de prévisualisation
             try
             {
-                string hex = Result.PixelColorConfig.ExpectedColor.TrimStart('#');
+                string hex = condition.PixelColorConfig.ExpectedColor.TrimStart('#');
                 if (hex.Length == 6)
                 {
                     int r = Convert.ToInt32(hex.Substring(0, 2), 16);
@@ -1176,7 +1545,7 @@ namespace MacroEngine.UI
 
             var colorTextBox = new TextBox
             {
-                Text = Result.PixelColorConfig.ExpectedColor,
+                Text = condition.PixelColorConfig.ExpectedColor,
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 MinWidth = 120,
@@ -1184,7 +1553,7 @@ namespace MacroEngine.UI
             };
             colorTextBox.TextChanged += (s, e) =>
             {
-                Result.PixelColorConfig!.ExpectedColor = colorTextBox.Text;
+                condition.PixelColorConfig!.ExpectedColor = colorTextBox.Text;
                 
                 // Mettre à jour la prévisualisation
                 try
@@ -1223,9 +1592,9 @@ namespace MacroEngine.UI
                     };
                     if (colorPicker.ShowDialog() == true)
                     {
-                        Result.PixelColorConfig!.X = colorPicker.SelectedX;
-                        Result.PixelColorConfig!.Y = colorPicker.SelectedY;
-                        Result.PixelColorConfig!.ExpectedColor = colorPicker.ColorHex;
+                        condition.PixelColorConfig!.X = colorPicker.SelectedX;
+                        condition.PixelColorConfig!.Y = colorPicker.SelectedY;
+                        condition.PixelColorConfig!.ExpectedColor = colorPicker.ColorHex;
                         
                         // Mettre à jour les champs
                         xTextBox.Text = colorPicker.SelectedX.ToString();
@@ -1313,8 +1682,20 @@ namespace MacroEngine.UI
 
         private void CreateMousePositionConfig()
         {
-            if (Result!.MousePositionConfig == null)
-                Result.MousePositionConfig = new MousePositionCondition();
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.MousePosition };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.MousePositionConfig == null)
+                condition.MousePositionConfig = new MousePositionCondition();
 
             // Zone (X1, Y1) - (X2, Y2) (déclarer d'abord pour être accessible dans le handler)
             var topLeftPanel = new StackPanel
@@ -1327,26 +1708,26 @@ namespace MacroEngine.UI
             var x1TextBox = new TextBox
             {
                 Width = 80,
-                Text = Result.MousePositionConfig.X1.ToString(),
+                Text = condition.MousePositionConfig.X1.ToString(),
                 FontSize = 12
             };
             x1TextBox.TextChanged += (s, e) =>
             {
                 if (int.TryParse(x1TextBox.Text, out int x1))
-                    Result.MousePositionConfig!.X1 = x1;
+                    condition.MousePositionConfig!.X1 = x1;
             };
 
             var y1Label = new TextBlock { Text = "Y1:", Margin = new Thickness(12, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
             var y1TextBox = new TextBox
             {
                 Width = 80,
-                Text = Result.MousePositionConfig.Y1.ToString(),
+                Text = condition.MousePositionConfig.Y1.ToString(),
                 FontSize = 12
             };
             y1TextBox.TextChanged += (s, e) =>
             {
                 if (int.TryParse(y1TextBox.Text, out int y1))
-                    Result.MousePositionConfig!.Y1 = y1;
+                    condition.MousePositionConfig!.Y1 = y1;
             };
 
             topLeftPanel.Children.Add(x1Label);
@@ -1363,26 +1744,26 @@ namespace MacroEngine.UI
             var x2TextBox = new TextBox
             {
                 Width = 80,
-                Text = Result.MousePositionConfig.X2.ToString(),
+                Text = condition.MousePositionConfig.X2.ToString(),
                 FontSize = 12
             };
             x2TextBox.TextChanged += (s, e) =>
             {
                 if (int.TryParse(x2TextBox.Text, out int x2))
-                    Result.MousePositionConfig!.X2 = x2;
+                    condition.MousePositionConfig!.X2 = x2;
             };
 
             var y2Label = new TextBlock { Text = "Y2:", Margin = new Thickness(12, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
             var y2TextBox = new TextBox
             {
                 Width = 80,
-                Text = Result.MousePositionConfig.Y2.ToString(),
+                Text = condition.MousePositionConfig.Y2.ToString(),
                 FontSize = 12
             };
             y2TextBox.TextChanged += (s, e) =>
             {
                 if (int.TryParse(y2TextBox.Text, out int y2))
-                    Result.MousePositionConfig!.Y2 = y2;
+                    condition.MousePositionConfig!.Y2 = y2;
             };
 
             bottomRightPanel.Children.Add(x2Label);
@@ -1409,16 +1790,16 @@ namespace MacroEngine.UI
                     };
                     if (zoneSelector.ShowDialog() == true)
                     {
-                        Result.MousePositionConfig!.X1 = zoneSelector.X1;
-                        Result.MousePositionConfig!.Y1 = zoneSelector.Y1;
-                        Result.MousePositionConfig!.X2 = zoneSelector.X2;
-                        Result.MousePositionConfig!.Y2 = zoneSelector.Y2;
+                        condition.MousePositionConfig!.X1 = zoneSelector.X1;
+                        condition.MousePositionConfig!.Y1 = zoneSelector.Y1;
+                        condition.MousePositionConfig!.X2 = zoneSelector.X2;
+                        condition.MousePositionConfig!.Y2 = zoneSelector.Y2;
                         
                         // Mettre à jour les champs
-                        x1TextBox.Text = zoneSelector.X1.ToString();
-                        y1TextBox.Text = zoneSelector.Y1.ToString();
-                        x2TextBox.Text = zoneSelector.X2.ToString();
-                        y2TextBox.Text = zoneSelector.Y2.ToString();
+                        x1TextBox.Text = condition.MousePositionConfig.X1.ToString();
+                        y1TextBox.Text = condition.MousePositionConfig.Y1.ToString();
+                        x2TextBox.Text = condition.MousePositionConfig.X2.ToString();
+                        y2TextBox.Text = condition.MousePositionConfig.Y2.ToString();
                     }
                 }
                 catch (Exception ex)
@@ -1450,8 +1831,20 @@ namespace MacroEngine.UI
 
         private void CreateTimeDateConfig()
         {
-            if (Result!.TimeDateConfig == null)
-                Result.TimeDateConfig = new TimeDateCondition();
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.TimeDate };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.TimeDateConfig == null)
+                condition.TimeDateConfig = new TimeDateCondition();
 
             // Aperçu de la condition
             var previewTextBlock = new TextBlock
@@ -1466,9 +1859,9 @@ namespace MacroEngine.UI
 
             void UpdatePreview()
             {
-                var type = Result.TimeDateConfig!.ComparisonType;
-                var op = Result.TimeDateConfig.Operator;
-                var value = Result.TimeDateConfig.Value;
+                var type = condition.TimeDateConfig!.ComparisonType;
+                var op = condition.TimeDateConfig.Operator;
+                var value = condition.TimeDateConfig.Value;
 
                 var operatorSymbol = op switch
                 {
@@ -1541,7 +1934,7 @@ namespace MacroEngine.UI
             typeComboBox.Items.Add("Mois");
             typeComboBox.Items.Add("Année");
 
-            var typeIndex = Result.TimeDateConfig.ComparisonType switch
+            var typeIndex = condition.TimeDateConfig.ComparisonType switch
             {
                 "Hour" => 0,
                 "Minute" => 1,
@@ -1578,7 +1971,7 @@ namespace MacroEngine.UI
             {
                 if (typeComboBox.SelectedIndex >= 0)
                 {
-                    Result.TimeDateConfig!.ComparisonType = typeComboBox.SelectedIndex switch
+                    condition.TimeDateConfig!.ComparisonType = typeComboBox.SelectedIndex switch
                     {
                         0 => "Hour",
                         1 => "Minute",
@@ -1597,7 +1990,7 @@ namespace MacroEngine.UI
             {
                 if (operatorComboBox.SelectedIndex >= 0)
                 {
-                    Result.TimeDateConfig!.Operator = (TimeComparisonOperator)operatorComboBox.SelectedIndex;
+                    condition.TimeDateConfig!.Operator = (TimeComparisonOperator)operatorComboBox.SelectedIndex;
                     UpdatePreview();
                 }
             };
@@ -1608,7 +2001,7 @@ namespace MacroEngine.UI
             {
                 valueContainer.Children.Clear();
 
-                var type = Result.TimeDateConfig!.ComparisonType;
+                var type = condition.TimeDateConfig!.ComparisonType;
 
                 if (type == "Hour" || type == "Minute")
                 {
@@ -1668,13 +2061,13 @@ namespace MacroEngine.UI
                     // Initialiser les valeurs
                     if (type == "Hour")
                     {
-                        hourTextBox.Text = Result.TimeDateConfig.Value.ToString();
+                        hourTextBox.Text = condition.TimeDateConfig.Value.ToString();
                         minuteTextBox.Text = "0";
                         minuteTextBox.IsEnabled = false;
                     }
                     else // Minute
                     {
-                        var totalMinutes = Result.TimeDateConfig.Value;
+                        var totalMinutes = condition.TimeDateConfig.Value;
                         hourTextBox.Text = (totalMinutes / 60).ToString();
                         minuteTextBox.Text = (totalMinutes % 60).ToString();
                     }
@@ -1685,14 +2078,14 @@ namespace MacroEngine.UI
                         {
                             if (type == "Hour")
                             {
-                                Result.TimeDateConfig!.Value = Math.Max(0, Math.Min(23, hours));
-                                hourTextBox.Text = Result.TimeDateConfig.Value.ToString();
+                                condition.TimeDateConfig!.Value = Math.Max(0, Math.Min(23, hours));
+                                hourTextBox.Text = condition.TimeDateConfig.Value.ToString();
                             }
                             else // Minute
                             {
                                 if (int.TryParse(minuteTextBox.Text, out int minutes))
                                 {
-                                    Result.TimeDateConfig!.Value = hours * 60 + Math.Max(0, Math.Min(59, minutes));
+                                    condition.TimeDateConfig!.Value = hours * 60 + Math.Max(0, Math.Min(59, minutes));
                                     UpdatePreview();
                                 }
                             }
@@ -1704,7 +2097,7 @@ namespace MacroEngine.UI
                         if (int.TryParse(hourTextBox.Text, out int hours) &&
                             int.TryParse(minuteTextBox.Text, out int minutes))
                         {
-                            Result.TimeDateConfig!.Value = hours * 60 + Math.Max(0, Math.Min(59, minutes));
+                            condition.TimeDateConfig!.Value = hours * 60 + Math.Max(0, Math.Min(59, minutes));
                             UpdatePreview();
                         }
                     };
@@ -1736,14 +2129,14 @@ namespace MacroEngine.UI
                             dayComboBox.Items.Add(dayName);
                         
                         // Convertir la valeur (0-6 pour DayOfWeek: Dimanche=0, Lundi=1, etc.)
-                        var dayIndex = Math.Max(0, Math.Min(6, Result.TimeDateConfig.Value));
+                        var dayIndex = Math.Max(0, Math.Min(6, condition.TimeDateConfig.Value));
                         dayComboBox.SelectedIndex = dayIndex;
                         
                         dayComboBox.SelectionChanged += (s, e) =>
                         {
                             if (dayComboBox.SelectedIndex >= 0)
                             {
-                                Result.TimeDateConfig!.Value = dayComboBox.SelectedIndex;
+                                condition.TimeDateConfig!.Value = dayComboBox.SelectedIndex;
                                 UpdatePreview();
                             }
                         };
@@ -1762,12 +2155,12 @@ namespace MacroEngine.UI
                         foreach (var month in months)
                             monthComboBox.Items.Add(month);
                         
-                        monthComboBox.SelectedIndex = Math.Max(0, Math.Min(11, Result.TimeDateConfig.Value - 1));
+                        monthComboBox.SelectedIndex = Math.Max(0, Math.Min(11, condition.TimeDateConfig.Value - 1));
                         monthComboBox.SelectionChanged += (s, e) =>
                         {
                             if (monthComboBox.SelectedIndex >= 0)
                             {
-                                Result.TimeDateConfig!.Value = monthComboBox.SelectedIndex + 1;
+                                condition.TimeDateConfig!.Value = monthComboBox.SelectedIndex + 1;
                                 UpdatePreview();
                             }
                         };
@@ -1793,7 +2186,7 @@ namespace MacroEngine.UI
                         }
                         
                         // Sélectionner l'année actuelle si elle correspond
-                        var selectedYear = Result.TimeDateConfig.Value;
+                        var selectedYear = condition.TimeDateConfig.Value;
                         if (selectedYear >= currentYear - 10 && selectedYear <= currentYear + 10)
                         {
                             yearComboBox.SelectedIndex = selectedYear - (currentYear - 10);
@@ -1804,7 +2197,7 @@ namespace MacroEngine.UI
                             if (yearComboBox.SelectedIndex >= 0 && 
                                 int.TryParse(yearComboBox.SelectedItem?.ToString(), out int year))
                             {
-                                Result.TimeDateConfig!.Value = year;
+                                condition.TimeDateConfig!.Value = year;
                                 UpdatePreview();
                             }
                         };
@@ -1813,7 +2206,7 @@ namespace MacroEngine.UI
                         {
                             Width = 80,
                             FontSize = 12,
-                            Text = Result.TimeDateConfig.Value.ToString(),
+                            Text = condition.TimeDateConfig.Value.ToString(),
                             ToolTip = "Ou saisissez une année (1900-2100)"
                         };
                         yearTextBox.TextChanged += (s, e) =>
@@ -1821,7 +2214,7 @@ namespace MacroEngine.UI
                             if (int.TryParse(yearTextBox.Text, out int year))
                             {
                                 var validYear = Math.Max(1900, Math.Min(2100, year));
-                                Result.TimeDateConfig!.Value = validYear;
+                                condition.TimeDateConfig!.Value = validYear;
                                 yearTextBox.Text = validYear.ToString();
                                 
                                 // Mettre à jour le ComboBox si l'année est dans la plage
@@ -1861,8 +2254,20 @@ namespace MacroEngine.UI
 
         private void CreateImageOnScreenConfig()
         {
-            if (Result!.ImageOnScreenConfig == null)
-                Result.ImageOnScreenConfig = new ImageOnScreenCondition();
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.ImageOnScreen };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.ImageOnScreenConfig == null)
+                condition.ImageOnScreenConfig = new ImageOnScreenCondition();
 
             // Aperçu de l'image
             var imagePreviewBorder = new Border
@@ -1889,12 +2294,12 @@ namespace MacroEngine.UI
             {
                 try
                 {
-                    if (!string.IsNullOrEmpty(Result.ImageOnScreenConfig!.ImagePath) && 
-                        System.IO.File.Exists(Result.ImageOnScreenConfig.ImagePath))
+                    if (!string.IsNullOrEmpty(condition.ImageOnScreenConfig!.ImagePath) && 
+                        System.IO.File.Exists(condition.ImageOnScreenConfig.ImagePath))
                     {
                         var bitmap = new System.Windows.Media.Imaging.BitmapImage();
                         bitmap.BeginInit();
-                        bitmap.UriSource = new Uri(Result.ImageOnScreenConfig.ImagePath, UriKind.Absolute);
+                        bitmap.UriSource = new Uri(condition.ImageOnScreenConfig.ImagePath, UriKind.Absolute);
                         bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
                         bitmap.EndInit();
                         imagePreview.Source = bitmap;
@@ -1930,14 +2335,14 @@ namespace MacroEngine.UI
 
             var pathTextBox = new TextBox
             {
-                Text = Result.ImageOnScreenConfig.ImagePath,
+                Text = condition.ImageOnScreenConfig.ImagePath,
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 MinWidth = 300
             };
             pathTextBox.TextChanged += (s, e) =>
             {
-                Result.ImageOnScreenConfig!.ImagePath = pathTextBox.Text;
+                condition.ImageOnScreenConfig!.ImagePath = pathTextBox.Text;
                 UpdateImagePreview();
             };
 
@@ -2045,7 +2450,7 @@ namespace MacroEngine.UI
             {
                 Minimum = 0,
                 Maximum = 100,
-                Value = Result.ImageOnScreenConfig.Sensitivity,
+                Value = condition.ImageOnScreenConfig.Sensitivity,
                 Width = 200,
                 TickFrequency = 10,
                 IsSnapToTickEnabled = true,
@@ -2054,7 +2459,7 @@ namespace MacroEngine.UI
 
             var sensitivityValueText = new TextBlock
             {
-                Text = $"{Result.ImageOnScreenConfig.Sensitivity}%",
+                Text = $"{condition.ImageOnScreenConfig.Sensitivity}%",
                 FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
                 MinWidth = 50,
@@ -2065,7 +2470,7 @@ namespace MacroEngine.UI
             sensitivitySlider.ValueChanged += (s, e) =>
             {
                 var value = (int)sensitivitySlider.Value;
-                Result.ImageOnScreenConfig!.Sensitivity = value;
+                condition.ImageOnScreenConfig!.Sensitivity = value;
                 sensitivityValueText.Text = $"{value}%";
             };
 
@@ -2087,8 +2492,8 @@ namespace MacroEngine.UI
 
             var searchAreaInfoText = new TextBlock
             {
-                Text = "Zone actuelle: " + (Result.ImageOnScreenConfig.SearchArea != null && Result.ImageOnScreenConfig.SearchArea.Length == 4
-                    ? $"({Result.ImageOnScreenConfig.SearchArea[0]}, {Result.ImageOnScreenConfig.SearchArea[1]}) - ({Result.ImageOnScreenConfig.SearchArea[2]}, {Result.ImageOnScreenConfig.SearchArea[3]})"
+                Text = "Zone actuelle: " + (condition.ImageOnScreenConfig.SearchArea != null && condition.ImageOnScreenConfig.SearchArea.Length == 4
+                    ? $"({condition.ImageOnScreenConfig.SearchArea[0]}, {condition.ImageOnScreenConfig.SearchArea[1]}) - ({condition.ImageOnScreenConfig.SearchArea[2]}, {condition.ImageOnScreenConfig.SearchArea[3]})"
                     : "Tout l'écran"),
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Colors.Gray),
@@ -2114,14 +2519,14 @@ namespace MacroEngine.UI
                     };
                     if (zoneSelector.ShowDialog() == true)
                     {
-                        Result.ImageOnScreenConfig!.SearchArea = new int[]
+                        condition.ImageOnScreenConfig!.SearchArea = new int[]
                         {
                             zoneSelector.X1,
                             zoneSelector.Y1,
                             zoneSelector.X2,
                             zoneSelector.Y2
                         };
-                        searchAreaInfoText.Text = $"Zone: ({Result.ImageOnScreenConfig.SearchArea[0]}, {Result.ImageOnScreenConfig.SearchArea[1]}) - ({Result.ImageOnScreenConfig.SearchArea[2]}, {Result.ImageOnScreenConfig.SearchArea[3]})";
+                        searchAreaInfoText.Text = $"Zone: ({condition.ImageOnScreenConfig.SearchArea[0]}, {condition.ImageOnScreenConfig.SearchArea[1]}) - ({condition.ImageOnScreenConfig.SearchArea[2]}, {condition.ImageOnScreenConfig.SearchArea[3]})";
                     }
                 }
                 catch (Exception ex)
@@ -2141,7 +2546,7 @@ namespace MacroEngine.UI
 
             clearZoneButton.Click += (s, e) =>
             {
-                Result.ImageOnScreenConfig!.SearchArea = null;
+                condition.ImageOnScreenConfig!.SearchArea = null;
                 searchAreaInfoText.Text = "Zone actuelle: Tout l'écran";
             };
 
@@ -2156,8 +2561,20 @@ namespace MacroEngine.UI
 
         private void CreateTextOnScreenConfig()
         {
-            if (Result!.TextOnScreenConfig == null)
-                Result.TextOnScreenConfig = new TextOnScreenCondition();
+            // Utiliser la première condition ou créer une nouvelle
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.TextOnScreen };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.TextOnScreenConfig == null)
+                condition.TextOnScreenConfig = new TextOnScreenCondition();
 
             // Aperçu de la condition
             var previewTextBlock = new TextBlock
@@ -2172,7 +2589,7 @@ namespace MacroEngine.UI
 
             void UpdatePreview()
             {
-                var text = Result.TextOnScreenConfig!.Text;
+                var text = condition.TextOnScreenConfig!.Text;
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     previewTextBlock.Text = "Aucun texte défini";
@@ -2198,7 +2615,7 @@ namespace MacroEngine.UI
 
             var textTextBox = new TextBox
             {
-                Text = Result.TextOnScreenConfig.Text,
+                Text = condition.TextOnScreenConfig.Text,
                 FontSize = 12,
                 MinHeight = 120,
                 MaxHeight = 200,
@@ -2210,7 +2627,7 @@ namespace MacroEngine.UI
             };
             textTextBox.TextChanged += (s, e) =>
             {
-                Result.TextOnScreenConfig!.Text = textTextBox.Text;
+                condition.TextOnScreenConfig!.Text = textTextBox.Text;
                 UpdatePreview();
             };
             ConfigContentPanel.Children.Add(textTextBox);
@@ -2229,8 +2646,8 @@ namespace MacroEngine.UI
 
             var searchAreaInfoText = new TextBlock
             {
-                Text = "Zone actuelle: " + (Result.TextOnScreenConfig.SearchArea != null && Result.TextOnScreenConfig.SearchArea.Length == 4
-                    ? $"({Result.TextOnScreenConfig.SearchArea[0]}, {Result.TextOnScreenConfig.SearchArea[1]}) - ({Result.TextOnScreenConfig.SearchArea[2]}, {Result.TextOnScreenConfig.SearchArea[3]})"
+                Text = "Zone actuelle: " + (condition.TextOnScreenConfig.SearchArea != null && condition.TextOnScreenConfig.SearchArea.Length == 4
+                    ? $"({condition.TextOnScreenConfig.SearchArea[0]}, {condition.TextOnScreenConfig.SearchArea[1]}) - ({condition.TextOnScreenConfig.SearchArea[2]}, {condition.TextOnScreenConfig.SearchArea[3]})"
                     : "Tout l'écran"),
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Colors.Gray),
@@ -2256,14 +2673,14 @@ namespace MacroEngine.UI
                     };
                     if (zoneSelector.ShowDialog() == true)
                     {
-                        Result.TextOnScreenConfig!.SearchArea = new int[]
+                        condition.TextOnScreenConfig!.SearchArea = new int[]
                         {
                             zoneSelector.X1,
                             zoneSelector.Y1,
                             zoneSelector.X2,
                             zoneSelector.Y2
                         };
-                        searchAreaInfoText.Text = $"Zone: ({Result.TextOnScreenConfig.SearchArea[0]}, {Result.TextOnScreenConfig.SearchArea[1]}) - ({Result.TextOnScreenConfig.SearchArea[2]}, {Result.TextOnScreenConfig.SearchArea[3]})";
+                        searchAreaInfoText.Text = $"Zone: ({condition.TextOnScreenConfig.SearchArea[0]}, {condition.TextOnScreenConfig.SearchArea[1]}) - ({condition.TextOnScreenConfig.SearchArea[2]}, {condition.TextOnScreenConfig.SearchArea[3]})";
                     }
                 }
                 catch (Exception ex)
@@ -2284,7 +2701,7 @@ namespace MacroEngine.UI
 
             clearZoneButton.Click += (s, e) =>
             {
-                Result.TextOnScreenConfig!.SearchArea = null;
+                condition.TextOnScreenConfig!.SearchArea = null;
                 searchAreaInfoText.Text = "Zone actuelle: Tout l'écran";
             };
 

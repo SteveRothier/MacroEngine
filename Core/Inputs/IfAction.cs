@@ -17,54 +17,217 @@ namespace MacroEngine.Core.Inputs
         public InputActionType Type => InputActionType.Condition;
 
         /// <summary>
-        /// Type de condition
+        /// Liste des conditions à évaluer
         /// </summary>
-        public ConditionType ConditionType { get; set; } = ConditionType.Boolean;
+        public List<ConditionItem> Conditions { get; set; } = new List<ConditionItem>();
 
         /// <summary>
-        /// Condition booléenne simple (pour ConditionType.Boolean)
+        /// Opérateurs logiques entre les conditions (AND/OR)
+        /// La liste doit avoir (Conditions.Count - 1) éléments
+        /// Exemple: [Condition1] AND [Condition2] OR [Condition3] -> [AND, OR]
         /// </summary>
-        public bool Condition { get; set; } = true;
+        public List<LogicalOperator> Operators { get; set; } = new List<LogicalOperator>();
+
+        // Propriétés de compatibilité avec l'ancien format (pour la rétrocompatibilité)
+        /// <summary>
+        /// Type de condition (obsolète, utiliser Conditions)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public ConditionType ConditionType
+        {
+            get => Conditions.Count > 0 ? Conditions[0].ConditionType : ConditionType.Boolean;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = value });
+                }
+                else
+                {
+                    Conditions[0].ConditionType = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// Configuration pour condition "Application active"
+        /// Condition booléenne simple (obsolète, utiliser Conditions)
         /// </summary>
-        public ActiveApplicationCondition? ActiveApplicationConfig { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool Condition
+        {
+            get => Conditions.Count > 0 && Conditions[0].ConditionType == ConditionType.Boolean ? Conditions[0].Condition : true;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.Boolean, Condition = value });
+                }
+                else if (Conditions[0].ConditionType == ConditionType.Boolean)
+                {
+                    Conditions[0].Condition = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// Configuration pour condition "Touche clavier"
+        /// Configuration pour condition "Application active" (obsolète, utiliser Conditions)
         /// </summary>
-        public KeyboardKeyCondition? KeyboardKeyConfig { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public ActiveApplicationCondition? ActiveApplicationConfig
+        {
+            get => Conditions.Count > 0 ? Conditions[0].ActiveApplicationConfig : null;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.ActiveApplication, ActiveApplicationConfig = value });
+                }
+                else
+                {
+                    Conditions[0].ActiveApplicationConfig = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// Configuration pour condition "Processus ouvert"
+        /// Configuration pour condition "Touche clavier" (obsolète, utiliser Conditions)
         /// </summary>
-        public ProcessRunningCondition? ProcessRunningConfig { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public KeyboardKeyCondition? KeyboardKeyConfig
+        {
+            get => Conditions.Count > 0 ? Conditions[0].KeyboardKeyConfig : null;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.KeyboardKey, KeyboardKeyConfig = value });
+                }
+                else
+                {
+                    Conditions[0].KeyboardKeyConfig = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// Configuration pour condition "Pixel couleur"
+        /// Configuration pour condition "Processus ouvert" (obsolète, utiliser Conditions)
         /// </summary>
-        public PixelColorCondition? PixelColorConfig { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public ProcessRunningCondition? ProcessRunningConfig
+        {
+            get => Conditions.Count > 0 ? Conditions[0].ProcessRunningConfig : null;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.ProcessRunning, ProcessRunningConfig = value });
+                }
+                else
+                {
+                    Conditions[0].ProcessRunningConfig = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// Configuration pour condition "Position souris"
+        /// Configuration pour condition "Pixel couleur" (obsolète, utiliser Conditions)
         /// </summary>
-        public MousePositionCondition? MousePositionConfig { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public PixelColorCondition? PixelColorConfig
+        {
+            get => Conditions.Count > 0 ? Conditions[0].PixelColorConfig : null;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.PixelColor, PixelColorConfig = value });
+                }
+                else
+                {
+                    Conditions[0].PixelColorConfig = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// Configuration pour condition "Temps/Date"
+        /// Configuration pour condition "Position souris" (obsolète, utiliser Conditions)
         /// </summary>
-        public TimeDateCondition? TimeDateConfig { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public MousePositionCondition? MousePositionConfig
+        {
+            get => Conditions.Count > 0 ? Conditions[0].MousePositionConfig : null;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.MousePosition, MousePositionConfig = value });
+                }
+                else
+                {
+                    Conditions[0].MousePositionConfig = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// Configuration pour condition "Image à l'écran"
+        /// Configuration pour condition "Temps/Date" (obsolète, utiliser Conditions)
         /// </summary>
-        public ImageOnScreenCondition? ImageOnScreenConfig { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public TimeDateCondition? TimeDateConfig
+        {
+            get => Conditions.Count > 0 ? Conditions[0].TimeDateConfig : null;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.TimeDate, TimeDateConfig = value });
+                }
+                else
+                {
+                    Conditions[0].TimeDateConfig = value;
+                }
+            }
+        }
 
         /// <summary>
-        /// Configuration pour condition "Texte à l'écran"
+        /// Configuration pour condition "Image à l'écran" (obsolète, utiliser Conditions)
         /// </summary>
-        public TextOnScreenCondition? TextOnScreenConfig { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore]
+        public ImageOnScreenCondition? ImageOnScreenConfig
+        {
+            get => Conditions.Count > 0 ? Conditions[0].ImageOnScreenConfig : null;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.ImageOnScreen, ImageOnScreenConfig = value });
+                }
+                else
+                {
+                    Conditions[0].ImageOnScreenConfig = value;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Configuration pour condition "Texte à l'écran" (obsolète, utiliser Conditions)
+        /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public TextOnScreenCondition? TextOnScreenConfig
+        {
+            get => Conditions.Count > 0 ? Conditions[0].TextOnScreenConfig : null;
+            set
+            {
+                if (Conditions.Count == 0)
+                {
+                    Conditions.Add(new ConditionItem { ConditionType = ConditionType.TextOnScreen, TextOnScreenConfig = value });
+                }
+                else
+                {
+                    Conditions[0].TextOnScreenConfig = value;
+                }
+            }
+        }
 
         /// <summary>
         /// Liste des actions à exécuter si la condition est vraie (Then)
@@ -115,34 +278,93 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         private bool EvaluateCondition()
         {
-            return ConditionType switch
+            // Si aucune condition n'est définie, retourner false
+            if (Conditions == null || Conditions.Count == 0)
             {
-                ConditionType.Boolean => Condition,
-                ConditionType.ActiveApplication => EvaluateActiveApplicationCondition(),
-                ConditionType.KeyboardKey => EvaluateKeyboardKeyCondition(),
-                ConditionType.ProcessRunning => EvaluateProcessRunningCondition(),
-                ConditionType.PixelColor => EvaluatePixelColorCondition(),
-                ConditionType.MousePosition => EvaluateMousePositionCondition(),
-                ConditionType.TimeDate => EvaluateTimeDateCondition(),
-                ConditionType.ImageOnScreen => EvaluateImageOnScreenCondition(),
-                ConditionType.TextOnScreen => EvaluateTextOnScreenCondition(),
-                _ => Condition
+                // Compatibilité avec l'ancien format
+                return ConditionType switch
+                {
+                    ConditionType.Boolean => Condition,
+                    ConditionType.ActiveApplication => EvaluateActiveApplicationCondition(),
+                    ConditionType.KeyboardKey => EvaluateKeyboardKeyCondition(),
+                    ConditionType.ProcessRunning => EvaluateProcessRunningCondition(),
+                    ConditionType.PixelColor => EvaluatePixelColorCondition(),
+                    ConditionType.MousePosition => EvaluateMousePositionCondition(),
+                    ConditionType.TimeDate => EvaluateTimeDateCondition(),
+                    ConditionType.ImageOnScreen => EvaluateImageOnScreenCondition(),
+                    ConditionType.TextOnScreen => EvaluateTextOnScreenCondition(),
+                    _ => Condition
+                };
+            }
+
+            // Si une seule condition, l'évaluer directement
+            if (Conditions.Count == 1)
+            {
+                return EvaluateConditionItem(Conditions[0]);
+            }
+
+            // Évaluer toutes les conditions
+            var results = new List<bool>();
+            foreach (var condition in Conditions)
+            {
+                results.Add(EvaluateConditionItem(condition));
+            }
+
+            // Appliquer les opérateurs logiques
+            bool result = results[0];
+            for (int i = 0; i < Operators.Count && i < results.Count - 1; i++)
+            {
+                bool nextResult = results[i + 1];
+                if (Operators[i] == LogicalOperator.AND)
+                {
+                    result = result && nextResult;
+                }
+                else // OR
+                {
+                    result = result || nextResult;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Évalue une condition individuelle
+        /// </summary>
+        private bool EvaluateConditionItem(ConditionItem condition)
+        {
+            if (condition == null)
+                return false;
+
+            return condition.ConditionType switch
+            {
+                ConditionType.Boolean => condition.Condition,
+                ConditionType.ActiveApplication => EvaluateActiveApplicationCondition(condition.ActiveApplicationConfig),
+                ConditionType.KeyboardKey => EvaluateKeyboardKeyCondition(condition.KeyboardKeyConfig),
+                ConditionType.ProcessRunning => EvaluateProcessRunningCondition(condition.ProcessRunningConfig),
+                ConditionType.PixelColor => EvaluatePixelColorCondition(condition.PixelColorConfig),
+                ConditionType.MousePosition => EvaluateMousePositionCondition(condition.MousePositionConfig),
+                ConditionType.TimeDate => EvaluateTimeDateCondition(condition.TimeDateConfig),
+                ConditionType.ImageOnScreen => EvaluateImageOnScreenCondition(condition.ImageOnScreenConfig),
+                ConditionType.TextOnScreen => EvaluateTextOnScreenCondition(condition.TextOnScreenConfig),
+                _ => false
             };
         }
 
         /// <summary>
         /// Évalue la condition "Application active"
         /// </summary>
-        private bool EvaluateActiveApplicationCondition()
+        private bool EvaluateActiveApplicationCondition(ActiveApplicationCondition? config = null)
         {
-            if (ActiveApplicationConfig == null || 
-                ActiveApplicationConfig.ProcessNames == null || 
-                ActiveApplicationConfig.ProcessNames.Count == 0)
+            var configToUse = config ?? ActiveApplicationConfig;
+            if (configToUse == null || 
+                configToUse.ProcessNames == null || 
+                configToUse.ProcessNames.Count == 0)
             {
                 // Compatibilité avec l'ancien format (un seul processus)
-                if (!string.IsNullOrEmpty(ActiveApplicationConfig?.ProcessName))
+                if (!string.IsNullOrEmpty(configToUse?.ProcessName))
                 {
-                    return EvaluateSingleProcess(ActiveApplicationConfig.ProcessName);
+                    return EvaluateSingleProcess(configToUse.ProcessName, configToUse);
                 }
                 return false;
             }
@@ -150,9 +372,9 @@ namespace MacroEngine.Core.Inputs
             try
             {
                 // Vérifier si au moins un des processus sélectionnés correspond
-                foreach (var processName in ActiveApplicationConfig.ProcessNames)
+                foreach (var processName in configToUse.ProcessNames)
                 {
-                    if (EvaluateSingleProcess(processName))
+                    if (EvaluateSingleProcess(processName, configToUse))
                         return true;
                 }
                 return false;
@@ -166,9 +388,13 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Évalue si un processus spécifique correspond à la condition
         /// </summary>
-        private bool EvaluateSingleProcess(string processName)
+        private bool EvaluateSingleProcess(string processName, ActiveApplicationCondition? config = null)
         {
             if (string.IsNullOrEmpty(processName))
+                return false;
+
+            var configToUse = config ?? ActiveApplicationConfig;
+            if (configToUse == null)
                 return false;
 
             try
@@ -177,7 +403,7 @@ namespace MacroEngine.Core.Inputs
                 if (processes.Length == 0)
                     return false;
 
-                if (ActiveApplicationConfig!.AnyWindow)
+                if (configToUse.AnyWindow)
                     return true; // Peu importe la fenêtre active, le processus existe
 
                 // Vérifier si une fenêtre du processus est active
@@ -186,13 +412,13 @@ namespace MacroEngine.Core.Inputs
                 {
                     if (process.MainWindowHandle == activeWindow)
                     {
-                        if (!string.IsNullOrEmpty(ActiveApplicationConfig.WindowTitle))
+                        if (!string.IsNullOrEmpty(configToUse.WindowTitle))
                         {
                             var title = process.MainWindowTitle;
-                            return ActiveApplicationConfig.TitleMatchMode switch
+                            return configToUse.TitleMatchMode switch
                             {
-                                TextMatchMode.Exact => title == ActiveApplicationConfig.WindowTitle,
-                                TextMatchMode.Contains => title.Contains(ActiveApplicationConfig.WindowTitle, StringComparison.OrdinalIgnoreCase),
+                                TextMatchMode.Exact => title == configToUse.WindowTitle,
+                                TextMatchMode.Contains => title.Contains(configToUse.WindowTitle, StringComparison.OrdinalIgnoreCase),
                                 _ => true
                             };
                         }
@@ -210,21 +436,22 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Évalue la condition "Touche clavier"
         /// </summary>
-        private bool EvaluateKeyboardKeyCondition()
+        private bool EvaluateKeyboardKeyCondition(KeyboardKeyCondition? config = null)
         {
-            if (KeyboardKeyConfig == null || KeyboardKeyConfig.VirtualKeyCode == 0)
+            var configToUse = config ?? KeyboardKeyConfig;
+            if (configToUse == null || configToUse.VirtualKeyCode == 0)
                 return false;
 
             try
             {
-                bool keyPressed = IsKeyPressed(KeyboardKeyConfig.VirtualKeyCode);
+                bool keyPressed = IsKeyPressed(configToUse.VirtualKeyCode);
                 
                 // Vérifier les modificateurs
-                if (KeyboardKeyConfig.RequireCtrl && !IsKeyPressed(0x11)) // VK_CONTROL
+                if (configToUse.RequireCtrl && !IsKeyPressed(0x11)) // VK_CONTROL
                     return false;
-                if (KeyboardKeyConfig.RequireAlt && !IsKeyPressed(0x12)) // VK_MENU
+                if (configToUse.RequireAlt && !IsKeyPressed(0x12)) // VK_MENU
                     return false;
-                if (KeyboardKeyConfig.RequireShift && !IsKeyPressed(0x10)) // VK_SHIFT
+                if (configToUse.RequireShift && !IsKeyPressed(0x10)) // VK_SHIFT
                     return false;
 
                 return keyPressed;
@@ -238,16 +465,17 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Évalue la condition "Processus ouvert"
         /// </summary>
-        private bool EvaluateProcessRunningCondition()
+        private bool EvaluateProcessRunningCondition(ProcessRunningCondition? config = null)
         {
-            if (ProcessRunningConfig == null || 
-                ProcessRunningConfig.ProcessNames == null || 
-                ProcessRunningConfig.ProcessNames.Count == 0)
+            var configToUse = config ?? ProcessRunningConfig;
+            if (configToUse == null || 
+                configToUse.ProcessNames == null || 
+                configToUse.ProcessNames.Count == 0)
             {
                 // Compatibilité avec l'ancien format (un seul processus)
-                if (!string.IsNullOrEmpty(ProcessRunningConfig?.ProcessName))
+                if (!string.IsNullOrEmpty(configToUse?.ProcessName))
                 {
-                    return EvaluateSingleProcessRunning(ProcessRunningConfig.ProcessName);
+                    return EvaluateSingleProcessRunning(configToUse.ProcessName);
                 }
                 return false;
             }
@@ -255,7 +483,7 @@ namespace MacroEngine.Core.Inputs
             try
             {
                 // Vérifier si au moins un des processus sélectionnés est ouvert
-                foreach (var processName in ProcessRunningConfig.ProcessNames)
+                foreach (var processName in configToUse.ProcessNames)
                 {
                     if (EvaluateSingleProcessRunning(processName))
                         return true;
@@ -290,19 +518,20 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Évalue la condition "Pixel couleur"
         /// </summary>
-        private bool EvaluatePixelColorCondition()
+        private bool EvaluatePixelColorCondition(PixelColorCondition? config = null)
         {
-            if (PixelColorConfig == null)
+            var configToUse = config ?? PixelColorConfig;
+            if (configToUse == null)
                 return false;
 
             try
             {
                 return Core.Services.ConditionEvaluationService.Instance.EvaluatePixelColor(
-                    PixelColorConfig.X,
-                    PixelColorConfig.Y,
-                    PixelColorConfig.ExpectedColor,
-                    PixelColorConfig.Tolerance,
-                    PixelColorConfig.MatchMode
+                    configToUse.X,
+                    configToUse.Y,
+                    configToUse.ExpectedColor,
+                    configToUse.Tolerance,
+                    configToUse.MatchMode
                 );
             }
             catch
@@ -314,9 +543,10 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Évalue la condition "Position souris"
         /// </summary>
-        private bool EvaluateMousePositionCondition()
+        private bool EvaluateMousePositionCondition(MousePositionCondition? config = null)
         {
-            if (MousePositionConfig == null)
+            var configToUse = config ?? MousePositionConfig;
+            if (configToUse == null)
                 return false;
 
             try
@@ -325,10 +555,10 @@ namespace MacroEngine.Core.Inputs
                 int x = pos.X;
                 int y = pos.Y;
 
-                int x1 = Math.Min(MousePositionConfig.X1, MousePositionConfig.X2);
-                int x2 = Math.Max(MousePositionConfig.X1, MousePositionConfig.X2);
-                int y1 = Math.Min(MousePositionConfig.Y1, MousePositionConfig.Y2);
-                int y2 = Math.Max(MousePositionConfig.Y1, MousePositionConfig.Y2);
+                int x1 = Math.Min(configToUse.X1, configToUse.X2);
+                int x2 = Math.Max(configToUse.X1, configToUse.X2);
+                int y1 = Math.Min(configToUse.Y1, configToUse.Y2);
+                int y2 = Math.Max(configToUse.Y1, configToUse.Y2);
 
                 return x >= x1 && x <= x2 && y >= y1 && y <= y2;
             }
@@ -341,15 +571,16 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Évalue la condition "Temps/Date"
         /// </summary>
-        private bool EvaluateTimeDateCondition()
+        private bool EvaluateTimeDateCondition(TimeDateCondition? config = null)
         {
-            if (TimeDateConfig == null)
+            var configToUse = config ?? TimeDateConfig;
+            if (configToUse == null)
                 return false;
 
             try
             {
                 var now = DateTime.Now;
-                int currentValue = TimeDateConfig.ComparisonType switch
+                int currentValue = configToUse.ComparisonType switch
                 {
                     "Hour" => now.Hour,
                     "Minute" => now.Minute,
@@ -359,13 +590,13 @@ namespace MacroEngine.Core.Inputs
                     _ => 0
                 };
 
-                return TimeDateConfig.Operator switch
+                return configToUse.Operator switch
                 {
-                    TimeComparisonOperator.Equals => currentValue == TimeDateConfig.Value,
-                    TimeComparisonOperator.GreaterThan => currentValue > TimeDateConfig.Value,
-                    TimeComparisonOperator.LessThan => currentValue < TimeDateConfig.Value,
-                    TimeComparisonOperator.GreaterThanOrEqual => currentValue >= TimeDateConfig.Value,
-                    TimeComparisonOperator.LessThanOrEqual => currentValue <= TimeDateConfig.Value,
+                    TimeComparisonOperator.Equals => currentValue == configToUse.Value,
+                    TimeComparisonOperator.GreaterThan => currentValue > configToUse.Value,
+                    TimeComparisonOperator.LessThan => currentValue < configToUse.Value,
+                    TimeComparisonOperator.GreaterThanOrEqual => currentValue >= configToUse.Value,
+                    TimeComparisonOperator.LessThanOrEqual => currentValue <= configToUse.Value,
                     _ => false
                 };
             }
@@ -378,17 +609,18 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Évalue la condition "Image à l'écran"
         /// </summary>
-        private bool EvaluateImageOnScreenCondition()
+        private bool EvaluateImageOnScreenCondition(ImageOnScreenCondition? config = null)
         {
-            if (ImageOnScreenConfig == null || string.IsNullOrEmpty(ImageOnScreenConfig.ImagePath))
+            var configToUse = config ?? ImageOnScreenConfig;
+            if (configToUse == null || string.IsNullOrEmpty(configToUse.ImagePath))
                 return false;
 
             try
             {
                 var task = Core.Services.ConditionEvaluationService.Instance.EvaluateImageOnScreenAsync(
-                    ImageOnScreenConfig.ImagePath,
-                    ImageOnScreenConfig.Sensitivity,
-                    ImageOnScreenConfig.SearchArea
+                    configToUse.ImagePath,
+                    configToUse.Sensitivity,
+                    configToUse.SearchArea
                 );
                 
                 // Attendre avec timeout de 2 secondes
@@ -408,16 +640,17 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Évalue la condition "Texte à l'écran"
         /// </summary>
-        private bool EvaluateTextOnScreenCondition()
+        private bool EvaluateTextOnScreenCondition(TextOnScreenCondition? config = null)
         {
-            if (TextOnScreenConfig == null || string.IsNullOrEmpty(TextOnScreenConfig.Text))
+            var configToUse = config ?? TextOnScreenConfig;
+            if (configToUse == null || string.IsNullOrEmpty(configToUse.Text))
                 return false;
 
             try
             {
                 var task = Core.Services.ConditionEvaluationService.Instance.EvaluateTextOnScreenAsync(
-                    TextOnScreenConfig.Text,
-                    TextOnScreenConfig.SearchArea
+                    configToUse.Text,
+                    configToUse.SearchArea
                 );
                 
                 // Attendre avec timeout de 3 secondes
@@ -448,70 +681,153 @@ namespace MacroEngine.Core.Inputs
 
         public IInputAction Clone()
         {
-            return new IfAction
+            var cloned = new IfAction
             {
                 Id = Guid.NewGuid().ToString(),
                 Name = this.Name,
-                ConditionType = this.ConditionType,
-                Condition = this.Condition,
-                ActiveApplicationConfig = this.ActiveApplicationConfig != null ? new ActiveApplicationCondition
-                {
-                    ProcessNames = this.ActiveApplicationConfig.ProcessNames != null 
-                        ? new List<string>(this.ActiveApplicationConfig.ProcessNames)
-                        : new List<string>(),
-                    WindowTitle = this.ActiveApplicationConfig.WindowTitle,
-                    TitleMatchMode = this.ActiveApplicationConfig.TitleMatchMode,
-                    AnyWindow = this.ActiveApplicationConfig.AnyWindow
-                } : null,
-                KeyboardKeyConfig = this.KeyboardKeyConfig != null ? new KeyboardKeyCondition
-                {
-                    VirtualKeyCode = this.KeyboardKeyConfig.VirtualKeyCode,
-                    State = this.KeyboardKeyConfig.State,
-                    RequireCtrl = this.KeyboardKeyConfig.RequireCtrl,
-                    RequireAlt = this.KeyboardKeyConfig.RequireAlt,
-                    RequireShift = this.KeyboardKeyConfig.RequireShift
-                } : null,
-                ProcessRunningConfig = this.ProcessRunningConfig != null ? new ProcessRunningCondition
-                {
-                    ProcessNames = this.ProcessRunningConfig.ProcessNames != null 
-                        ? new List<string>(this.ProcessRunningConfig.ProcessNames)
-                        : new List<string>(),
-                    AnyWindow = this.ProcessRunningConfig.AnyWindow
-                } : null,
-                PixelColorConfig = this.PixelColorConfig != null ? new PixelColorCondition
-                {
-                    X = this.PixelColorConfig.X,
-                    Y = this.PixelColorConfig.Y,
-                    ExpectedColor = this.PixelColorConfig.ExpectedColor,
-                    Tolerance = this.PixelColorConfig.Tolerance,
-                    MatchMode = this.PixelColorConfig.MatchMode
-                } : null,
-                MousePositionConfig = this.MousePositionConfig != null ? new MousePositionCondition
-                {
-                    X1 = this.MousePositionConfig.X1,
-                    Y1 = this.MousePositionConfig.Y1,
-                    X2 = this.MousePositionConfig.X2,
-                    Y2 = this.MousePositionConfig.Y2
-                } : null,
-                TimeDateConfig = this.TimeDateConfig != null ? new TimeDateCondition
-                {
-                    ComparisonType = this.TimeDateConfig.ComparisonType,
-                    Operator = this.TimeDateConfig.Operator,
-                    Value = this.TimeDateConfig.Value
-                } : null,
-                ImageOnScreenConfig = this.ImageOnScreenConfig != null ? new ImageOnScreenCondition
-                {
-                    ImagePath = this.ImageOnScreenConfig.ImagePath,
-                    Sensitivity = this.ImageOnScreenConfig.Sensitivity,
-                    SearchArea = this.ImageOnScreenConfig.SearchArea?.ToArray()
-                } : null,
-                TextOnScreenConfig = this.TextOnScreenConfig != null ? new TextOnScreenCondition
-                {
-                    Text = this.TextOnScreenConfig.Text,
-                    SearchArea = this.TextOnScreenConfig.SearchArea?.ToArray()
-                } : null,
+                Conditions = this.Conditions?.Select(c => CloneConditionItem(c)).ToList() ?? new List<ConditionItem>(),
+                Operators = this.Operators?.ToList() ?? new List<LogicalOperator>(),
                 ThenActions = this.ThenActions?.Select(a => a?.Clone()).Where(a => a != null).Cast<IInputAction>().ToList() ?? new List<IInputAction>(),
                 ElseActions = this.ElseActions?.Select(a => a?.Clone()).Where(a => a != null).Cast<IInputAction>().ToList() ?? new List<IInputAction>()
+            };
+
+            // Si Conditions est vide mais que les anciennes propriétés sont définies, créer une ConditionItem pour compatibilité
+            if (cloned.Conditions.Count == 0 && ConditionType != ConditionType.Boolean)
+            {
+                cloned.Conditions.Add(new ConditionItem
+                {
+                    ConditionType = this.ConditionType,
+                    Condition = this.Condition,
+                    ActiveApplicationConfig = this.ActiveApplicationConfig != null ? new ActiveApplicationCondition
+                    {
+                        ProcessNames = this.ActiveApplicationConfig.ProcessNames != null 
+                            ? new List<string>(this.ActiveApplicationConfig.ProcessNames)
+                            : new List<string>(),
+                        WindowTitle = this.ActiveApplicationConfig.WindowTitle,
+                        TitleMatchMode = this.ActiveApplicationConfig.TitleMatchMode,
+                        AnyWindow = this.ActiveApplicationConfig.AnyWindow
+                    } : null,
+                    KeyboardKeyConfig = this.KeyboardKeyConfig != null ? new KeyboardKeyCondition
+                    {
+                        VirtualKeyCode = this.KeyboardKeyConfig.VirtualKeyCode,
+                        State = this.KeyboardKeyConfig.State,
+                        RequireCtrl = this.KeyboardKeyConfig.RequireCtrl,
+                        RequireAlt = this.KeyboardKeyConfig.RequireAlt,
+                        RequireShift = this.KeyboardKeyConfig.RequireShift
+                    } : null,
+                    ProcessRunningConfig = this.ProcessRunningConfig != null ? new ProcessRunningCondition
+                    {
+                        ProcessNames = this.ProcessRunningConfig.ProcessNames != null 
+                            ? new List<string>(this.ProcessRunningConfig.ProcessNames)
+                            : new List<string>(),
+                        AnyWindow = this.ProcessRunningConfig.AnyWindow
+                    } : null,
+                    PixelColorConfig = this.PixelColorConfig != null ? new PixelColorCondition
+                    {
+                        X = this.PixelColorConfig.X,
+                        Y = this.PixelColorConfig.Y,
+                        ExpectedColor = this.PixelColorConfig.ExpectedColor,
+                        Tolerance = this.PixelColorConfig.Tolerance,
+                        MatchMode = this.PixelColorConfig.MatchMode
+                    } : null,
+                    MousePositionConfig = this.MousePositionConfig != null ? new MousePositionCondition
+                    {
+                        X1 = this.MousePositionConfig.X1,
+                        Y1 = this.MousePositionConfig.Y1,
+                        X2 = this.MousePositionConfig.X2,
+                        Y2 = this.MousePositionConfig.Y2
+                    } : null,
+                    TimeDateConfig = this.TimeDateConfig != null ? new TimeDateCondition
+                    {
+                        ComparisonType = this.TimeDateConfig.ComparisonType,
+                        Operator = this.TimeDateConfig.Operator,
+                        Value = this.TimeDateConfig.Value
+                    } : null,
+                    ImageOnScreenConfig = this.ImageOnScreenConfig != null ? new ImageOnScreenCondition
+                    {
+                        ImagePath = this.ImageOnScreenConfig.ImagePath,
+                        Sensitivity = this.ImageOnScreenConfig.Sensitivity,
+                        SearchArea = this.ImageOnScreenConfig.SearchArea?.ToArray()
+                    } : null,
+                    TextOnScreenConfig = this.TextOnScreenConfig != null ? new TextOnScreenCondition
+                    {
+                        Text = this.TextOnScreenConfig.Text,
+                        SearchArea = this.TextOnScreenConfig.SearchArea?.ToArray()
+                    } : null
+                });
+            }
+
+            return cloned;
+        }
+
+        /// <summary>
+        /// Clone une ConditionItem
+        /// </summary>
+        private ConditionItem CloneConditionItem(ConditionItem item)
+        {
+            if (item == null)
+                return new ConditionItem();
+
+            return new ConditionItem
+            {
+                ConditionType = item.ConditionType,
+                Condition = item.Condition,
+                ActiveApplicationConfig = item.ActiveApplicationConfig != null ? new ActiveApplicationCondition
+                {
+                    ProcessNames = item.ActiveApplicationConfig.ProcessNames != null 
+                        ? new List<string>(item.ActiveApplicationConfig.ProcessNames)
+                        : new List<string>(),
+                    WindowTitle = item.ActiveApplicationConfig.WindowTitle,
+                    TitleMatchMode = item.ActiveApplicationConfig.TitleMatchMode,
+                    AnyWindow = item.ActiveApplicationConfig.AnyWindow
+                } : null,
+                KeyboardKeyConfig = item.KeyboardKeyConfig != null ? new KeyboardKeyCondition
+                {
+                    VirtualKeyCode = item.KeyboardKeyConfig.VirtualKeyCode,
+                    State = item.KeyboardKeyConfig.State,
+                    RequireCtrl = item.KeyboardKeyConfig.RequireCtrl,
+                    RequireAlt = item.KeyboardKeyConfig.RequireAlt,
+                    RequireShift = item.KeyboardKeyConfig.RequireShift
+                } : null,
+                ProcessRunningConfig = item.ProcessRunningConfig != null ? new ProcessRunningCondition
+                {
+                    ProcessNames = item.ProcessRunningConfig.ProcessNames != null 
+                        ? new List<string>(item.ProcessRunningConfig.ProcessNames)
+                        : new List<string>(),
+                    AnyWindow = item.ProcessRunningConfig.AnyWindow
+                } : null,
+                PixelColorConfig = item.PixelColorConfig != null ? new PixelColorCondition
+                {
+                    X = item.PixelColorConfig.X,
+                    Y = item.PixelColorConfig.Y,
+                    ExpectedColor = item.PixelColorConfig.ExpectedColor,
+                    Tolerance = item.PixelColorConfig.Tolerance,
+                    MatchMode = item.PixelColorConfig.MatchMode
+                } : null,
+                MousePositionConfig = item.MousePositionConfig != null ? new MousePositionCondition
+                {
+                    X1 = item.MousePositionConfig.X1,
+                    Y1 = item.MousePositionConfig.Y1,
+                    X2 = item.MousePositionConfig.X2,
+                    Y2 = item.MousePositionConfig.Y2
+                } : null,
+                TimeDateConfig = item.TimeDateConfig != null ? new TimeDateCondition
+                {
+                    ComparisonType = item.TimeDateConfig.ComparisonType,
+                    Operator = item.TimeDateConfig.Operator,
+                    Value = item.TimeDateConfig.Value
+                } : null,
+                ImageOnScreenConfig = item.ImageOnScreenConfig != null ? new ImageOnScreenCondition
+                {
+                    ImagePath = item.ImageOnScreenConfig.ImagePath,
+                    Sensitivity = item.ImageOnScreenConfig.Sensitivity,
+                    SearchArea = item.ImageOnScreenConfig.SearchArea?.ToArray()
+                } : null,
+                TextOnScreenConfig = item.TextOnScreenConfig != null ? new TextOnScreenCondition
+                {
+                    Text = item.TextOnScreenConfig.Text,
+                    SearchArea = item.TextOnScreenConfig.SearchArea?.ToArray()
+                } : null
             };
         }
     }
