@@ -1644,7 +1644,7 @@ namespace MacroEngine.UI
 
             var toleranceTextBox = new TextBox
             {
-                Text = Result.PixelColorConfig.Tolerance.ToString(),
+                Text = condition.PixelColorConfig?.Tolerance.ToString() ?? "0",
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 0, 12)
             };
@@ -1671,7 +1671,7 @@ namespace MacroEngine.UI
             };
             modeComboBox.Items.Add("RGB");
             modeComboBox.Items.Add("HSV");
-            modeComboBox.SelectedIndex = (int)Result.PixelColorConfig.MatchMode;
+            modeComboBox.SelectedIndex = (int)(condition.PixelColorConfig?.MatchMode ?? ColorMatchMode.RGB);
             modeComboBox.SelectionChanged += (s, e) =>
             {
                 if (modeComboBox.SelectedIndex >= 0)
@@ -1965,7 +1965,7 @@ namespace MacroEngine.UI
             operatorComboBox.Items.Add("<");
             operatorComboBox.Items.Add(">=");
             operatorComboBox.Items.Add("<=");
-            operatorComboBox.SelectedIndex = (int)Result.TimeDateConfig.Operator;
+            operatorComboBox.SelectedIndex = (int)(condition.TimeDateConfig?.Operator ?? TimeComparisonOperator.Equals);
 
             typeComboBox.SelectionChanged += (s, e) =>
             {
