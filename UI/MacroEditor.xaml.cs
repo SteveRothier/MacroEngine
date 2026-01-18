@@ -889,6 +889,19 @@ namespace MacroEngine.UI
             return -1; // Retourner -1 pour indiquer une erreur
         }
 
+        private void ActionsDataGrid_LoadingRow(object sender, DataGridRowEventArgs e)
+        {
+            if (e.Row.Item is IInputAction action && action.Type == InputActionType.Condition)
+            {
+                // Style pour les conditions If
+                e.Row.Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(232, 245, 233)); // #E8F5E9
+                e.Row.BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(76, 175, 80)); // #4CAF50
+                e.Row.BorderThickness = new Thickness(0, 0, 0, 2);
+                e.Row.FontWeight = FontWeights.SemiBold;
+                e.Row.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(46, 125, 50)); // #2E7D32
+            }
+        }
+
         private void ActionsDataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (ActionsDataGrid.SelectedItem == null)
