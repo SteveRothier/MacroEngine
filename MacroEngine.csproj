@@ -11,6 +11,11 @@
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Configuration explicite pour éviter les problèmes de cache -->
+    <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
+    <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
+    <!-- Désactiver le cache de build incrémental pour forcer la recompilation -->
+    <UseSharedCompilation>false</UseSharedCompilation>
   </PropertyGroup>
 
   <ItemGroup>
