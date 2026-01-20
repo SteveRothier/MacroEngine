@@ -539,6 +539,14 @@ namespace MacroEngine.UI
                     EditDelayAction(da, index, titleBlock);
                 };
             }
+            else if (action is Core.Inputs.MouseAction ma)
+            {
+                // Pour MouseAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
+                textPanel.Children.Remove(titleBlock);
+                
+                var mouseControlsPanel = CreateMouseActionControls(ma, index, textPanel);
+                textPanel.Children.Insert(0, mouseControlsPanel);
+            }
             else if (action is RepeatAction ra)
             {
                 // Pour RepeatAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
@@ -1808,6 +1816,181 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
+        /// Crée les contrôles inline pour une action MouseAction (toujours visibles dans la carte)
+        /// </summary>
+        private StackPanel CreateMouseActionControls(Core.Inputs.MouseAction ma, int index, Panel parentPanel)
+        {
+            // Créer un panel horizontal pour le ComboBox
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            // ComboBox pour le type d'action
+            var actionTypeComboBox = new ComboBox
+            {
+                MinWidth = 140,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                SelectedIndex = (int)ma.ActionType
+            };
+
+            // Ordre doit correspondre à l'enum MouseActionType (sans les "Relâcher")
+            actionTypeComboBox.Items.Add("Clic gauche");      // 0: LeftClick
+            actionTypeComboBox.Items.Add("Clic droit");       // 1: RightClick
+            actionTypeComboBox.Items.Add("Clic milieu");      // 2: MiddleClick
+            actionTypeComboBox.Items.Add("Maintenir gauche");  // 3: LeftDown
+            actionTypeComboBox.Items.Add("Maintenir droit");   // 5: RightDown (sauter 4: LeftUp)
+            actionTypeComboBox.Items.Add("Maintenir milieu");  // 7: MiddleDown (sauter 6: RightUp)
+            actionTypeComboBox.Items.Add("Déplacer");         // 9: Move (sauter 8: MiddleUp)
+            actionTypeComboBox.Items.Add("Molette haut");      // 10: WheelUp
+            actionTypeComboBox.Items.Add("Molette bas");       // 11: WheelDown
+            actionTypeComboBox.Items.Add("Molette");          // 12: Wheel
+
+            editPanel.Children.Add(actionTypeComboBox);
+
+            // Gestion du changement de type d'action
+            actionTypeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (actionTypeComboBox.SelectedIndex >= 0 && _currentMacro != null)
+                {
+                    SaveState();
+                    // Mapper l'index du ComboBox vers l'enum MouseActionType
+                    ma.ActionType = actionTypeComboBox.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MouseActionType.LeftClick,
+                        1 => Core.Inputs.MouseActionType.RightClick,
+                        2 => Core.Inputs.MouseActionType.MiddleClick,
+                        3 => Core.Inputs.MouseActionType.LeftDown,
+                        4 => Core.Inputs.MouseActionType.RightDown,
+                        5 => Core.Inputs.MouseActionType.MiddleDown,
+                        6 => Core.Inputs.MouseActionType.Move,
+                        7 => Core.Inputs.MouseActionType.WheelUp,
+                        8 => Core.Inputs.MouseActionType.WheelDown,
+                        9 => Core.Inputs.MouseActionType.Wheel,
+                        _ => Core.Inputs.MouseActionType.LeftClick
+                    };
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+
+            return editPanel;
+        }
+
+        /// <summary>
+        /// Édition inline d'une MouseAction au niveau principal (désactivé, maintenant on utilise CreateMouseActionControls)
+        /// </summary>
+        private void EditMouseAction(Core.Inputs.MouseAction ma, int index, TextBlock titleText)
+        {
+            if (_currentMacro == null || index < 0 || index >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[index] is not Core.Inputs.MouseAction mouseAction)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            var originalMargin = titleText.Margin;
+
+            // Panel horizontal pour ComboBox (type de clic)
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = originalMargin
+            };
+
+            // ComboBox pour le type d'action
+            var actionTypeComboBox = new ComboBox
+            {
+                MinWidth = 140,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                SelectedIndex = (int)mouseAction.ActionType
+            };
+
+            // Ordre doit correspondre à l'enum MouseActionType (sans les "Relâcher")
+            actionTypeComboBox.Items.Add("Clic gauche");      // 0: LeftClick
+            actionTypeComboBox.Items.Add("Clic droit");       // 1: RightClick
+            actionTypeComboBox.Items.Add("Clic milieu");      // 2: MiddleClick
+            actionTypeComboBox.Items.Add("Maintenir gauche");  // 3: LeftDown
+            actionTypeComboBox.Items.Add("Maintenir droit");   // 5: RightDown (sauter 4: LeftUp)
+            actionTypeComboBox.Items.Add("Maintenir milieu");  // 7: MiddleDown (sauter 6: RightUp)
+            actionTypeComboBox.Items.Add("Déplacer");         // 9: Move (sauter 8: MiddleUp)
+            actionTypeComboBox.Items.Add("Molette haut");      // 10: WheelUp
+            actionTypeComboBox.Items.Add("Molette bas");       // 11: WheelDown
+            actionTypeComboBox.Items.Add("Molette");          // 12: Wheel
+
+            editPanel.Children.Add(actionTypeComboBox);
+
+            // Gestion du changement de type d'action
+            actionTypeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (actionTypeComboBox.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    mouseAction.ActionType = (Core.Inputs.MouseActionType)actionTypeComboBox.SelectedIndex;
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+
+            // Fermeture du ComboBox : revenir au titre
+            actionTypeComboBox.DropDownClosed += (s, e) =>
+            {
+                if (parentPanel.Children.Contains(editPanel))
+                {
+                    int idx = parentPanel.Children.IndexOf(editPanel);
+                    if (idx >= 0)
+                    {
+                        parentPanel.Children.RemoveAt(idx);
+                        parentPanel.Children.Insert(idx, titleText);
+                    }
+                }
+            };
+
+            // Échap : revenir au titre
+            actionTypeComboBox.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    if (parentPanel.Children.Contains(editPanel))
+                    {
+                        int idx = parentPanel.Children.IndexOf(editPanel);
+                        if (idx >= 0)
+                        {
+                            parentPanel.Children.RemoveAt(idx);
+                            parentPanel.Children.Insert(idx, titleText);
+                        }
+                    }
+                }
+            };
+
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, editPanel);
+
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
+            {
+                actionTypeComboBox.Focus();
+            }));
+        }
+
+        /// <summary>
         /// Édition inline d'une MouseAction imbriquée dans un RepeatAction
         /// </summary>
         private void EditNestedMouseAction(int parentIndex, int nestedIndex, TextBlock titleText)
@@ -1845,22 +2028,37 @@ namespace MacroEngine.UI
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                SelectedIndex = (int)ma.ActionType
+                Margin = new Thickness(0, 0, 8, 0)
             };
 
-            actionTypeComboBox.Items.Add("Clic gauche");
-            actionTypeComboBox.Items.Add("Clic droit");
-            actionTypeComboBox.Items.Add("Clic milieu");
-            actionTypeComboBox.Items.Add("Déplacer");
-            actionTypeComboBox.Items.Add("Appuyer gauche");
-            actionTypeComboBox.Items.Add("Relâcher gauche");
-            actionTypeComboBox.Items.Add("Appuyer droit");
-            actionTypeComboBox.Items.Add("Relâcher droit");
-            actionTypeComboBox.Items.Add("Appuyer milieu");
-            actionTypeComboBox.Items.Add("Relâcher milieu");
-            actionTypeComboBox.Items.Add("Molette haut");
-            actionTypeComboBox.Items.Add("Molette bas");
+            // Ordre doit correspondre à l'enum MouseActionType (sans les "Relâcher")
+            actionTypeComboBox.Items.Add("Clic gauche");      // 0: LeftClick
+            actionTypeComboBox.Items.Add("Clic droit");       // 1: RightClick
+            actionTypeComboBox.Items.Add("Clic milieu");      // 2: MiddleClick
+            actionTypeComboBox.Items.Add("Maintenir gauche");  // 3: LeftDown
+            actionTypeComboBox.Items.Add("Maintenir droit");   // 5: RightDown (sauter 4: LeftUp)
+            actionTypeComboBox.Items.Add("Maintenir milieu");  // 7: MiddleDown (sauter 6: RightUp)
+            actionTypeComboBox.Items.Add("Déplacer");         // 9: Move (sauter 8: MiddleUp)
+            actionTypeComboBox.Items.Add("Molette haut");      // 10: WheelUp
+            actionTypeComboBox.Items.Add("Molette bas");       // 11: WheelDown
+            actionTypeComboBox.Items.Add("Molette");          // 12: Wheel
+
+            // Mapper l'ActionType actuel vers l'index du ComboBox
+            int currentIndex = ma.ActionType switch
+            {
+                Core.Inputs.MouseActionType.LeftClick => 0,
+                Core.Inputs.MouseActionType.RightClick => 1,
+                Core.Inputs.MouseActionType.MiddleClick => 2,
+                Core.Inputs.MouseActionType.LeftDown => 3,
+                Core.Inputs.MouseActionType.RightDown => 4,
+                Core.Inputs.MouseActionType.MiddleDown => 5,
+                Core.Inputs.MouseActionType.Move => 6,
+                Core.Inputs.MouseActionType.WheelUp => 7,
+                Core.Inputs.MouseActionType.WheelDown => 8,
+                Core.Inputs.MouseActionType.Wheel => 9,
+                _ => 0 // Par défaut, LeftClick si c'est un type "Relâcher" non supporté
+            };
+            actionTypeComboBox.SelectedIndex = currentIndex;
 
             editPanel.Children.Add(actionTypeComboBox);
 
@@ -1904,7 +2102,21 @@ namespace MacroEngine.UI
                 if (actionTypeComboBox.SelectedIndex >= 0)
                 {
                     SaveState();
-                    ma.ActionType = (Core.Inputs.MouseActionType)actionTypeComboBox.SelectedIndex;
+                    // Mapper l'index du ComboBox vers l'enum MouseActionType
+                    ma.ActionType = actionTypeComboBox.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MouseActionType.LeftClick,
+                        1 => Core.Inputs.MouseActionType.RightClick,
+                        2 => Core.Inputs.MouseActionType.MiddleClick,
+                        3 => Core.Inputs.MouseActionType.LeftDown,
+                        4 => Core.Inputs.MouseActionType.RightDown,
+                        5 => Core.Inputs.MouseActionType.MiddleDown,
+                        6 => Core.Inputs.MouseActionType.Move,
+                        7 => Core.Inputs.MouseActionType.WheelUp,
+                        8 => Core.Inputs.MouseActionType.WheelDown,
+                        9 => Core.Inputs.MouseActionType.Wheel,
+                        _ => Core.Inputs.MouseActionType.LeftClick
+                    };
                     positionTextBox.Visibility = ma.ActionType == Core.Inputs.MouseActionType.Move ? Visibility.Visible : Visibility.Collapsed;
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();

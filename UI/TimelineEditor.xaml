@@ -71,7 +71,7 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="Bd"
-                                                Background="#ff00ff"
+                                                Background="#4A90E2"
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
