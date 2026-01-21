@@ -1820,7 +1820,7 @@ namespace MacroEngine.UI
         /// </summary>
         private StackPanel CreateMouseActionControls(Core.Inputs.MouseAction ma, int index, Panel parentPanel)
         {
-            // Créer un panel horizontal pour le ComboBox
+            // Créer un panel horizontal pour tous les contrôles
             var editPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -1852,6 +1852,113 @@ namespace MacroEngine.UI
 
             editPanel.Children.Add(actionTypeComboBox);
 
+            // Label et TextBox pour X
+            var xLabel = new TextBlock
+            {
+                Text = "X:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0)
+            };
+            editPanel.Children.Add(xLabel);
+
+            var xTextBox = new TextBox
+            {
+                Text = ma.X >= 0 ? ma.X.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0)
+            };
+            xTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(xTextBox.Text, out int x))
+                {
+                    SaveState();
+                    ma.X = x;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            xTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(xTextBox.Text, out int x))
+                {
+                    xTextBox.Text = ma.X >= 0 ? ma.X.ToString() : "-1";
+                }
+            };
+            editPanel.Children.Add(xTextBox);
+
+            // Label et TextBox pour Y
+            var yLabel = new TextBlock
+            {
+                Text = "Y:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0)
+            };
+            editPanel.Children.Add(yLabel);
+
+            var yTextBox = new TextBox
+            {
+                Text = ma.Y >= 0 ? ma.Y.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            yTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(yTextBox.Text, out int y))
+                {
+                    SaveState();
+                    ma.Y = y;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            yTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(yTextBox.Text, out int y))
+                {
+                    yTextBox.Text = ma.Y >= 0 ? ma.Y.ToString() : "-1";
+                }
+            };
+            editPanel.Children.Add(yTextBox);
+
+            // Bouton pour sélectionner un point à l'écran (comme la pipette)
+            var selectPointButton = new Button
+            {
+                Content = "🎯 Sélectionner",
+                MinWidth = 110,
+                Height = 24,
+                FontSize = 12,
+                Padding = new Thickness(6, 0, 6, 0),
+                Margin = new Thickness(0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Sélectionner un point à l'écran (comme la pipette)",
+                Cursor = Cursors.Hand
+            };
+
+            selectPointButton.Click += (s, e) =>
+            {
+                SelectPointOnScreen(ma, xTextBox, yTextBox);
+            };
+
+            editPanel.Children.Add(selectPointButton);
+
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -1880,6 +1987,49 @@ namespace MacroEngine.UI
             };
 
             return editPanel;
+        }
+
+        /// <summary>
+        /// Sélectionne un point à l'écran (capture seulement les coordonnées)
+        /// </summary>
+        private void SelectPointOnScreen(Core.Inputs.MouseAction ma, TextBox xTextBox, TextBox yTextBox)
+        {
+            try
+            {
+                // Utiliser PointSelectorWindow qui capture seulement les coordonnées
+                var pointSelector = new PointSelectorWindow
+                {
+                    Owner = Application.Current.MainWindow
+                };
+                
+                if (pointSelector.ShowDialog() == true)
+                {
+                    SaveState();
+                    ma.X = pointSelector.SelectedX;
+                    ma.Y = pointSelector.SelectedY;
+                    
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                    }
+                    
+                    // Mettre à jour les TextBox
+                    xTextBox.Text = ma.X.ToString();
+                    yTextBox.Text = ma.Y.ToString();
+                    
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Erreur lors de la sélection de point: {ex.Message}");
+                MessageBox.Show(
+                    $"Erreur lors de la sélection de point : {ex.Message}",
+                    "Erreur",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
         }
 
         /// <summary>
@@ -2062,39 +2212,112 @@ namespace MacroEngine.UI
 
             editPanel.Children.Add(actionTypeComboBox);
 
-            // TextBox pour la position (seulement si nécessaire)
-            var positionTextBox = new TextBox
+            // Label et TextBox pour X
+            var xLabel = new TextBlock
             {
-                Text = ma.X >= 0 && ma.Y >= 0 ? $"({ma.X}, {ma.Y})" : "Position actuelle",
-                MinWidth = 120,
-                MaxWidth = 150,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
+                Text = "X:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0)
+            };
+            editPanel.Children.Add(xLabel);
+
+            var xTextBox = new TextBox
+            {
+                Text = ma.X >= 0 ? ma.X.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                IsReadOnly = true,
-                Cursor = Cursors.Hand,
-                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(4),
-                Visibility = ma.ActionType == Core.Inputs.MouseActionType.Move ? Visibility.Visible : Visibility.Collapsed
+                Margin = new Thickness(0, 0, 4, 0)
             };
-
-            positionTextBox.MouseLeftButtonDown += (s, e) =>
+            xTextBox.TextChanged += (s, e) =>
             {
-                e.Handled = true;
-                // Pour l'instant, on garde "Position actuelle" (-1, -1)
-                // On pourrait ajouter une capture de position ici plus tard
-                SaveState();
-                ma.X = -1;
-                ma.Y = -1;
-                _currentMacro.ModifiedAt = DateTime.Now;
-                RefreshBlocks();
-                MacroChanged?.Invoke(this, EventArgs.Empty);
+                if (int.TryParse(xTextBox.Text, out int x))
+                {
+                    SaveState();
+                    ma.X = x;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            xTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(xTextBox.Text, out int x))
+                {
+                    xTextBox.Text = ma.X >= 0 ? ma.X.ToString() : "-1";
+                }
+            };
+            editPanel.Children.Add(xTextBox);
+
+            // Label et TextBox pour Y
+            var yLabel = new TextBlock
+            {
+                Text = "Y:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0)
+            };
+            editPanel.Children.Add(yLabel);
+
+            var yTextBox = new TextBox
+            {
+                Text = ma.Y >= 0 ? ma.Y.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            yTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(yTextBox.Text, out int y))
+                {
+                    SaveState();
+                    ma.Y = y;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            yTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(yTextBox.Text, out int y))
+                {
+                    yTextBox.Text = ma.Y >= 0 ? ma.Y.ToString() : "-1";
+                }
+            };
+            editPanel.Children.Add(yTextBox);
+
+            // Bouton pour sélectionner un point à l'écran (comme la pipette)
+            var selectPointButton = new Button
+            {
+                Content = "🎯 Sélectionner",
+                MinWidth = 110,
+                Height = 24,
+                FontSize = 12,
+                Padding = new Thickness(6, 0, 6, 0),
+                Margin = new Thickness(0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Sélectionner un point à l'écran (comme la pipette)",
+                Cursor = Cursors.Hand
             };
 
-            editPanel.Children.Add(positionTextBox);
+            selectPointButton.Click += (s, e) =>
+            {
+                SelectPointOnScreen(ma, xTextBox, yTextBox);
+            };
+
+            editPanel.Children.Add(selectPointButton);
 
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
@@ -2117,7 +2340,6 @@ namespace MacroEngine.UI
                         9 => Core.Inputs.MouseActionType.Wheel,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
-                    positionTextBox.Visibility = ma.ActionType == Core.Inputs.MouseActionType.Move ? Visibility.Visible : Visibility.Collapsed;
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
