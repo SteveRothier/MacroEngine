@@ -793,11 +793,44 @@ namespace MacroEngine.UI
 
         private string GetMouseActionDetails(Core.Inputs.MouseAction ma)
         {
-            if (ma.X >= 0 && ma.Y >= 0)
+            var details = new System.Text.StringBuilder();
+            
+            // Afficher les coordonnées pour les actions qui en ont besoin
+            bool showCoords = ma.ActionType == Core.Inputs.MouseActionType.LeftClick ||
+                             ma.ActionType == Core.Inputs.MouseActionType.RightClick ||
+                             ma.ActionType == Core.Inputs.MouseActionType.MiddleClick ||
+                             ma.ActionType == Core.Inputs.MouseActionType.LeftDown ||
+                             ma.ActionType == Core.Inputs.MouseActionType.RightDown ||
+                             ma.ActionType == Core.Inputs.MouseActionType.MiddleDown ||
+                             ma.ActionType == Core.Inputs.MouseActionType.Move;
+            
+            if (showCoords)
             {
-                return $"Position: ({ma.X}, {ma.Y})";
+                if (ma.X >= 0 && ma.Y >= 0)
+                {
+                    details.Append($"Position: ({ma.X}, {ma.Y})");
+                }
+                else
+                {
+                    details.Append("Position actuelle");
+                }
             }
-            return "Position actuelle";
+            
+            // Afficher le delta pour les actions de molette
+            bool showDelta = ma.ActionType == Core.Inputs.MouseActionType.WheelUp ||
+                           ma.ActionType == Core.Inputs.MouseActionType.WheelDown ||
+                           ma.ActionType == Core.Inputs.MouseActionType.Wheel;
+            
+            if (showDelta)
+            {
+                if (details.Length > 0)
+                {
+                    details.Append(" • ");
+                }
+                details.Append($"Delta: {ma.Delta}");
+            }
+            
+            return details.Length > 0 ? details.ToString() : "";
         }
 
         private string GetRepeatActionTitle(RepeatAction ra)
@@ -2070,6 +2103,31 @@ namespace MacroEngine.UI
                         9 => Core.Inputs.MouseActionType.Wheel,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
+                    
+                    // Initialiser le delta avec des valeurs par défaut selon le type d'action
+                    if (ma.ActionType == Core.Inputs.MouseActionType.WheelUp)
+                    {
+                        // Initialiser à 120 seulement si le delta est 0 (nouvelle action ou pas encore configuré)
+                        if (ma.Delta == 0)
+                        {
+                            ma.Delta = 120;
+                            deltaTextBox.Text = "120";
+                        }
+                    }
+                    else if (ma.ActionType == Core.Inputs.MouseActionType.WheelDown)
+                    {
+                        // Initialiser à -120 seulement si le delta est 0 (nouvelle action ou pas encore configuré)
+                        if (ma.Delta == 0)
+                        {
+                            ma.Delta = -120;
+                            deltaTextBox.Text = "-120";
+                        }
+                    }
+                    else if (ma.ActionType == Core.Inputs.MouseActionType.Wheel)
+                    {
+                        // Pour Wheel, garder la valeur actuelle ou 0 par défaut
+                        deltaTextBox.Text = ma.Delta.ToString();
+                    }
                     
                     // Mettre à jour la visibilité des contrôles selon le type d'action
                     bool showCoords = ShouldShowCoordinates(ma.ActionType);
