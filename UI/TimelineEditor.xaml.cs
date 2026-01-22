@@ -1834,32 +1834,63 @@ namespace MacroEngine.UI
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                SelectedIndex = (int)ma.ActionType
+                Margin = new Thickness(0, 0, 8, 0)
             };
 
-            // Ordre doit correspondre à l'enum MouseActionType (sans les "Relâcher")
-            actionTypeComboBox.Items.Add("Clic gauche");      // 0: LeftClick
-            actionTypeComboBox.Items.Add("Clic droit");       // 1: RightClick
-            actionTypeComboBox.Items.Add("Clic milieu");      // 2: MiddleClick
-            actionTypeComboBox.Items.Add("Maintenir gauche");  // 3: LeftDown
-            actionTypeComboBox.Items.Add("Maintenir droit");   // 5: RightDown (sauter 4: LeftUp)
-            actionTypeComboBox.Items.Add("Maintenir milieu");  // 7: MiddleDown (sauter 6: RightUp)
-            actionTypeComboBox.Items.Add("Déplacer");         // 9: Move (sauter 8: MiddleUp)
-            actionTypeComboBox.Items.Add("Molette haut");      // 10: WheelUp
-            actionTypeComboBox.Items.Add("Molette bas");       // 11: WheelDown
-            actionTypeComboBox.Items.Add("Molette");          // 12: Wheel
+            // Ordre des items dans le ComboBox (sans les "Relâcher")
+            actionTypeComboBox.Items.Add("Clic gauche");      // index 0
+            actionTypeComboBox.Items.Add("Clic droit");       // index 1
+            actionTypeComboBox.Items.Add("Clic milieu");      // index 2
+            actionTypeComboBox.Items.Add("Maintenir gauche");  // index 3
+            actionTypeComboBox.Items.Add("Maintenir droit");   // index 4
+            actionTypeComboBox.Items.Add("Maintenir milieu");  // index 5
+            actionTypeComboBox.Items.Add("Déplacer");         // index 6
+            actionTypeComboBox.Items.Add("Molette haut");      // index 7
+            actionTypeComboBox.Items.Add("Molette bas");       // index 8
+            actionTypeComboBox.Items.Add("Molette");          // index 9
+
+            // Mapper l'ActionType actuel vers l'index du ComboBox
+            int currentIndex = ma.ActionType switch
+            {
+                Core.Inputs.MouseActionType.LeftClick => 0,
+                Core.Inputs.MouseActionType.RightClick => 1,
+                Core.Inputs.MouseActionType.MiddleClick => 2,
+                Core.Inputs.MouseActionType.LeftDown => 3,
+                Core.Inputs.MouseActionType.RightDown => 4,
+                Core.Inputs.MouseActionType.MiddleDown => 5,
+                Core.Inputs.MouseActionType.Move => 6,
+                Core.Inputs.MouseActionType.WheelUp => 7,
+                Core.Inputs.MouseActionType.WheelDown => 8,
+                Core.Inputs.MouseActionType.Wheel => 9,
+                _ => 0 // Par défaut, LeftClick si c'est un type "Relâcher" non supporté
+            };
+            actionTypeComboBox.SelectedIndex = currentIndex;
 
             editPanel.Children.Add(actionTypeComboBox);
 
-            // Label et TextBox pour X
+            // Fonction pour déterminer si les coordonnées doivent être affichées
+            bool ShouldShowCoordinates(Core.Inputs.MouseActionType actionType)
+            {
+                return actionType == Core.Inputs.MouseActionType.LeftClick ||
+                       actionType == Core.Inputs.MouseActionType.RightClick ||
+                       actionType == Core.Inputs.MouseActionType.MiddleClick ||
+                       actionType == Core.Inputs.MouseActionType.LeftDown ||
+                       actionType == Core.Inputs.MouseActionType.RightDown ||
+                       actionType == Core.Inputs.MouseActionType.MiddleDown ||
+                       actionType == Core.Inputs.MouseActionType.Move;
+            }
+
+            bool showCoords = ShouldShowCoordinates(ma.ActionType);
+
+            // Label et TextBox pour X (seulement pour clics et Maintenir)
             var xLabel = new TextBlock
             {
                 Text = "X:",
                 FontSize = 12,
                 FontWeight = FontWeights.Medium,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 4, 0)
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
             };
             editPanel.Children.Add(xLabel);
 
@@ -1871,7 +1902,8 @@ namespace MacroEngine.UI
                 FontWeight = FontWeights.Medium,
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 4, 0)
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
             };
             xTextBox.TextChanged += (s, e) =>
             {
@@ -1895,14 +1927,15 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(xTextBox);
 
-            // Label et TextBox pour Y
+            // Label et TextBox pour Y (seulement pour clics et Maintenir)
             var yLabel = new TextBlock
             {
                 Text = "Y:",
                 FontSize = 12,
                 FontWeight = FontWeights.Medium,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 4, 0)
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
             };
             editPanel.Children.Add(yLabel);
 
@@ -1914,7 +1947,8 @@ namespace MacroEngine.UI
                 FontWeight = FontWeights.Medium,
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
             };
             yTextBox.TextChanged += (s, e) =>
             {
@@ -1938,7 +1972,7 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(yTextBox);
 
-            // Bouton pour sélectionner un point à l'écran (comme la pipette)
+            // Bouton pour sélectionner un point à l'écran (seulement pour clics et Maintenir)
             var selectPointButton = new Button
             {
                 Content = "🎯 Sélectionner",
@@ -1946,10 +1980,11 @@ namespace MacroEngine.UI
                 Height = 24,
                 FontSize = 12,
                 Padding = new Thickness(6, 0, 6, 0),
-                Margin = new Thickness(0),
+                Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 ToolTip = "Sélectionner un point à l'écran (comme la pipette)",
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
             };
 
             selectPointButton.Click += (s, e) =>
@@ -1958,6 +1993,61 @@ namespace MacroEngine.UI
             };
 
             editPanel.Children.Add(selectPointButton);
+
+            // Fonction pour déterminer si le delta doit être affiché (pour toutes les actions de molette)
+            bool ShouldShowDelta(Core.Inputs.MouseActionType actionType)
+            {
+                return actionType == Core.Inputs.MouseActionType.WheelUp ||
+                       actionType == Core.Inputs.MouseActionType.WheelDown ||
+                       actionType == Core.Inputs.MouseActionType.Wheel;
+            }
+
+            // Label et TextBox pour le delta de la molette (pour Molette haut, bas et Molette)
+            bool showDelta = ShouldShowDelta(ma.ActionType);
+            var deltaLabel = new TextBlock
+            {
+                Text = "Delta:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showDelta ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(deltaLabel);
+
+            var deltaTextBox = new TextBox
+            {
+                Text = ma.Delta.ToString(),
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0),
+                Visibility = showDelta ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Delta de la molette (positif = haut, négatif = bas)"
+            };
+            deltaTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(deltaTextBox.Text, out int delta))
+                {
+                    SaveState();
+                    ma.Delta = delta;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            deltaTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(deltaTextBox.Text, out int delta))
+                {
+                    deltaTextBox.Text = ma.Delta.ToString();
+                }
+            };
+            editPanel.Children.Add(deltaTextBox);
 
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
@@ -1980,6 +2070,19 @@ namespace MacroEngine.UI
                         9 => Core.Inputs.MouseActionType.Wheel,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
+                    
+                    // Mettre à jour la visibilité des contrôles selon le type d'action
+                    bool showCoords = ShouldShowCoordinates(ma.ActionType);
+                    xLabel.Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed;
+                    xTextBox.Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed;
+                    yLabel.Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed;
+                    yTextBox.Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed;
+                    selectPointButton.Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed;
+                    
+                    bool showDelta = ShouldShowDelta(ma.ActionType);
+                    deltaLabel.Visibility = showDelta ? Visibility.Visible : Visibility.Collapsed;
+                    deltaTextBox.Visibility = showDelta ? Visibility.Visible : Visibility.Collapsed;
+                    
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
