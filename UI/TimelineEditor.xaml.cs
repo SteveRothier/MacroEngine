@@ -1957,6 +1957,11 @@ namespace MacroEngine.UI
                 {
                     xTextBox.Text = ma.X >= 0 ? ma.X.ToString() : "-1";
                 }
+                else
+                {
+                    // Mettre à jour l'affichage seulement quand on quitte le champ
+                    RefreshBlocks();
+                }
             };
             editPanel.Children.Add(xTextBox);
 
@@ -2001,6 +2006,11 @@ namespace MacroEngine.UI
                 if (!int.TryParse(yTextBox.Text, out int y))
                 {
                     yTextBox.Text = ma.Y >= 0 ? ma.Y.ToString() : "-1";
+                }
+                else
+                {
+                    // Mettre à jour l'affichage seulement quand on quitte le champ
+                    RefreshBlocks();
                 }
             };
             editPanel.Children.Add(yTextBox);
@@ -2078,6 +2088,11 @@ namespace MacroEngine.UI
                 if (!int.TryParse(deltaTextBox.Text, out int delta))
                 {
                     deltaTextBox.Text = ma.Delta.ToString();
+                }
+                else
+                {
+                    // Mettre à jour l'affichage seulement quand on quitte le champ
+                    RefreshBlocks();
                 }
             };
             editPanel.Children.Add(deltaTextBox);
@@ -2413,6 +2428,11 @@ namespace MacroEngine.UI
                 {
                     xTextBox.Text = ma.X >= 0 ? ma.X.ToString() : "-1";
                 }
+                else
+                {
+                    // Mettre à jour l'affichage seulement quand on quitte le champ
+                    RefreshBlocks();
+                }
             };
             editPanel.Children.Add(xTextBox);
 
@@ -2455,6 +2475,11 @@ namespace MacroEngine.UI
                 if (!int.TryParse(yTextBox.Text, out int y))
                 {
                     yTextBox.Text = ma.Y >= 0 ? ma.Y.ToString() : "-1";
+                }
+                else
+                {
+                    // Mettre à jour l'affichage seulement quand on quitte le champ
+                    RefreshBlocks();
                 }
             };
             editPanel.Children.Add(yTextBox);
