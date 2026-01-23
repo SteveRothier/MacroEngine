@@ -779,6 +779,8 @@ namespace MacroEngine.UI
                 MouseActionType.LeftClick => "Clic gauche",
                 MouseActionType.RightClick => "Clic droit",
                 MouseActionType.MiddleClick => "Clic milieu",
+                MouseActionType.DoubleLeftClick => "Double-clic gauche",
+                MouseActionType.DoubleRightClick => "Double-clic droit",
                 MouseActionType.Move => "Déplacer",
                 MouseActionType.LeftDown => "Appuyer gauche",
                 MouseActionType.LeftUp => "Relâcher gauche",
@@ -799,6 +801,8 @@ namespace MacroEngine.UI
             bool showCoords = ma.ActionType == Core.Inputs.MouseActionType.LeftClick ||
                              ma.ActionType == Core.Inputs.MouseActionType.RightClick ||
                              ma.ActionType == Core.Inputs.MouseActionType.MiddleClick ||
+                             ma.ActionType == Core.Inputs.MouseActionType.DoubleLeftClick ||
+                             ma.ActionType == Core.Inputs.MouseActionType.DoubleRightClick ||
                              ma.ActionType == Core.Inputs.MouseActionType.LeftDown ||
                              ma.ActionType == Core.Inputs.MouseActionType.RightDown ||
                              ma.ActionType == Core.Inputs.MouseActionType.MiddleDown ||
@@ -1874,13 +1878,15 @@ namespace MacroEngine.UI
             actionTypeComboBox.Items.Add("Clic gauche");      // index 0
             actionTypeComboBox.Items.Add("Clic droit");       // index 1
             actionTypeComboBox.Items.Add("Clic milieu");      // index 2
-            actionTypeComboBox.Items.Add("Maintenir gauche");  // index 3
-            actionTypeComboBox.Items.Add("Maintenir droit");   // index 4
-            actionTypeComboBox.Items.Add("Maintenir milieu");  // index 5
-            actionTypeComboBox.Items.Add("Déplacer");         // index 6
-            actionTypeComboBox.Items.Add("Molette haut");      // index 7
-            actionTypeComboBox.Items.Add("Molette bas");       // index 8
-            actionTypeComboBox.Items.Add("Molette");          // index 9
+            actionTypeComboBox.Items.Add("Double-clic gauche");  // index 3
+            actionTypeComboBox.Items.Add("Double-clic droit");   // index 4
+            actionTypeComboBox.Items.Add("Maintenir gauche");  // index 5
+            actionTypeComboBox.Items.Add("Maintenir droit");   // index 6
+            actionTypeComboBox.Items.Add("Maintenir milieu");  // index 7
+            actionTypeComboBox.Items.Add("Déplacer");         // index 8
+            actionTypeComboBox.Items.Add("Molette haut");      // index 9
+            actionTypeComboBox.Items.Add("Molette bas");       // index 10
+            actionTypeComboBox.Items.Add("Molette");          // index 11
 
             // Mapper l'ActionType actuel vers l'index du ComboBox
             int currentIndex = ma.ActionType switch
@@ -1888,13 +1894,15 @@ namespace MacroEngine.UI
                 Core.Inputs.MouseActionType.LeftClick => 0,
                 Core.Inputs.MouseActionType.RightClick => 1,
                 Core.Inputs.MouseActionType.MiddleClick => 2,
-                Core.Inputs.MouseActionType.LeftDown => 3,
-                Core.Inputs.MouseActionType.RightDown => 4,
-                Core.Inputs.MouseActionType.MiddleDown => 5,
-                Core.Inputs.MouseActionType.Move => 6,
-                Core.Inputs.MouseActionType.WheelUp => 7,
-                Core.Inputs.MouseActionType.WheelDown => 8,
-                Core.Inputs.MouseActionType.Wheel => 9,
+                Core.Inputs.MouseActionType.DoubleLeftClick => 3,
+                Core.Inputs.MouseActionType.DoubleRightClick => 4,
+                Core.Inputs.MouseActionType.LeftDown => 5,
+                Core.Inputs.MouseActionType.RightDown => 6,
+                Core.Inputs.MouseActionType.MiddleDown => 7,
+                Core.Inputs.MouseActionType.Move => 8,
+                Core.Inputs.MouseActionType.WheelUp => 9,
+                Core.Inputs.MouseActionType.WheelDown => 10,
+                Core.Inputs.MouseActionType.Wheel => 11,
                 _ => 0 // Par défaut, LeftClick si c'est un type "Relâcher" non supporté
             };
             actionTypeComboBox.SelectedIndex = currentIndex;
@@ -1907,6 +1915,8 @@ namespace MacroEngine.UI
                 return actionType == Core.Inputs.MouseActionType.LeftClick ||
                        actionType == Core.Inputs.MouseActionType.RightClick ||
                        actionType == Core.Inputs.MouseActionType.MiddleClick ||
+                       actionType == Core.Inputs.MouseActionType.DoubleLeftClick ||
+                       actionType == Core.Inputs.MouseActionType.DoubleRightClick ||
                        actionType == Core.Inputs.MouseActionType.LeftDown ||
                        actionType == Core.Inputs.MouseActionType.RightDown ||
                        actionType == Core.Inputs.MouseActionType.MiddleDown ||
@@ -2109,13 +2119,15 @@ namespace MacroEngine.UI
                         0 => Core.Inputs.MouseActionType.LeftClick,
                         1 => Core.Inputs.MouseActionType.RightClick,
                         2 => Core.Inputs.MouseActionType.MiddleClick,
-                        3 => Core.Inputs.MouseActionType.LeftDown,
-                        4 => Core.Inputs.MouseActionType.RightDown,
-                        5 => Core.Inputs.MouseActionType.MiddleDown,
-                        6 => Core.Inputs.MouseActionType.Move,
-                        7 => Core.Inputs.MouseActionType.WheelUp,
-                        8 => Core.Inputs.MouseActionType.WheelDown,
-                        9 => Core.Inputs.MouseActionType.Wheel,
+                        3 => Core.Inputs.MouseActionType.DoubleLeftClick,
+                        4 => Core.Inputs.MouseActionType.DoubleRightClick,
+                        5 => Core.Inputs.MouseActionType.LeftDown,
+                        6 => Core.Inputs.MouseActionType.RightDown,
+                        7 => Core.Inputs.MouseActionType.MiddleDown,
+                        8 => Core.Inputs.MouseActionType.Move,
+                        9 => Core.Inputs.MouseActionType.WheelUp,
+                        10 => Core.Inputs.MouseActionType.WheelDown,
+                        11 => Core.Inputs.MouseActionType.Wheel,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
                     
@@ -2357,17 +2369,19 @@ namespace MacroEngine.UI
                 Margin = new Thickness(0, 0, 8, 0)
             };
 
-            // Ordre doit correspondre à l'enum MouseActionType (sans les "Relâcher")
-            actionTypeComboBox.Items.Add("Clic gauche");      // 0: LeftClick
-            actionTypeComboBox.Items.Add("Clic droit");       // 1: RightClick
-            actionTypeComboBox.Items.Add("Clic milieu");      // 2: MiddleClick
-            actionTypeComboBox.Items.Add("Maintenir gauche");  // 3: LeftDown
-            actionTypeComboBox.Items.Add("Maintenir droit");   // 5: RightDown (sauter 4: LeftUp)
-            actionTypeComboBox.Items.Add("Maintenir milieu");  // 7: MiddleDown (sauter 6: RightUp)
-            actionTypeComboBox.Items.Add("Déplacer");         // 9: Move (sauter 8: MiddleUp)
-            actionTypeComboBox.Items.Add("Molette haut");      // 10: WheelUp
-            actionTypeComboBox.Items.Add("Molette bas");       // 11: WheelDown
-            actionTypeComboBox.Items.Add("Molette");          // 12: Wheel
+            // Ordre des items dans le ComboBox (sans les "Relâcher")
+            actionTypeComboBox.Items.Add("Clic gauche");      // index 0
+            actionTypeComboBox.Items.Add("Clic droit");       // index 1
+            actionTypeComboBox.Items.Add("Clic milieu");      // index 2
+            actionTypeComboBox.Items.Add("Double-clic gauche");  // index 3
+            actionTypeComboBox.Items.Add("Double-clic droit");   // index 4
+            actionTypeComboBox.Items.Add("Maintenir gauche");  // index 5
+            actionTypeComboBox.Items.Add("Maintenir droit");   // index 6
+            actionTypeComboBox.Items.Add("Maintenir milieu");  // index 7
+            actionTypeComboBox.Items.Add("Déplacer");         // index 8
+            actionTypeComboBox.Items.Add("Molette haut");      // index 9
+            actionTypeComboBox.Items.Add("Molette bas");       // index 10
+            actionTypeComboBox.Items.Add("Molette");          // index 11
 
             // Mapper l'ActionType actuel vers l'index du ComboBox
             int currentIndex = ma.ActionType switch
@@ -2375,13 +2389,15 @@ namespace MacroEngine.UI
                 Core.Inputs.MouseActionType.LeftClick => 0,
                 Core.Inputs.MouseActionType.RightClick => 1,
                 Core.Inputs.MouseActionType.MiddleClick => 2,
-                Core.Inputs.MouseActionType.LeftDown => 3,
-                Core.Inputs.MouseActionType.RightDown => 4,
-                Core.Inputs.MouseActionType.MiddleDown => 5,
-                Core.Inputs.MouseActionType.Move => 6,
-                Core.Inputs.MouseActionType.WheelUp => 7,
-                Core.Inputs.MouseActionType.WheelDown => 8,
-                Core.Inputs.MouseActionType.Wheel => 9,
+                Core.Inputs.MouseActionType.DoubleLeftClick => 3,
+                Core.Inputs.MouseActionType.DoubleRightClick => 4,
+                Core.Inputs.MouseActionType.LeftDown => 5,
+                Core.Inputs.MouseActionType.RightDown => 6,
+                Core.Inputs.MouseActionType.MiddleDown => 7,
+                Core.Inputs.MouseActionType.Move => 8,
+                Core.Inputs.MouseActionType.WheelUp => 9,
+                Core.Inputs.MouseActionType.WheelDown => 10,
+                Core.Inputs.MouseActionType.Wheel => 11,
                 _ => 0 // Par défaut, LeftClick si c'est un type "Relâcher" non supporté
             };
             actionTypeComboBox.SelectedIndex = currentIndex;
@@ -2517,13 +2533,15 @@ namespace MacroEngine.UI
                         0 => Core.Inputs.MouseActionType.LeftClick,
                         1 => Core.Inputs.MouseActionType.RightClick,
                         2 => Core.Inputs.MouseActionType.MiddleClick,
-                        3 => Core.Inputs.MouseActionType.LeftDown,
-                        4 => Core.Inputs.MouseActionType.RightDown,
-                        5 => Core.Inputs.MouseActionType.MiddleDown,
-                        6 => Core.Inputs.MouseActionType.Move,
-                        7 => Core.Inputs.MouseActionType.WheelUp,
-                        8 => Core.Inputs.MouseActionType.WheelDown,
-                        9 => Core.Inputs.MouseActionType.Wheel,
+                        3 => Core.Inputs.MouseActionType.DoubleLeftClick,
+                        4 => Core.Inputs.MouseActionType.DoubleRightClick,
+                        5 => Core.Inputs.MouseActionType.LeftDown,
+                        6 => Core.Inputs.MouseActionType.RightDown,
+                        7 => Core.Inputs.MouseActionType.MiddleDown,
+                        8 => Core.Inputs.MouseActionType.Move,
+                        9 => Core.Inputs.MouseActionType.WheelUp,
+                        10 => Core.Inputs.MouseActionType.WheelDown,
+                        11 => Core.Inputs.MouseActionType.Wheel,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
                     _currentMacro.ModifiedAt = DateTime.Now;
@@ -4607,32 +4625,67 @@ namespace MacroEngine.UI
 
             var clickTypeComboBox = new ComboBox
             {
-                MinWidth = 100,
+                MinWidth = 140,
                 FontSize = titleText.FontSize,
                 FontWeight = titleText.FontWeight,
-                VerticalAlignment = VerticalAlignment.Center,
-                SelectedIndex = (int)ma.ActionType
+                VerticalAlignment = VerticalAlignment.Center
             };
 
-            clickTypeComboBox.Items.Add("Clic gauche");
-            clickTypeComboBox.Items.Add("Clic droit");
-            clickTypeComboBox.Items.Add("Clic milieu");
-            clickTypeComboBox.Items.Add("Bouton gauche ↓");
-            clickTypeComboBox.Items.Add("Bouton gauche ↑");
-            clickTypeComboBox.Items.Add("Bouton droit ↓");
-            clickTypeComboBox.Items.Add("Bouton droit ↑");
-            clickTypeComboBox.Items.Add("Bouton milieu ↓");
-            clickTypeComboBox.Items.Add("Bouton milieu ↑");
-            clickTypeComboBox.Items.Add("Déplacement");
-            clickTypeComboBox.Items.Add("Molette ↑");
-            clickTypeComboBox.Items.Add("Molette ↓");
+            // Ordre des items dans le ComboBox (sans les "Relâcher")
+            clickTypeComboBox.Items.Add("Clic gauche");      // index 0
+            clickTypeComboBox.Items.Add("Clic droit");       // index 1
+            clickTypeComboBox.Items.Add("Clic milieu");      // index 2
+            clickTypeComboBox.Items.Add("Double-clic gauche");  // index 3
+            clickTypeComboBox.Items.Add("Double-clic droit");   // index 4
+            clickTypeComboBox.Items.Add("Maintenir gauche");  // index 5
+            clickTypeComboBox.Items.Add("Maintenir droit");   // index 6
+            clickTypeComboBox.Items.Add("Maintenir milieu");  // index 7
+            clickTypeComboBox.Items.Add("Déplacer");         // index 8
+            clickTypeComboBox.Items.Add("Molette haut");      // index 9
+            clickTypeComboBox.Items.Add("Molette bas");       // index 10
+            clickTypeComboBox.Items.Add("Molette");          // index 11
+
+            // Mapper l'ActionType actuel vers l'index du ComboBox
+            int currentIndex = ma.ActionType switch
+            {
+                Core.Inputs.MouseActionType.LeftClick => 0,
+                Core.Inputs.MouseActionType.RightClick => 1,
+                Core.Inputs.MouseActionType.MiddleClick => 2,
+                Core.Inputs.MouseActionType.DoubleLeftClick => 3,
+                Core.Inputs.MouseActionType.DoubleRightClick => 4,
+                Core.Inputs.MouseActionType.LeftDown => 5,
+                Core.Inputs.MouseActionType.RightDown => 6,
+                Core.Inputs.MouseActionType.MiddleDown => 7,
+                Core.Inputs.MouseActionType.Move => 8,
+                Core.Inputs.MouseActionType.WheelUp => 9,
+                Core.Inputs.MouseActionType.WheelDown => 10,
+                Core.Inputs.MouseActionType.Wheel => 11,
+                _ => 0 // Par défaut, LeftClick si c'est un type "Relâcher" non supporté
+            };
+            clickTypeComboBox.SelectedIndex = currentIndex;
 
             clickTypeComboBox.SelectionChanged += (s, e) =>
             {
                 if (clickTypeComboBox.SelectedIndex >= 0)
                 {
                     SaveState();
-                    ma.ActionType = (Core.Inputs.MouseActionType)clickTypeComboBox.SelectedIndex;
+                    // Mapper l'index du ComboBox vers l'enum MouseActionType
+                    ma.ActionType = clickTypeComboBox.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MouseActionType.LeftClick,
+                        1 => Core.Inputs.MouseActionType.RightClick,
+                        2 => Core.Inputs.MouseActionType.MiddleClick,
+                        3 => Core.Inputs.MouseActionType.DoubleLeftClick,
+                        4 => Core.Inputs.MouseActionType.DoubleRightClick,
+                        5 => Core.Inputs.MouseActionType.LeftDown,
+                        6 => Core.Inputs.MouseActionType.RightDown,
+                        7 => Core.Inputs.MouseActionType.MiddleDown,
+                        8 => Core.Inputs.MouseActionType.Move,
+                        9 => Core.Inputs.MouseActionType.WheelUp,
+                        10 => Core.Inputs.MouseActionType.WheelDown,
+                        11 => Core.Inputs.MouseActionType.Wheel,
+                        _ => Core.Inputs.MouseActionType.LeftClick
+                    };
                     _currentMacro!.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);

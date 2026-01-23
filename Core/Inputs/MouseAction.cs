@@ -86,6 +86,22 @@ namespace MacroEngine.Core.Inputs
                 case MouseActionType.Wheel:
                     MouseEvent(MOUSEEVENTF_WHEEL, Delta);
                     break;
+                case MouseActionType.DoubleLeftClick:
+                    // Double-clic gauche : deux clics rapides
+                    MouseEvent(MOUSEEVENTF_LEFTDOWN);
+                    MouseEvent(MOUSEEVENTF_LEFTUP);
+                    System.Threading.Thread.Sleep(50); // Délai entre les deux clics
+                    MouseEvent(MOUSEEVENTF_LEFTDOWN);
+                    MouseEvent(MOUSEEVENTF_LEFTUP);
+                    break;
+                case MouseActionType.DoubleRightClick:
+                    // Double-clic droit : deux clics rapides
+                    MouseEvent(MOUSEEVENTF_RIGHTDOWN);
+                    MouseEvent(MOUSEEVENTF_RIGHTUP);
+                    System.Threading.Thread.Sleep(50); // Délai entre les deux clics
+                    MouseEvent(MOUSEEVENTF_RIGHTDOWN);
+                    MouseEvent(MOUSEEVENTF_RIGHTUP);
+                    break;
             }
         }
 
@@ -171,7 +187,9 @@ namespace MacroEngine.Core.Inputs
         Move,
         WheelUp,
         WheelDown,
-        Wheel
+        Wheel,
+        DoubleLeftClick,
+        DoubleRightClick
     }
 }
 
