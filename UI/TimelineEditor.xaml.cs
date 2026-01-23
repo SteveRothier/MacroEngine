@@ -810,13 +810,49 @@ namespace MacroEngine.UI
             
             if (showCoords)
             {
-                if (ma.X >= 0 && ma.Y >= 0)
+                if (ma.ActionType == Core.Inputs.MouseActionType.Move)
                 {
-                    details.Append($"Position: ({ma.X}, {ma.Y})");
+                    // Affichage spécial pour le déplacement
+                    if (ma.IsRelativeMove)
+                    {
+                        if (ma.X != 0 || ma.Y != 0)
+                        {
+                            details.Append($"Déplacer de ({ma.X:+0;-0;0}, {ma.Y:+0;-0;0})");
+                        }
+                        else
+                        {
+                            details.Append("Déplacer de (0, 0)");
+                        }
+                    }
+                    else
+                    {
+                        if (ma.X >= 0 && ma.Y >= 0)
+                        {
+                            details.Append($"Déplacer vers ({ma.X}, {ma.Y})");
+                        }
+                        else
+                        {
+                            details.Append("Déplacer vers position actuelle");
+                        }
+                    }
+                    
+                    // Afficher la vitesse si elle n'est pas instantanée
+                    if (ma.MoveSpeed != Core.Inputs.MoveSpeed.Instant)
+                    {
+                        details.Append($" • {GetMoveSpeedLabel(ma.MoveSpeed)}");
+                    }
                 }
                 else
                 {
-                    details.Append("Position actuelle");
+                    // Affichage normal pour les clics
+                    if (ma.X >= 0 && ma.Y >= 0)
+                    {
+                        details.Append($"Position: ({ma.X}, {ma.Y})");
+                    }
+                    else
+                    {
+                        details.Append("Position actuelle");
+                    }
                 }
             }
             
@@ -835,6 +871,17 @@ namespace MacroEngine.UI
             }
             
             return details.Length > 0 ? details.ToString() : "";
+        }
+
+        private string GetMoveSpeedLabel(Core.Inputs.MoveSpeed speed)
+        {
+            return speed switch
+            {
+                Core.Inputs.MoveSpeed.Instant => "Instantané",
+                Core.Inputs.MoveSpeed.Fast => "Rapide",
+                Core.Inputs.MoveSpeed.Gradual => "Graduel",
+                _ => "Instantané"
+            };
         }
 
         private string GetRepeatActionTitle(RepeatAction ra)
@@ -2107,6 +2154,93 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(deltaTextBox);
 
+            // Fonction pour déterminer si les contrôles de déplacement doivent être affichés (uniquement pour Move)
+            bool ShouldShowMoveControls(Core.Inputs.MouseActionType actionType)
+            {
+                return actionType == Core.Inputs.MouseActionType.Move;
+            }
+
+            // CheckBox pour le mode relatif (uniquement pour Move)
+            bool showMoveControls = ShouldShowMoveControls(ma.ActionType);
+            var relativeMoveCheckBox = new CheckBox
+            {
+                Content = "Relatif",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                ToolTip = "Déplacer de X/Y pixels par rapport à la position actuelle",
+                IsChecked = ma.IsRelativeMove,
+                Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed
+            };
+            relativeMoveCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ma.IsRelativeMove = true;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            relativeMoveCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ma.IsRelativeMove = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(relativeMoveCheckBox);
+
+            // ComboBox pour la vitesse de déplacement (uniquement pour Move)
+            var moveSpeedComboBox = new ComboBox
+            {
+                MinWidth = 100,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                ToolTip = "Vitesse du déplacement",
+                Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed
+            };
+            moveSpeedComboBox.Items.Add("Instantané");
+            moveSpeedComboBox.Items.Add("Rapide");
+            moveSpeedComboBox.Items.Add("Graduel");
+            
+            // Mapper la vitesse actuelle vers l'index
+            moveSpeedComboBox.SelectedIndex = ma.MoveSpeed switch
+            {
+                Core.Inputs.MoveSpeed.Instant => 0,
+                Core.Inputs.MoveSpeed.Fast => 1,
+                Core.Inputs.MoveSpeed.Gradual => 2,
+                _ => 0
+            };
+            
+            moveSpeedComboBox.SelectionChanged += (s, e) =>
+            {
+                if (moveSpeedComboBox.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.MoveSpeed = moveSpeedComboBox.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MoveSpeed.Instant,
+                        1 => Core.Inputs.MoveSpeed.Fast,
+                        2 => Core.Inputs.MoveSpeed.Gradual,
+                        _ => Core.Inputs.MoveSpeed.Instant
+                    };
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(moveSpeedComboBox);
+
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -2167,6 +2301,10 @@ namespace MacroEngine.UI
                     bool showDelta = ShouldShowDelta(ma.ActionType);
                     deltaLabel.Visibility = showDelta ? Visibility.Visible : Visibility.Collapsed;
                     deltaTextBox.Visibility = showDelta ? Visibility.Visible : Visibility.Collapsed;
+                    
+                    bool showMoveControls = ShouldShowMoveControls(ma.ActionType);
+                    relativeMoveCheckBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    moveSpeedComboBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
@@ -2521,6 +2659,93 @@ namespace MacroEngine.UI
 
             editPanel.Children.Add(selectPointButton);
 
+            // Fonction pour déterminer si les contrôles de déplacement doivent être affichés (uniquement pour Move)
+            bool ShouldShowMoveControlsNested(Core.Inputs.MouseActionType actionType)
+            {
+                return actionType == Core.Inputs.MouseActionType.Move;
+            }
+
+            // CheckBox pour le mode relatif (uniquement pour Move)
+            bool showMoveControlsNested = ShouldShowMoveControlsNested(ma.ActionType);
+            var relativeMoveCheckBoxNested = new CheckBox
+            {
+                Content = "Relatif",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                ToolTip = "Déplacer de X/Y pixels par rapport à la position actuelle",
+                IsChecked = ma.IsRelativeMove,
+                Visibility = showMoveControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            relativeMoveCheckBoxNested.Checked += (s, e) =>
+            {
+                SaveState();
+                ma.IsRelativeMove = true;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            relativeMoveCheckBoxNested.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ma.IsRelativeMove = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(relativeMoveCheckBoxNested);
+
+            // ComboBox pour la vitesse de déplacement (uniquement pour Move)
+            var moveSpeedComboBoxNested = new ComboBox
+            {
+                MinWidth = 100,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                ToolTip = "Vitesse du déplacement",
+                Visibility = showMoveControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            moveSpeedComboBoxNested.Items.Add("Instantané");
+            moveSpeedComboBoxNested.Items.Add("Rapide");
+            moveSpeedComboBoxNested.Items.Add("Graduel");
+            
+            // Mapper la vitesse actuelle vers l'index
+            moveSpeedComboBoxNested.SelectedIndex = ma.MoveSpeed switch
+            {
+                Core.Inputs.MoveSpeed.Instant => 0,
+                Core.Inputs.MoveSpeed.Fast => 1,
+                Core.Inputs.MoveSpeed.Gradual => 2,
+                _ => 0
+            };
+            
+            moveSpeedComboBoxNested.SelectionChanged += (s, e) =>
+            {
+                if (moveSpeedComboBoxNested.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.MoveSpeed = moveSpeedComboBoxNested.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MoveSpeed.Instant,
+                        1 => Core.Inputs.MoveSpeed.Fast,
+                        2 => Core.Inputs.MoveSpeed.Gradual,
+                        _ => Core.Inputs.MoveSpeed.Instant
+                    };
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(moveSpeedComboBoxNested);
+
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -2544,6 +2769,12 @@ namespace MacroEngine.UI
                         11 => Core.Inputs.MouseActionType.Wheel,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
+                    
+                    // Mettre à jour la visibilité des contrôles selon le type d'action
+                    bool showMoveControls = ShouldShowMoveControlsNested(ma.ActionType);
+                    relativeMoveCheckBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    moveSpeedComboBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
@@ -4664,35 +4895,92 @@ namespace MacroEngine.UI
             };
             clickTypeComboBox.SelectedIndex = currentIndex;
 
-            clickTypeComboBox.SelectionChanged += (s, e) =>
+            // Fonction pour déterminer si les contrôles de déplacement doivent être affichés (uniquement pour Move)
+            bool ShouldShowMoveControlsIf(Core.Inputs.MouseActionType actionType)
             {
-                if (clickTypeComboBox.SelectedIndex >= 0)
+                return actionType == Core.Inputs.MouseActionType.Move;
+            }
+
+            // CheckBox pour le mode relatif (uniquement pour Move) - déclaré avant SelectionChanged
+            bool showMoveControlsIf = ShouldShowMoveControlsIf(ma.ActionType);
+            var relativeMoveCheckBoxIf = new CheckBox
+            {
+                Content = "Relatif",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                ToolTip = "Déplacer de X/Y pixels par rapport à la position actuelle",
+                IsChecked = ma.IsRelativeMove,
+                Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            relativeMoveCheckBoxIf.Checked += (s, e) =>
+            {
+                SaveState();
+                ma.IsRelativeMove = true;
+                if (_currentMacro != null)
                 {
-                    SaveState();
-                    // Mapper l'index du ComboBox vers l'enum MouseActionType
-                    ma.ActionType = clickTypeComboBox.SelectedIndex switch
-                    {
-                        0 => Core.Inputs.MouseActionType.LeftClick,
-                        1 => Core.Inputs.MouseActionType.RightClick,
-                        2 => Core.Inputs.MouseActionType.MiddleClick,
-                        3 => Core.Inputs.MouseActionType.DoubleLeftClick,
-                        4 => Core.Inputs.MouseActionType.DoubleRightClick,
-                        5 => Core.Inputs.MouseActionType.LeftDown,
-                        6 => Core.Inputs.MouseActionType.RightDown,
-                        7 => Core.Inputs.MouseActionType.MiddleDown,
-                        8 => Core.Inputs.MouseActionType.Move,
-                        9 => Core.Inputs.MouseActionType.WheelUp,
-                        10 => Core.Inputs.MouseActionType.WheelDown,
-                        11 => Core.Inputs.MouseActionType.Wheel,
-                        _ => Core.Inputs.MouseActionType.LeftClick
-                    };
-                    _currentMacro!.ModifiedAt = DateTime.Now;
-                    RefreshBlocks();
+                    _currentMacro.ModifiedAt = DateTime.Now;
                     MacroChanged?.Invoke(this, EventArgs.Empty);
                 }
+                RefreshBlocks();
             };
+            relativeMoveCheckBoxIf.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ma.IsRelativeMove = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(relativeMoveCheckBoxIf);
 
-            editPanel.Children.Add(clickTypeComboBox);
+            // ComboBox pour la vitesse de déplacement (uniquement pour Move)
+            var moveSpeedComboBoxIf = new ComboBox
+            {
+                MinWidth = 100,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                ToolTip = "Vitesse du déplacement",
+                Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            moveSpeedComboBoxIf.Items.Add("Instantané");
+            moveSpeedComboBoxIf.Items.Add("Rapide");
+            moveSpeedComboBoxIf.Items.Add("Graduel");
+            
+            // Mapper la vitesse actuelle vers l'index
+            moveSpeedComboBoxIf.SelectedIndex = ma.MoveSpeed switch
+            {
+                Core.Inputs.MoveSpeed.Instant => 0,
+                Core.Inputs.MoveSpeed.Fast => 1,
+                Core.Inputs.MoveSpeed.Gradual => 2,
+                _ => 0
+            };
+            
+            moveSpeedComboBoxIf.SelectionChanged += (s, e) =>
+            {
+                if (moveSpeedComboBoxIf.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.MoveSpeed = moveSpeedComboBoxIf.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MoveSpeed.Instant,
+                        1 => Core.Inputs.MoveSpeed.Fast,
+                        2 => Core.Inputs.MoveSpeed.Gradual,
+                        _ => Core.Inputs.MoveSpeed.Instant
+                    };
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(moveSpeedComboBoxIf);
 
             var idx = parentPanel.Children.IndexOf(titleText);
             if (idx < 0)
