@@ -43,6 +43,11 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         public MoveSpeed MoveSpeed { get; set; } = MoveSpeed.Instant;
 
+        /// <summary>
+        /// Type d'easing pour le déplacement - uniquement pour Move
+        /// </summary>
+        public MoveEasing MoveEasing { get; set; } = MoveEasing.Linear;
+
         public void Execute()
         {
             // Exécuter l'action
@@ -56,14 +61,14 @@ namespace MacroEngine.Core.Inputs
                         GetCursorPos(out POINT currentPos);
                         int targetX = currentPos.X + X;
                         int targetY = currentPos.Y + Y;
-                        MoveCursorTo(targetX, targetY, MoveSpeed);
+                        MoveCursorTo(targetX, targetY, MoveSpeed, MoveEasing);
                     }
                     else
                     {
                         // Déplacement absolu
                         if (X >= 0 && Y >= 0)
                         {
-                            MoveCursorTo(X, Y, MoveSpeed);
+                            MoveCursorTo(X, Y, MoveSpeed, MoveEasing);
                         }
                     }
                     break;
@@ -184,7 +189,8 @@ namespace MacroEngine.Core.Inputs
                 Y = this.Y,
                 Delta = this.Delta,
                 IsRelativeMove = this.IsRelativeMove,
-                MoveSpeed = this.MoveSpeed
+                MoveSpeed = this.MoveSpeed,
+                MoveEasing = this.MoveEasing
             };
         }
 
@@ -234,9 +240,9 @@ namespace MacroEngine.Core.Inputs
         }
 
         /// <summary>
-        /// Déplace le curseur vers une position avec une vitesse donnée
+        /// Déplace le curseur vers une position avec une vitesse et un easing donnés
         /// </summary>
-        private void MoveCursorTo(int targetX, int targetY, MoveSpeed speed)
+        private void MoveCursorTo(int targetX, int targetY, MoveSpeed speed, MoveEasing easing)
         {
             if (speed == MoveSpeed.Instant)
             {
@@ -272,12 +278,14 @@ namespace MacroEngine.Core.Inputs
                     return;
             }
 
-            // Déplacement progressif
+            // Déplacement progressif avec easing
             for (int i = 0; i <= steps; i++)
             {
-                double ratio = (double)i / steps;
-                int currentX = startX + (int)((targetX - startX) * ratio);
-                int currentY = startY + (int)((targetY - startY) * ratio);
+                double t = (double)i / steps; // Ratio linéaire de 0 à 1
+                double easedT = ApplyEasing(t, easing); // Appliquer l'easing
+                
+                int currentX = startX + (int)((targetX - startX) * easedT);
+                int currentY = startY + (int)((targetY - startY) * easedT);
                 
                 SetCursorPos(currentX, currentY);
                 
@@ -286,6 +294,26 @@ namespace MacroEngine.Core.Inputs
                     System.Threading.Thread.Sleep(delayMs);
                 }
             }
+        }
+
+        /// <summary>
+        /// Applique une fonction d'easing à un ratio de 0 à 1
+        /// </summary>
+        private double ApplyEasing(double t, MoveEasing easing)
+        {
+            // Clamp t entre 0 et 1
+            t = Math.Max(0, Math.Min(1, t));
+            
+            return easing switch
+            {
+                MoveEasing.Linear => t, // Pas d'easing, linéaire
+                MoveEasing.EaseIn => t * t, // Accélération (démarrage lent, fin rapide)
+                MoveEasing.EaseOut => 1 - (1 - t) * (1 - t), // Décélération (démarrage rapide, fin lente)
+                MoveEasing.EaseInOut => t < 0.5 
+                    ? 2 * t * t // Première moitié : accélération
+                    : 1 - Math.Pow(-2 * t + 2, 2) / 2, // Seconde moitié : décélération
+                _ => t
+            };
         }
     }
 
@@ -316,6 +344,17 @@ namespace MacroEngine.Core.Inputs
         Instant,    // Déplacement instantané
         Fast,       // Déplacement rapide (quelques ms)
         Gradual     // Déplacement graduel (plus lent, plus naturel)
+    }
+
+    /// <summary>
+    /// Type d'easing (courbe d'accélération/décélération) pour le déplacement
+    /// </summary>
+    public enum MoveEasing
+    {
+        Linear,      // Linéaire (pas d'easing)
+        EaseIn,      // Accélération (démarrage lent, fin rapide)
+        EaseOut,     // Décélération (démarrage rapide, fin lente)
+        EaseInOut    // Ease-in-out (démarrage et fin lents, milieu rapide)
     }
 }
 

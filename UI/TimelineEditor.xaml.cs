@@ -841,6 +841,12 @@ namespace MacroEngine.UI
                     {
                         details.Append($" • {GetMoveSpeedLabel(ma.MoveSpeed)}");
                     }
+                    
+                    // Afficher l'easing si ce n'est pas linéaire
+                    if (ma.MoveEasing != Core.Inputs.MoveEasing.Linear)
+                    {
+                        details.Append($" • {GetMoveEasingLabel(ma.MoveEasing)}");
+                    }
                 }
                 else
                 {
@@ -881,6 +887,18 @@ namespace MacroEngine.UI
                 Core.Inputs.MoveSpeed.Fast => "Rapide",
                 Core.Inputs.MoveSpeed.Gradual => "Graduel",
                 _ => "Instantané"
+            };
+        }
+
+        private string GetMoveEasingLabel(Core.Inputs.MoveEasing easing)
+        {
+            return easing switch
+            {
+                Core.Inputs.MoveEasing.Linear => "Linéaire",
+                Core.Inputs.MoveEasing.EaseIn => "Accélération",
+                Core.Inputs.MoveEasing.EaseOut => "Décélération",
+                Core.Inputs.MoveEasing.EaseInOut => "Ease-in-out",
+                _ => "Linéaire"
             };
         }
 
@@ -2241,6 +2259,54 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(moveSpeedComboBox);
 
+            // ComboBox pour le type d'easing (uniquement pour Move)
+            var moveEasingComboBox = new ComboBox
+            {
+                MinWidth = 120,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                ToolTip = "Courbe d'accélération/décélération",
+                Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed
+            };
+            moveEasingComboBox.Items.Add("Linéaire");
+            moveEasingComboBox.Items.Add("Accélération");
+            moveEasingComboBox.Items.Add("Décélération");
+            moveEasingComboBox.Items.Add("Ease-in-out");
+            
+            // Mapper l'easing actuel vers l'index
+            moveEasingComboBox.SelectedIndex = ma.MoveEasing switch
+            {
+                Core.Inputs.MoveEasing.Linear => 0,
+                Core.Inputs.MoveEasing.EaseIn => 1,
+                Core.Inputs.MoveEasing.EaseOut => 2,
+                Core.Inputs.MoveEasing.EaseInOut => 3,
+                _ => 0
+            };
+            
+            moveEasingComboBox.SelectionChanged += (s, e) =>
+            {
+                if (moveEasingComboBox.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.MoveEasing = moveEasingComboBox.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MoveEasing.Linear,
+                        1 => Core.Inputs.MoveEasing.EaseIn,
+                        2 => Core.Inputs.MoveEasing.EaseOut,
+                        3 => Core.Inputs.MoveEasing.EaseInOut,
+                        _ => Core.Inputs.MoveEasing.Linear
+                    };
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(moveEasingComboBox);
+
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -2305,6 +2371,7 @@ namespace MacroEngine.UI
                     bool showMoveControls = ShouldShowMoveControls(ma.ActionType);
                     relativeMoveCheckBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     moveSpeedComboBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    moveEasingComboBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
@@ -2746,6 +2813,54 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(moveSpeedComboBoxNested);
 
+            // ComboBox pour le type d'easing (uniquement pour Move)
+            var moveEasingComboBoxNested = new ComboBox
+            {
+                MinWidth = 120,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                ToolTip = "Courbe d'accélération/décélération",
+                Visibility = showMoveControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            moveEasingComboBoxNested.Items.Add("Linéaire");
+            moveEasingComboBoxNested.Items.Add("Accélération");
+            moveEasingComboBoxNested.Items.Add("Décélération");
+            moveEasingComboBoxNested.Items.Add("Ease-in-out");
+            
+            // Mapper l'easing actuel vers l'index
+            moveEasingComboBoxNested.SelectedIndex = ma.MoveEasing switch
+            {
+                Core.Inputs.MoveEasing.Linear => 0,
+                Core.Inputs.MoveEasing.EaseIn => 1,
+                Core.Inputs.MoveEasing.EaseOut => 2,
+                Core.Inputs.MoveEasing.EaseInOut => 3,
+                _ => 0
+            };
+            
+            moveEasingComboBoxNested.SelectionChanged += (s, e) =>
+            {
+                if (moveEasingComboBoxNested.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.MoveEasing = moveEasingComboBoxNested.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MoveEasing.Linear,
+                        1 => Core.Inputs.MoveEasing.EaseIn,
+                        2 => Core.Inputs.MoveEasing.EaseOut,
+                        3 => Core.Inputs.MoveEasing.EaseInOut,
+                        _ => Core.Inputs.MoveEasing.Linear
+                    };
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(moveEasingComboBoxNested);
+
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -2774,6 +2889,7 @@ namespace MacroEngine.UI
                     bool showMoveControls = ShouldShowMoveControlsNested(ma.ActionType);
                     relativeMoveCheckBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     moveSpeedComboBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    moveEasingComboBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
@@ -4981,6 +5097,92 @@ namespace MacroEngine.UI
                 }
             };
             editPanel.Children.Add(moveSpeedComboBoxIf);
+
+            // ComboBox pour le type d'easing (uniquement pour Move)
+            var moveEasingComboBoxIf = new ComboBox
+            {
+                MinWidth = 120,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                ToolTip = "Courbe d'accélération/décélération",
+                Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            moveEasingComboBoxIf.Items.Add("Linéaire");
+            moveEasingComboBoxIf.Items.Add("Accélération");
+            moveEasingComboBoxIf.Items.Add("Décélération");
+            moveEasingComboBoxIf.Items.Add("Ease-in-out");
+            
+            // Mapper l'easing actuel vers l'index
+            moveEasingComboBoxIf.SelectedIndex = ma.MoveEasing switch
+            {
+                Core.Inputs.MoveEasing.Linear => 0,
+                Core.Inputs.MoveEasing.EaseIn => 1,
+                Core.Inputs.MoveEasing.EaseOut => 2,
+                Core.Inputs.MoveEasing.EaseInOut => 3,
+                _ => 0
+            };
+            
+            moveEasingComboBoxIf.SelectionChanged += (s, e) =>
+            {
+                if (moveEasingComboBoxIf.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.MoveEasing = moveEasingComboBoxIf.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MoveEasing.Linear,
+                        1 => Core.Inputs.MoveEasing.EaseIn,
+                        2 => Core.Inputs.MoveEasing.EaseOut,
+                        3 => Core.Inputs.MoveEasing.EaseInOut,
+                        _ => Core.Inputs.MoveEasing.Linear
+                    };
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(moveEasingComboBoxIf);
+
+            // Ajouter le SelectionChanged après la déclaration de toutes les variables
+            clickTypeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (clickTypeComboBox.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    // Mapper l'index du ComboBox vers l'enum MouseActionType
+                    ma.ActionType = clickTypeComboBox.SelectedIndex switch
+                    {
+                        0 => Core.Inputs.MouseActionType.LeftClick,
+                        1 => Core.Inputs.MouseActionType.RightClick,
+                        2 => Core.Inputs.MouseActionType.MiddleClick,
+                        3 => Core.Inputs.MouseActionType.DoubleLeftClick,
+                        4 => Core.Inputs.MouseActionType.DoubleRightClick,
+                        5 => Core.Inputs.MouseActionType.LeftDown,
+                        6 => Core.Inputs.MouseActionType.RightDown,
+                        7 => Core.Inputs.MouseActionType.MiddleDown,
+                        8 => Core.Inputs.MouseActionType.Move,
+                        9 => Core.Inputs.MouseActionType.WheelUp,
+                        10 => Core.Inputs.MouseActionType.WheelDown,
+                        11 => Core.Inputs.MouseActionType.Wheel,
+                        _ => Core.Inputs.MouseActionType.LeftClick
+                    };
+                    
+                    // Mettre à jour la visibilité des contrôles de déplacement
+                    bool showMoveControlsIf = ma.ActionType == Core.Inputs.MouseActionType.Move;
+                    relativeMoveCheckBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    moveSpeedComboBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    moveEasingComboBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+
+            editPanel.Children.Add(clickTypeComboBox);
 
             var idx = parentPanel.Children.IndexOf(titleText);
             if (idx < 0)
