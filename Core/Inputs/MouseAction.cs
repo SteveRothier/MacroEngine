@@ -48,6 +48,21 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         public MoveEasing MoveEasing { get; set; } = MoveEasing.Linear;
 
+        /// <summary>
+        /// Utiliser une trajectoire courbe (Bézier) - uniquement pour Move
+        /// </summary>
+        public bool UseBezierPath { get; set; } = false;
+
+        /// <summary>
+        /// Point de contrôle X pour la courbe de Bézier - uniquement pour Move avec UseBezierPath
+        /// </summary>
+        public int ControlX { get; set; } = -1;
+
+        /// <summary>
+        /// Point de contrôle Y pour la courbe de Bézier - uniquement pour Move avec UseBezierPath
+        /// </summary>
+        public int ControlY { get; set; } = -1;
+
         public void Execute()
         {
             // Exécuter l'action
@@ -61,14 +76,19 @@ namespace MacroEngine.Core.Inputs
                         GetCursorPos(out POINT currentPos);
                         int targetX = currentPos.X + X;
                         int targetY = currentPos.Y + Y;
-                        MoveCursorTo(targetX, targetY, MoveSpeed, MoveEasing);
+                        int controlX = UseBezierPath && ControlX >= 0 ? (IsRelativeMove ? currentPos.X + ControlX : ControlX) : -1;
+                        int controlY = UseBezierPath && ControlY >= 0 ? (IsRelativeMove ? currentPos.Y + ControlY : ControlY) : -1;
+                        MoveCursorTo(currentPos.X, currentPos.Y, targetX, targetY, MoveSpeed, MoveEasing, UseBezierPath, controlX, controlY);
                     }
                     else
                     {
                         // Déplacement absolu
                         if (X >= 0 && Y >= 0)
                         {
-                            MoveCursorTo(X, Y, MoveSpeed, MoveEasing);
+                            GetCursorPos(out POINT startPos);
+                            int controlX = UseBezierPath && ControlX >= 0 ? ControlX : -1;
+                            int controlY = UseBezierPath && ControlY >= 0 ? ControlY : -1;
+                            MoveCursorTo(startPos.X, startPos.Y, X, Y, MoveSpeed, MoveEasing, UseBezierPath, controlX, controlY);
                         }
                     }
                     break;
@@ -190,7 +210,10 @@ namespace MacroEngine.Core.Inputs
                 Delta = this.Delta,
                 IsRelativeMove = this.IsRelativeMove,
                 MoveSpeed = this.MoveSpeed,
-                MoveEasing = this.MoveEasing
+                MoveEasing = this.MoveEasing,
+                UseBezierPath = this.UseBezierPath,
+                ControlX = this.ControlX,
+                ControlY = this.ControlY
             };
         }
 
@@ -240,19 +263,15 @@ namespace MacroEngine.Core.Inputs
         }
 
         /// <summary>
-        /// Déplace le curseur vers une position avec une vitesse et un easing donnés
+        /// Déplace le curseur vers une position avec une vitesse, un easing et optionnellement une courbe de Bézier
         /// </summary>
-        private void MoveCursorTo(int targetX, int targetY, MoveSpeed speed, MoveEasing easing)
+        private void MoveCursorTo(int startX, int startY, int targetX, int targetY, MoveSpeed speed, MoveEasing easing, bool useBezier, int controlX, int controlY)
         {
             if (speed == MoveSpeed.Instant)
             {
                 SetCursorPos(targetX, targetY);
                 return;
             }
-
-            GetCursorPos(out POINT startPos);
-            int startX = startPos.X;
-            int startY = startPos.Y;
 
             int distance = (int)Math.Sqrt(Math.Pow(targetX - startX, 2) + Math.Pow(targetY - startY, 2));
             
@@ -278,14 +297,31 @@ namespace MacroEngine.Core.Inputs
                     return;
             }
 
-            // Déplacement progressif avec easing
+            // Déplacement progressif avec easing et optionnellement Bézier
             for (int i = 0; i <= steps; i++)
             {
                 double t = (double)i / steps; // Ratio linéaire de 0 à 1
                 double easedT = ApplyEasing(t, easing); // Appliquer l'easing
                 
-                int currentX = startX + (int)((targetX - startX) * easedT);
-                int currentY = startY + (int)((targetY - startY) * easedT);
+                int currentX, currentY;
+                
+                if (useBezier && controlX >= 0 && controlY >= 0)
+                {
+                    // Courbe de Bézier quadratique : B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
+                    // P₀ = point de départ, P₁ = point de contrôle, P₂ = point d'arrivée
+                    double oneMinusT = 1 - easedT;
+                    double tSquared = easedT * easedT;
+                    double oneMinusTSquared = oneMinusT * oneMinusT;
+                    
+                    currentX = (int)(oneMinusTSquared * startX + 2 * oneMinusT * easedT * controlX + tSquared * targetX);
+                    currentY = (int)(oneMinusTSquared * startY + 2 * oneMinusT * easedT * controlY + tSquared * targetY);
+                }
+                else
+                {
+                    // Déplacement linéaire
+                    currentX = startX + (int)((targetX - startX) * easedT);
+                    currentY = startY + (int)((targetY - startY) * easedT);
+                }
                 
                 SetCursorPos(currentX, currentY);
                 

@@ -847,6 +847,18 @@ namespace MacroEngine.UI
                     {
                         details.Append($" • {GetMoveEasingLabel(ma.MoveEasing)}");
                     }
+                    
+                    // Afficher le point de contrôle si Bézier est activé
+                    if (ma.UseBezierPath && ma.ControlX >= 0 && ma.ControlY >= 0)
+                    {
+                        details.Append($" • Bézier: ({ma.ControlX}, {ma.ControlY})");
+                    }
+                    
+                    // Afficher le point de contrôle si Bézier est activé
+                    if (ma.UseBezierPath && ma.ControlX >= 0 && ma.ControlY >= 0)
+                    {
+                        details.Append($" • Bézier: ({ma.ControlX}, {ma.ControlY})");
+                    }
                 }
                 else
                 {
@@ -2307,6 +2319,189 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(moveEasingComboBox);
 
+            // CheckBox pour activer le mode Bézier (uniquement pour Move)
+            var bezierCheckBox = new CheckBox
+            {
+                Content = "Bézier",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                ToolTip = "Utiliser une trajectoire courbe (Bézier) avec un point de contrôle",
+                IsChecked = ma.UseBezierPath,
+                Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(bezierCheckBox);
+
+            // Label et TextBox pour le point de contrôle X (uniquement pour Move avec Bézier)
+            var controlXLabel = new TextBlock
+            {
+                Text = "Ctrl X:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = (showMoveControls && ma.UseBezierPath) ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(controlXLabel);
+
+            var controlXTextBox = new TextBox
+            {
+                Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = (showMoveControls && ma.UseBezierPath) ? Visibility.Visible : Visibility.Collapsed
+            };
+            controlXTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(controlXTextBox.Text, out int controlX))
+                {
+                    SaveState();
+                    ma.ControlX = controlX;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            controlXTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(controlXTextBox.Text, out int controlX))
+                {
+                    controlXTextBox.Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1";
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(controlXTextBox);
+
+            // Label et TextBox pour le point de contrôle Y (uniquement pour Move avec Bézier)
+            var controlYLabel = new TextBlock
+            {
+                Text = "Ctrl Y:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = (showMoveControls && ma.UseBezierPath) ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(controlYLabel);
+
+            var controlYTextBox = new TextBox
+            {
+                Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = (showMoveControls && ma.UseBezierPath) ? Visibility.Visible : Visibility.Collapsed
+            };
+            controlYTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(controlYTextBox.Text, out int controlY))
+                {
+                    SaveState();
+                    ma.ControlY = controlY;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            controlYTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(controlYTextBox.Text, out int controlY))
+                {
+                    controlYTextBox.Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1";
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(controlYTextBox);
+
+            // Bouton pour sélectionner le point de contrôle à l'écran (uniquement pour Move avec Bézier)
+            var selectControlPointButton = new Button
+            {
+                Content = "🎯 Ctrl",
+                MinWidth = 70,
+                Height = 24,
+                FontSize = 12,
+                Padding = new Thickness(6, 0, 6, 0),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Sélectionner le point de contrôle à l'écran",
+                Cursor = Cursors.Hand,
+                Visibility = (showMoveControls && ma.UseBezierPath) ? Visibility.Visible : Visibility.Collapsed
+            };
+            selectControlPointButton.Click += (s, e) =>
+            {
+                var pointSelector = new PointSelectorWindow();
+                if (pointSelector.ShowDialog() == true)
+                {
+                    SaveState();
+                    ma.ControlX = pointSelector.SelectedX;
+                    ma.ControlY = pointSelector.SelectedY;
+                    controlXTextBox.Text = ma.ControlX.ToString();
+                    controlYTextBox.Text = ma.ControlY.ToString();
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(selectControlPointButton);
+
+            // Ajouter les handlers après la déclaration de toutes les variables
+            bezierCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ma.UseBezierPath = true;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                // Mettre à jour la visibilité des contrôles Bézier
+                bool showBezierControls = showMoveControls && ma.UseBezierPath;
+                controlXLabel.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                controlXTextBox.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                controlYLabel.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                controlYTextBox.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                selectControlPointButton.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                RefreshBlocks();
+            };
+            bezierCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ma.UseBezierPath = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                // Mettre à jour la visibilité des contrôles Bézier
+                bool showBezierControls = showMoveControls && ma.UseBezierPath;
+                controlXLabel.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                controlXTextBox.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                controlYLabel.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                controlYTextBox.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                selectControlPointButton.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                RefreshBlocks();
+            };
+
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -2372,6 +2567,13 @@ namespace MacroEngine.UI
                     relativeMoveCheckBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     moveSpeedComboBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     moveEasingComboBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    bezierCheckBox.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    bool showBezierControls = showMoveControls && ma.UseBezierPath;
+                    controlXLabel.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                    controlXTextBox.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                    controlYLabel.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                    controlYTextBox.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
+                    selectControlPointButton.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
                     
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
@@ -2861,6 +3063,185 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(moveEasingComboBoxNested);
 
+            // CheckBox pour activer le mode Bézier (uniquement pour Move)
+            var bezierCheckBoxNested = new CheckBox
+            {
+                Content = "Bézier",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                ToolTip = "Utiliser une trajectoire courbe (Bézier) avec un point de contrôle",
+                IsChecked = ma.UseBezierPath,
+                Visibility = showMoveControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            
+            // Contrôles pour le point de contrôle Bézier
+            bool showBezierControlsNested = showMoveControlsNested && ma.UseBezierPath;
+            var controlXLabelNested = new TextBlock
+            {
+                Text = "Ctrl X:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showBezierControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(controlXLabelNested);
+
+            var controlXTextBoxNested = new TextBox
+            {
+                Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = showBezierControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            controlXTextBoxNested.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(controlXTextBoxNested.Text, out int controlX))
+                {
+                    SaveState();
+                    ma.ControlX = controlX;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            controlXTextBoxNested.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(controlXTextBoxNested.Text, out int controlX))
+                {
+                    controlXTextBoxNested.Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1";
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(controlXTextBoxNested);
+
+            var controlYLabelNested = new TextBlock
+            {
+                Text = "Ctrl Y:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showBezierControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(controlYLabelNested);
+
+            var controlYTextBoxNested = new TextBox
+            {
+                Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = showBezierControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            controlYTextBoxNested.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(controlYTextBoxNested.Text, out int controlY))
+                {
+                    SaveState();
+                    ma.ControlY = controlY;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            controlYTextBoxNested.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(controlYTextBoxNested.Text, out int controlY))
+                {
+                    controlYTextBoxNested.Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1";
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(controlYTextBoxNested);
+
+            var selectControlPointButtonNested = new Button
+            {
+                Content = "🎯 Ctrl",
+                MinWidth = 70,
+                Height = 24,
+                FontSize = 12,
+                Padding = new Thickness(6, 0, 6, 0),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Sélectionner le point de contrôle à l'écran",
+                Cursor = Cursors.Hand,
+                Visibility = showBezierControlsNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            selectControlPointButtonNested.Click += (s, e) =>
+            {
+                var pointSelector = new PointSelectorWindow();
+                if (pointSelector.ShowDialog() == true)
+                {
+                    SaveState();
+                    ma.ControlX = pointSelector.SelectedX;
+                    ma.ControlY = pointSelector.SelectedY;
+                    controlXTextBoxNested.Text = ma.ControlX.ToString();
+                    controlYTextBoxNested.Text = ma.ControlY.ToString();
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(selectControlPointButtonNested);
+
+            bezierCheckBoxNested.Checked += (s, e) =>
+            {
+                SaveState();
+                ma.UseBezierPath = true;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                bool showBezier = showMoveControlsNested && ma.UseBezierPath;
+                controlXLabelNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                controlXTextBoxNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                controlYLabelNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                controlYTextBoxNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                selectControlPointButtonNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                RefreshBlocks();
+            };
+            bezierCheckBoxNested.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ma.UseBezierPath = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                bool showBezier = showMoveControlsNested && ma.UseBezierPath;
+                controlXLabelNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                controlXTextBoxNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                controlYLabelNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                controlYTextBoxNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                selectControlPointButtonNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(bezierCheckBoxNested);
+
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -2890,6 +3271,14 @@ namespace MacroEngine.UI
                     relativeMoveCheckBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     moveSpeedComboBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     moveEasingComboBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    bezierCheckBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
+                    
+                    bool showBezier = showMoveControls && ma.UseBezierPath;
+                    controlXLabelNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                    controlXTextBoxNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                    controlYLabelNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                    controlYTextBoxNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
+                    selectControlPointButtonNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
                     
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
@@ -5146,6 +5535,186 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(moveEasingComboBoxIf);
 
+            // CheckBox pour activer le mode Bézier (uniquement pour Move)
+            var bezierCheckBoxIf = new CheckBox
+            {
+                Content = "Bézier",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                ToolTip = "Utiliser une trajectoire courbe (Bézier) avec un point de contrôle",
+                IsChecked = ma.UseBezierPath,
+                Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(bezierCheckBoxIf);
+
+            // Contrôles pour le point de contrôle Bézier
+            bool showBezierControlsIf = showMoveControlsIf && ma.UseBezierPath;
+            var controlXLabelIf = new TextBlock
+            {
+                Text = "Ctrl X:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(controlXLabelIf);
+
+            var controlXTextBoxIf = new TextBox
+            {
+                Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            controlXTextBoxIf.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(controlXTextBoxIf.Text, out int controlX))
+                {
+                    SaveState();
+                    ma.ControlX = controlX;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            controlXTextBoxIf.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(controlXTextBoxIf.Text, out int controlX))
+                {
+                    controlXTextBoxIf.Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1";
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(controlXTextBoxIf);
+
+            var controlYLabelIf = new TextBlock
+            {
+                Text = "Ctrl Y:",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(controlYLabelIf);
+
+            var controlYTextBoxIf = new TextBox
+            {
+                Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1",
+                Width = 60,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            controlYTextBoxIf.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(controlYTextBoxIf.Text, out int controlY))
+                {
+                    SaveState();
+                    ma.ControlY = controlY;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            controlYTextBoxIf.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(controlYTextBoxIf.Text, out int controlY))
+                {
+                    controlYTextBoxIf.Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1";
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(controlYTextBoxIf);
+
+            var selectControlPointButtonIf = new Button
+            {
+                Content = "🎯 Ctrl",
+                MinWidth = 70,
+                Height = 24,
+                FontSize = 12,
+                Padding = new Thickness(6, 0, 6, 0),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Sélectionner le point de contrôle à l'écran",
+                Cursor = Cursors.Hand,
+                Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            selectControlPointButtonIf.Click += (s, e) =>
+            {
+                var pointSelector = new PointSelectorWindow();
+                if (pointSelector.ShowDialog() == true)
+                {
+                    SaveState();
+                    ma.ControlX = pointSelector.SelectedX;
+                    ma.ControlY = pointSelector.SelectedY;
+                    controlXTextBoxIf.Text = ma.ControlX.ToString();
+                    controlYTextBoxIf.Text = ma.ControlY.ToString();
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(selectControlPointButtonIf);
+
+            // Ajouter les handlers après la déclaration de toutes les variables
+            bezierCheckBoxIf.Checked += (s, e) =>
+            {
+                SaveState();
+                ma.UseBezierPath = true;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                bool showBezierControlsIf = showMoveControlsIf && ma.UseBezierPath;
+                controlXLabelIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                controlXTextBoxIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                controlYLabelIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                controlYTextBoxIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                selectControlPointButtonIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                RefreshBlocks();
+            };
+            bezierCheckBoxIf.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ma.UseBezierPath = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                bool showBezierControlsIf = showMoveControlsIf && ma.UseBezierPath;
+                controlXLabelIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                controlXTextBoxIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                controlYLabelIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                controlYTextBoxIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                selectControlPointButtonIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                RefreshBlocks();
+            };
+
             // Ajouter le SelectionChanged après la déclaration de toutes les variables
             clickTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -5175,6 +5744,14 @@ namespace MacroEngine.UI
                     relativeMoveCheckBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;
                     moveSpeedComboBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;
                     moveEasingComboBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    bezierCheckBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    
+                    bool showBezierControlsIf = showMoveControlsIf && ma.UseBezierPath;
+                    controlXLabelIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    controlXTextBoxIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    controlYLabelIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    controlYTextBoxIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
+                    selectControlPointButtonIf.Visibility = showBezierControlsIf ? Visibility.Visible : Visibility.Collapsed;
                     
                     _currentMacro!.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
