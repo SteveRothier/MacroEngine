@@ -523,12 +523,11 @@ namespace MacroEngine.UI
             // Édition inline
             if (action is KeyboardAction ka2)
             {
-                titleBlock.Cursor = Cursors.Hand;
-                titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
-                {
-                    e.Handled = true; // Empêcher le drag & drop
-                    EditKeyboardAction(ka2, index, titleBlock);
-                };
+                // Pour KeyboardAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
+                textPanel.Children.Remove(titleBlock);
+                
+                var keyboardControlsPanel = CreateKeyboardActionControls(ka2, index, textPanel);
+                textPanel.Children.Insert(0, keyboardControlsPanel);
             }
             else if (action is DelayAction da)
             {
@@ -755,21 +754,32 @@ namespace MacroEngine.UI
 
         private string GetKeyboardActionDetails(KeyboardAction ka)
         {
-            var actionType = ka.ActionType == KeyboardActionType.Down ? "Appuyer" :
-                           ka.ActionType == KeyboardActionType.Up ? "Relâcher" : "Presser";
+            var parts = new System.Collections.Generic.List<string>();
             
-            if (ka.Modifiers != Core.Inputs.ModifierKeys.None)
+            // Ajouter les modificateurs
+            if (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Control))
+                parts.Add("Ctrl");
+            if (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Alt))
+                parts.Add("Alt");
+            if (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Shift))
+                parts.Add("Shift");
+            if (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Windows))
+                parts.Add("Win");
+            
+            // Ajouter la touche principale
+            if (ka.VirtualKeyCode != 0)
             {
-                var mods = string.Join(" + ", 
-                    (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Control) ? "Ctrl" : ""),
-                    (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Shift) ? "Shift" : ""),
-                    (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Alt) ? "Alt" : ""),
-                    (ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Windows) ? "Win" : "")
-                ).Replace("  ", " ").Trim();
-                return $"{actionType} ({mods})";
+                parts.Add(GetKeyName(ka.VirtualKeyCode));
             }
             
-            return actionType;
+            // Ajouter le type d'action si ce n'est pas Press
+            if (ka.ActionType != KeyboardActionType.Press)
+            {
+                var actionType = ka.ActionType == KeyboardActionType.Down ? "Maintenir" : "Relâcher";
+                return $"{string.Join(" + ", parts)} ({actionType})";
+            }
+            
+            return parts.Count > 0 ? string.Join(" + ", parts) : "Touche ?";
         }
 
         private string GetMouseActionTitle(Core.Inputs.MouseAction ma)
@@ -1045,6 +1055,42 @@ namespace MacroEngine.UI
         private string GetKeyName(ushort virtualKeyCode)
         {
             if (virtualKeyCode == 0) return "?";
+            
+            // Touches spéciales
+            switch (virtualKeyCode)
+            {
+                case 0x5B: return "Win";
+                case 0x5C: return "Win (droit)";
+                case 0x5D: return "Menu";
+                case 0x1B: return "Échap";
+                case 0x0D: return "Entrée";
+                case 0x08: return "Retour";
+                case 0x09: return "Tab";
+                case 0x20: return "Espace";
+                case 0x2E: return "Suppr";
+                case 0x2D: return "Insert";
+                case 0x24: return "Début";
+                case 0x23: return "Fin";
+                case 0x21: return "Page ↑";
+                case 0x22: return "Page ↓";
+                case 0x25: return "←";
+                case 0x26: return "↑";
+                case 0x27: return "→";
+                case 0x28: return "↓";
+                case 0x70: return "F1";
+                case 0x71: return "F2";
+                case 0x72: return "F3";
+                case 0x73: return "F4";
+                case 0x74: return "F5";
+                case 0x75: return "F6";
+                case 0x76: return "F7";
+                case 0x77: return "F8";
+                case 0x78: return "F9";
+                case 0x79: return "F10";
+                case 0x7A: return "F11";
+                case 0x7B: return "F12";
+            }
+            
             try
             {
                 var key = KeyInterop.KeyFromVirtualKey(virtualKeyCode);
@@ -1473,6 +1519,262 @@ namespace MacroEngine.UI
 
         #region Édition inline
 
+        private Panel CreateKeyboardActionControls(KeyboardAction ka, int index, Panel parentPanel)
+        {
+            var originalMargin = new Thickness(0, 0, 0, 0);
+            
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = originalMargin
+            };
+
+            // ComboBox pour le type d'action (Press, Down, Up)
+            var actionTypeComboBox = new ComboBox
+            {
+                MinWidth = 100,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            actionTypeComboBox.Items.Add("Presser");
+            actionTypeComboBox.Items.Add("Maintenir");
+            actionTypeComboBox.Items.Add("Relâcher");
+            
+            // Mapper l'ActionType actuel vers l'index du ComboBox
+            actionTypeComboBox.SelectedIndex = ka.ActionType switch
+            {
+                KeyboardActionType.Press => 0,
+                KeyboardActionType.Down => 1,
+                KeyboardActionType.Up => 2,
+                _ => 0
+            };
+            editPanel.Children.Add(actionTypeComboBox);
+
+            // CheckBoxes pour les modificateurs
+            var ctrlCheckBox = new CheckBox
+            {
+                Content = "Ctrl",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                IsChecked = ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Control)
+            };
+            ctrlCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ka.Modifiers |= Core.Inputs.ModifierKeys.Control;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            ctrlCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ka.Modifiers &= ~Core.Inputs.ModifierKeys.Control;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(ctrlCheckBox);
+
+            var altCheckBox = new CheckBox
+            {
+                Content = "Alt",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 4, 0),
+                IsChecked = ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Alt)
+            };
+            altCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ka.Modifiers |= Core.Inputs.ModifierKeys.Alt;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            altCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ka.Modifiers &= ~Core.Inputs.ModifierKeys.Alt;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(altCheckBox);
+
+            var shiftCheckBox = new CheckBox
+            {
+                Content = "Shift",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 4, 0),
+                IsChecked = ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Shift)
+            };
+            shiftCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ka.Modifiers |= Core.Inputs.ModifierKeys.Shift;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            shiftCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ka.Modifiers &= ~Core.Inputs.ModifierKeys.Shift;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(shiftCheckBox);
+
+            var winCheckBox = new CheckBox
+            {
+                Content = "Win",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 8, 0),
+                IsChecked = ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Windows)
+            };
+            winCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ka.Modifiers |= Core.Inputs.ModifierKeys.Windows;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            winCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ka.Modifiers &= ~Core.Inputs.ModifierKeys.Windows;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(winCheckBox);
+
+            // TextBox pour capturer la touche principale
+            var keyTextBox = new TextBox
+            {
+                Text = ka.VirtualKeyCode == 0 ? "Appuyez sur une touche..." : GetKeyName(ka.VirtualKeyCode),
+                MinWidth = 150,
+                MaxWidth = 200,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsReadOnly = true,
+                Background = new SolidColorBrush(Color.FromRgb(255, 255, 200)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(255, 165, 0)),
+                BorderThickness = new Thickness(2),
+                Padding = new Thickness(4),
+                Margin = new Thickness(0, 0, 8, 0),
+                Cursor = Cursors.IBeam,
+                ToolTip = "Cliquez puis appuyez sur une touche pour la capturer"
+            };
+            
+            bool keyCaptured = false;
+            KeyboardHook? tempKeyHook = null;
+            
+            keyTextBox.GotFocus += (s, e) =>
+            {
+                if (!keyCaptured)
+                {
+                    keyTextBox.Text = "Appuyez sur une touche...";
+                    keyTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
+                    tempKeyHook = new KeyboardHook();
+                    tempKeyHook.KeyDown += (sender, args) =>
+                    {
+                        SaveState();
+                        ka.VirtualKeyCode = (ushort)args.VirtualKeyCode;
+                        keyTextBox.Text = GetKeyName(ka.VirtualKeyCode);
+                        keyTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+                        keyCaptured = true;
+                        tempKeyHook?.Uninstall();
+                        tempKeyHook = null;
+                        if (_currentMacro != null)
+                        {
+                            _currentMacro.ModifiedAt = DateTime.Now;
+                            MacroChanged?.Invoke(this, EventArgs.Empty);
+                        }
+                        RefreshBlocks();
+                    };
+                    tempKeyHook.Install();
+                }
+            };
+            
+            keyTextBox.LostFocus += (s, e) =>
+            {
+                tempKeyHook?.Uninstall();
+                tempKeyHook = null;
+                if (keyCaptured)
+                {
+                    keyCaptured = false;
+                }
+            };
+            
+            keyTextBox.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    Keyboard.ClearFocus();
+                }
+            };
+            
+            editPanel.Children.Add(keyTextBox);
+
+            // Gestion du changement de type d'action
+            actionTypeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (actionTypeComboBox.SelectedIndex >= 0 && _currentMacro != null)
+                {
+                    SaveState();
+                    ka.ActionType = actionTypeComboBox.SelectedIndex switch
+                    {
+                        0 => KeyboardActionType.Press,
+                        1 => KeyboardActionType.Down,
+                        2 => KeyboardActionType.Up,
+                        _ => KeyboardActionType.Press
+                    };
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+
+            return editPanel;
+        }
+
         private void EditKeyboardAction(KeyboardAction ka, int index, TextBlock titleText)
         {
             // Édition inline : remplacer le TextBlock par un TextBox qui capture la touche
@@ -1729,96 +2031,16 @@ namespace MacroEngine.UI
             if (parentPanel == null)
                 return;
 
-            bool keyCaptured = false;
             var originalMargin = titleText.Margin;
-            var originalWidth = titleText.Width;
-
-            var textBox = new TextBox
-            {
-                Text = "Appuyez sur une touche...",
-                MinWidth = 150,
-                MaxWidth = 300,
-                TextAlignment = TextAlignment.Center,
-                IsReadOnly = true,
-                Background = new SolidColorBrush(Color.FromRgb(255, 255, 200)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(255, 165, 0)),
-                BorderThickness = new Thickness(2),
-                Padding = new Thickness(4),
-                Margin = originalMargin,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Cursor = Cursors.IBeam,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold
-            };
-
-            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
-            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
-
-            textBox.PreviewKeyDown += (s, e) =>
-            {
-                if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
-                    e.Key == Key.LeftShift || e.Key == Key.RightShift ||
-                    e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
-                    e.Key == Key.LWin || e.Key == Key.RWin)
-                {
-                    e.Handled = true;
-                    return;
-                }
-
-                if (e.Key == Key.Escape)
-                {
-                    e.Handled = true;
-                    Keyboard.ClearFocus();
-                    if (parentPanel.Children.Contains(textBox) && !keyCaptured)
-                    {
-                        int textBoxIdx = parentPanel.Children.IndexOf(textBox);
-                        parentPanel.Children.RemoveAt(textBoxIdx);
-                        parentPanel.Children.Insert(textBoxIdx, titleText);
-                    }
-                    return;
-                }
-
-                try
-                {
-                    int virtualKeyCode = KeyInterop.VirtualKeyFromKey(e.Key);
-                    SaveState();
-                    ka.VirtualKeyCode = (ushort)virtualKeyCode;
-                    _currentMacro.ModifiedAt = DateTime.Now;
-                    keyCaptured = true;
-                    RefreshBlocks();
-                    MacroChanged?.Invoke(this, EventArgs.Empty);
-                    e.Handled = true;
-                    Keyboard.ClearFocus();
-                }
-                catch
-                {
-                    e.Handled = true;
-                }
-            };
-
-            textBox.LostFocus += (s, e) =>
-            {
-                if (parentPanel.Children.Contains(textBox) && !keyCaptured)
-                {
-                    int textBoxIdx = parentPanel.Children.IndexOf(textBox);
-                    parentPanel.Children.RemoveAt(textBoxIdx);
-                    parentPanel.Children.Insert(textBoxIdx, titleText);
-                }
-            };
+            var editPanel = CreateKeyboardActionControls(ka, parentIndex, parentPanel);
+            editPanel.Margin = originalMargin;
 
             int idx = parentPanel.Children.IndexOf(titleText);
             if (idx < 0)
                 return;
 
             parentPanel.Children.RemoveAt(idx);
-            parentPanel.Children.Insert(idx, textBox);
-
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
-            {
-                textBox.Focus();
-                textBox.SelectAll();
-            }));
+            parentPanel.Children.Insert(idx, editPanel);
         }
 
         /// <summary>
@@ -5169,74 +5391,16 @@ namespace MacroEngine.UI
             if (parentPanel == null)
                 return;
 
-            bool keyCaptured = false;
             var originalMargin = titleText.Margin;
-            var originalWidth = titleText.Width;
-
-            var textBox = new TextBox
-            {
-                Text = GetKeyName(ka.VirtualKeyCode),
-                FontSize = titleText.FontSize,
-                FontWeight = titleText.FontWeight,
-                Foreground = titleText.Foreground,
-                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(100, 149, 237)),
-                BorderThickness = new Thickness(2),
-                Padding = new Thickness(4),
-                Margin = originalMargin,
-                Width = originalWidth != double.NaN ? originalWidth : 200,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Left
-            };
-
-            KeyboardHook? tempKeyHook = null;
-            textBox.GotFocus += (s, e) =>
-            {
-                if (!keyCaptured)
-                {
-                    keyCaptured = true;
-                    textBox.Text = "Appuyez sur une touche...";
-                    textBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
-                    tempKeyHook = new KeyboardHook();
-                    tempKeyHook.KeyDown += (sender, args) =>
-                    {
-                        SaveState();
-                        ka.VirtualKeyCode = (ushort)args.VirtualKeyCode;
-                        textBox.Text = GetKeyName(ka.VirtualKeyCode);
-                        textBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
-                        keyCaptured = false;
-                        tempKeyHook?.Uninstall();
-                        tempKeyHook = null;
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    };
-                    tempKeyHook.Install();
-                }
-            };
-
-            textBox.LostFocus += (s, e) =>
-            {
-                tempKeyHook?.Uninstall();
-                tempKeyHook = null;
-                if (keyCaptured)
-                {
-                    keyCaptured = false;
-                }
-            };
+            var editPanel = CreateKeyboardActionControls(ka, parentIndex, parentPanel);
+            editPanel.Margin = originalMargin;
 
             var idx = parentPanel.Children.IndexOf(titleText);
             if (idx < 0)
                 return;
 
             parentPanel.Children.RemoveAt(idx);
-            parentPanel.Children.Insert(idx, textBox);
-
-            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded, new Action(() =>
-            {
-                textBox.Focus();
-                textBox.SelectAll();
-            }));
+            parentPanel.Children.Insert(idx, editPanel);
         }
 
         private void EditNestedIfDelayAction(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)

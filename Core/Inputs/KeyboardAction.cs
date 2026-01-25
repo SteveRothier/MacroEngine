@@ -110,6 +110,8 @@ namespace MacroEngine.Core.Inputs
         private const ushort VK_MENU = 0x12;
         private const ushort VK_SHIFT = 0x10;
         private const ushort VK_LWIN = 0x5B;
+        private const ushort VK_RWIN = 0x5C;
+        private const ushort VK_APPS = 0x5D; // Touche Menu contextuel
         private const int INPUT_KEYBOARD = 1;
         private const uint KEYEVENTF_KEYUP = 0x0002;
 
