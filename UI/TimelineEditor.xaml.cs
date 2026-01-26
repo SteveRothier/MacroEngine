@@ -753,7 +753,6 @@ namespace MacroEngine.UI
 
         private string GetDelayActionTitle(DelayAction da)
         {
-            double value = da.GetDurationInUnit(da.Unit);
             string unitLabel = da.Unit switch
             {
                 TimeUnit.Milliseconds => "ms",
@@ -761,7 +760,18 @@ namespace MacroEngine.UI
                 TimeUnit.Minutes => "min",
                 _ => "ms"
             };
-            return $"{value:0.##} {unitLabel}";
+
+            if (da.IsRandom)
+            {
+                double minValue = da.GetMinDurationInUnit(da.Unit);
+                double maxValue = da.GetMaxDurationInUnit(da.Unit);
+                return $"Entre {minValue:0.##} {unitLabel} et {maxValue:0.##} {unitLabel}";
+            }
+            else
+            {
+                double value = da.GetDurationInUnit(da.Unit);
+                return $"{value:0.##} {unitLabel}";
+            }
         }
 
         /// <summary>
@@ -1982,6 +1992,136 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(durationTextBox);
 
+            // TextBox pour la durée minimale (visible seulement si aléatoire)
+            var minDurationTextBox = new TextBox
+            {
+                Text = da.GetMinDurationInUnit(da.Unit).ToString("0.##"),
+                Width = 70,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = da.IsRandom ? Visibility.Visible : Visibility.Collapsed
+            };
+            minDurationTextBox.TextChanged += (s, e) =>
+            {
+                if (TryParseDouble(minDurationTextBox.Text, out double value) && value >= 0)
+                {
+                    SaveState();
+                    da.SetMinDurationFromUnit(value, da.Unit);
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            minDurationTextBox.LostFocus += (s, e) =>
+            {
+                if (!TryParseDouble(minDurationTextBox.Text, out double value) || value < 0)
+                {
+                    minDurationTextBox.Text = da.GetMinDurationInUnit(da.Unit).ToString("0.##");
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(minDurationTextBox);
+
+            // Label "et" (visible seulement si aléatoire)
+            var andLabel = new TextBlock
+            {
+                Text = "et",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 4, 0),
+                Visibility = da.IsRandom ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(andLabel);
+
+            // TextBox pour la durée maximale (visible seulement si aléatoire)
+            var maxDurationTextBox = new TextBox
+            {
+                Text = da.GetMaxDurationInUnit(da.Unit).ToString("0.##"),
+                Width = 70,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = da.IsRandom ? Visibility.Visible : Visibility.Collapsed
+            };
+            maxDurationTextBox.TextChanged += (s, e) =>
+            {
+                if (TryParseDouble(maxDurationTextBox.Text, out double value) && value >= 0)
+                {
+                    SaveState();
+                    da.SetMaxDurationFromUnit(value, da.Unit);
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            maxDurationTextBox.LostFocus += (s, e) =>
+            {
+                if (!TryParseDouble(maxDurationTextBox.Text, out double value) || value < 0)
+                {
+                    maxDurationTextBox.Text = da.GetMaxDurationInUnit(da.Unit).ToString("0.##");
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(maxDurationTextBox);
+
+            // CheckBox pour le mode aléatoire (déclaré après min/max pour pouvoir les référencer)
+            var randomCheckBox = new CheckBox
+            {
+                Content = "Aléatoire",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                IsChecked = da.IsRandom
+            };
+            randomCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                da.IsRandom = true;
+                minDurationTextBox.Visibility = Visibility.Visible;
+                andLabel.Visibility = Visibility.Visible;
+                maxDurationTextBox.Visibility = Visibility.Visible;
+                durationTextBox.Visibility = Visibility.Collapsed;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            randomCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                da.IsRandom = false;
+                minDurationTextBox.Visibility = Visibility.Collapsed;
+                andLabel.Visibility = Visibility.Collapsed;
+                maxDurationTextBox.Visibility = Visibility.Collapsed;
+                durationTextBox.Visibility = Visibility.Visible;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            // Insérer la CheckBox après le TextBox durée (position 2)
+            editPanel.Children.Insert(2, randomCheckBox);
+
             // ComboBox pour l'unité de temps
             var unitComboBox = new ComboBox
             {
@@ -2022,6 +2162,16 @@ namespace MacroEngine.UI
                     // Appliquer la valeur dans la nouvelle unité (sans conversion)
                     da.SetDurationFromUnit(currentValue, newUnit);
                     durationTextBox.Text = currentValue.ToString("0.##");
+                    // Mettre à jour aussi min/max si aléatoire
+                    if (da.IsRandom)
+                    {
+                        double minValue = TryParseDouble(minDurationTextBox.Text, out double minVal) ? minVal : da.GetMinDurationInUnit(da.Unit);
+                        double maxValue = TryParseDouble(maxDurationTextBox.Text, out double maxVal) ? maxVal : da.GetMaxDurationInUnit(da.Unit);
+                        da.SetMinDurationFromUnit(minValue, newUnit);
+                        da.SetMaxDurationFromUnit(maxValue, newUnit);
+                        minDurationTextBox.Text = minValue.ToString("0.##");
+                        maxDurationTextBox.Text = maxValue.ToString("0.##");
+                    }
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
