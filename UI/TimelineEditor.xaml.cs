@@ -4159,6 +4159,18 @@ namespace MacroEngine.UI
                     Margin = new Thickness(0, 0, 8, 0)
                 };
 
+                // Label pour afficher le numéro de condition
+                var conditionLabel = new TextBlock
+                {
+                    Text = $"[Condition{i + 1}]",
+                    FontSize = 12,
+                    FontWeight = FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 4, 0),
+                    Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234))
+                };
+                conditionPanel.Children.Add(conditionLabel);
+
                 // ComboBox pour le type de condition
                 var conditionTypeComboBox = new ComboBox
                 {
@@ -4243,50 +4255,51 @@ namespace MacroEngine.UI
                 };
                 conditionPanel.Children.Add(configButton);
 
-                // Bouton pour supprimer cette condition (si plus d'une condition)
-                if (ifAction.Conditions.Count > 1)
+                // Bouton pour supprimer cette condition (toujours visible, mais désactivé si seule condition)
+                var removeButton = new Button
                 {
-                    var removeButton = new Button
+                    Content = "✕",
+                    Width = 24,
+                    Height = 24,
+                    FontSize = 10,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 0, 0),
+                    Cursor = Cursors.Hand,
+                    ToolTip = "Supprimer cette condition",
+                    IsEnabled = ifAction.Conditions.Count > 1
+                };
+                removeButton.Click += (s, e) =>
+                {
+                    if (ifAction.Conditions.Count <= 1)
+                        return; // Ne pas supprimer la dernière condition
+                    
+                    SaveState();
+                    if (conditionIndex >= 0 && conditionIndex < ifAction.Conditions.Count)
                     {
-                        Content = "✕",
-                        Width = 24,
-                        Height = 24,
-                        FontSize = 10,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(4, 0, 0, 0),
-                        Cursor = Cursors.Hand,
-                        ToolTip = "Supprimer cette condition"
-                    };
-                    removeButton.Click += (s, e) =>
-                    {
-                        SaveState();
-                        if (conditionIndex >= 0 && conditionIndex < ifAction.Conditions.Count)
+                        ifAction.Conditions.RemoveAt(conditionIndex);
+                        
+                        // Supprimer l'opérateur correspondant
+                        if (ifAction.Operators.Count > 0)
                         {
-                            ifAction.Conditions.RemoveAt(conditionIndex);
-                            
-                            // Supprimer l'opérateur correspondant
-                            if (ifAction.Operators.Count > 0)
+                            if (conditionIndex == 0)
                             {
-                                if (conditionIndex == 0)
-                                {
-                                    ifAction.Operators.RemoveAt(0);
-                                }
-                                else if (conditionIndex >= ifAction.Operators.Count)
-                                {
-                                    ifAction.Operators.RemoveAt(ifAction.Operators.Count - 1);
-                                }
-                                else
-                                {
-                                    ifAction.Operators.RemoveAt(conditionIndex);
-                                }
+                                ifAction.Operators.RemoveAt(0);
+                            }
+                            else if (conditionIndex >= ifAction.Operators.Count)
+                            {
+                                ifAction.Operators.RemoveAt(ifAction.Operators.Count - 1);
+                            }
+                            else
+                            {
+                                ifAction.Operators.RemoveAt(conditionIndex);
                             }
                         }
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    };
-                    conditionPanel.Children.Add(removeButton);
-                }
+                    }
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                };
+                conditionPanel.Children.Add(removeButton);
 
                 mainPanel.Children.Add(conditionPanel);
 
@@ -4295,10 +4308,11 @@ namespace MacroEngine.UI
                 {
                     var operatorComboBox = new ComboBox
                     {
-                        Width = 60,
-                        FontSize = 11,
+                        Width = 70,
+                        FontSize = 12,
+                        FontWeight = FontWeights.SemiBold,
                         VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(4, 0, 4, 0)
+                        Margin = new Thickness(8, 0, 8, 0)
                     };
                     operatorComboBox.Items.Add("ET");
                     operatorComboBox.Items.Add("OU");
@@ -4354,15 +4368,16 @@ namespace MacroEngine.UI
             // Bouton pour ajouter une nouvelle condition
             var addButton = new Button
             {
-                Content = "+",
-                Width = 28,
+                Content = "Ajouter condition",
+                MinWidth = 120,
                 Height = 28,
-                FontSize = 16,
-                FontWeight = FontWeights.Bold,
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand,
-                ToolTip = "Ajouter une condition"
+                ToolTip = "Ajouter une nouvelle condition",
+                Padding = new Thickness(8, 0, 8, 0)
             };
             addButton.Click += (s, e) =>
             {
