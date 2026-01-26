@@ -214,7 +214,7 @@ namespace MacroEngine.UI
                     textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
                     iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
                     icon = "⏱";
-                    title = $"{da.Duration} ms";
+                    title = GetDelayActionTitle(da);
                     details = "Pause";
                     break;
                 case RepeatAction ra:
@@ -531,12 +531,11 @@ namespace MacroEngine.UI
             }
             else if (action is DelayAction da)
             {
-                titleBlock.Cursor = Cursors.Hand;
-                titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
-                {
-                    e.Handled = true; // Empêcher le drag & drop
-                    EditDelayAction(da, index, titleBlock);
-                };
+                // Pour DelayAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
+                textPanel.Children.Remove(titleBlock);
+                
+                var delayControlsPanel = CreateDelayActionControls(da, index, textPanel);
+                textPanel.Children.Insert(0, delayControlsPanel);
             }
             else if (action is Core.Inputs.MouseAction ma)
             {
@@ -750,6 +749,19 @@ namespace MacroEngine.UI
         {
             if (ka.VirtualKeyCode == 0) return "Touche ?";
             return GetKeyName(ka.VirtualKeyCode);
+        }
+
+        private string GetDelayActionTitle(DelayAction da)
+        {
+            double value = da.GetDurationInUnit(da.Unit);
+            string unitLabel = da.Unit switch
+            {
+                TimeUnit.Milliseconds => "ms",
+                TimeUnit.Seconds => "s",
+                TimeUnit.Minutes => "min",
+                _ => "ms"
+            };
+            return $"{value:0.##} {unitLabel}";
         }
 
         private string GetKeyboardActionDetails(KeyboardAction ka)
@@ -1893,7 +1905,136 @@ namespace MacroEngine.UI
             }));
         }
 
+        private Panel CreateDelayActionControls(DelayAction da, int index, Panel parentPanel)
+        {
+            var originalMargin = new Thickness(0, 0, 0, 0);
+            
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = originalMargin
+            };
+
+            // Label "Délai:"
+            var delayLabel = new TextBlock
+            {
+                Text = "Délai:",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            editPanel.Children.Add(delayLabel);
+
+            // TextBox pour la durée
+            var durationTextBox = new TextBox
+            {
+                Text = da.GetDurationInUnit(da.Unit).ToString("0.##"),
+                Width = 80,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            durationTextBox.TextChanged += (s, e) =>
+            {
+                if (double.TryParse(durationTextBox.Text, out double value) && value >= 0)
+                {
+                    SaveState();
+                    da.SetDurationFromUnit(value, da.Unit);
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            durationTextBox.LostFocus += (s, e) =>
+            {
+                if (!double.TryParse(durationTextBox.Text, out double value) || value < 0)
+                {
+                    durationTextBox.Text = da.GetDurationInUnit(da.Unit).ToString("0.##");
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(durationTextBox);
+
+            // ComboBox pour l'unité de temps
+            var unitComboBox = new ComboBox
+            {
+                MinWidth = 100,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+            unitComboBox.Items.Add("ms");
+            unitComboBox.Items.Add("s");
+            unitComboBox.Items.Add("min");
+            
+            // Mapper l'unité actuelle vers l'index
+            unitComboBox.SelectedIndex = da.Unit switch
+            {
+                TimeUnit.Milliseconds => 0,
+                TimeUnit.Seconds => 1,
+                TimeUnit.Minutes => 2,
+                _ => 0
+            };
+            
+            unitComboBox.SelectionChanged += (s, e) =>
+            {
+                if (unitComboBox.SelectedIndex >= 0 && _currentMacro != null)
+                {
+                    SaveState();
+                    // Garder la valeur numérique actuelle (pas de conversion)
+                    double currentValue = double.TryParse(durationTextBox.Text, out double val) ? val : da.GetDurationInUnit(da.Unit);
+                    var newUnit = unitComboBox.SelectedIndex switch
+                    {
+                        0 => TimeUnit.Milliseconds,
+                        1 => TimeUnit.Seconds,
+                        2 => TimeUnit.Minutes,
+                        _ => TimeUnit.Milliseconds
+                    };
+                    da.Unit = newUnit;
+                    // Appliquer la valeur dans la nouvelle unité (sans conversion)
+                    da.SetDurationFromUnit(currentValue, newUnit);
+                    durationTextBox.Text = currentValue.ToString("0.##");
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+            editPanel.Children.Add(unitComboBox);
+
+            return editPanel;
+        }
+
         private void EditDelayAction(DelayAction da, int index, TextBlock titleText)
+        {
+            // Cette fonction n'est plus utilisée, remplacée par CreateDelayActionControls
+            // Conservée pour compatibilité si nécessaire
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            var originalMargin = titleText.Margin;
+            var editPanel = CreateDelayActionControls(da, index, parentPanel);
+            editPanel.Margin = originalMargin;
+
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, editPanel);
+        }
+
+        private void EditDelayActionOld(DelayAction da, int index, TextBlock titleText)
         {
             // Édition inline : remplacer le TextBlock par un TextBox qui capture le délai
             var parentPanel = titleText.Parent as Panel;
@@ -2047,6 +2188,36 @@ namespace MacroEngine.UI
         /// Édition inline d'une DelayAction imbriquée dans un RepeatAction
         /// </summary>
         private void EditNestedDelayAction(int parentIndex, int nestedIndex, TextBlock titleText)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
+                return;
+
+            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
+                return;
+
+            if (repeatAction.Actions[nestedIndex] is not DelayAction da)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            var originalMargin = titleText.Margin;
+            var editPanel = CreateDelayActionControls(da, parentIndex, parentPanel);
+            editPanel.Margin = originalMargin;
+
+            int idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, editPanel);
+        }
+
+        private void EditNestedDelayActionOld(int parentIndex, int nestedIndex, TextBlock titleText)
         {
             if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
                 return;
@@ -5404,6 +5575,37 @@ namespace MacroEngine.UI
         }
 
         private void EditNestedIfDelayAction(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)
+        {
+            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+                return;
+
+            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction)
+                return;
+
+            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
+            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count)
+                return;
+
+            if (actionsList[nestedIndex] is not DelayAction da)
+                return;
+
+            var parentPanel = titleText.Parent as Panel;
+            if (parentPanel == null)
+                return;
+
+            var originalMargin = titleText.Margin;
+            var editPanel = CreateDelayActionControls(da, parentIndex, parentPanel);
+            editPanel.Margin = originalMargin;
+
+            var idx = parentPanel.Children.IndexOf(titleText);
+            if (idx < 0)
+                return;
+
+            parentPanel.Children.RemoveAt(idx);
+            parentPanel.Children.Insert(idx, editPanel);
+        }
+
+        private void EditNestedIfDelayActionOld(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)
         {
             if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
                 return;
