@@ -764,6 +764,24 @@ namespace MacroEngine.UI
             return $"{value:0.##} {unitLabel}";
         }
 
+        /// <summary>
+        /// Parse un double en acceptant à la fois les virgules et les points comme séparateurs décimaux
+        /// </summary>
+        private bool TryParseDouble(string text, out double result)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                result = 0;
+                return false;
+            }
+
+            // Remplacer les virgules par des points pour le parsing
+            string normalizedText = text.Replace(',', '.');
+            
+            // Essayer de parser avec le format invariant (point comme séparateur)
+            return double.TryParse(normalizedText, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out result);
+        }
+
         private string GetKeyboardActionDetails(KeyboardAction ka)
         {
             var parts = new System.Collections.Generic.List<string>();
@@ -1940,7 +1958,7 @@ namespace MacroEngine.UI
             };
             durationTextBox.TextChanged += (s, e) =>
             {
-                if (double.TryParse(durationTextBox.Text, out double value) && value >= 0)
+                if (TryParseDouble(durationTextBox.Text, out double value) && value >= 0)
                 {
                     SaveState();
                     da.SetDurationFromUnit(value, da.Unit);
@@ -1953,7 +1971,7 @@ namespace MacroEngine.UI
             };
             durationTextBox.LostFocus += (s, e) =>
             {
-                if (!double.TryParse(durationTextBox.Text, out double value) || value < 0)
+                if (!TryParseDouble(durationTextBox.Text, out double value) || value < 0)
                 {
                     durationTextBox.Text = da.GetDurationInUnit(da.Unit).ToString("0.##");
                 }
@@ -1992,7 +2010,7 @@ namespace MacroEngine.UI
                 {
                     SaveState();
                     // Garder la valeur numérique actuelle (pas de conversion)
-                    double currentValue = double.TryParse(durationTextBox.Text, out double val) ? val : da.GetDurationInUnit(da.Unit);
+                    double currentValue = TryParseDouble(durationTextBox.Text, out double val) ? val : da.GetDurationInUnit(da.Unit);
                     var newUnit = unitComboBox.SelectedIndex switch
                     {
                         0 => TimeUnit.Milliseconds,
