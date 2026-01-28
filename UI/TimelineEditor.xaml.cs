@@ -288,7 +288,6 @@ namespace MacroEngine.UI
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge icône
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Texte
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge info optionnel
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) }); // Largeur fixe pour le bouton supprimer (toujours réservée pour éviter changement de largeur)
 
             // Barre colorée à gauche (timeline) - avec effet lumineux enrichi
             var timelineBar = new Border
@@ -431,60 +430,11 @@ namespace MacroEngine.UI
             Grid.SetColumn(infoBadge, 3);
             contentGrid.Children.Add(infoBadge);
 
-            // Bouton supprimer avec style enrichi (visible au survol mais toujours présent pour ne pas changer la largeur)
-            var deleteBtnContainer = new Border
-            {
-                Background = Brushes.Transparent,
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(4),
-                Width = 24,
-                Height = 24,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Cursor = Cursors.Hand,
-                Tag = index,
-                Opacity = 0, // Invisible par défaut mais toujours présent pour ne pas changer la largeur
-                Visibility = Visibility.Visible // Toujours visible pour réserver l'espace
-            };
-            
-            var deleteBtn = new Button
-            {
-                Content = "✕",
-                Width = 16,
-                Height = 16,
-                Padding = new Thickness(0),
-                Background = Brushes.Transparent,
-                BorderThickness = new Thickness(0),
-                Foreground = new SolidColorBrush(Color.FromRgb(160, 160, 160)),
-                FontSize = 12,
-                FontWeight = FontWeights.Medium,
-                Tag = index,
-                Cursor = Cursors.Hand,
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
-            deleteBtn.Click += DeleteAction_Click;
-            deleteBtn.MouseEnter += (s, e) => 
-            {
-                deleteBtn.Foreground = new SolidColorBrush(Color.FromRgb(220, 53, 69)); // Rouge vif
-                deleteBtnContainer.Background = new SolidColorBrush(Color.FromArgb(15, 220, 53, 69));
-            };
-            deleteBtn.MouseLeave += (s, e) => 
-            {
-                deleteBtn.Foreground = new SolidColorBrush(Color.FromRgb(160, 160, 160));
-                deleteBtnContainer.Background = Brushes.Transparent;
-            };
-            
-            deleteBtnContainer.Child = deleteBtn;
-            Grid.SetColumn(deleteBtnContainer, 4); // Colonne 4 (les boutons monter/descendre sont maintenant séparés)
-            contentGrid.Children.Add(deleteBtnContainer);
-
             card.Child = contentGrid;
 
             // Effets hover : changement de couleur uniquement, pas de changement de taille ni de bordure
             card.MouseEnter += (s, e) =>
             {
-                deleteBtnContainer.Opacity = 1; // Rendre visible sans changer Visibility pour ne pas changer la largeur
                 infoBadge.Visibility = Visibility.Visible;
                 card.Background = new SolidColorBrush(backgroundColorHover);
                 timelineBar.Background = new SolidColorBrush(hoverColor);
@@ -499,7 +449,6 @@ namespace MacroEngine.UI
 
             card.MouseLeave += (s, e) =>
             {
-                deleteBtnContainer.Opacity = 0; // Rendre invisible sans changer Visibility pour ne pas changer la largeur
                 infoBadge.Visibility = Visibility.Collapsed;
                 card.Background = new SolidColorBrush(backgroundColor);
                 timelineBar.Background = new SolidColorBrush(primaryColor);
@@ -4871,7 +4820,6 @@ namespace MacroEngine.UI
 
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Boutons flèches
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Bouton supprimer
 
             card.HorizontalAlignment = HorizontalAlignment.Stretch;
             Grid.SetColumn(card, 0);
@@ -4881,45 +4829,6 @@ namespace MacroEngine.UI
             var moveButtonsContainer = CreateNestedMoveButtonsContainer(action, parentIndex, nestedIndex);
             Grid.SetColumn(moveButtonsContainer, 1);
             container.Children.Add(moveButtonsContainer);
-
-            // Bouton supprimer pour les actions imbriquées
-            var deleteBtn = new Border
-            {
-                Width = 28,
-                Height = 28,
-                Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69)), // Rouge pour supprimer
-                CornerRadius = new CornerRadius(4),
-                Cursor = Cursors.Hand,
-                Margin = new Thickness(8, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex },
-                Visibility = Visibility.Visible
-            };
-
-            var deleteText = new TextBlock
-            {
-                Text = "✕",
-                FontSize = 14,
-                FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            deleteBtn.Child = deleteText;
-            deleteBtn.MouseLeftButtonDown += DeleteNestedAction_Click;
-
-            deleteBtn.MouseEnter += (s, e) =>
-            {
-                deleteBtn.Background = new SolidColorBrush(Color.FromRgb(200, 35, 51));
-            };
-            deleteBtn.MouseLeave += (s, e) =>
-            {
-                deleteBtn.Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69));
-            };
-
-            Grid.SetColumn(deleteBtn, 2);
-            container.Children.Add(deleteBtn);
 
             return container;
         }
@@ -5384,7 +5293,6 @@ namespace MacroEngine.UI
 
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             card.HorizontalAlignment = HorizontalAlignment.Stretch;
             Grid.SetColumn(card, 0);
@@ -5393,38 +5301,6 @@ namespace MacroEngine.UI
             var moveButtonsContainer = CreateNestedIfMoveButtonsContainer(action, parentIndex, nestedIndex, isThen);
             Grid.SetColumn(moveButtonsContainer, 1);
             container.Children.Add(moveButtonsContainer);
-
-            var deleteBtn = new Border
-            {
-                Width = 28,
-                Height = 28,
-                Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69)),
-                CornerRadius = new CornerRadius(4),
-                Cursor = Cursors.Hand,
-                Margin = new Thickness(8, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                Tag = new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen },
-                Visibility = Visibility.Visible
-            };
-
-            var deleteText = new TextBlock
-            {
-                Text = "✕",
-                FontSize = 14,
-                FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            deleteBtn.Child = deleteText;
-            deleteBtn.MouseLeftButtonDown += DeleteNestedIfAction_Click;
-
-            deleteBtn.MouseEnter += (s, e) => deleteBtn.Background = new SolidColorBrush(Color.FromRgb(200, 35, 51));
-            deleteBtn.MouseLeave += (s, e) => deleteBtn.Background = new SolidColorBrush(Color.FromArgb(180, 220, 53, 69));
-
-            Grid.SetColumn(deleteBtn, 2);
-            container.Children.Add(deleteBtn);
 
             return container;
         }
