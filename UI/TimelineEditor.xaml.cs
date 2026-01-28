@@ -5403,77 +5403,125 @@ namespace MacroEngine.UI
                 }
             }
 
+            // Bouton monter (▲)
             var moveUpBtnBorder = new Border
             {
                 Width = 30,
                 Height = 30,
                 Background = canMoveUp
-                    ? new SolidColorBrush(Color.FromArgb(180, 70, 130, 180))
-                    : new SolidColorBrush(Color.FromArgb(50, 150, 150, 150)),
-                CornerRadius = new CornerRadius(4),
+                    ? new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)) // Fond gris très clair
+                    : new SolidColorBrush(Color.FromArgb(2, 150, 150, 150)), // Fond très clair pour désactivé
+                BorderThickness = new Thickness(0), // Pas de bordure individuelle, bordure commune sur le conteneur
+                CornerRadius = new CornerRadius(0),
                 Cursor = canMoveUp ? Cursors.Hand : Cursors.Arrow,
-                Margin = new Thickness(0, 0, 0, 2),
+                Margin = new Thickness(0, 0, 0, 1), // Marge réduite pour rapprocher les flèches
+                Padding = new Thickness(0), // Pas de padding pour maximiser l'espace pour la flèche
                 Tag = new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen }
             };
-
-            var moveUpText = new TextBlock
+            
+            var moveUpBtnText = new TextBlock
             {
                 Text = "▲",
-                FontSize = 12,
+                FontSize = 14,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
+                Foreground = canMoveUp
+                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80)) // Flèche en gris foncé
+                    : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)), // Gris pour désactivé
                 HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                LineHeight = 36,
+                LineStackingStrategy = LineStackingStrategy.BlockLineHeight
             };
-            moveUpBtnBorder.Child = moveUpText;
-
-            if (canMoveUp)
+            
+            moveUpBtnBorder.Child = moveUpBtnText;
+            moveUpBtnBorder.MouseLeftButtonDown += (s, e) => 
             {
-                moveUpBtnBorder.MouseLeftButtonDown += (s, e) =>
+                if (canMoveUp)
                 {
-                    e.Handled = true;
                     MoveNestedIfActionUp(parentIndex, nestedIndex, isThen);
-                };
-                moveUpBtnBorder.MouseEnter += (s, e) => moveUpBtnBorder.Background = new SolidColorBrush(Color.FromRgb(90, 150, 200));
-                moveUpBtnBorder.MouseLeave += (s, e) => moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(180, 70, 130, 180));
-            }
+                    e.Handled = true;
+                }
+            };
+            moveUpBtnBorder.MouseEnter += (s, e) => 
+            {
+                if (canMoveUp)
+                {
+                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60)); // Flèche en gris plus foncé au survol
+                    moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0)); // Fond gris très clair au survol
+                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0)); // Bordure du conteneur plus foncée au survol
+                }
+            };
+            moveUpBtnBorder.MouseLeave += (s, e) => 
+            {
+                if (canMoveUp)
+                {
+                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80)); // Flèche en gris foncé
+                    moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)); // Fond gris très clair
+                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)); // Bordure du conteneur normale
+                }
+            };
 
-            moveButtonsPanel.Children.Add(moveUpBtnBorder);
-
+            // Bouton descendre (▼)
             var moveDownBtnBorder = new Border
             {
                 Width = 30,
                 Height = 30,
                 Background = canMoveDown
-                    ? new SolidColorBrush(Color.FromArgb(180, 70, 130, 180))
-                    : new SolidColorBrush(Color.FromArgb(50, 150, 150, 150)),
-                CornerRadius = new CornerRadius(4),
+                    ? new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)) // Fond gris très clair
+                    : new SolidColorBrush(Color.FromArgb(2, 150, 150, 150)), // Fond très clair pour désactivé
+                BorderThickness = new Thickness(0), // Pas de bordure individuelle, bordure commune sur le conteneur
+                CornerRadius = new CornerRadius(0),
                 Cursor = canMoveDown ? Cursors.Hand : Cursors.Arrow,
+                Margin = new Thickness(0, 1, 0, 0), // Marge réduite pour rapprocher les flèches
+                Padding = new Thickness(0), // Pas de padding pour maximiser l'espace pour la flèche
                 Tag = new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen }
             };
-
-            var moveDownText = new TextBlock
+            
+            var moveDownBtnText = new TextBlock
             {
                 Text = "▼",
-                FontSize = 12,
+                FontSize = 14,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.White,
+                Foreground = canMoveDown
+                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80)) // Flèche en gris foncé
+                    : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)), // Gris pour désactivé
                 HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                LineHeight = 1,
+                LineStackingStrategy = LineStackingStrategy.BlockLineHeight
             };
-            moveDownBtnBorder.Child = moveDownText;
-
-            if (canMoveDown)
+            
+            moveDownBtnBorder.Child = moveDownBtnText;
+            moveDownBtnBorder.MouseLeftButtonDown += (s, e) => 
             {
-                moveDownBtnBorder.MouseLeftButtonDown += (s, e) =>
+                if (canMoveDown)
                 {
-                    e.Handled = true;
                     MoveNestedIfActionDown(parentIndex, nestedIndex, isThen);
-                };
-                moveDownBtnBorder.MouseEnter += (s, e) => moveDownBtnBorder.Background = new SolidColorBrush(Color.FromRgb(90, 150, 200));
-                moveDownBtnBorder.MouseLeave += (s, e) => moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(180, 70, 130, 180));
-            }
+                    e.Handled = true;
+                }
+            };
+            moveDownBtnBorder.MouseEnter += (s, e) => 
+            {
+                if (canMoveDown)
+                {
+                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60)); // Flèche en gris plus foncé au survol
+                    moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0)); // Fond gris très clair au survol
+                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0)); // Bordure du conteneur plus foncée au survol
+                }
+            };
+            moveDownBtnBorder.MouseLeave += (s, e) => 
+            {
+                if (canMoveDown)
+                {
+                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80)); // Flèche en gris foncé
+                    moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)); // Fond gris très clair
+                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)); // Bordure du conteneur normale
+                }
+            };
 
+            moveButtonsPanel.Children.Add(moveUpBtnBorder);
             moveButtonsPanel.Children.Add(moveDownBtnBorder);
             centeringGrid.Children.Add(moveButtonsPanel);
             moveButtonsContainer.Child = centeringGrid;
