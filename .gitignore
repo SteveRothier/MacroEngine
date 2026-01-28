@@ -148,3 +148,5 @@ project.nuget.cache
 
 # Scripts de diagnostic
 diagnostic-build.ps1
+
+s

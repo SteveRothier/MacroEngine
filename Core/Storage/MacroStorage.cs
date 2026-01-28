@@ -292,6 +292,8 @@ namespace MacroEngine.Core.Storage
                                 ?? throw new InvalidOperationException("Impossible de désérialiser RepeatAction"),
                             InputActionType.Condition => JsonSerializer.Deserialize<IfAction>(root.GetRawText(), options)
                                 ?? throw new InvalidOperationException("Impossible de dÃ©sÃ©rialiser IfAction"),
+                            InputActionType.Text => JsonSerializer.Deserialize<TextAction>(root.GetRawText(), options)
+                                ?? throw new InvalidOperationException("Impossible de désérialiser TextAction"),
                             _ => throw new NotSupportedException($"Type d'action non supporté: {inputActionType}")
                         };
                     }
@@ -324,6 +326,12 @@ namespace MacroEngine.Core.Storage
                         // MouseAction a des propriétés X et Y
                         return JsonSerializer.Deserialize<MouseAction>(root.GetRawText(), options)
                             ?? throw new InvalidOperationException("Impossible de désérialiser MouseAction");
+                    }
+                    else if (root.TryGetProperty("Text", out _) || root.TryGetProperty("TypingSpeed", out _))
+                    {
+                        // TextAction a des propriétés Text et TypingSpeed
+                        return JsonSerializer.Deserialize<TextAction>(root.GetRawText(), options)
+                            ?? throw new InvalidOperationException("Impossible de désérialiser TextAction");
                     }
                     
                     throw new NotSupportedException($"Type d'action non reconnu dans le JSON");
