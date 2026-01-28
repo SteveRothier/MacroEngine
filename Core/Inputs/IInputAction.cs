@@ -1,4 +1,4 @@
-﻿namespace MacroEngine.Core.Inputs
+namespace MacroEngine.Core.Inputs
 {
     /// <summary>
     /// Interface pour toutes les actions d'entrÃ©e (clavier, souris, dÃ©lai)
@@ -59,6 +59,11 @@
         /// <summary>
         /// Action conditionnelle (If/Then/Else)
         /// </summary>
-        Condition
+        Condition,
+
+        /// <summary>
+        /// Action texte (saisie de texte)
+        /// </summary>
+        Text
     }
 }

@@ -242,6 +242,17 @@ namespace MacroEngine.UI
                     title = GetIfActionTitle(ifAction);
                     details = $"Then: {thenCount}, Else: {elseCount}";
                     break;
+                case TextAction ta:
+                    primaryColor = Color.FromRgb(70, 130, 180); // Bleu acier #4682B4
+                    hoverColor = Color.FromRgb(85, 150, 200); // Bleu hover #5596C8
+                    backgroundColor = Color.FromRgb(70, 130, 180); // Fond #4682B4
+                    backgroundColorHover = Color.FromRgb(85, 150, 200); // Dégradé hover #5596C8
+                    textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
+                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    icon = "📝";
+                    title = GetTextActionTitle(ta);
+                    details = GetTextActionDetails(ta);
+                    break;
                 default:
                     primaryColor = Color.FromRgb(123, 30, 58); // Rouge pourpre foncé par défaut
                     hoverColor = Color.FromRgb(143, 39, 72);
@@ -510,6 +521,14 @@ namespace MacroEngine.UI
                 var ifControlsPanel = CreateIfActionControls(ifAction, index, textPanel);
                 textPanel.Children.Insert(0, ifControlsPanel);
             }
+            else if (action is TextAction ta)
+            {
+                // Pour TextAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
+                textPanel.Children.Remove(titleBlock);
+                
+                var textControlsPanel = CreateTextActionControls(ta, index, textPanel);
+                textPanel.Children.Insert(0, textControlsPanel);
+            }
 
             return card;
         }
@@ -524,6 +543,7 @@ namespace MacroEngine.UI
             {
                 KeyboardAction => Color.FromRgb(122, 30, 58),
                 Core.Inputs.MouseAction => Color.FromRgb(90, 138, 201),
+                TextAction => Color.FromRgb(70, 130, 180),
                 DelayAction => Color.FromRgb(216, 162, 74),
                 RepeatAction => Color.FromRgb(138, 43, 226),
                 IfAction => Color.FromRgb(34, 139, 34),
@@ -721,6 +741,39 @@ namespace MacroEngine.UI
                 double value = da.GetDurationInUnit(da.Unit);
                 return $"{value:0.##} {unitLabel}";
             }
+        }
+
+        private string GetTextActionTitle(TextAction ta)
+        {
+            if (string.IsNullOrEmpty(ta.Text))
+                return "Texte vide";
+            
+            // Afficher les premiers caractères du texte (max 30)
+            string preview = ta.Text.Length > 30 ? ta.Text.Substring(0, 30) + "..." : ta.Text;
+            // Remplacer les retours à la ligne par \n pour l'affichage
+            preview = preview.Replace("\n", "\\n").Replace("\r", "");
+            return $"\"{preview}\"";
+        }
+
+        private string GetTextActionDetails(TextAction ta)
+        {
+            var details = new System.Text.StringBuilder();
+            
+            if (ta.UseNaturalTyping)
+            {
+                details.Append($"Frappe naturelle ({ta.MinDelay}-{ta.MaxDelay} ms)");
+            }
+            else
+            {
+                details.Append($"Vitesse: {ta.TypingSpeed} ms");
+            }
+            
+            if (!string.IsNullOrEmpty(ta.Text))
+            {
+                details.Append($" • {ta.Text.Length} caractère{(ta.Text.Length > 1 ? "s" : "")}");
+            }
+            
+            return details.ToString();
         }
 
         /// <summary>
@@ -1410,6 +1463,24 @@ namespace MacroEngine.UI
             _currentMacro.Actions.Add(new DelayAction
             {
                 Duration = 100
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void AddText_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            SaveState();
+
+            _currentMacro.Actions.Add(new TextAction
+            {
+                Text = "",
+                TypingSpeed = 50,
+                UseNaturalTyping = false
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
@@ -2127,6 +2198,295 @@ namespace MacroEngine.UI
                 }
             };
             editPanel.Children.Add(unitComboBox);
+
+            return editPanel;
+        }
+
+        private Panel CreateTextActionControls(TextAction ta, int index, Panel parentPanel)
+        {
+            var originalMargin = new Thickness(0, 0, 0, 0);
+            
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = originalMargin
+            };
+
+            // Label "Texte:"
+            var textLabel = new TextBlock
+            {
+                Text = "Texte:",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            editPanel.Children.Add(textLabel);
+
+            // TextBox pour le texte
+            var textTextBox = new TextBox
+            {
+                Text = ta.Text ?? "",
+                MinWidth = 200,
+                MaxWidth = 400,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.Wrap,
+                MaxHeight = 60
+            };
+            textTextBox.TextChanged += (s, e) =>
+            {
+                SaveState();
+                ta.Text = textTextBox.Text;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+            textTextBox.LostFocus += (s, e) =>
+            {
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(textTextBox);
+
+            // CheckBox pour la frappe naturelle
+            var naturalTypingCheckBox = new CheckBox
+            {
+                Content = "Frappe naturelle",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                IsChecked = ta.UseNaturalTyping
+            };
+            naturalTypingCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ta.UseNaturalTyping = true;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            naturalTypingCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ta.UseNaturalTyping = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(naturalTypingCheckBox);
+
+            // TextBox pour la vitesse de frappe (visible si pas de frappe naturelle)
+            var speedLabel = new TextBlock
+            {
+                Text = "Vitesse:",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Collapsed : Visibility.Visible
+            };
+            editPanel.Children.Add(speedLabel);
+
+            var speedTextBox = new TextBox
+            {
+                Text = ta.TypingSpeed.ToString(),
+                Width = 60,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Collapsed : Visibility.Visible
+            };
+            speedTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(speedTextBox.Text, out int speed) && speed >= 0)
+                {
+                    SaveState();
+                    ta.TypingSpeed = speed;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            speedTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(speedTextBox.Text, out int speed) || speed < 0)
+                {
+                    speedTextBox.Text = ta.TypingSpeed.ToString();
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(speedTextBox);
+
+            var msLabel = new TextBlock
+            {
+                Text = "ms",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Collapsed : Visibility.Visible
+            };
+            editPanel.Children.Add(msLabel);
+
+            // TextBox pour délai min (visible si frappe naturelle)
+            var minDelayLabel = new TextBlock
+            {
+                Text = "Min:",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(minDelayLabel);
+
+            var minDelayTextBox = new TextBox
+            {
+                Text = ta.MinDelay.ToString(),
+                Width = 50,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+            };
+            minDelayTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(minDelayTextBox.Text, out int minDelay) && minDelay >= 0)
+                {
+                    SaveState();
+                    ta.MinDelay = minDelay;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            minDelayTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(minDelayTextBox.Text, out int minDelay) || minDelay < 0)
+                {
+                    minDelayTextBox.Text = ta.MinDelay.ToString();
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(minDelayTextBox);
+
+            // Label "et"
+            var andLabel = new TextBlock
+            {
+                Text = "et",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 4, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(andLabel);
+
+            // TextBox pour délai max (visible si frappe naturelle)
+            var maxDelayLabel = new TextBlock
+            {
+                Text = "Max:",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(maxDelayLabel);
+
+            var maxDelayTextBox = new TextBox
+            {
+                Text = ta.MaxDelay.ToString(),
+                Width = 50,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+            };
+            maxDelayTextBox.TextChanged += (s, e) =>
+            {
+                if (int.TryParse(maxDelayTextBox.Text, out int maxDelay) && maxDelay >= 0)
+                {
+                    SaveState();
+                    ta.MaxDelay = maxDelay;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            maxDelayTextBox.LostFocus += (s, e) =>
+            {
+                if (!int.TryParse(maxDelayTextBox.Text, out int maxDelay) || maxDelay < 0)
+                {
+                    maxDelayTextBox.Text = ta.MaxDelay.ToString();
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(maxDelayTextBox);
+
+            var msLabel2 = new TextBlock
+            {
+                Text = "ms",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0),
+                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(msLabel2);
+
+            // Mettre à jour la visibilité des contrôles quand le mode frappe naturelle change
+            naturalTypingCheckBox.Checked += (s, e) =>
+            {
+                speedLabel.Visibility = Visibility.Collapsed;
+                speedTextBox.Visibility = Visibility.Collapsed;
+                msLabel.Visibility = Visibility.Collapsed;
+                minDelayLabel.Visibility = Visibility.Visible;
+                minDelayTextBox.Visibility = Visibility.Visible;
+                andLabel.Visibility = Visibility.Visible;
+                maxDelayLabel.Visibility = Visibility.Visible;
+                maxDelayTextBox.Visibility = Visibility.Visible;
+                msLabel2.Visibility = Visibility.Visible;
+            };
+            naturalTypingCheckBox.Unchecked += (s, e) =>
+            {
+                speedLabel.Visibility = Visibility.Visible;
+                speedTextBox.Visibility = Visibility.Visible;
+                msLabel.Visibility = Visibility.Visible;
+                minDelayLabel.Visibility = Visibility.Collapsed;
+                minDelayTextBox.Visibility = Visibility.Collapsed;
+                andLabel.Visibility = Visibility.Collapsed;
+                maxDelayLabel.Visibility = Visibility.Collapsed;
+                maxDelayTextBox.Visibility = Visibility.Collapsed;
+                msLabel2.Visibility = Visibility.Collapsed;
+            };
 
             return editPanel;
         }
@@ -4797,6 +5157,17 @@ namespace MacroEngine.UI
                         EditNestedMouseAction(parentIndex, nestedIndex, titleBlock);
                     };
                 }
+                else if (action is TextAction)
+                {
+                    // Pour TextAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
+                    var textPanel = titleBlock.Parent as Panel;
+                    if (textPanel != null)
+                    {
+                        textPanel.Children.Remove(titleBlock);
+                        var textControlsPanel = CreateTextActionControls((TextAction)action, parentIndex, textPanel);
+                        textPanel.Children.Insert(0, textControlsPanel);
+                    }
+                }
             }
 
             // Retirer les handlers drag & drop de la carte (les actions imbriquées ne doivent pas être déplaçables entre RepeatActions)
@@ -5084,6 +5455,7 @@ namespace MacroEngine.UI
 
             panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
             panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
+            panel.Children.Add(createAddButton("📝", "Texte", new TextAction()));
             panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
             panel.Children.Add(createAddButton("🔀", "Si", new IfAction()));
 
@@ -5119,6 +5491,12 @@ namespace MacroEngine.UI
                     ActionType = Core.Inputs.MouseActionType.LeftClick,
                     X = -1,
                     Y = -1
+                },
+                "Text" => new TextAction
+                {
+                    Text = "",
+                    TypingSpeed = 50,
+                    UseNaturalTyping = false
                 },
                 "Delay" => new DelayAction
                 {
@@ -5272,6 +5650,17 @@ namespace MacroEngine.UI
                         EditNestedIfMouseAction(parentIndex, nestedIndex, isThen, titleBlock);
                     };
                 }
+                else if (action is TextAction)
+                {
+                    // Pour TextAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
+                    var textPanel = titleBlock.Parent as Panel;
+                    if (textPanel != null)
+                    {
+                        textPanel.Children.Remove(titleBlock);
+                        var textControlsPanel = CreateTextActionControls((TextAction)action, parentIndex, textPanel);
+                        textPanel.Children.Insert(0, textControlsPanel);
+                    }
+                }
             }
 
             card.MouseLeftButtonDown -= ActionCard_MouseLeftButtonDown;
@@ -5347,6 +5736,7 @@ namespace MacroEngine.UI
 
             panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
             panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
+            panel.Children.Add(createAddButton("📝", "Texte", new TextAction()));
             panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
             panel.Children.Add(createAddButton("🔁", "Répéter", new RepeatAction()));
 
@@ -5550,6 +5940,7 @@ namespace MacroEngine.UI
             {
                 "Keyboard" => new KeyboardAction { VirtualKeyCode = 0, ActionType = KeyboardActionType.Press },
                 "Mouse" => new Core.Inputs.MouseAction { ActionType = Core.Inputs.MouseActionType.LeftClick, X = -1, Y = -1 },
+                "Text" => new TextAction { Text = "", TypingSpeed = 50, UseNaturalTyping = false },
                 "Delay" => new DelayAction { Duration = 100 },
                 "Repeat" => new RepeatAction
                 {
