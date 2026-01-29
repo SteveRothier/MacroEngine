@@ -299,6 +299,7 @@ namespace MacroEngine.UI
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge icône
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Texte
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge info optionnel
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) }); // Croix supprimer à droite
 
             // Barre colorée à gauche (timeline) - avec effet lumineux enrichi
             var timelineBar = new Border
@@ -441,12 +442,45 @@ namespace MacroEngine.UI
             Grid.SetColumn(infoBadge, 3);
             contentGrid.Children.Add(infoBadge);
 
+            // Croix supprimer à droite dans l'action (Border + TextBlock pour aucun fond, même au survol)
+            var deleteBtnContainer = new Border
+            {
+                Background = Brushes.Transparent,
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(4, 4, 4, 4),
+                Margin = new Thickness(4, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Cursor = Cursors.Hand,
+                Tag = index,
+                Opacity = 0
+            };
+            var deleteCrossText = new TextBlock
+            {
+                Text = "×",
+                FontSize = 18,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(textColor),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            deleteBtnContainer.Child = deleteCrossText;
+            deleteBtnContainer.MouseLeftButtonDown += (s, e) =>
+            {
+                if (s is Border b && b.Tag is int idx)
+                    DeleteActionByIndex(idx);
+                e.Handled = true;
+            };
+            Grid.SetColumn(deleteBtnContainer, 4);
+            contentGrid.Children.Add(deleteBtnContainer);
+
             card.Child = contentGrid;
 
             // Effets hover : changement de couleur uniquement, pas de changement de taille ni de bordure
             card.MouseEnter += (s, e) =>
             {
                 infoBadge.Visibility = Visibility.Visible;
+                deleteBtnContainer.Opacity = 1;
                 card.Background = new SolidColorBrush(backgroundColorHover);
                 timelineBar.Background = new SolidColorBrush(hoverColor);
                 // Pas de changement de bordure pour garder la même taille
@@ -461,6 +495,7 @@ namespace MacroEngine.UI
             card.MouseLeave += (s, e) =>
             {
                 infoBadge.Visibility = Visibility.Collapsed;
+                deleteBtnContainer.Opacity = 0;
                 card.Background = new SolidColorBrush(backgroundColor);
                 timelineBar.Background = new SolidColorBrush(primaryColor);
                 // Pas de changement de bordure pour garder la même taille
@@ -1562,21 +1597,21 @@ namespace MacroEngine.UI
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
+        private void DeleteActionByIndex(int index)
+        {
+            if (_currentMacro == null || index < 0 || index >= _currentMacro.Actions.Count)
+                return;
+            SaveState();
+            _currentMacro.Actions.RemoveAt(index);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
         private void DeleteAction_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is Button btn && btn.Tag is int index && _currentMacro != null)
-            {
-                if (index >= 0 && index < _currentMacro.Actions.Count)
-                {
-                    SaveState();
-                    
-                    _currentMacro.Actions.RemoveAt(index);
-                    _currentMacro.ModifiedAt = DateTime.Now;
-                    
-                    RefreshBlocks();
-                    MacroChanged?.Invoke(this, EventArgs.Empty);
-                }
-            }
+            if (sender is FrameworkElement fe && fe.Tag is int index)
+                DeleteActionByIndex(index);
         }
 
         #endregion
