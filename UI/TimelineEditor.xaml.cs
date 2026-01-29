@@ -166,9 +166,10 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée une carte d'action pour la Timeline (style Timeline compact et professionnel)
+        /// Crée une carte d'action pour la Timeline (style Timeline compact et professionnel).
+        /// Si nestedRepeatInfo ou nestedIfInfo est fourni, la croix supprime l'action imbriquée uniquement, pas le bloc parent.
         /// </summary>
-        private FrameworkElement CreateActionCard(IInputAction action, int index)
+        private FrameworkElement CreateActionCard(IInputAction action, int index, NestedActionInfo? nestedRepeatInfo = null, NestedIfActionInfo? nestedIfInfo = null)
         {
             // Couleurs définies directement (pas de FindResource pour éviter les conflits)
             Color primaryColor;
@@ -442,7 +443,7 @@ namespace MacroEngine.UI
             Grid.SetColumn(infoBadge, 3);
             contentGrid.Children.Add(infoBadge);
 
-            // Croix supprimer à droite dans l'action (Border + TextBlock pour aucun fond, même au survol)
+            // Croix supprimer à droite : supprime l'action principale (index) ou l'action imbriquée (nestedRepeatInfo/nestedIfInfo)
             var deleteBtnContainer = new Border
             {
                 Background = Brushes.Transparent,
@@ -452,7 +453,7 @@ namespace MacroEngine.UI
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Cursor = Cursors.Hand,
-                Tag = index,
+                Tag = nestedRepeatInfo != null ? (object)nestedRepeatInfo : (nestedIfInfo != null ? (object)nestedIfInfo : (object)index),
                 Opacity = 0
             };
             var deleteCrossText = new TextBlock
@@ -465,12 +466,19 @@ namespace MacroEngine.UI
                 HorizontalAlignment = HorizontalAlignment.Center
             };
             deleteBtnContainer.Child = deleteCrossText;
-            deleteBtnContainer.MouseLeftButtonDown += (s, e) =>
+            if (nestedRepeatInfo != null)
+                deleteBtnContainer.MouseLeftButtonDown += DeleteNestedAction_Click;
+            else if (nestedIfInfo != null)
+                deleteBtnContainer.MouseLeftButtonDown += DeleteNestedIfAction_Click;
+            else
             {
-                if (s is Border b && b.Tag is int idx)
-                    DeleteActionByIndex(idx);
-                e.Handled = true;
-            };
+                deleteBtnContainer.MouseLeftButtonDown += (s, e) =>
+                {
+                    if (s is Border b && b.Tag is int idx)
+                        DeleteActionByIndex(idx);
+                    e.Handled = true;
+                };
+            }
             Grid.SetColumn(deleteBtnContainer, 4);
             contentGrid.Children.Add(deleteBtnContainer);
 
@@ -5193,8 +5201,8 @@ namespace MacroEngine.UI
                 return CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex);
             }
 
-            // Créer la carte visuelle avec CreateActionCard
-            var card = CreateActionCard(action, parentIndex);
+            // Créer la carte visuelle avec CreateActionCard (croix = supprimer cette action imbriquée uniquement)
+            var card = CreateActionCard(action, parentIndex, new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex }, null);
             
             // Trouver le TextBlock titleBlock et ajouter les handlers d'édition appropriés
             var titleBlock = FindTitleBlockInCard(card);
@@ -5689,9 +5697,8 @@ namespace MacroEngine.UI
                 return CreateNestedRepeatActionContainer(nestedRepeatAction, parentIndex, nestedIndex, isThen);
             }
 
-            // Réutiliser CreateNestedActionCard mais adapter pour IfAction
-            // Pour l'instant, on utilise la même structure que RepeatAction
-            var card = CreateActionCard(action, parentIndex);
+            // Réutiliser CreateActionCard avec NestedIfActionInfo pour que la croix supprime cette action imbriquée uniquement
+            var card = CreateActionCard(action, parentIndex, null, new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen });
             
             var titleBlock = FindTitleBlockInCard(card);
             if (titleBlock != null)
