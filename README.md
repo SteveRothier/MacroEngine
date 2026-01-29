@@ -52,6 +52,17 @@ dotnet run --project MacroEngine.csproj
 3. **Modifier une macro** : Double-cliquez sur une macro pour ouvrir l'éditeur
 4. **Configurer un raccourci** : Dans l'éditeur, définissez un raccourci personnalisé pour chaque macro
 
+### Types d'actions et options
+
+| Type | Options |
+|------|---------|
+| **Touche** | Type : Presser, Maintenir, Relâcher. Modificateurs : Ctrl, Alt, Shift, Win. Touche principale configurable. |
+| **Clic** | Type : Clic gauche/droit/milieu, Maintenir, Double-clic, Déplacer, Molette haut/bas/molette. Position (X, Y) ou position actuelle. Delta pour molette. Déplacer : relatif/absolu, vitesse (instantané/rapide/graduel), courbe d’accélération, trajectoire Bézier (point de contrôle). |
+| **Texte** | Texte à saisir. **Coller** : coller tout d’un coup (Ctrl+V). Sinon : **Vitesse** (délai en ms entre caractères) ou **Frappe naturelle** (délai aléatoire min–max en ms). |
+| **Délai** | Durée. Unité : ms, s ou min. Option **aléatoire** : entre une durée min et max. |
+| **Répéter** | Mode : Une fois, Nombre (X fois), Infini. Nombre de répétitions. Délai entre chaque répétition (ms/s/min). Liste d’actions imbriquées. |
+| **Si** | Conditions multiples avec opérateurs ET/OU. Types : application active, touche enfoncée, processus en cours, couleur pixel, position souris, date/heure, image à l’écran, texte à l’écran. Blocs **Alors** et **Sinon** avec actions imbriquées. |
+
 ## Statut du projet
 
 🚧 **En développement actif** - Le projet évolue régulièrement avec de nouvelles fonctionnalités.
