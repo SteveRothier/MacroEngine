@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows.Forms;
 
 namespace MacroEngine.Core.Inputs
 {
@@ -38,10 +39,21 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         public int MaxDelay { get; set; } = 80;
 
+        /// <summary>
+        /// Coller tout le texte d'un coup (Ctrl+V) au lieu de le taper caractère par caractère
+        /// </summary>
+        public bool PasteAtOnce { get; set; } = false;
+
         public void Execute()
         {
             if (string.IsNullOrEmpty(Text))
                 return;
+
+            if (PasteAtOnce)
+            {
+                ExecutePasteAtOnce();
+                return;
+            }
 
             foreach (char c in Text)
             {
@@ -76,6 +88,44 @@ namespace MacroEngine.Core.Inputs
                 {
                     Thread.Sleep(delay);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Colle le texte en une fois via le presse-papiers (Ctrl+V)
+        /// </summary>
+        private void ExecutePasteAtOnce()
+        {
+            string? previousClipboard = null;
+            try
+            {
+                if (Clipboard.ContainsText())
+                {
+                    previousClipboard = Clipboard.GetText();
+                }
+                Clipboard.SetText(Text);
+                Thread.Sleep(50); // Laisser le temps au presse-papiers
+                // Envoyer Ctrl+V
+                keybd_event(0x11, 0, 0, 0);   // VK_CONTROL down
+                Thread.Sleep(20);
+                keybd_event(0x56, 0, 0, 0);   // V down
+                Thread.Sleep(20);
+                keybd_event(0x56, 0, KEYEVENTF_KEYUP, 0);
+                Thread.Sleep(20);
+                keybd_event(0x11, 0, KEYEVENTF_KEYUP, 0);
+                Thread.Sleep(100); // Laisser l'application traiter le collage
+            }
+            finally
+            {
+                Thread.Sleep(50);
+                try
+                {
+                    if (previousClipboard != null)
+                        Clipboard.SetText(previousClipboard);
+                    else
+                        Clipboard.Clear();
+                }
+                catch { /* restaurer le presse-papiers peut échouer */ }
             }
         }
 
@@ -190,7 +240,8 @@ namespace MacroEngine.Core.Inputs
                 TypingSpeed = this.TypingSpeed,
                 UseNaturalTyping = this.UseNaturalTyping,
                 MinDelay = this.MinDelay,
-                MaxDelay = this.MaxDelay
+                MaxDelay = this.MaxDelay,
+                PasteAtOnce = this.PasteAtOnce
             };
         }
 

@@ -759,7 +759,11 @@ namespace MacroEngine.UI
         {
             var details = new System.Text.StringBuilder();
             
-            if (ta.UseNaturalTyping)
+            if (ta.PasteAtOnce)
+            {
+                details.Append("Coller");
+            }
+            else if (ta.UseNaturalTyping)
             {
                 details.Append($"Frappe naturelle ({ta.MinDelay}-{ta.MaxDelay} ms)");
             }
@@ -2254,14 +2258,48 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(textTextBox);
 
-            // CheckBox pour la frappe naturelle
+            // CheckBox pour coller tout d'un coup
+            var pasteAtOnceCheckBox = new CheckBox
+            {
+                Content = "Coller",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                IsChecked = ta.PasteAtOnce
+            };
+            pasteAtOnceCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ta.PasteAtOnce = true;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            pasteAtOnceCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ta.PasteAtOnce = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(pasteAtOnceCheckBox);
+
+            // CheckBox pour la frappe naturelle (masqué si "Coller")
             var naturalTypingCheckBox = new CheckBox
             {
                 Content = "Frappe naturelle",
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
-                IsChecked = ta.UseNaturalTyping
+                IsChecked = ta.UseNaturalTyping,
+                Visibility = ta.PasteAtOnce ? Visibility.Collapsed : Visibility.Visible
             };
             naturalTypingCheckBox.Checked += (s, e) =>
             {
@@ -2287,14 +2325,14 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(naturalTypingCheckBox);
 
-            // TextBox pour la vitesse de frappe (visible si pas de frappe naturelle)
+            // TextBox pour la vitesse de frappe (visible si pas de frappe naturelle et pas "Coller")
             var speedLabel = new TextBlock
             {
                 Text = "Vitesse:",
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Collapsed : Visibility.Visible
+                Visibility = (ta.UseNaturalTyping || ta.PasteAtOnce) ? Visibility.Collapsed : Visibility.Visible
             };
             editPanel.Children.Add(speedLabel);
 
@@ -2307,7 +2345,7 @@ namespace MacroEngine.UI
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 4, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Collapsed : Visibility.Visible
+                Visibility = (ta.UseNaturalTyping || ta.PasteAtOnce) ? Visibility.Collapsed : Visibility.Visible
             };
             speedTextBox.TextChanged += (s, e) =>
             {
@@ -2341,18 +2379,18 @@ namespace MacroEngine.UI
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Collapsed : Visibility.Visible
+                Visibility = (ta.UseNaturalTyping || ta.PasteAtOnce) ? Visibility.Collapsed : Visibility.Visible
             };
             editPanel.Children.Add(msLabel);
 
-            // TextBox pour délai min (visible si frappe naturelle)
+            // TextBox pour délai min (visible si frappe naturelle et pas "Coller")
             var minDelayLabel = new TextBlock
             {
                 Text = "Min:",
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+                Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
             editPanel.Children.Add(minDelayLabel);
 
@@ -2365,7 +2403,7 @@ namespace MacroEngine.UI
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 4, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+                Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
             minDelayTextBox.TextChanged += (s, e) =>
             {
@@ -2400,18 +2438,18 @@ namespace MacroEngine.UI
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 4, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+                Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
             editPanel.Children.Add(andLabel);
 
-            // TextBox pour délai max (visible si frappe naturelle)
+            // TextBox pour délai max (visible si frappe naturelle et pas "Coller")
             var maxDelayLabel = new TextBlock
             {
                 Text = "Max:",
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 4, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+                Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
             editPanel.Children.Add(maxDelayLabel);
 
@@ -2424,7 +2462,7 @@ namespace MacroEngine.UI
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 4, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+                Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
             maxDelayTextBox.TextChanged += (s, e) =>
             {
@@ -2458,7 +2496,7 @@ namespace MacroEngine.UI
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 0),
-                Visibility = ta.UseNaturalTyping ? Visibility.Visible : Visibility.Collapsed
+                Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
             editPanel.Children.Add(msLabel2);
 
