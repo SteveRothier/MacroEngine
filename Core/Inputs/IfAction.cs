@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using MacroEngine.Core.Engine;
 
 namespace MacroEngine.Core.Inputs
 {
@@ -347,8 +348,30 @@ namespace MacroEngine.Core.Inputs
                 ConditionType.TimeDate => EvaluateTimeDateCondition(condition.TimeDateConfig),
                 ConditionType.ImageOnScreen => EvaluateImageOnScreenCondition(condition.ImageOnScreenConfig),
                 ConditionType.TextOnScreen => EvaluateTextOnScreenCondition(condition.TextOnScreenConfig),
+                ConditionType.Variable => EvaluateVariableCondition(condition.VariableName),
                 _ => false
             };
+        }
+
+        /// <summary>
+        /// Évalue la condition "Variable" (valeur d'une variable du contexte d'exécution).
+        /// </summary>
+        private bool EvaluateVariableCondition(string? variableName)
+        {
+            if (string.IsNullOrWhiteSpace(variableName))
+                return false;
+            var store = ExecutionContext.Current?.Variables;
+            if (store == null)
+                return false;
+            return store.GetBoolean(variableName.Trim());
+        }
+
+        /// <summary>
+        /// Retourne le résultat de l'évaluation de la condition au moment de l'exécution (pour le moteur).
+        /// </summary>
+        public bool GetConditionResult()
+        {
+            return EvaluateCondition();
         }
 
         /// <summary>
@@ -827,7 +850,8 @@ namespace MacroEngine.Core.Inputs
                 {
                     Text = item.TextOnScreenConfig.Text,
                     SearchArea = item.TextOnScreenConfig.SearchArea?.ToArray()
-                } : null
+                } : null,
+                VariableName = item.VariableName
             };
         }
     }

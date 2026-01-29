@@ -52,7 +52,12 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Si un texte est visible à l'écran
         /// </summary>
-        TextOnScreen
+        TextOnScreen,
+
+        /// <summary>
+        /// Valeur d'une variable (nombre, texte ou booléen)
+        /// </summary>
+        Variable
     }
 
     /// <summary>
@@ -418,5 +423,10 @@ namespace MacroEngine.Core.Inputs
         /// Configuration pour condition "Texte à l'écran"
         /// </summary>
         public TextOnScreenCondition? TextOnScreenConfig { get; set; }
+
+        /// <summary>
+        /// Nom de la variable (pour ConditionType.Variable) — valeur booléenne ou vérité (nombre != 0, texte non vide)
+        /// </summary>
+        public string? VariableName { get; set; }
     }
 }

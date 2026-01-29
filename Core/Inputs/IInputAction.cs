@@ -64,6 +64,11 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Action texte (saisie de texte)
         /// </summary>
-        Text
+        Text,
+
+        /// <summary>
+        /// Action variable (créer, modifier, utiliser des variables)
+        /// </summary>
+        Variable
     }
 }

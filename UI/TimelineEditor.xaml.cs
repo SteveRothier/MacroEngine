@@ -254,6 +254,17 @@ namespace MacroEngine.UI
                     title = GetTextActionTitle(ta);
                     details = GetTextActionDetails(ta);
                     break;
+                case VariableAction va:
+                    primaryColor = Color.FromRgb(46, 125, 50); // Vert #2E7D32
+                    hoverColor = Color.FromRgb(27, 94, 32); // Vert hover #1B5E20
+                    backgroundColor = Color.FromRgb(46, 125, 50);
+                    backgroundColorHover = Color.FromRgb(27, 94, 32);
+                    textColor = Color.FromRgb(243, 235, 221);
+                    iconColor = Color.FromRgb(252, 252, 248);
+                    icon = "📦";
+                    title = GetVariableActionTitle(va);
+                    details = GetVariableActionDetails(va);
+                    break;
                 default:
                     primaryColor = Color.FromRgb(123, 30, 58); // Rouge pourpre foncé par défaut
                     hoverColor = Color.FromRgb(143, 39, 72);
@@ -572,6 +583,12 @@ namespace MacroEngine.UI
                 var textControlsPanel = CreateTextActionControls(ta, index, textPanel);
                 textPanel.Children.Insert(0, textControlsPanel);
             }
+            else if (action is VariableAction va)
+            {
+                textPanel.Children.Remove(titleBlock);
+                var variableControlsPanel = CreateVariableActionControls(va, index, textPanel);
+                textPanel.Children.Insert(0, variableControlsPanel);
+            }
 
             return card;
         }
@@ -587,6 +604,7 @@ namespace MacroEngine.UI
                 KeyboardAction => Color.FromRgb(122, 30, 58),
                 Core.Inputs.MouseAction => Color.FromRgb(90, 138, 201),
                 TextAction => Color.FromRgb(70, 130, 180),
+                VariableAction => Color.FromRgb(46, 125, 50),
                 DelayAction => Color.FromRgb(216, 162, 74),
                 RepeatAction => Color.FromRgb(138, 43, 226),
                 IfAction => Color.FromRgb(34, 139, 34),
@@ -821,6 +839,48 @@ namespace MacroEngine.UI
             }
             
             return details.ToString();
+        }
+
+        private string GetVariableActionTitle(VariableAction va)
+        {
+            string name = string.IsNullOrEmpty(va.VariableName) ? "?" : va.VariableName;
+            string op = va.Operation switch
+            {
+                VariableOperation.Set => "=",
+                VariableOperation.Increment => "++",
+                VariableOperation.Decrement => "--",
+                VariableOperation.Toggle => "!",
+                VariableOperation.EvaluateExpression => ":=",
+                _ => ""
+            };
+            return $"{name} {op} {(string.IsNullOrEmpty(va.Value) ? "?" : va.Value)}";
+        }
+
+        private string GetVariableActionDetails(VariableAction va)
+        {
+            string typeStr = va.VariableType switch
+            {
+                VariableType.Number => "Nombre",
+                VariableType.Text => "Texte",
+                VariableType.Boolean => "Booléen",
+                _ => ""
+            };
+            string opStr = va.Operation switch
+            {
+                VariableOperation.Set => "Définir",
+                VariableOperation.Increment => "Incrémenter",
+                VariableOperation.Decrement => "Décrémenter",
+                VariableOperation.Toggle => "Inverser",
+                VariableOperation.EvaluateExpression => "Expression",
+                _ => ""
+            };
+            if (va.Operation == VariableOperation.Increment || va.Operation == VariableOperation.Decrement)
+            {
+                double step = va.Step;
+                if (double.IsNaN(step) || double.IsInfinity(step)) step = 1;
+                return $"{typeStr} • {opStr} (pas {step})";
+            }
+            return $"{typeStr} • {opStr}";
         }
 
         /// <summary>
@@ -1088,6 +1148,9 @@ namespace MacroEngine.UI
                 ConditionType.TextOnScreen => ifAction.TextOnScreenConfig != null
                     ? $"Si texte \"{ifAction.TextOnScreenConfig.Text}\" visible"
                     : "Si Texte à l'écran",
+                ConditionType.Variable => !string.IsNullOrEmpty(ifAction.Conditions?.FirstOrDefault()?.VariableName)
+                    ? $"Si variable \"{ifAction.Conditions[0].VariableName}\""
+                    : "Si Variable",
                 _ => "Si"
             };
         }
@@ -1124,6 +1187,9 @@ namespace MacroEngine.UI
                 ConditionType.TextOnScreen => condition.TextOnScreenConfig != null && !string.IsNullOrEmpty(condition.TextOnScreenConfig.Text)
                     ? $"Si texte \"{(condition.TextOnScreenConfig.Text.Length > 30 ? condition.TextOnScreenConfig.Text.Substring(0, 30) + "..." : condition.TextOnScreenConfig.Text)}\" visible"
                     : "Si Texte à l'écran",
+                ConditionType.Variable => !string.IsNullOrEmpty(condition.VariableName)
+                    ? $"Si variable \"{condition.VariableName}\""
+                    : "Si Variable",
                 _ => "Si"
             };
         }
@@ -1528,6 +1594,25 @@ namespace MacroEngine.UI
                 Text = "",
                 TypingSpeed = 50,
                 UseNaturalTyping = false
+            });
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void AddVariable_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentMacro == null) return;
+
+            SaveState();
+
+            _currentMacro.Actions.Add(new VariableAction
+            {
+                VariableName = "var",
+                VariableType = VariableType.Number,
+                Operation = VariableOperation.Set,
+                Value = "0"
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
@@ -2570,6 +2655,222 @@ namespace MacroEngine.UI
             };
 
             return editPanel;
+        }
+
+        private static readonly string[] VariableTypeLabels = { "Nombre", "Texte", "Booléen" };
+        private static readonly string[] VariableOperationLabels = { "Définir", "Incrémenter", "Décrémenter", "Inverser", "Expression" };
+
+        private Panel CreateVariableActionControls(VariableAction va, int index, Panel parentPanel)
+        {
+            var editPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+
+            var nameLabel = new TextBlock
+            {
+                Text = "Nom:",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            editPanel.Children.Add(nameLabel);
+
+            var nameTextBox = new TextBox
+            {
+                Text = va.VariableName ?? "",
+                MinWidth = 80,
+                MaxWidth = 150,
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0),
+                ToolTip = "Lettres, chiffres, tirets bas (espaces → _)"
+            };
+            nameTextBox.TextChanged += (s, e) =>
+            {
+                SaveState();
+                va.VariableName = nameTextBox.Text?.Trim() ?? "";
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+            };
+            nameTextBox.LostFocus += (s, e) => RefreshBlocks();
+            editPanel.Children.Add(nameTextBox);
+
+            var typeLabel = new TextBlock
+            {
+                Text = "Type:",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            editPanel.Children.Add(typeLabel);
+
+            var valueLabel = new TextBlock
+            {
+                Text = "Valeur:",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0),
+                Visibility = (va.Operation == VariableOperation.Set || va.Operation == VariableOperation.EvaluateExpression) ? Visibility.Visible : Visibility.Collapsed
+            };
+            var valueTextBox = new TextBox
+            {
+                Text = va.Value ?? "",
+                MinWidth = 120,
+                MaxWidth = 250,
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = (va.Operation == VariableOperation.Set || va.Operation == VariableOperation.EvaluateExpression) ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Ex: 0, counter + 1, true, \"texte\""
+            };
+            valueTextBox.TextChanged += (s, e) =>
+            {
+                SaveState();
+                va.Value = valueTextBox.Text ?? "";
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+            };
+            valueTextBox.LostFocus += (s, e) => RefreshBlocks();
+
+            var stepLabel = new TextBlock
+            {
+                Text = "Pas:",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0),
+                Visibility = (va.Operation == VariableOperation.Increment || va.Operation == VariableOperation.Decrement) ? Visibility.Visible : Visibility.Collapsed
+            };
+            var stepTextBox = new TextBox
+            {
+                Text = va.Step.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Width = 50,
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = (va.Operation == VariableOperation.Increment || va.Operation == VariableOperation.Decrement) ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Valeur d'incrément ou de décrément"
+            };
+            stepTextBox.TextChanged += (s, e) =>
+            {
+                if (double.TryParse(stepTextBox.Text?.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double step))
+                {
+                    SaveState();
+                    va.Step = step;
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                }
+            };
+            stepTextBox.LostFocus += (s, e) =>
+            {
+                if (!double.TryParse(stepTextBox.Text?.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _))
+                    stepTextBox.Text = va.Step.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                RefreshBlocks();
+            };
+
+            var opLabel = new TextBlock
+            {
+                Text = "Opération:",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            var opCombo = new ComboBox
+            {
+                MinWidth = 120,
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0)
+            };
+            UpdateVariableOperationCombo(opCombo, va);
+            opCombo.SelectionChanged += (s, e) =>
+            {
+                if (opCombo.SelectedIndex >= 0 && GetVariableOperationFromIndex(opCombo.SelectedIndex, va.VariableType, out VariableOperation selectedOp))
+                {
+                    SaveState();
+                    va.Operation = selectedOp;
+                    UpdateVariableFieldsVisibility(va, valueLabel, valueTextBox, stepLabel, stepTextBox);
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                    RefreshBlocks();
+                }
+            };
+
+            var typeCombo = new ComboBox
+            {
+                MinWidth = 90,
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 12, 0)
+            };
+            foreach (var label in VariableTypeLabels) typeCombo.Items.Add(label);
+            typeCombo.SelectedIndex = (int)va.VariableType;
+            typeCombo.SelectionChanged += (s, e) =>
+            {
+                if (typeCombo.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    va.VariableType = (VariableType)typeCombo.SelectedIndex;
+                    UpdateVariableOperationCombo(opCombo, va);
+                    UpdateVariableFieldsVisibility(va, valueLabel, valueTextBox, stepLabel, stepTextBox);
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                    RefreshBlocks();
+                }
+            };
+
+            editPanel.Children.Add(typeCombo);
+            editPanel.Children.Add(opLabel);
+            editPanel.Children.Add(opCombo);
+            editPanel.Children.Add(valueLabel);
+            editPanel.Children.Add(valueTextBox);
+            editPanel.Children.Add(stepLabel);
+            editPanel.Children.Add(stepTextBox);
+
+            return editPanel;
+        }
+
+        private static void UpdateVariableOperationCombo(ComboBox opCombo, VariableAction va)
+        {
+            opCombo.Items.Clear();
+            var ops = GetVariableOperationsForType(va.VariableType);
+            foreach (var op in ops)
+                opCombo.Items.Add(VariableOperationLabels[(int)op]);
+            int idx = ops.IndexOf(va.Operation);
+            if (idx < 0) { va.Operation = ops[0]; idx = 0; }
+            opCombo.SelectedIndex = idx;
+        }
+
+        private static System.Collections.Generic.List<VariableOperation> GetVariableOperationsForType(VariableType vt)
+        {
+            return vt switch
+            {
+                VariableType.Number => new System.Collections.Generic.List<VariableOperation>
+                    { VariableOperation.Set, VariableOperation.Increment, VariableOperation.Decrement, VariableOperation.EvaluateExpression },
+                VariableType.Text => new System.Collections.Generic.List<VariableOperation>
+                    { VariableOperation.Set, VariableOperation.EvaluateExpression },
+                VariableType.Boolean => new System.Collections.Generic.List<VariableOperation>
+                    { VariableOperation.Set, VariableOperation.Toggle, VariableOperation.EvaluateExpression },
+                _ => new System.Collections.Generic.List<VariableOperation> { VariableOperation.Set }
+            };
+        }
+
+        private static bool GetVariableOperationFromIndex(int index, VariableType vt, out VariableOperation op)
+        {
+            var ops = GetVariableOperationsForType(vt);
+            if (index >= 0 && index < ops.Count) { op = ops[index]; return true; }
+            op = VariableOperation.Set;
+            return false;
+        }
+
+        private static void UpdateVariableFieldsVisibility(VariableAction va, TextBlock valueLabel, TextBox valueTextBox, TextBlock stepLabel, TextBox stepTextBox)
+        {
+            bool showValue = va.Operation == VariableOperation.Set || va.Operation == VariableOperation.EvaluateExpression;
+            bool showStep = va.Operation == VariableOperation.Increment || va.Operation == VariableOperation.Decrement;
+            valueLabel.Visibility = valueTextBox.Visibility = showValue ? Visibility.Visible : Visibility.Collapsed;
+            stepLabel.Visibility = stepTextBox.Visibility = showStep ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void EditDelayAction(DelayAction da, int index, TextBlock titleText)
@@ -4594,6 +4895,7 @@ namespace MacroEngine.UI
                         condition.TimeDateConfig = null;
                         condition.ImageOnScreenConfig = null;
                         condition.TextOnScreenConfig = null;
+                        condition.VariableName = null;
                         _currentMacro!.ModifiedAt = DateTime.Now;
                         RefreshBlocks();
                         MacroChanged?.Invoke(this, EventArgs.Empty);
@@ -4638,6 +4940,7 @@ namespace MacroEngine.UI
                         condition.TimeDateConfig = resultCondition.TimeDateConfig;
                         condition.ImageOnScreenConfig = resultCondition.ImageOnScreenConfig;
                         condition.TextOnScreenConfig = resultCondition.TextOnScreenConfig;
+                        condition.VariableName = resultCondition.VariableName;
                         _currentMacro!.ModifiedAt = DateTime.Now;
                         RefreshBlocks();
                         MacroChanged?.Invoke(this, EventArgs.Empty);
@@ -5249,6 +5552,16 @@ namespace MacroEngine.UI
                         textPanel.Children.Insert(0, textControlsPanel);
                     }
                 }
+                else if (action is VariableAction vaNested)
+                {
+                    var textPanel = titleBlock.Parent as Panel;
+                    if (textPanel != null)
+                    {
+                        textPanel.Children.Remove(titleBlock);
+                        var variableControlsPanel = CreateVariableActionControls(vaNested, parentIndex, textPanel);
+                        textPanel.Children.Insert(0, variableControlsPanel);
+                    }
+                }
             }
 
             // Retirer les handlers drag & drop de la carte (les actions imbriquées ne doivent pas être déplaçables entre RepeatActions)
@@ -5537,6 +5850,7 @@ namespace MacroEngine.UI
             panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
             panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
             panel.Children.Add(createAddButton("📝", "Texte", new TextAction()));
+            panel.Children.Add(createAddButton("📦", "Variable", new VariableAction()));
             panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
             panel.Children.Add(createAddButton("🔀", "Si", new IfAction()));
 
@@ -5578,6 +5892,13 @@ namespace MacroEngine.UI
                     Text = "",
                     TypingSpeed = 50,
                     UseNaturalTyping = false
+                },
+                "Variable" => new VariableAction
+                {
+                    VariableName = "var",
+                    VariableType = VariableType.Number,
+                    Operation = VariableOperation.Set,
+                    Value = "0"
                 },
                 "Delay" => new DelayAction
                 {
@@ -5741,6 +6062,16 @@ namespace MacroEngine.UI
                         textPanel.Children.Insert(0, textControlsPanel);
                     }
                 }
+                else if (action is VariableAction vaIfNested)
+                {
+                    var textPanel = titleBlock.Parent as Panel;
+                    if (textPanel != null)
+                    {
+                        textPanel.Children.Remove(titleBlock);
+                        var variableControlsPanel = CreateVariableActionControls(vaIfNested, parentIndex, textPanel);
+                        textPanel.Children.Insert(0, variableControlsPanel);
+                    }
+                }
             }
 
             card.MouseLeftButtonDown -= ActionCard_MouseLeftButtonDown;
@@ -5817,6 +6148,7 @@ namespace MacroEngine.UI
             panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
             panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
             panel.Children.Add(createAddButton("📝", "Texte", new TextAction()));
+            panel.Children.Add(createAddButton("📦", "Variable", new VariableAction()));
             panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
             panel.Children.Add(createAddButton("🔁", "Répéter", new RepeatAction()));
 
@@ -6021,6 +6353,7 @@ namespace MacroEngine.UI
                 "Keyboard" => new KeyboardAction { VirtualKeyCode = 0, ActionType = KeyboardActionType.Press },
                 "Mouse" => new Core.Inputs.MouseAction { ActionType = Core.Inputs.MouseActionType.LeftClick, X = -1, Y = -1 },
                 "Text" => new TextAction { Text = "", TypingSpeed = 50, UseNaturalTyping = false },
+                "Variable" => new VariableAction { VariableName = "var", VariableType = VariableType.Number, Operation = VariableOperation.Set, Value = "0" },
                 "Delay" => new DelayAction { Duration = 100 },
                 "Repeat" => new RepeatAction
                 {

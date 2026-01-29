@@ -123,6 +123,38 @@
                     </Button.Style>
                 </Button>
 
+                <!-- Bouton Ajouter Variable -->
+                <Button x:Name="AddVariableButton"
+                        Click="AddVariable_Click"
+                        Margin="4,0"
+                        Cursor="Hand"
+                        ToolTip="Ajouter une variable">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd"
+                                                Background="#2E7D32"
+                                                CornerRadius="8"
+                                                Padding="12,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="📦" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="+ Variable" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#1B5E20"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
                 <!-- Bouton Ajouter Délai -->
                 <Button x:Name="AddDelayButton"
                         Click="AddDelay_Click"

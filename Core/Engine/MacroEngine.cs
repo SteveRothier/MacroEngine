@@ -224,8 +224,8 @@ namespace MacroEngine.Core.Engine
                             ActionDescription = description
                         });
                         
-                        // Évaluer la condition et exécuter les actions appropriées
-                        if (ifAction.Condition)
+                        // Évaluer la condition au runtime et exécuter les actions appropriées
+                        if (ifAction.GetConditionResult())
                         {
                             // Exécuter les actions Then
                             if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
@@ -458,7 +458,18 @@ namespace MacroEngine.Core.Engine
             if (cancellationToken.IsCancellationRequested)
                 return;
 
-            await ExecuteActionsAsync(macro.Actions);
+            // Contexte d'exécution (variables) pour cette macro
+            var context = new ExecutionContext();
+            ExecutionContext.Current = context;
+            try
+            {
+                await ExecuteActionsAsync(macro.Actions);
+            }
+            finally
+            {
+                context.Variables.Clear();
+                ExecutionContext.Current = null;
+            }
         }
 
         private string GetActionDescription(IInputAction action)
@@ -549,6 +560,22 @@ namespace MacroEngine.Core.Engine
                         return $"Si ({conditionText}): Then={thenCount}, Else={elseCount}";
                     }
                     return $"Condition: {action.Name}";
+
+                case InputActionType.Variable:
+                    if (action is VariableAction varAction)
+                    {
+                        var opText = varAction.Operation switch
+                        {
+                            VariableOperation.Set => "=",
+                            VariableOperation.Increment => $"+= {varAction.Step}",
+                            VariableOperation.Decrement => $"-= {varAction.Step}",
+                            VariableOperation.Toggle => "!",
+                            VariableOperation.EvaluateExpression => ":=",
+                            _ => ""
+                        };
+                        return $"Variable {varAction.VariableName} {opText} {varAction.Value}";
+                    }
+                    return $"Variable: {action.Name}";
 
                 default:
                     return action.Name;

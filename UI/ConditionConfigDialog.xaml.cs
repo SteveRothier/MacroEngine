@@ -54,7 +54,8 @@ namespace MacroEngine.UI
                     MousePositionConfig = Result.MousePositionConfig,
                     TimeDateConfig = Result.TimeDateConfig,
                     ImageOnScreenConfig = Result.ImageOnScreenConfig,
-                    TextOnScreenConfig = Result.TextOnScreenConfig
+                    TextOnScreenConfig = Result.TextOnScreenConfig,
+                    VariableName = Result.Conditions?.FirstOrDefault()?.VariableName
                 };
                 Result.Conditions.Add(conditionItem);
             }
@@ -297,6 +298,7 @@ namespace MacroEngine.UI
                 ConditionType.TimeDate => "Temps/Date",
                 ConditionType.ImageOnScreen => "Image à l'écran",
                 ConditionType.TextOnScreen => "Texte à l'écran",
+                ConditionType.Variable => "Variable",
                 _ => "Inconnue"
             };
         }
@@ -329,6 +331,7 @@ namespace MacroEngine.UI
             typeComboBox.Items.Add("Temps/Date");
             typeComboBox.Items.Add("Image à l'écran");
             typeComboBox.Items.Add("Texte à l'écran");
+            typeComboBox.Items.Add("Variable");
 
             typeComboBox.SelectedIndex = (int)condition.ConditionType;
             typeComboBox.SelectionChanged += (s, e) =>
@@ -345,6 +348,7 @@ namespace MacroEngine.UI
                     condition.TimeDateConfig = null;
                     condition.ImageOnScreenConfig = null;
                     condition.TextOnScreenConfig = null;
+                    condition.VariableName = null;
                     // Recharger l'UI
                     LoadConfiguration();
                 }
@@ -395,6 +399,9 @@ namespace MacroEngine.UI
                     case ConditionType.TextOnScreen:
                         CreateTextOnScreenConfig();
                         break;
+                    case ConditionType.Variable:
+                        CreateVariableConfig();
+                        break;
                 }
             }
             finally
@@ -405,6 +412,42 @@ namespace MacroEngine.UI
             }
 
             return panel;
+        }
+
+        private void CreateVariableConfig()
+        {
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.Variable, VariableName = "" };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            var nameLabel = new TextBlock
+            {
+                Text = "Nom de la variable:",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            ConfigContentPanel!.Children.Add(nameLabel);
+
+            var nameTextBox = new TextBox
+            {
+                Text = condition.VariableName ?? "",
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 8),
+                MaxLength = 100
+            };
+            nameTextBox.TextChanged += (s, e) =>
+            {
+                condition.VariableName = nameTextBox.Text?.Trim() ?? "";
+            };
+            ConfigContentPanel.Children.Add(nameTextBox);
         }
 
         private void CreateBooleanConfig()
