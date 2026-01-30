@@ -4878,6 +4878,7 @@ namespace MacroEngine.UI
                 conditionTypeComboBox.Items.Add("Temps/Date");
                 conditionTypeComboBox.Items.Add("Image à l'écran");
                 conditionTypeComboBox.Items.Add("Texte à l'écran");
+                conditionTypeComboBox.Items.Add("Variable");
                 conditionTypeComboBox.SelectedIndex = (int)condition.ConditionType;
 
                 conditionTypeComboBox.SelectionChanged += (s, e) =>
