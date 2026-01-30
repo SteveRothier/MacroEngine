@@ -36,33 +36,36 @@ namespace MacroEngine.UI
 
         private void LoadConfiguration()
         {
+            if (Result is null)
+                return;
             ConfigContentPanel.Children.Clear();
+            var result = Result;
 
             // Initialiser Conditions si vide (compatibilité avec l'ancien format)
-            if (Result!.Conditions == null || Result.Conditions.Count == 0)
+            if (result.Conditions == null || result.Conditions.Count == 0)
             {
-                Result.Conditions = new List<ConditionItem>();
+                result.Conditions = new List<ConditionItem>();
                 // Créer une condition à partir des anciennes propriétés
                 var conditionItem = new ConditionItem
                 {
-                    ConditionType = Result.ConditionType,
-                    Condition = Result.Condition,
-                    ActiveApplicationConfig = Result.ActiveApplicationConfig,
-                    KeyboardKeyConfig = Result.KeyboardKeyConfig,
-                    ProcessRunningConfig = Result.ProcessRunningConfig,
-                    PixelColorConfig = Result.PixelColorConfig,
-                    MousePositionConfig = Result.MousePositionConfig,
-                    TimeDateConfig = Result.TimeDateConfig,
-                    ImageOnScreenConfig = Result.ImageOnScreenConfig,
-                    TextOnScreenConfig = Result.TextOnScreenConfig,
-                    VariableName = Result.Conditions?.FirstOrDefault()?.VariableName
+                    ConditionType = result.ConditionType,
+                    Condition = result.Condition,
+                    ActiveApplicationConfig = result.ActiveApplicationConfig,
+                    KeyboardKeyConfig = result.KeyboardKeyConfig,
+                    ProcessRunningConfig = result.ProcessRunningConfig,
+                    PixelColorConfig = result.PixelColorConfig,
+                    MousePositionConfig = result.MousePositionConfig,
+                    TimeDateConfig = result.TimeDateConfig,
+                    ImageOnScreenConfig = result.ImageOnScreenConfig,
+                    TextOnScreenConfig = result.TextOnScreenConfig,
+                    VariableName = result.Conditions?.FirstOrDefault()?.VariableName
                 };
-                Result.Conditions.Add(conditionItem);
+                result.Conditions!.Add(conditionItem);
             }
 
-            if (Result.Operators == null)
+            if (result.Operators == null)
             {
-                Result.Operators = new List<LogicalOperator>();
+                result.Operators = new List<LogicalOperator>();
             }
 
             // Créer l'interface pour gérer plusieurs conditions
