@@ -78,8 +78,6 @@ namespace MacroEngine.UI
         // Enregistrement des mouvements souris
         private DateTime _lastMouseMoveRecorded = DateTime.MinValue;
         private const int MIN_MOUSE_MOVE_INTERVAL_MS = 100; // Intervalle minimum entre deux mouvements (10 mouvements/seconde max)
-        private int _lastMouseX = -1;
-        private int _lastMouseY = -1;
         private const int MIN_MOUSE_MOVE_DISTANCE = 20; // Distance minimale en pixels pour enregistrer un mouvement
 
         public MainWindow()
@@ -1201,9 +1199,7 @@ namespace MacroEngine.UI
             _lastRapidKeyWarning = DateTime.MinValue;
             _recordingInProgress = 0;
             _lastMouseMoveRecorded = DateTime.MinValue;
-            _lastMouseX = -1;
-            _lastMouseY = -1;
-            _recordMouseClicks = RecordMouseClicksCheckBox.IsChecked == true;
+            _recordMouseClicks = true; // Toujours enregistrer les clics
             
             // Initialiser le cache des coordonnées de la fenêtre
             _cachedWindowHandle = new WindowInteropHelper(this).Handle;
@@ -1674,111 +1670,12 @@ namespace MacroEngine.UI
 
         private void MouseHook_MouseMove(object? sender, MouseHookEventArgs e)
         {
-            // Vérifier si l'enregistrement des mouvements est activé
-            if (!_isRecording || _isRecordingPaused)
-                return;
-
-            if (RecordMouseMovesCheckBox.IsChecked != true)
-                return;
-
-            // Vérifier si le mouvement est dans la fenêtre de l'application
-            var now = DateTime.Now;
-            var x = e.X;
-            var y = e.Y;
-
-            // Appliquer un échantillonnage pour éviter trop d'actions
-            // 1. Vérifier l'intervalle de temps
-            if ((now - _lastMouseMoveRecorded).TotalMilliseconds < MIN_MOUSE_MOVE_INTERVAL_MS)
-                return;
-
-            // 2. Vérifier la distance minimale parcourue
-            if (_lastMouseX >= 0 && _lastMouseY >= 0)
-            {
-                var distance = Math.Sqrt(Math.Pow(x - _lastMouseX, 2) + Math.Pow(y - _lastMouseY, 2));
-                if (distance < MIN_MOUSE_MOVE_DISTANCE)
-                    return;
-            }
-
-            _lastMouseMoveRecorded = now;
-            _lastMouseX = x;
-            _lastMouseY = y;
-
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                try
-                {
-                    if (!_isRecording || _isRecordingPaused)
-                        return;
-
-                    if (_selectedMacro != null && _selectedMacro.Actions == null)
-                    {
-                        _selectedMacro.Actions = new List<IInputAction>();
-                    }
-
-                    // Ajouter un délai si nécessaire
-                    AddDelayIfNeeded();
-
-                    var mouseAction = new MouseAction
-                    {
-                        Name = $"Déplacer ({x}, {y})",
-                        ActionType = MouseActionType.Move,
-                        X = x,
-                        Y = y
-                    };
-
-                    if (_selectedMacro != null)
-                    {
-                        _selectedMacro.Actions.Add(mouseAction);
-                    }
-                    _lastActionTime = now;
-
-                    // Déclencher la sauvegarde automatique
-                    TriggerAutoSave();
-
-                    // Afficher dans la zone d'actions
-                    var actionItem = new ActionLogItem
-                    {
-                        Timestamp = now.ToString("HH:mm:ss.fff"),
-                        Description = $"Enregistré: {mouseAction.Name}"
-                    };
-
-                    var items = ActionsListBox.ItemsSource as System.Collections.ObjectModel.ObservableCollection<ActionLogItem> ??
-                               new System.Collections.ObjectModel.ObservableCollection<ActionLogItem>();
-
-                    if (ActionsListBox.ItemsSource == null)
-                    {
-                        ActionsListBox.ItemsSource = items;
-                    }
-
-                    items.Add(actionItem);
-
-                    // Limiter à 100 actions
-                    while (items.Count > 100)
-                    {
-                        items.RemoveAt(0);
-                    }
-
-                    ActionsCountText.Text = $"{_selectedMacro?.Actions?.Count ?? 0} action(s)";
-
-                    // Rafraîchir l'éditeur moins fréquemment
-                    if ((now - _lastEditorRefresh).TotalMilliseconds >= EDITOR_REFRESH_INTERVAL_MS * 2)
-                    {
-                        _lastEditorRefresh = now;
-                        RefreshMacroEditor();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Erreur lors de l'enregistrement du mouvement: {ex.Message}");
-                }
-            }), System.Windows.Threading.DispatcherPriority.Input);
+            // Mouvements de souris non enregistrés (option retirée de l'UI)
         }
 
         private void AddDelayIfNeeded()
         {
-            // Ne pas ajouter de délai si la checkbox est décochée
-            if (RecordDelaysCheckBox.IsChecked == false)
-                return;
+            // Toujours enregistrer les délais (option retirée de l'UI)
 
             if (_selectedMacro != null && _selectedMacro.Actions?.Count > 0)
             {
@@ -2067,8 +1964,7 @@ namespace MacroEngine.UI
                 // Liste des boutons de contrôle à ignorer
                 var controlButtons = new FrameworkElement[] 
                 { 
-                    StartButton, StopButton, PauseButton, ExecuteButton,
-                    RecordDelaysCheckBox, RecordMouseClicksCheckBox, RecordMouseMovesCheckBox
+                    StartButton, StopButton, PauseButton, ExecuteButton
                 };
                 
                 foreach (var button in controlButtons)

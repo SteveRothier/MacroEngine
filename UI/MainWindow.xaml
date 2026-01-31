@@ -106,30 +106,6 @@
                         <TextBlock Text="⏹" FontSize="14"/>
                     </Button>
 
-                    <!-- Séparateur -->
-                    <Border Style="{StaticResource SeparatorVertical}" Height="24"/>
-
-                    <!-- Options d'enregistrement -->
-                    <CheckBox x:Name="RecordDelaysCheckBox" 
-                              Content="Délais" 
-                              IsChecked="True"
-                              VerticalAlignment="Center"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              Margin="8,0"/>
-                    <CheckBox x:Name="RecordMouseClicksCheckBox" 
-                              Content="Clics" 
-                              IsChecked="True"
-                              VerticalAlignment="Center"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              Margin="8,0"
-                              ToolTip="Enregistrer les clics souris"/>
-                    <CheckBox x:Name="RecordMouseMovesCheckBox" 
-                              Content="Mouvements" 
-                              IsChecked="False"
-                              VerticalAlignment="Center"
-                              Foreground="{StaticResource TextPrimaryBrush}"
-                              Margin="8,0"
-                              ToolTip="Enregistrer les déplacements souris"/>
                 </StackPanel>
 
                 <!-- Actions droite -->

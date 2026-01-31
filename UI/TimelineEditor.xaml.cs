@@ -91,7 +91,6 @@ namespace MacroEngine.UI
         {
             _currentMacro = macro;
             RefreshBlocks();
-            UpdateRepeatControls();
             UpdateMacroEnableToggle();
             
             // Réinitialiser l'historique
@@ -8725,69 +8724,6 @@ namespace MacroEngine.UI
             public string ActionType { get; set; } = "";
             public bool IsThen { get; set; }
             public int ElseIfBranchIndex { get; set; } = -1;
-        }
-
-        #endregion
-
-        #region Options de répétition
-
-        private void UpdateRepeatControls()
-        {
-            if (_currentMacro == null) return;
-
-            switch (_currentMacro.RepeatMode)
-            {
-                case RepeatMode.Once:
-                    RepeatModeComboBox.SelectedIndex = 0;
-                    RepeatCountTextBox.Visibility = Visibility.Collapsed;
-                    break;
-                case RepeatMode.RepeatCount:
-                    RepeatModeComboBox.SelectedIndex = 1;
-                    RepeatCountTextBox.Visibility = Visibility.Visible;
-                    RepeatCountTextBox.Text = _currentMacro.RepeatCount.ToString();
-                    break;
-                case RepeatMode.UntilStopped:
-                    RepeatModeComboBox.SelectedIndex = 2;
-                    RepeatCountTextBox.Visibility = Visibility.Collapsed;
-                    break;
-            }
-        }
-
-        private void RepeatModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_currentMacro == null) return;
-
-            switch (RepeatModeComboBox.SelectedIndex)
-            {
-                case 0:
-                    _currentMacro.RepeatMode = RepeatMode.Once;
-                    _currentMacro.RepeatCount = 1;
-                    RepeatCountTextBox.Visibility = Visibility.Collapsed;
-                    break;
-                case 1:
-                    _currentMacro.RepeatMode = RepeatMode.RepeatCount;
-                    RepeatCountTextBox.Visibility = Visibility.Visible;
-                    break;
-                case 2:
-                    _currentMacro.RepeatMode = RepeatMode.UntilStopped;
-                    RepeatCountTextBox.Visibility = Visibility.Collapsed;
-                    break;
-            }
-
-            _currentMacro.ModifiedAt = DateTime.Now;
-            MacroChanged?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void RepeatCountTextBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (_currentMacro == null) return;
-
-            if (int.TryParse(RepeatCountTextBox.Text, out int count) && count > 0)
-            {
-                _currentMacro.RepeatCount = count;
-                _currentMacro.ModifiedAt = DateTime.Now;
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }
         }
 
         #endregion

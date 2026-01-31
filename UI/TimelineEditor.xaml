@@ -187,38 +187,6 @@
                     </Button.Style>
                 </Button>
 
-                <!-- Bouton Ajouter Répéter -->
-                <Button x:Name="AddRepeatButton"
-                        Click="AddRepeat_Click"
-                        Margin="4,0"
-                        Cursor="Hand"
-                        ToolTip="Ajouter une répétition">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="Bd"
-                                                Background="{StaticResource BlockLoopBrush}"
-                                                CornerRadius="8"
-                                                Padding="12,8">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="🔁" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="+ Répéter" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockLoopDarkBrush}"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </Button.Style>
-                </Button>
-
                 <!-- Bouton Ajouter If -->
                 <Button x:Name="AddIfButton"
                         Click="AddIf_Click"
@@ -250,32 +218,6 @@
                         </Style>
                     </Button.Style>
                 </Button>
-
-                <!-- Séparateur vertical -->
-                <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
-
-                <!-- Options de répétition -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Répéter:" 
-                               Style="{StaticResource TextSecondary}"
-                               VerticalAlignment="Center"
-                               Margin="0,0,8,0"/>
-                    <ComboBox x:Name="RepeatModeComboBox"
-                              SelectionChanged="RepeatModeComboBox_SelectionChanged"
-                              Width="130"
-                              VerticalAlignment="Center">
-                        <ComboBoxItem Content="1 fois" IsSelected="True"/>
-                        <ComboBoxItem Content="X fois"/>
-                        <ComboBoxItem Content="Jusqu'à arrêt"/>
-                    </ComboBox>
-                    <TextBox x:Name="RepeatCountTextBox"
-                             Width="50"
-                             Text="1"
-                             TextChanged="RepeatCountTextBox_TextChanged"
-                             VerticalAlignment="Center"
-                             Margin="8,0,0,0"
-                             Visibility="Collapsed"/>
-                </StackPanel>
 
                 <!-- Séparateur vertical -->
                 <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
