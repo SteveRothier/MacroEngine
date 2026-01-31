@@ -2177,7 +2177,7 @@ namespace MacroEngine.UI
                 var activateButton = new Button { Content = "Activer", Margin = new Thickness(0, 0, 5, 0), Padding = new Thickness(10, 5, 10, 5) };
                 var closeButton = new Button { Content = "Fermer", Padding = new Thickness(10, 5, 10, 5) };
 
-                editButton.Click += async (s, args) =>
+                editButton.Click += (s, args) =>
                 {
                     if (profilesListBox.SelectedItem is MacroProfile profile)
                     {
