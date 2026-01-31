@@ -71,6 +71,41 @@ namespace MacroEngine.Core.Inputs
         public int HoldDurationMs { get; set; }
 
         /// <summary>
+        /// Durée du scroll continu en ms (pour WheelContinuous)
+        /// </summary>
+        public int ScrollDurationMs { get; set; }
+
+        /// <summary>
+        /// Intervalle entre chaque tick de scroll en ms (pour WheelContinuous, défaut 50ms)
+        /// </summary>
+        public int ScrollIntervalMs { get; set; } = 50;
+
+        /// <summary>
+        /// Activer le clic conditionnel (exécuter seulement si le curseur est dans la zone)
+        /// </summary>
+        public bool ConditionalZoneEnabled { get; set; }
+
+        /// <summary>
+        /// Zone conditionnelle - X minimum
+        /// </summary>
+        public int ConditionalZoneX1 { get; set; }
+
+        /// <summary>
+        /// Zone conditionnelle - Y minimum
+        /// </summary>
+        public int ConditionalZoneY1 { get; set; }
+
+        /// <summary>
+        /// Zone conditionnelle - X maximum
+        /// </summary>
+        public int ConditionalZoneX2 { get; set; }
+
+        /// <summary>
+        /// Zone conditionnelle - Y maximum
+        /// </summary>
+        public int ConditionalZoneY2 { get; set; }
+
+        /// <summary>
         /// Relâche un bouton de souris (utilisé pour la relâche automatique à la fin de la macro).
         /// </summary>
         public static void ReleaseMouseButton(uint upFlags)
@@ -94,6 +129,14 @@ namespace MacroEngine.Core.Inputs
 
         public void Execute()
         {
+            // Vérifier la zone conditionnelle (pour les clics)
+            if (ConditionalZoneEnabled && IsClickAction(ActionType))
+            {
+                GetCursorPos(out POINT cursorPos);
+                if (!IsInConditionalZone(cursorPos.X, cursorPos.Y))
+                    return; // Ne pas exécuter le clic si le curseur n'est pas dans la zone
+            }
+
             // Exécuter l'action
             switch (ActionType)
             {
@@ -219,6 +262,9 @@ namespace MacroEngine.Core.Inputs
                 case MouseActionType.Wheel:
                     MouseEvent(MOUSEEVENTF_WHEEL, Delta);
                     break;
+                case MouseActionType.WheelContinuous:
+                    ExecuteWheelContinuous();
+                    break;
                 case MouseActionType.DoubleLeftClick:
                     // Double-clic gauche : deux clics rapides
                     MouseEvent(MOUSEEVENTF_LEFTDOWN);
@@ -257,6 +303,41 @@ namespace MacroEngine.Core.Inputs
             SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT)));
         }
 
+        private bool IsClickAction(MouseActionType actionType)
+        {
+            return actionType == MouseActionType.LeftClick ||
+                   actionType == MouseActionType.RightClick ||
+                   actionType == MouseActionType.MiddleClick ||
+                   actionType == MouseActionType.DoubleLeftClick ||
+                   actionType == MouseActionType.DoubleRightClick ||
+                   actionType == MouseActionType.LeftDown ||
+                   actionType == MouseActionType.RightDown ||
+                   actionType == MouseActionType.MiddleDown;
+        }
+
+        private bool IsInConditionalZone(int x, int y)
+        {
+            int minX = Math.Min(ConditionalZoneX1, ConditionalZoneX2);
+            int maxX = Math.Max(ConditionalZoneX1, ConditionalZoneX2);
+            int minY = Math.Min(ConditionalZoneY1, ConditionalZoneY2);
+            int maxY = Math.Max(ConditionalZoneY1, ConditionalZoneY2);
+            return x >= minX && x <= maxX && y >= minY && y <= maxY;
+        }
+
+        private void ExecuteWheelContinuous()
+        {
+            int duration = ScrollDurationMs > 0 ? ScrollDurationMs : 1000;
+            int interval = ScrollIntervalMs > 0 ? ScrollIntervalMs : 50;
+            int delta = Delta != 0 ? Delta : 120;
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            while (stopwatch.ElapsedMilliseconds < duration)
+            {
+                MouseEvent(MOUSEEVENTF_WHEEL, delta);
+                Thread.Sleep(interval);
+            }
+        }
+
         public IInputAction Clone()
         {
             return new MouseAction
@@ -273,7 +354,14 @@ namespace MacroEngine.Core.Inputs
                 UseBezierPath = this.UseBezierPath,
                 ControlX = this.ControlX,
                 ControlY = this.ControlY,
-                HoldDurationMs = this.HoldDurationMs
+                HoldDurationMs = this.HoldDurationMs,
+                ScrollDurationMs = this.ScrollDurationMs,
+                ScrollIntervalMs = this.ScrollIntervalMs,
+                ConditionalZoneEnabled = this.ConditionalZoneEnabled,
+                ConditionalZoneX1 = this.ConditionalZoneX1,
+                ConditionalZoneY1 = this.ConditionalZoneY1,
+                ConditionalZoneX2 = this.ConditionalZoneX2,
+                ConditionalZoneY2 = this.ConditionalZoneY2
             };
         }
 
@@ -429,7 +517,8 @@ namespace MacroEngine.Core.Inputs
         WheelDown,
         Wheel,
         DoubleLeftClick,
-        DoubleRightClick
+        DoubleRightClick,
+        WheelContinuous
     }
 
     /// <summary>

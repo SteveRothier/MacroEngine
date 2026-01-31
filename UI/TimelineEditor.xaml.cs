@@ -951,6 +951,7 @@ namespace MacroEngine.UI
                 MouseActionType.WheelUp => "Molette haut",
                 MouseActionType.WheelDown => "Molette bas",
                 MouseActionType.Wheel => "Molette",
+                MouseActionType.WheelContinuous => "Scroll continu",
                 _ => ma.ActionType.ToString()
             };
         }
@@ -1061,6 +1062,22 @@ namespace MacroEngine.UI
                     details.Append(" • ");
                 }
                 details.Append($"pendant {ma.HoldDurationMs} ms");
+            }
+            
+            // Scroll continu
+            if (ma.ActionType == Core.Inputs.MouseActionType.WheelContinuous)
+            {
+                details.Append($"Delta: {(ma.Delta != 0 ? ma.Delta : 120)} • {ma.ScrollDurationMs}ms / {ma.ScrollIntervalMs}ms intervalle");
+            }
+            
+            // Zone conditionnelle
+            if (ma.ConditionalZoneEnabled)
+            {
+                if (details.Length > 0)
+                {
+                    details.Append(" • ");
+                }
+                details.Append($"Zone: ({ma.ConditionalZoneX1},{ma.ConditionalZoneY1})→({ma.ConditionalZoneX2},{ma.ConditionalZoneY2})");
             }
             
             return details.Length > 0 ? details.ToString() : "";
@@ -3304,6 +3321,7 @@ namespace MacroEngine.UI
             actionTypeComboBox.Items.Add("Molette haut");      // index 9
             actionTypeComboBox.Items.Add("Molette bas");       // index 10
             actionTypeComboBox.Items.Add("Molette");          // index 11
+            actionTypeComboBox.Items.Add("Scroll continu");   // index 12
 
             // Mapper l'ActionType actuel vers l'index du ComboBox
             int currentIndex = ma.ActionType switch
@@ -3320,6 +3338,7 @@ namespace MacroEngine.UI
                 Core.Inputs.MouseActionType.WheelUp => 9,
                 Core.Inputs.MouseActionType.WheelDown => 10,
                 Core.Inputs.MouseActionType.Wheel => 11,
+                Core.Inputs.MouseActionType.WheelContinuous => 12,
                 _ => 0 // Par défaut, LeftClick si c'est un type "Relâcher" non supporté
             };
             actionTypeComboBox.SelectedIndex = currentIndex;
@@ -3464,6 +3483,135 @@ namespace MacroEngine.UI
 
             editPanel.Children.Add(selectPointButton);
 
+            // Bouton Aperçu position (snap visuel)
+            var previewPositionButton = new Button
+            {
+                Content = "👁 Aperçu",
+                MinWidth = 70,
+                Height = 24,
+                FontSize = 11,
+                Padding = new Thickness(4, 0, 4, 0),
+                Margin = new Thickness(4, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Afficher un indicateur visuel à la position X/Y",
+                Cursor = Cursors.Hand,
+                Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
+            };
+            previewPositionButton.Click += (s, e) =>
+            {
+                if (ma.X >= 0 && ma.Y >= 0)
+                {
+                    ShowPositionPreview(ma.X, ma.Y);
+                }
+                else
+                {
+                    MessageBox.Show("Veuillez d'abord définir une position X/Y valide.", "Position non définie", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            };
+            editPanel.Children.Add(previewPositionButton);
+
+            // Zone conditionnelle (clic seulement si curseur dans la zone)
+            bool IsClickType(Core.Inputs.MouseActionType t) =>
+                t == Core.Inputs.MouseActionType.LeftClick || t == Core.Inputs.MouseActionType.RightClick ||
+                t == Core.Inputs.MouseActionType.MiddleClick || t == Core.Inputs.MouseActionType.DoubleLeftClick ||
+                t == Core.Inputs.MouseActionType.DoubleRightClick || t == Core.Inputs.MouseActionType.LeftDown ||
+                t == Core.Inputs.MouseActionType.RightDown || t == Core.Inputs.MouseActionType.MiddleDown;
+
+            bool showConditionalZone = IsClickType(ma.ActionType);
+            var conditionalZoneCheckBox = new CheckBox
+            {
+                Content = "Zone conditionnelle",
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 4, 0),
+                IsChecked = ma.ConditionalZoneEnabled,
+                ToolTip = "Exécuter le clic seulement si le curseur est dans la zone définie",
+                Visibility = showConditionalZone ? Visibility.Visible : Visibility.Collapsed
+            };
+
+            var zoneButton = new Button
+            {
+                Content = "📐 Définir zone",
+                MinWidth = 90,
+                Height = 22,
+                FontSize = 11,
+                Padding = new Thickness(4, 0, 4, 0),
+                Margin = new Thickness(4, 0, 4, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Définir la zone conditionnelle à l'écran",
+                Cursor = Cursors.Hand,
+                Visibility = (showConditionalZone && ma.ConditionalZoneEnabled) ? Visibility.Visible : Visibility.Collapsed
+            };
+
+            var zoneLabel = new TextBlock
+            {
+                Text = ma.ConditionalZoneEnabled && (ma.ConditionalZoneX2 > ma.ConditionalZoneX1 || ma.ConditionalZoneY2 > ma.ConditionalZoneY1)
+                    ? $"({ma.ConditionalZoneX1},{ma.ConditionalZoneY1}) → ({ma.ConditionalZoneX2},{ma.ConditionalZoneY2})"
+                    : "",
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = (showConditionalZone && ma.ConditionalZoneEnabled) ? Visibility.Visible : Visibility.Collapsed
+            };
+
+            conditionalZoneCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ma.ConditionalZoneEnabled = true;
+                zoneButton.Visibility = Visibility.Visible;
+                zoneLabel.Visibility = Visibility.Visible;
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+            };
+            conditionalZoneCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ma.ConditionalZoneEnabled = false;
+                zoneButton.Visibility = Visibility.Collapsed;
+                zoneLabel.Visibility = Visibility.Collapsed;
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+            };
+
+            zoneButton.Click += (s, e) =>
+            {
+                var zoneSelectorWindow = new ZoneSelectorWindow();
+                if (zoneSelectorWindow.ShowDialog() == true)
+                {
+                    SaveState();
+                    ma.ConditionalZoneX1 = zoneSelectorWindow.X1;
+                    ma.ConditionalZoneY1 = zoneSelectorWindow.Y1;
+                    ma.ConditionalZoneX2 = zoneSelectorWindow.X2;
+                    ma.ConditionalZoneY2 = zoneSelectorWindow.Y2;
+                    zoneLabel.Text = $"({ma.ConditionalZoneX1},{ma.ConditionalZoneY1}) → ({ma.ConditionalZoneX2},{ma.ConditionalZoneY2})";
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                }
+            };
+
+            editPanel.Children.Add(conditionalZoneCheckBox);
+            editPanel.Children.Add(zoneButton);
+            editPanel.Children.Add(zoneLabel);
+
+            void UpdateConditionalZoneVisibility()
+            {
+                bool show = IsClickType(ma.ActionType);
+                conditionalZoneCheckBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                zoneButton.Visibility = (show && ma.ConditionalZoneEnabled) ? Visibility.Visible : Visibility.Collapsed;
+                zoneLabel.Visibility = (show && ma.ConditionalZoneEnabled) ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            void UpdatePreviewButtonVisibility()
+            {
+                bool show = ma.ActionType == Core.Inputs.MouseActionType.LeftClick ||
+                           ma.ActionType == Core.Inputs.MouseActionType.RightClick ||
+                           ma.ActionType == Core.Inputs.MouseActionType.MiddleClick ||
+                           ma.ActionType == Core.Inputs.MouseActionType.DoubleLeftClick ||
+                           ma.ActionType == Core.Inputs.MouseActionType.DoubleRightClick ||
+                           ma.ActionType == Core.Inputs.MouseActionType.LeftDown ||
+                           ma.ActionType == Core.Inputs.MouseActionType.RightDown ||
+                           ma.ActionType == Core.Inputs.MouseActionType.MiddleDown ||
+                           ma.ActionType == Core.Inputs.MouseActionType.Move;
+                previewPositionButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            }
+
             // Durée de maintien (ms) pour "Maintenir" — optionnel, vide ou 0 = illimité
             bool IsMaintenirType(Core.Inputs.MouseActionType t) =>
                 t == Core.Inputs.MouseActionType.LeftDown || t == Core.Inputs.MouseActionType.RightDown || t == Core.Inputs.MouseActionType.MiddleDown;
@@ -3582,6 +3730,75 @@ namespace MacroEngine.UI
                 }
             };
             editPanel.Children.Add(deltaTextBox);
+
+            // Contrôles pour Scroll continu (durée, intervalle)
+            bool showScrollContinuous = ma.ActionType == Core.Inputs.MouseActionType.WheelContinuous;
+            var scrollDurationLabel = new TextBlock
+            {
+                Text = "Durée (ms):",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showScrollContinuous ? Visibility.Visible : Visibility.Collapsed
+            };
+            var scrollDurationTextBox = new TextBox
+            {
+                Text = ma.ScrollDurationMs > 0 ? ma.ScrollDurationMs.ToString() : "1000",
+                Width = 60,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = showScrollContinuous ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Durée totale du scroll en ms"
+            };
+            scrollDurationTextBox.LostFocus += (s, e) =>
+            {
+                if (int.TryParse(scrollDurationTextBox.Text, out int dur) && dur > 0)
+                {
+                    SaveState();
+                    ma.ScrollDurationMs = dur;
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                }
+            };
+            editPanel.Children.Add(scrollDurationLabel);
+            editPanel.Children.Add(scrollDurationTextBox);
+
+            var scrollIntervalLabel = new TextBlock
+            {
+                Text = "Intervalle (ms):",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showScrollContinuous ? Visibility.Visible : Visibility.Collapsed
+            };
+            var scrollIntervalTextBox = new TextBox
+            {
+                Text = ma.ScrollIntervalMs > 0 ? ma.ScrollIntervalMs.ToString() : "50",
+                Width = 50,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = showScrollContinuous ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Intervalle entre chaque tick de scroll en ms"
+            };
+            scrollIntervalTextBox.LostFocus += (s, e) =>
+            {
+                if (int.TryParse(scrollIntervalTextBox.Text, out int intv) && intv > 0)
+                {
+                    SaveState();
+                    ma.ScrollIntervalMs = intv;
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                }
+            };
+            editPanel.Children.Add(scrollIntervalLabel);
+            editPanel.Children.Add(scrollIntervalTextBox);
+
+            void UpdateScrollContinuousVisibility()
+            {
+                bool show = ma.ActionType == Core.Inputs.MouseActionType.WheelContinuous;
+                scrollDurationLabel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                scrollDurationTextBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                scrollIntervalLabel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                scrollIntervalTextBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            }
 
             // Fonction pour déterminer si les contrôles de déplacement doivent être affichés (uniquement pour Move)
             bool ShouldShowMoveControls(Core.Inputs.MouseActionType actionType)
@@ -3922,6 +4139,7 @@ namespace MacroEngine.UI
                         9 => Core.Inputs.MouseActionType.WheelUp,
                         10 => Core.Inputs.MouseActionType.WheelDown,
                         11 => Core.Inputs.MouseActionType.Wheel,
+                        12 => Core.Inputs.MouseActionType.WheelContinuous,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
                     
@@ -3975,6 +4193,9 @@ namespace MacroEngine.UI
                     selectControlPointButton.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
                     
                     UpdateHoldDurationVisibility();
+                    UpdateScrollContinuousVisibility();
+                    UpdateConditionalZoneVisibility();
+                    UpdatePreviewButtonVisibility();
                     
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
@@ -4025,6 +4246,77 @@ namespace MacroEngine.UI
                     "Erreur",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
+            }
+        }
+
+        /// <summary>
+        /// Affiche un indicateur visuel temporaire à la position X/Y spécifiée (snap visuel)
+        /// </summary>
+        private void ShowPositionPreview(int x, int y)
+        {
+            try
+            {
+                var previewWindow = new Window
+                {
+                    Width = 30,
+                    Height = 30,
+                    Left = x - 15,
+                    Top = y - 15,
+                    WindowStyle = WindowStyle.None,
+                    AllowsTransparency = true,
+                    Background = System.Windows.Media.Brushes.Transparent,
+                    Topmost = true,
+                    ShowInTaskbar = false,
+                    IsHitTestVisible = false
+                };
+
+                var ellipse = new System.Windows.Shapes.Ellipse
+                {
+                    Width = 28,
+                    Height = 28,
+                    Stroke = new SolidColorBrush(Color.FromRgb(255, 69, 0)),
+                    StrokeThickness = 3,
+                    Fill = new SolidColorBrush(Color.FromArgb(80, 255, 69, 0))
+                };
+
+                var crossH = new System.Windows.Shapes.Line
+                {
+                    X1 = 0, Y1 = 14, X2 = 28, Y2 = 14,
+                    Stroke = new SolidColorBrush(Color.FromRgb(255, 69, 0)),
+                    StrokeThickness = 2
+                };
+                var crossV = new System.Windows.Shapes.Line
+                {
+                    X1 = 14, Y1 = 0, X2 = 14, Y2 = 28,
+                    Stroke = new SolidColorBrush(Color.FromRgb(255, 69, 0)),
+                    StrokeThickness = 2
+                };
+
+                var canvas = new Canvas { Width = 30, Height = 30 };
+                canvas.Children.Add(ellipse);
+                canvas.Children.Add(crossH);
+                canvas.Children.Add(crossV);
+                previewWindow.Content = canvas;
+
+                previewWindow.Show();
+
+                // Fermer automatiquement après 2 secondes avec animation de fade
+                var timer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(1500)
+                };
+                timer.Tick += (s, e) =>
+                {
+                    timer.Stop();
+                    var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(500));
+                    fadeOut.Completed += (s2, e2) => previewWindow.Close();
+                    previewWindow.BeginAnimation(Window.OpacityProperty, fadeOut);
+                };
+                timer.Start();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Erreur lors de l'aperçu position: {ex.Message}");
             }
         }
 
@@ -4706,6 +4998,7 @@ namespace MacroEngine.UI
                         9 => Core.Inputs.MouseActionType.WheelUp,
                         10 => Core.Inputs.MouseActionType.WheelDown,
                         11 => Core.Inputs.MouseActionType.Wheel,
+                        12 => Core.Inputs.MouseActionType.WheelContinuous,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
                     
@@ -7251,6 +7544,7 @@ namespace MacroEngine.UI
                         9 => Core.Inputs.MouseActionType.WheelUp,
                         10 => Core.Inputs.MouseActionType.WheelDown,
                         11 => Core.Inputs.MouseActionType.Wheel,
+                        12 => Core.Inputs.MouseActionType.WheelContinuous,
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
                     
