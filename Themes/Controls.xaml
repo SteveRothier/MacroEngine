@@ -36,7 +36,7 @@
                                      Height="12"
                                      Margin="0,0,6,0"
                                      VerticalAlignment="Center"
-                                     Fill="#CCCCCC"/>
+                                     Fill="{StaticResource TextMutedBrush}"/>
                             <TextBlock x:Name="labelText"
                                        Text="Désactivé"
                                        VerticalAlignment="Center"/>
@@ -76,7 +76,7 @@
         <Setter Property="Margin" Value="8,0,0,0"/>
         <Setter Property="Effect">
             <Setter.Value>
-                <DropShadowEffect Color="#5A9F68" Opacity="0.6" BlurRadius="4" ShadowDepth="0"/>
+                <DropShadowEffect Color="{StaticResource SuccessColor}" Opacity="0.5" BlurRadius="4" ShadowDepth="0"/>
             </Setter.Value>
         </Setter>
         <Style.Triggers>
@@ -84,7 +84,7 @@
                 <Setter Property="Fill" Value="{StaticResource TextMutedBrush}"/>
                 <Setter Property="Effect">
                     <Setter.Value>
-                        <DropShadowEffect Color="#8A8A8A" Opacity="0.4" BlurRadius="3" ShadowDepth="0"/>
+                        <DropShadowEffect Color="{StaticResource TextMutedColor}" Opacity="0.35" BlurRadius="3" ShadowDepth="0"/>
                     </Setter.Value>
                 </Setter>
             </DataTrigger>
@@ -272,17 +272,10 @@
          BOUTONS SIDEBAR (Palette pourpre)
          ══════════════════════════════════════════════════════════════════════ -->
 
-    <!-- Bouton "Nouvelle Macro" (CTA principal) -->
+    <!-- Bouton "Nouvelle Macro" (CTA principal - pourpre signature) -->
     <Style x:Key="ButtonSidebarPrimary" TargetType="Button">
-        <Setter Property="Background">
-            <Setter.Value>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#8B2A45" Offset="0"/>
-                    <GradientStop Color="#7A1E3A" Offset="1"/>
-                </LinearGradientBrush>
-            </Setter.Value>
-        </Setter>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="12,8"/>
@@ -304,26 +297,14 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background">
-                                <Setter.Value>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#9A3A55" Offset="0"/>
-                                        <GradientStop Color="#8B2A45" Offset="1"/>
-                                    </LinearGradientBrush>
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="border" Property="Background" 
+                                    Value="{StaticResource AccentHoverBrush}"/>
                             <Setter TargetName="border" Property="Effect" 
                                     Value="{StaticResource ShadowButtonHover}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="border" Property="Background">
-                                <Setter.Value>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#6A1525" Offset="0"/>
-                                        <GradientStop Color="#5E1629" Offset="1"/>
-                                    </LinearGradientBrush>
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="border" Property="Background" 
+                                    Value="{StaticResource AccentPressedBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="border" Property="Opacity" Value="0.5"/>
@@ -336,16 +317,9 @@
 
     <!-- Boutons Importer/Exporter (actions secondaires) -->
     <Style x:Key="ButtonSidebarSecondary" TargetType="Button">
-        <Setter Property="Background">
-            <Setter.Value>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#F8F1EB" Offset="0"/>
-                    <GradientStop Color="#F4EDE4" Offset="1"/>
-                </LinearGradientBrush>
-            </Setter.Value>
-        </Setter>
-        <Setter Property="Foreground" Value="{StaticResource SidebarAccentBrush}"/>
-        <Setter Property="BorderBrush" Value="{StaticResource SidebarAccentBorderBrush}"/>
+        <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Padding" Value="10,6"/>
         <Setter Property="FontFamily" Value="{StaticResource FontPrimary}"/>
@@ -366,14 +340,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background">
-                                <Setter.Value>
-                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#F0E8DE" Offset="0"/>
-                                        <GradientStop Color="#E8D4DB" Offset="1"/>
-                                    </LinearGradientBrush>
-                                </Setter.Value>
-                            </Setter>
+                            <Setter TargetName="border" Property="Background" 
+                                    Value="{StaticResource SidebarAccentHoverBrush}"/>
+                            <Setter TargetName="border" Property="BorderBrush" 
+                                    Value="{StaticResource SidebarAccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="border" Property="Background" 
@@ -421,10 +391,10 @@
                             <Setter TargetName="Bd" Property="BorderThickness" 
                                     Value="2"/>
                             <Setter Property="Foreground" 
-                                    Value="{StaticResource SidebarAccentBrush}"/>
+                                    Value="{StaticResource TextPrimaryBrush}"/>
                             <Setter TargetName="Bd" Property="Effect">
                                 <Setter.Value>
-                                    <DropShadowEffect Color="#7A1E3A" Opacity="0.15" BlurRadius="4" ShadowDepth="0"/>
+                                    <DropShadowEffect Color="#7A1E3A" Opacity="0.18" BlurRadius="6" ShadowDepth="0"/>
                                 </Setter.Value>
                             </Setter>
                         </Trigger>
@@ -491,7 +461,7 @@
         <Setter Property="CornerRadius" Value="{StaticResource RadiusPanel}"/>
         <Setter Property="Effect">
             <Setter.Value>
-                <DropShadowEffect Color="Black" Opacity="0.1" BlurRadius="8" ShadowDepth="2" Direction="270"/>
+                <DropShadowEffect Color="Black" Opacity="0.35" BlurRadius="10" ShadowDepth="2" Direction="270"/>
             </Setter.Value>
         </Setter>
     </Style>
@@ -561,9 +531,9 @@
         <Setter Property="BorderThickness" Value="0,0,0,3"/>
     </Style>
 
-    <!-- Texte sur les blocs (blanc) -->
+    <!-- Texte sur les blocs (blanc / contraste sur couleurs) -->
     <Style x:Key="BlockText" TargetType="TextBlock">
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource FontPrimary}"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="FontWeight" Value="Medium"/>
@@ -589,7 +559,7 @@
     <!-- Bouton d'ajout de bloc (+) -->
     <Style x:Key="BlockAddButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}"/>
-        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
         <Setter Property="Width" Value="48"/>
         <Setter Property="Height" Value="48"/>
         <Setter Property="FontSize" Value="24"/>
@@ -631,7 +601,7 @@
     <!-- Bouton de suppression sur les blocs -->
     <Style x:Key="BlockDeleteButton" TargetType="Button">
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="Foreground" Value="#99FFFFFF"/>
+        <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
         <Setter Property="Width" Value="24"/>
         <Setter Property="Height" Value="24"/>
         <Setter Property="FontSize" Value="14"/>
@@ -653,8 +623,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="border" Property="Background" Value="#33000000"/>
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter TargetName="border" Property="Background" Value="#33FFFFFF"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

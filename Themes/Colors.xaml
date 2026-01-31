@@ -3,69 +3,86 @@
 
     <!-- ══════════════════════════════════════════════════════════════════════
          MacroEngine - Palette de Couleurs
-         Design: Beige professionnel avec accents vert sauge / bleu pétrole
+         Design: Thème sombre professionnel - gris anthracite violacé, accent pourpre
          ══════════════════════════════════════════════════════════════════════ -->
 
     <!-- Fonds principaux -->
-    <Color x:Key="BackgroundPrimaryColor">#EDE4DB</Color>
-    <Color x:Key="BackgroundSecondaryColor">#E8DFD3</Color>
-    <Color x:Key="BackgroundTertiaryColor">#E1D8CD</Color>
+    <Color x:Key="BackgroundPrimaryColor">#1E1B22</Color>
+    <Color x:Key="BackgroundSecondaryColor">#25222B</Color>
+    <Color x:Key="BackgroundTertiaryColor">#2D2934</Color>
     
-    <!-- Accents -->
-    <Color x:Key="AccentPrimaryColor">#7A1E3A</Color> <!-- Rouge pourpre -->
-    <Color x:Key="AccentSecondaryColor">#4A6C6F</Color>
-    <Color x:Key="AccentHoverColor">#8B2A45</Color> <!-- Pourpre plus clair pour hover -->
-    <Color x:Key="AccentPressedColor">#5E1629</Color> <!-- Pourpre plus foncé pour pressed -->
+    <!-- Accent principal – Rouge pourpre (signature MacroEngine) -->
+    <Color x:Key="AccentPrimaryColor">#7A1E3A</Color>
+    <Color x:Key="AccentHoverColor">#8F2A4A</Color>
+    <Color x:Key="AccentPressedColor">#5E1629</Color>
+    <Color x:Key="AccentSelectionColor">#2A121A</Color>
+    <Color x:Key="AccentSecondaryColor">#7A1E3A</Color>
     
-    <!-- Couleurs pourpre spécifiques à la sidebar -->
+    <!-- Sidebar / sélection macro -->
     <Color x:Key="SidebarAccentColor">#7A1E3A</Color>
-    <Color x:Key="SidebarAccentLightColor">#F5E6EB</Color> <!-- Beige pourpre très clair -->
-    <Color x:Key="SidebarAccentHoverColor">#E8D4DB</Color> <!-- Beige pourpre clair pour hover -->
-    <Color x:Key="SidebarAccentBorderColor">#7A1E3A</Color> <!-- Pourpre translucide pour bordures (avec alpha) -->
+    <Color x:Key="SidebarAccentLightColor">#2A121A</Color>
+    <Color x:Key="SidebarAccentHoverColor">#3A1828</Color>
+    <Color x:Key="SidebarAccentBorderColor">#7A1E3A</Color>
     
     <!-- Texte -->
-    <Color x:Key="TextPrimaryColor">#2E2E2E</Color>
-    <Color x:Key="TextSecondaryColor">#5A5A5A</Color>
-    <Color x:Key="TextMutedColor">#8A8A8A</Color>
+    <Color x:Key="TextPrimaryColor">#E6E4EA</Color>
+    <Color x:Key="TextSecondaryColor">#B9B6C2</Color>
+    <Color x:Key="TextMutedColor">#8A8794</Color>
     <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
     
     <!-- États -->
-    <Color x:Key="WarningColor">#D8A24A</Color>
+    <Color x:Key="WarningColor">#C97A3A</Color>
     <Color x:Key="ErrorColor">#C94A4A</Color>
-    <Color x:Key="SuccessColor">#5A9F68</Color>
-    <Color x:Key="InfoColor">#5A8AC9</Color>
+    <Color x:Key="SuccessColor">#4FB58C</Color>
+    <Color x:Key="InfoColor">#4FA3D1</Color>
     
-    <!-- Bordures -->
-    <Color x:Key="BorderLightColor">#D4C9BC</Color>
-    <Color x:Key="BorderMediumColor">#C4B9AC</Color>
-    <Color x:Key="BorderDarkColor">#A49989</Color>
+    <!-- Bordures et séparateurs -->
+    <Color x:Key="BorderLightColor">#3A3642</Color>
+    <Color x:Key="BorderFocusColor">#7A1E3A</Color>
+    <Color x:Key="BorderInternalColor">#2F2B36</Color>
+    <Color x:Key="BorderMediumColor">#3A3642</Color>
+    <Color x:Key="BorderDarkColor">#2F2B36</Color>
     
-    <!-- Ombres -->
-    <Color x:Key="ShadowColor">#1A000000</Color>
-    <Color x:Key="ShadowHoverColor">#2E000000</Color>
+    <!-- Ombres (couleurs pour DropShadowEffect) -->
+    <Color x:Key="ShadowColor">#59000000</Color>
+    <Color x:Key="ShadowHoverColor">#80000000</Color>
+    <Color x:Key="GlowPurpleColor">#597A1E3A</Color>
+    <Color x:Key="GlowPurpleSubtleColor">#2E7A1E3A</Color>
 
     <!-- ══════════════════════════════════════════════════════════════════════
-         Couleurs des Blocs (Scratch-like)
+         Couleurs des blocs d'action (Timeline / cartes)
          ══════════════════════════════════════════════════════════════════════ -->
     
-    <!-- Bloc Clavier - Bleu -->
-    <Color x:Key="BlockKeyboardColor">#5B8DEF</Color>
-    <Color x:Key="BlockKeyboardDarkColor">#4A7BD9</Color>
+    <!-- Touche / Clavier - Bleu froid précis -->
+    <Color x:Key="BlockKeyboardColor">#4FA3D1</Color>
+    <Color x:Key="BlockKeyboardDarkColor">#3E92C0</Color>
     
-    <!-- Bloc Souris - Vert -->
-    <Color x:Key="BlockMouseColor">#5ABB7A</Color>
-    <Color x:Key="BlockMouseDarkColor">#4AA66A</Color>
+    <!-- Souris / Clic - Vert technique -->
+    <Color x:Key="BlockMouseColor">#4FB58C</Color>
+    <Color x:Key="BlockMouseDarkColor">#3EA47B</Color>
     
-    <!-- Bloc Délai - Jaune/Orange -->
-    <Color x:Key="BlockDelayColor">#F5A623</Color>
-    <Color x:Key="BlockDelayDarkColor">#E09515</Color>
+    <!-- Texte - Jaune chaud lisible -->
+    <Color x:Key="BlockTextColor">#E0B15A</Color>
+    <Color x:Key="BlockTextDarkColor">#CFA049</Color>
     
-    <!-- Bloc Boucle/Répétition - Violet -->
-    <Color x:Key="BlockLoopColor">#9B6DD8</Color>
-    <Color x:Key="BlockLoopDarkColor">#8A5DC8</Color>
+    <!-- Délai - Orange timing -->
+    <Color x:Key="BlockDelayColor">#C97A3A</Color>
+    <Color x:Key="BlockDelayDarkColor">#B86929</Color>
     
-    <!-- Fond de l'éditeur avec grille -->
-    <Color x:Key="EditorGridColor">#E0D6C8</Color>
+    <!-- Répéter / Boucle - Violet logique -->
+    <Color x:Key="BlockLoopColor">#8A6CD1</Color>
+    <Color x:Key="BlockLoopDarkColor">#795BC0</Color>
+    
+    <!-- Si / Condition - Rouge décisionnel -->
+    <Color x:Key="BlockConditionColor">#C94A4A</Color>
+    <Color x:Key="BlockConditionDarkColor">#B83939</Color>
+    
+    <!-- Variable - Cyan neutre / data -->
+    <Color x:Key="BlockVariableColor">#5AA3A3</Color>
+    <Color x:Key="BlockVariableDarkColor">#499292</Color>
+    
+    <!-- Fond éditeur / grille -->
+    <Color x:Key="EditorGridColor">#25222B</Color>
 
     <!-- ══════════════════════════════════════════════════════════════════════
          Brushes (SolidColorBrush)
@@ -81,17 +98,13 @@
     <SolidColorBrush x:Key="AccentSecondaryBrush" Color="{StaticResource AccentSecondaryColor}"/>
     <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}"/>
     <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource AccentPressedColor}"/>
+    <SolidColorBrush x:Key="AccentSelectionBrush" Color="{StaticResource AccentSelectionColor}"/>
     
     <!-- Sidebar -->
     <SolidColorBrush x:Key="SidebarAccentBrush" Color="{StaticResource SidebarAccentColor}"/>
     <SolidColorBrush x:Key="SidebarAccentLightBrush" Color="{StaticResource SidebarAccentLightColor}"/>
     <SolidColorBrush x:Key="SidebarAccentHoverBrush" Color="{StaticResource SidebarAccentHoverColor}"/>
-    <!-- Bordure pourpre translucide (60% d'opacité) -->
-    <SolidColorBrush x:Key="SidebarAccentBorderBrush">
-        <SolidColorBrush.Color>
-            <Color A="153" R="122" G="30" B="58"/> <!-- 60% d'opacité -->
-        </SolidColorBrush.Color>
-    </SolidColorBrush>
+    <SolidColorBrush x:Key="SidebarAccentBorderBrush" Color="{StaticResource SidebarAccentBorderColor}"/>
     
     <!-- Texte -->
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
@@ -107,58 +120,66 @@
     
     <!-- Bordures -->
     <SolidColorBrush x:Key="BorderLightBrush" Color="{StaticResource BorderLightColor}"/>
+    <SolidColorBrush x:Key="BorderFocusBrush" Color="{StaticResource BorderFocusColor}"/>
+    <SolidColorBrush x:Key="BorderInternalBrush" Color="{StaticResource BorderInternalColor}"/>
     <SolidColorBrush x:Key="BorderMediumBrush" Color="{StaticResource BorderMediumColor}"/>
     <SolidColorBrush x:Key="BorderDarkBrush" Color="{StaticResource BorderDarkColor}"/>
     
-    <!-- Blocs Scratch-like -->
+    <!-- Blocs d'action -->
     <SolidColorBrush x:Key="BlockKeyboardBrush" Color="{StaticResource BlockKeyboardColor}"/>
     <SolidColorBrush x:Key="BlockKeyboardDarkBrush" Color="{StaticResource BlockKeyboardDarkColor}"/>
     <SolidColorBrush x:Key="BlockMouseBrush" Color="{StaticResource BlockMouseColor}"/>
     <SolidColorBrush x:Key="BlockMouseDarkBrush" Color="{StaticResource BlockMouseDarkColor}"/>
+    <SolidColorBrush x:Key="BlockTextBrush" Color="{StaticResource BlockTextColor}"/>
+    <SolidColorBrush x:Key="BlockTextDarkBrush" Color="{StaticResource BlockTextDarkColor}"/>
     <SolidColorBrush x:Key="BlockDelayBrush" Color="{StaticResource BlockDelayColor}"/>
     <SolidColorBrush x:Key="BlockDelayDarkBrush" Color="{StaticResource BlockDelayDarkColor}"/>
     <SolidColorBrush x:Key="BlockLoopBrush" Color="{StaticResource BlockLoopColor}"/>
     <SolidColorBrush x:Key="BlockLoopDarkBrush" Color="{StaticResource BlockLoopDarkColor}"/>
+    <SolidColorBrush x:Key="BlockConditionBrush" Color="{StaticResource BlockConditionColor}"/>
+    <SolidColorBrush x:Key="BlockConditionDarkBrush" Color="{StaticResource BlockConditionDarkColor}"/>
+    <SolidColorBrush x:Key="BlockVariableBrush" Color="{StaticResource BlockVariableColor}"/>
+    <SolidColorBrush x:Key="BlockVariableDarkBrush" Color="{StaticResource BlockVariableDarkColor}"/>
     <SolidColorBrush x:Key="EditorGridBrush" Color="{StaticResource EditorGridColor}"/>
 
     <!-- ══════════════════════════════════════════════════════════════════════
-         Effets d'ombre
+         Effets d'ombre et glow
          ══════════════════════════════════════════════════════════════════════ -->
     
-    <!-- Ombre subtile pour les cartes/panneaux -->
+    <!-- Ombre standard (rgba(0,0,0,0.35)) -->
     <DropShadowEffect x:Key="ShadowSubtle" 
                       Color="Black" 
-                      Opacity="0.08" 
-                      BlurRadius="8" 
+                      Opacity="0.35" 
+                      BlurRadius="10" 
                       ShadowDepth="2"
                       Direction="270"/>
     
     <!-- Ombre pour les blocs d'action (normal) -->
     <DropShadowEffect x:Key="ShadowActionBlock" 
                       Color="Black" 
-                      Opacity="0.12" 
+                      Opacity="0.35" 
                       BlurRadius="8" 
                       ShadowDepth="2"
                       Direction="270"/>
     
-    <!-- Ombre pour les blocs d'action (hover) -->
+    <!-- Glow pourpre (hover important) - rgba(122,30,58,0.35) -->
     <DropShadowEffect x:Key="ShadowActionBlockHover" 
-                      Color="Black" 
-                      Opacity="0.18" 
+                      Color="#7A1E3A" 
+                      Opacity="0.35" 
                       BlurRadius="12" 
-                      ShadowDepth="3"
+                      ShadowDepth="0"
                       Direction="270"/>
     
-    <!-- Ombre pour les boutons (hover) -->
+    <!-- Glow pourpre subtil (sélection) - rgba(122,30,58,0.18) -->
     <DropShadowEffect x:Key="ShadowButtonHover" 
-                      Color="Black" 
-                      Opacity="0.15" 
-                      BlurRadius="6" 
-                      ShadowDepth="2"
+                      Color="#7A1E3A" 
+                      Opacity="0.18" 
+                      BlurRadius="8" 
+                      ShadowDepth="0"
                       Direction="270"/>
 
     <!-- ══════════════════════════════════════════════════════════════════════
-         CornerRadius (Border Radius)
+         CornerRadius
          ══════════════════════════════════════════════════════════════════════ -->
     
     <CornerRadius x:Key="RadiusActionBlock">12</CornerRadius>

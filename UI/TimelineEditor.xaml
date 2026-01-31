@@ -71,7 +71,7 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="Bd"
-                                                Background="#4A90E2"
+                                                Background="{StaticResource BlockMouseBrush}"
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
@@ -81,7 +81,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#3A80D2"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockMouseDarkBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -103,7 +103,7 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="Bd"
-                                                Background="#4682B4"
+                                                Background="{StaticResource BlockTextBrush}"
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
@@ -113,7 +113,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#3A72A4"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockTextDarkBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -135,7 +135,7 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="Bd"
-                                                Background="#2E7D32"
+                                                Background="{StaticResource BlockVariableBrush}"
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
@@ -145,7 +145,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#1B5E20"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockVariableDarkBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -167,7 +167,7 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="Bd"
-                                                Background="#D8A24A"
+                                                Background="{StaticResource BlockDelayBrush}"
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
@@ -177,7 +177,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#C8923A"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockDelayDarkBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -199,7 +199,7 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="Bd"
-                                                Background="#8A2BE2"
+                                                Background="{StaticResource BlockLoopBrush}"
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
@@ -209,7 +209,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#9932CC"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockLoopDarkBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -231,7 +231,7 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="Button">
                                         <Border x:Name="Bd"
-                                                Background="#228B22"
+                                                Background="{StaticResource BlockConditionBrush}"
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
@@ -241,7 +241,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#32CD32"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockConditionDarkBrush}"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>

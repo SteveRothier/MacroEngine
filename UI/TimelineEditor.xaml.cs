@@ -36,6 +36,24 @@ namespace MacroEngine.UI
         // Événement déclenché quand la macro est modifiée
         public event EventHandler? MacroChanged;
 
+        /// <summary>Récupère une couleur du thème (Colors.xaml) par clé.</summary>
+        private static Color GetThemeColor(string key)
+        {
+            var res = Application.Current.TryFindResource(key);
+            if (res is Color c) return c;
+            if (res is SolidColorBrush b) return b.Color;
+            return Colors.Gray;
+        }
+
+        /// <summary>Récupère un pinceau du thème (Colors.xaml) par clé.</summary>
+        private static SolidColorBrush GetThemeBrush(string key)
+        {
+            var res = Application.Current.TryFindResource(key);
+            if (res is SolidColorBrush b) return b;
+            if (res is Color c) return new SolidColorBrush(c);
+            return new SolidColorBrush(Colors.Gray);
+        }
+
         public TimelineEditor()
         {
             InitializeComponent();
@@ -186,57 +204,57 @@ namespace MacroEngine.UI
             switch (action)
             {
                 case KeyboardAction ka:
-                    primaryColor = Color.FromRgb(123, 30, 58); // Rouge pourpre foncé #7B1E3A
-                    hoverColor = Color.FromRgb(143, 39, 72); // Dégradé hover #8F2748
-                    backgroundColor = Color.FromRgb(123, 30, 58); // Fond #7B1E3A
-                    backgroundColorHover = Color.FromRgb(143, 39, 72); // Dégradé hover #8F2748
-                    textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
-                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    primaryColor = Color.FromRgb(79, 163, 209);   // #4FA3D1 Bleu froid
+                    hoverColor = Color.FromRgb(62, 146, 192);      // #3E92C0
+                    backgroundColor = Color.FromRgb(79, 163, 209);
+                    backgroundColorHover = Color.FromRgb(62, 146, 192);
+                    textColor = Color.FromRgb(255, 255, 255);
+                    iconColor = Color.FromRgb(255, 255, 255);
                     icon = "⌨";
                     title = GetKeyboardActionTitle(ka);
                     details = GetKeyboardActionDetails(ka);
                     break;
                 case Core.Inputs.MouseAction ma:
-                    primaryColor = Color.FromRgb(95, 124, 122); // Bleu-gris désaturé #5F7C7A
-                    hoverColor = Color.FromRgb(111, 143, 140); // Dégradé hover #6F8F8C
-                    backgroundColor = Color.FromRgb(95, 124, 122); // Fond #5F7C7A
-                    backgroundColorHover = Color.FromRgb(111, 143, 140); // Dégradé hover #6F8F8C
-                    textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
-                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    primaryColor = Color.FromRgb(79, 181, 140);   // #4FB58C Vert technique
+                    hoverColor = Color.FromRgb(62, 164, 123);      // #3EA47B
+                    backgroundColor = Color.FromRgb(79, 181, 140);
+                    backgroundColorHover = Color.FromRgb(62, 164, 123);
+                    textColor = Color.FromRgb(255, 255, 255);
+                    iconColor = Color.FromRgb(255, 255, 255);
                     icon = "🖱";
                     title = GetMouseActionTitle(ma);
                     details = GetMouseActionDetails(ma);
                     break;
                 case DelayAction da:
-                    primaryColor = Color.FromRgb(200, 169, 106); // Beige doré / ocre doux #C8A96A
-                    hoverColor = Color.FromRgb(214, 185, 125); // Dégradé hover #D6B97D
-                    backgroundColor = Color.FromRgb(200, 169, 106); // Fond #C8A96A
-                    backgroundColorHover = Color.FromRgb(214, 185, 125); // Dégradé hover #D6B97D
-                    textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
-                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    primaryColor = Color.FromRgb(201, 122, 58);   // #C97A3A Orange timing
+                    hoverColor = Color.FromRgb(184, 105, 41);     // #B86929
+                    backgroundColor = Color.FromRgb(201, 122, 58);
+                    backgroundColorHover = Color.FromRgb(184, 105, 41);
+                    textColor = Color.FromRgb(255, 255, 255);
+                    iconColor = Color.FromRgb(255, 255, 255);
                     icon = "⏱";
                     title = GetDelayActionTitle(da);
                     details = "Pause";
                     break;
                 case RepeatAction ra:
-                    primaryColor = Color.FromRgb(138, 43, 226); // Violet #8A2BE2
-                    hoverColor = Color.FromRgb(153, 50, 204); // Violet hover #9932CC
-                    backgroundColor = Color.FromRgb(138, 43, 226); // Fond #8A2BE2
-                    backgroundColorHover = Color.FromRgb(153, 50, 204); // Dégradé hover #9932CC
-                    textColor = Color.FromRgb(248, 239, 234); // Texte #F8EFEA
-                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    primaryColor = Color.FromRgb(138, 108, 209);   // #8A6CD1 Violet logique
+                    hoverColor = Color.FromRgb(121, 91, 192);      // #795BC0
+                    backgroundColor = Color.FromRgb(138, 108, 209);
+                    backgroundColorHover = Color.FromRgb(121, 91, 192);
+                    textColor = Color.FromRgb(255, 255, 255);
+                    iconColor = Color.FromRgb(255, 255, 255);
                     icon = "🔁";
                     var actionsCount = ra.Actions?.Count ?? 0;
                     title = GetRepeatActionTitle(ra);
                     details = $"{actionsCount} action{(actionsCount > 1 ? "s" : "")}";
                     break;
                 case IfAction ifAction:
-                    primaryColor = Color.FromRgb(34, 139, 34); // Vert #228B22
-                    hoverColor = Color.FromRgb(46, 160, 46); // Vert hover #2EA02E
-                    backgroundColor = Color.FromRgb(34, 139, 34); // Fond #228B22
-                    backgroundColorHover = Color.FromRgb(46, 160, 46); // Dégradé hover #2EA02E
-                    textColor = Color.FromRgb(248, 239, 234); // Texte #F8EFEA
-                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    primaryColor = Color.FromRgb(201, 74, 74);     // #C94A4A Rouge décisionnel
+                    hoverColor = Color.FromRgb(184, 57, 57);      // #B83939
+                    backgroundColor = Color.FromRgb(201, 74, 74);
+                    backgroundColorHover = Color.FromRgb(184, 57, 57);
+                    textColor = Color.FromRgb(255, 255, 255);
+                    iconColor = Color.FromRgb(255, 255, 255);
                     icon = "🔀";
                     var thenCount = ifAction.ThenActions?.Count ?? 0;
                     var elseCount = ifAction.ElseActions?.Count ?? 0;
@@ -244,34 +262,34 @@ namespace MacroEngine.UI
                     details = $"Then: {thenCount}, Else: {elseCount}";
                     break;
                 case TextAction ta:
-                    primaryColor = Color.FromRgb(70, 130, 180); // Bleu acier #4682B4
-                    hoverColor = Color.FromRgb(85, 150, 200); // Bleu hover #5596C8
-                    backgroundColor = Color.FromRgb(70, 130, 180); // Fond #4682B4
-                    backgroundColorHover = Color.FromRgb(85, 150, 200); // Dégradé hover #5596C8
-                    textColor = Color.FromRgb(243, 235, 221); // Texte #F3EBDD
-                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé pour l'icône
+                    primaryColor = Color.FromRgb(224, 177, 90);     // #E0B15A Jaune chaud
+                    hoverColor = Color.FromRgb(207, 160, 73);      // #CFA049
+                    backgroundColor = Color.FromRgb(224, 177, 90);
+                    backgroundColorHover = Color.FromRgb(207, 160, 73);
+                    textColor = Color.FromRgb(30, 27, 34);         // Contraste sur jaune
+                    iconColor = Color.FromRgb(30, 27, 34);
                     icon = "📝";
                     title = GetTextActionTitle(ta);
                     details = GetTextActionDetails(ta);
                     break;
                 case VariableAction va:
-                    primaryColor = Color.FromRgb(46, 125, 50); // Vert #2E7D32
-                    hoverColor = Color.FromRgb(27, 94, 32); // Vert hover #1B5E20
-                    backgroundColor = Color.FromRgb(46, 125, 50);
-                    backgroundColorHover = Color.FromRgb(27, 94, 32);
-                    textColor = Color.FromRgb(243, 235, 221);
-                    iconColor = Color.FromRgb(252, 252, 248);
+                    primaryColor = Color.FromRgb(90, 163, 163);    // #5AA3A3 Cyan data
+                    hoverColor = Color.FromRgb(73, 146, 146);      // #499292
+                    backgroundColor = Color.FromRgb(90, 163, 163);
+                    backgroundColorHover = Color.FromRgb(73, 146, 146);
+                    textColor = Color.FromRgb(255, 255, 255);
+                    iconColor = Color.FromRgb(255, 255, 255);
                     icon = "📦";
                     title = GetVariableActionTitle(va);
                     details = GetVariableActionDetails(va);
                     break;
                 default:
-                    primaryColor = Color.FromRgb(123, 30, 58); // Rouge pourpre foncé par défaut
-                    hoverColor = Color.FromRgb(143, 39, 72);
-                    backgroundColor = Color.FromRgb(123, 30, 58);
-                    backgroundColorHover = Color.FromRgb(143, 39, 72);
-                    textColor = Color.FromRgb(248, 239, 234);
-                    iconColor = Color.FromRgb(252, 252, 248); // Blanc cassé par défaut
+                    primaryColor = Color.FromRgb(122, 30, 58);    // #7A1E3A Pourpre signature
+                    hoverColor = Color.FromRgb(143, 42, 74);       // #8F2A4A
+                    backgroundColor = Color.FromRgb(122, 30, 58);
+                    backgroundColorHover = Color.FromRgb(143, 42, 74);
+                    textColor = Color.FromRgb(255, 255, 255);
+                    iconColor = Color.FromRgb(255, 255, 255);
                     icon = "❓";
                     title = action.Type.ToString();
                     details = "";
@@ -601,14 +619,14 @@ namespace MacroEngine.UI
             // Déterminer la couleur principale selon le type d'action
             Color primaryColor = action switch
             {
-                KeyboardAction => Color.FromRgb(122, 30, 58),
-                Core.Inputs.MouseAction => Color.FromRgb(90, 138, 201),
-                TextAction => Color.FromRgb(70, 130, 180),
-                VariableAction => Color.FromRgb(46, 125, 50),
-                DelayAction => Color.FromRgb(216, 162, 74),
-                RepeatAction => Color.FromRgb(138, 43, 226),
-                IfAction => Color.FromRgb(34, 139, 34),
-                _ => Color.FromRgb(122, 30, 58)
+                KeyboardAction => Color.FromRgb(79, 163, 209),   // #4FA3D1
+                Core.Inputs.MouseAction => Color.FromRgb(79, 181, 140),   // #4FB58C
+                TextAction => Color.FromRgb(224, 177, 90),       // #E0B15A
+                VariableAction => Color.FromRgb(90, 163, 163),   // #5AA3A3
+                DelayAction => Color.FromRgb(201, 122, 58),      // #C97A3A
+                RepeatAction => Color.FromRgb(138, 108, 209),    // #8A6CD1
+                IfAction => Color.FromRgb(201, 74, 74),          // #C94A4A
+                _ => Color.FromRgb(122, 30, 58)                 // #7A1E3A
             };
 
             // Conteneur séparé pour les boutons monter/descendre complètement à l'extérieur à droite
@@ -616,7 +634,7 @@ namespace MacroEngine.UI
             {
                 Background = Brushes.Transparent, // Fond transparent pour ne voir que les boutons
                 BorderThickness = new Thickness(1.5), // Bordure commune pour le conteneur
-                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)), // Bordure grise
+                BorderBrush = GetThemeBrush("BorderLightBrush"),
                 CornerRadius = new CornerRadius(4), // Coins arrondis
                 Padding = new Thickness(2, 2, 2, 2), // Padding réduit
                 Margin = new Thickness(10, 0, 0, 0), // Marge à gauche pour séparer de la carte
@@ -665,16 +683,14 @@ namespace MacroEngine.UI
                 Text = "▲",
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
-                Foreground = canMoveUp
-                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80)) // Flèche en gris foncé
-                    : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)), // Gris pour désactivé
+                Foreground = GetThemeBrush("TextMutedBrush"),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
                 LineHeight = 36,
                 LineStackingStrategy = LineStackingStrategy.BlockLineHeight
             };
-            
+            if (!canMoveUp) moveUpBtnText.Opacity = 0.6;
             moveUpBtnBorder.Child = moveUpBtnText;
             moveUpBtnBorder.MouseLeftButtonDown += (s, e) => 
             {
@@ -688,18 +704,18 @@ namespace MacroEngine.UI
             {
                 if (canMoveUp)
                 {
-                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60)); // Flèche en gris plus foncé au survol
+                    moveUpBtnText.Foreground = GetThemeBrush("TextSecondaryBrush"); // Flèche en gris plus foncé au survol
                     moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0)); // Fond gris très clair au survol
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0)); // Bordure du conteneur plus foncée au survol
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderMediumBrush"); // Bordure du conteneur plus foncée au survol
                 }
             };
             moveUpBtnBorder.MouseLeave += (s, e) => 
             {
                 if (canMoveUp)
                 {
-                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80)); // Flèche en gris foncé
+                    moveUpBtnText.Foreground = GetThemeBrush("TextMutedBrush"); // Flèche en gris foncé
                     moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)); // Fond gris très clair
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)); // Bordure du conteneur normale
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderLightBrush"); // Bordure du conteneur normale
                 }
             };
 
@@ -726,7 +742,7 @@ namespace MacroEngine.UI
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Foreground = canMoveDown
-                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80)) // Flèche en gris foncé
+                    ? GetThemeBrush("TextMutedBrush") // Flèche en gris foncé
                     : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)), // Gris pour désactivé
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -748,18 +764,18 @@ namespace MacroEngine.UI
             {
                 if (canMoveDown)
                 {
-                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60)); // Flèche en gris plus foncé au survol
+                    moveDownBtnText.Foreground = GetThemeBrush("TextSecondaryBrush"); // Flèche en gris plus foncé au survol
                     moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0)); // Fond gris très clair au survol
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0)); // Bordure du conteneur plus foncée au survol
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderMediumBrush"); // Bordure du conteneur plus foncée au survol
                 }
             };
             moveDownBtnBorder.MouseLeave += (s, e) => 
             {
                 if (canMoveDown)
                 {
-                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80)); // Flèche en gris foncé
+                    moveDownBtnText.Foreground = GetThemeBrush("TextMutedBrush"); // Flèche en gris foncé
                     moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)); // Fond gris très clair
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)); // Bordure du conteneur normale
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderLightBrush"); // Bordure du conteneur normale
                 }
             };
 
@@ -1497,9 +1513,9 @@ namespace MacroEngine.UI
             if (sender is Border card && card.Tag is int index)
             {
                 // Mettre en surbrillance la carte cible sans changer la taille
-                card.Background = new SolidColorBrush(Color.FromRgb(245, 242, 240)); // Fond légèrement grisé
+                card.Background = GetThemeBrush("BackgroundTertiaryBrush"); // Fond légèrement grisé
                 // BorderThickness reste constante pour ne pas changer la taille
-                card.BorderBrush = new SolidColorBrush(Color.FromRgb(122, 30, 58)); // Bordure pourpre
+                card.BorderBrush = GetThemeBrush("AccentPrimaryBrush"); // Bordure pourpre
             }
         }
 
@@ -1507,27 +1523,33 @@ namespace MacroEngine.UI
         {
             if (sender is Border card && card.Tag is int index && _currentMacro != null)
             {
-                // Restaurer le style normal
+                // Restaurer le style normal (mêmes couleurs que CreateActionCard)
                 if (index < _currentMacro.Actions.Count)
                 {
                     var action = _currentMacro.Actions[index];
                     Color bgColor = action switch
                     {
-                        KeyboardAction => Color.FromRgb(255, 252, 250),
-                        Core.Inputs.MouseAction => Color.FromRgb(250, 252, 255),
-                        DelayAction => Color.FromRgb(255, 252, 248),
-                        _ => Color.FromRgb(255, 255, 255)
+                        KeyboardAction => Color.FromRgb(79, 163, 209),
+                        Core.Inputs.MouseAction => Color.FromRgb(79, 181, 140),
+                        DelayAction => Color.FromRgb(201, 122, 58),
+                        RepeatAction => Color.FromRgb(138, 108, 209),
+                        IfAction => Color.FromRgb(201, 74, 74),
+                        TextAction => Color.FromRgb(224, 177, 90),
+                        VariableAction => Color.FromRgb(90, 163, 163),
+                        _ => Color.FromRgb(122, 30, 58)
                     };
                     card.Background = new SolidColorBrush(bgColor);
-                    // Restaurer la BorderThickness initiale pour ne pas changer la taille
-                    card.BorderThickness = new Thickness(0, 0, 0, 2); // Ligne de séparation - même épaisseur que l'initial
-                    // Restaurer la BorderBrush selon le type d'action
+                    card.BorderThickness = new Thickness(0, 0, 0, 2);
                     var restoredAction = _currentMacro.Actions[index];
                     Color primaryColor = restoredAction switch
                     {
-                        KeyboardAction => Color.FromRgb(122, 30, 58),
-                        Core.Inputs.MouseAction => Color.FromRgb(90, 138, 201),
-                        DelayAction => Color.FromRgb(216, 162, 74),
+                        KeyboardAction => Color.FromRgb(79, 163, 209),
+                        Core.Inputs.MouseAction => Color.FromRgb(79, 181, 140),
+                        DelayAction => Color.FromRgb(201, 122, 58),
+                        RepeatAction => Color.FromRgb(138, 108, 209),
+                        IfAction => Color.FromRgb(201, 74, 74),
+                        TextAction => Color.FromRgb(224, 177, 90),
+                        VariableAction => Color.FromRgb(90, 163, 163),
                         _ => Color.FromRgb(122, 30, 58)
                     };
                     card.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
@@ -1969,8 +1991,8 @@ namespace MacroEngine.UI
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 IsReadOnly = true,
-                Background = new SolidColorBrush(Color.FromRgb(255, 255, 200)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(255, 165, 0)),
+                Background = GetThemeBrush("AccentSelectionBrush"),
+                BorderBrush = GetThemeBrush("AccentPrimaryBrush"),
                 BorderThickness = new Thickness(2),
                 Padding = new Thickness(4),
                 Margin = new Thickness(0, 0, 8, 0),
@@ -1986,14 +2008,14 @@ namespace MacroEngine.UI
                 if (!keyCaptured)
                 {
                     keyTextBox.Text = "Appuyez sur une touche...";
-                    keyTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
+                    keyTextBox.Background = GetThemeBrush("AccentSelectionBrush");
                     tempKeyHook = new KeyboardHook();
                     tempKeyHook.KeyDown += (sender, args) =>
                     {
                         SaveState();
                         ka.VirtualKeyCode = (ushort)args.VirtualKeyCode;
                         keyTextBox.Text = GetKeyName(ka.VirtualKeyCode);
-                        keyTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 255));
+                        keyTextBox.Background = GetThemeBrush("BackgroundTertiaryBrush");
                         keyCaptured = true;
                         tempKeyHook?.Uninstall();
                         tempKeyHook = null;
@@ -2052,7 +2074,7 @@ namespace MacroEngine.UI
             {
                 Text = "ms",
                 FontSize = 12,
-                Foreground = new SolidColorBrush(Color.FromRgb(160, 160, 160)),
+                Foreground = GetThemeBrush("TextMutedBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
                 IsHitTestVisible = false,
                 Margin = new Thickness(-75, 0, 0, 0),
@@ -2146,8 +2168,8 @@ namespace MacroEngine.UI
                 MaxWidth = 300,
                 TextAlignment = TextAlignment.Center,
                 IsReadOnly = true,
-                Background = new SolidColorBrush(Color.FromRgb(255, 255, 200)), // Fond jaune clair pour être visible
-                BorderBrush = new SolidColorBrush(Color.FromRgb(255, 165, 0)), // Bordure orange pour être visible
+                Background = GetThemeBrush("AccentSelectionBrush"), // Fond jaune clair pour être visible
+                BorderBrush = GetThemeBrush("AccentPrimaryBrush"), // Bordure orange pour être visible
                 BorderThickness = new Thickness(2),
                 Padding = new Thickness(4),
                 Margin = originalMargin, // Conserver la même marge
@@ -3309,8 +3331,8 @@ namespace MacroEngine.UI
                 MinWidth = 60,
                 MaxWidth = 120,
                 TextAlignment = TextAlignment.Center,
-                Background = new SolidColorBrush(Color.FromRgb(250, 250, 250)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                Background = GetThemeBrush("BackgroundTertiaryBrush"),
+                BorderBrush = GetThemeBrush("BorderLightBrush"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(4),
                 Margin = originalMargin,
@@ -3498,8 +3520,8 @@ namespace MacroEngine.UI
                 MinWidth = 60,
                 MaxWidth = 120,
                 TextAlignment = TextAlignment.Center,
-                Background = new SolidColorBrush(Color.FromRgb(250, 250, 250)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                Background = GetThemeBrush("BackgroundTertiaryBrush"),
+                BorderBrush = GetThemeBrush("BorderLightBrush"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(4),
                 Margin = originalMargin,
@@ -3838,7 +3860,7 @@ namespace MacroEngine.UI
                     ? $"({ma.ConditionalZoneX1},{ma.ConditionalZoneY1}) → ({ma.ConditionalZoneX2},{ma.ConditionalZoneY2})"
                     : "",
                 FontSize = 10,
-                Foreground = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
+                Foreground = GetThemeBrush("TextMutedBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
                 Visibility = (showConditionalZone && ma.ConditionalZoneEnabled) ? Visibility.Visible : Visibility.Collapsed
             };
@@ -4588,21 +4610,21 @@ namespace MacroEngine.UI
                 {
                     Width = 28,
                     Height = 28,
-                    Stroke = new SolidColorBrush(Color.FromRgb(255, 69, 0)),
+                    Stroke = new SolidColorBrush(GetThemeColor("AccentPrimaryColor")),
                     StrokeThickness = 3,
-                    Fill = new SolidColorBrush(Color.FromArgb(80, 255, 69, 0))
+                    Fill = new SolidColorBrush(Color.FromArgb(80, GetThemeColor("AccentPrimaryColor").R, GetThemeColor("AccentPrimaryColor").G, GetThemeColor("AccentPrimaryColor").B))
                 };
 
                 var crossH = new System.Windows.Shapes.Line
                 {
                     X1 = 0, Y1 = 14, X2 = 28, Y2 = 14,
-                    Stroke = new SolidColorBrush(Color.FromRgb(255, 69, 0)),
+                    Stroke = new SolidColorBrush(GetThemeColor("AccentPrimaryColor")),
                     StrokeThickness = 2
                 };
                 var crossV = new System.Windows.Shapes.Line
                 {
                     X1 = 14, Y1 = 0, X2 = 14, Y2 = 28,
-                    Stroke = new SolidColorBrush(Color.FromRgb(255, 69, 0)),
+                    Stroke = new SolidColorBrush(GetThemeColor("AccentPrimaryColor")),
                     StrokeThickness = 2
                 };
 
@@ -5410,8 +5432,8 @@ namespace MacroEngine.UI
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0),
                 Visibility = ra.RepeatMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed,
-                Background = new SolidColorBrush(Color.FromRgb(250, 250, 250)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                Background = GetThemeBrush("BackgroundTertiaryBrush"),
+                BorderBrush = GetThemeBrush("BorderLightBrush"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(4),
                 Cursor = Cursors.IBeam
@@ -5434,8 +5456,8 @@ namespace MacroEngine.UI
                 Visibility = ra.RepeatMode == RepeatMode.WhileKeyPressed ? Visibility.Visible : Visibility.Collapsed,
                 IsReadOnly = true,
                 Cursor = Cursors.Hand,
-                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(180, 180, 180)),
+                Background = GetThemeBrush("BackgroundTertiaryBrush"),
+                BorderBrush = GetThemeBrush("BorderLightBrush"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(4)
             };
@@ -5448,14 +5470,14 @@ namespace MacroEngine.UI
                     e.Handled = true;
                     keyCaptureMode = true;
                     keyCodeTextBox.Text = "Appuyez sur une touche...";
-                    keyCodeTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
+                    keyCodeTextBox.Background = GetThemeBrush("AccentSelectionBrush");
                     tempKeyHook = new KeyboardHook();
                     tempKeyHook.KeyDown += (sender, args) =>
                     {
                         SaveState();
                         ra.KeyCodeToMonitor = (ushort)args.VirtualKeyCode;
                         keyCodeTextBox.Text = GetKeyName(ra.KeyCodeToMonitor);
-                        keyCodeTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
+                        keyCodeTextBox.Background = GetThemeBrush("BackgroundTertiaryBrush");
                         keyCaptureMode = false;
                         tempKeyHook?.Uninstall();
                         tempKeyHook = null;
@@ -5643,7 +5665,7 @@ namespace MacroEngine.UI
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234))
+                Foreground = GetThemeBrush("TextPrimaryBrush")
             };
             mainPanel.Children.Add(ifLabel);
 
@@ -5669,7 +5691,7 @@ namespace MacroEngine.UI
                     FontWeight = FontWeights.SemiBold,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(0, 0, 4, 0),
-                    Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234))
+                    Foreground = GetThemeBrush("TextPrimaryBrush")
                 };
                 conditionPanel.Children.Add(conditionLabel);
 
@@ -6018,7 +6040,7 @@ namespace MacroEngine.UI
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 6, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234))
+                Foreground = GetThemeBrush("TextPrimaryBrush")
             };
             mainPanel.Children.Add(ifLabel);
 
@@ -6036,7 +6058,7 @@ namespace MacroEngine.UI
                         Text = "OU",
                         FontSize = 11,
                         FontWeight = FontWeights.Bold,
-                        Foreground = new SolidColorBrush(Color.FromRgb(255, 140, 0)),
+                        Foreground = new SolidColorBrush(GetThemeColor("WarningColor")),
                         VerticalAlignment = VerticalAlignment.Center,
                         Margin = new Thickness(6, 0, 6, 0)
                     };
@@ -6046,11 +6068,11 @@ namespace MacroEngine.UI
                 // Bordure du groupe (parenthèses visuelles)
                 var groupBorder = new Border
                 {
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(100, 149, 237)),
+                    BorderBrush = new SolidColorBrush(GetThemeColor("InfoColor")),
                     BorderThickness = new Thickness(2),
                     CornerRadius = new CornerRadius(4),
                     Padding = new Thickness(4, 2, 4, 2),
-                    Background = new SolidColorBrush(Color.FromArgb(25, 100, 149, 237)),
+                    Background = new SolidColorBrush(Color.FromArgb(25, GetThemeColor("InfoColor").R, GetThemeColor("InfoColor").G, GetThemeColor("InfoColor").B)),
                     VerticalAlignment = VerticalAlignment.Center
                 };
 
@@ -6072,7 +6094,7 @@ namespace MacroEngine.UI
                                 Text = "ET",
                                 FontSize = 10,
                                 FontWeight = FontWeights.Bold,
-                                Foreground = new SolidColorBrush(Color.FromRgb(34, 139, 34)),
+                                Foreground = new SolidColorBrush(GetThemeColor("SuccessColor")),
                                 VerticalAlignment = VerticalAlignment.Center,
                                 Margin = new Thickness(4, 0, 4, 0)
                             };
@@ -6262,7 +6284,7 @@ namespace MacroEngine.UI
                 Cursor = Cursors.Hand,
                 ToolTip = "Ajouter groupe (OU)",
                 Padding = new Thickness(4, 0, 4, 0),
-                Foreground = new SolidColorBrush(Color.FromRgb(255, 140, 0))
+                Foreground = new SolidColorBrush(GetThemeColor("WarningColor"))
             };
             addGroupButton.Click += (s, e) =>
             {
@@ -6427,7 +6449,7 @@ namespace MacroEngine.UI
                     Text = previewText,
                     FontSize = 11,
                     FontStyle = FontStyles.Italic,
-                    Foreground = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+                    Foreground = GetThemeBrush("TextSecondaryBrush"),
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(8, 0, 0, 0),
                     MaxWidth = 300,
@@ -6607,7 +6629,7 @@ namespace MacroEngine.UI
                 FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(Color.FromRgb(34, 139, 34))
+                Foreground = new SolidColorBrush(GetThemeColor("SuccessColor"))
             };
             thenSection.Children.Add(thenHeader);
 
@@ -6618,7 +6640,7 @@ namespace MacroEngine.UI
                 {
                     Orientation = Orientation.Vertical,
                     Margin = new Thickness(0, 0, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, 34, 139, 34)) // Fond léger vert
+                    Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("SuccessColor").R, GetThemeColor("SuccessColor").G, GetThemeColor("SuccessColor").B)) // Fond léger vert
                 };
 
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
@@ -6652,7 +6674,7 @@ namespace MacroEngine.UI
                         FontSize = 12,
                         FontWeight = FontWeights.Bold,
                         Margin = new Thickness(0, 0, 0, 4),
-                        Foreground = new SolidColorBrush(Color.FromRgb(180, 120, 60))
+                        Foreground = new SolidColorBrush(GetThemeColor("WarningColor"))
                     };
                     elseIfSection.Children.Add(elseIfHeader);
                     if (branch.Actions != null && branch.Actions.Count > 0)
@@ -6661,7 +6683,7 @@ namespace MacroEngine.UI
                         {
                             Orientation = Orientation.Vertical,
                             Margin = new Thickness(0, 0, 0, 4),
-                            Background = new SolidColorBrush(Color.FromArgb(10, 180, 120, 60))
+                            Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("WarningColor").R, GetThemeColor("WarningColor").G, GetThemeColor("WarningColor").B))
                         };
                         for (int i = 0; i < branch.Actions.Count; i++)
                         {
@@ -6690,7 +6712,7 @@ namespace MacroEngine.UI
                 FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(Color.FromRgb(200, 80, 80))
+                Foreground = new SolidColorBrush(GetThemeColor("ErrorColor"))
             };
             elseSection.Children.Add(elseHeader);
 
@@ -6701,7 +6723,7 @@ namespace MacroEngine.UI
                 {
                     Orientation = Orientation.Vertical,
                     Margin = new Thickness(0, 0, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, 200, 80, 80)) // Fond léger rouge
+                    Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("ErrorColor").R, GetThemeColor("ErrorColor").G, GetThemeColor("ErrorColor").B)) // Fond léger rouge
                 };
 
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
@@ -6904,7 +6926,7 @@ namespace MacroEngine.UI
             {
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(1.5),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)),
+                BorderBrush = GetThemeBrush("BorderLightBrush"),
                 CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(2, 2, 2, 2),
                 Margin = new Thickness(10, 0, 0, 0),
@@ -6964,7 +6986,7 @@ namespace MacroEngine.UI
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Foreground = canMoveUp
-                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80))
+                    ? GetThemeBrush("TextMutedBrush")
                     : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -6986,18 +7008,18 @@ namespace MacroEngine.UI
             {
                 if (canMoveUp)
                 {
-                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60));
+                    moveUpBtnText.Foreground = GetThemeBrush("TextSecondaryBrush");
                     moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0));
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0));
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderMediumBrush");
                 }
             };
             moveUpBtnBorder.MouseLeave += (s, e) => 
             {
                 if (canMoveUp)
                 {
-                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+                    moveUpBtnText.Foreground = GetThemeBrush("TextMutedBrush");
                     moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0));
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderLightBrush");
                 }
             };
 
@@ -7023,7 +7045,7 @@ namespace MacroEngine.UI
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Foreground = canMoveDown
-                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80))
+                    ? GetThemeBrush("TextMutedBrush")
                     : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -7045,18 +7067,18 @@ namespace MacroEngine.UI
             {
                 if (canMoveDown)
                 {
-                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60));
+                    moveDownBtnText.Foreground = GetThemeBrush("TextSecondaryBrush");
                     moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0));
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0));
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderMediumBrush");
                 }
             };
             moveDownBtnBorder.MouseLeave += (s, e) => 
             {
                 if (canMoveDown)
                 {
-                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80));
+                    moveDownBtnText.Foreground = GetThemeBrush("TextMutedBrush");
                     moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0));
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderLightBrush");
                 }
             };
 
@@ -7106,7 +7128,7 @@ namespace MacroEngine.UI
 
                 button.MouseEnter += (s, e) =>
                 {
-                    button.Background = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                    button.Background = GetThemeBrush("BorderLightBrush");
                 };
                 button.MouseLeave += (s, e) =>
                 {
@@ -7407,7 +7429,7 @@ namespace MacroEngine.UI
                 };
                 button.Child = textBlock;
 
-                button.MouseEnter += (s, e) => button.Background = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0));
+                button.MouseEnter += (s, e) => button.Background = GetThemeBrush("BorderLightBrush");
                 button.MouseLeave += (s, e) => button.Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0));
 
                 return button;
@@ -7432,7 +7454,7 @@ namespace MacroEngine.UI
             {
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(1.5),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)),
+                BorderBrush = GetThemeBrush("BorderLightBrush"),
                 CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(2, 2, 2, 2),
                 Margin = new Thickness(10, 0, 0, 0),
@@ -7495,7 +7517,7 @@ namespace MacroEngine.UI
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Foreground = canMoveUp
-                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80)) // Flèche en gris foncé
+                    ? GetThemeBrush("TextMutedBrush") // Flèche en gris foncé
                     : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)), // Gris pour désactivé
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -7517,18 +7539,18 @@ namespace MacroEngine.UI
             {
                 if (canMoveUp)
                 {
-                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60)); // Flèche en gris plus foncé au survol
+                    moveUpBtnText.Foreground = GetThemeBrush("TextSecondaryBrush"); // Flèche en gris plus foncé au survol
                     moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0)); // Fond gris très clair au survol
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0)); // Bordure du conteneur plus foncée au survol
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderMediumBrush"); // Bordure du conteneur plus foncée au survol
                 }
             };
             moveUpBtnBorder.MouseLeave += (s, e) => 
             {
                 if (canMoveUp)
                 {
-                    moveUpBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80)); // Flèche en gris foncé
+                    moveUpBtnText.Foreground = GetThemeBrush("TextMutedBrush"); // Flèche en gris foncé
                     moveUpBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)); // Fond gris très clair
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)); // Bordure du conteneur normale
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderLightBrush"); // Bordure du conteneur normale
                 }
             };
 
@@ -7554,7 +7576,7 @@ namespace MacroEngine.UI
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Foreground = canMoveDown
-                    ? new SolidColorBrush(Color.FromRgb(80, 80, 80)) // Flèche en gris foncé
+                    ? GetThemeBrush("TextMutedBrush") // Flèche en gris foncé
                     : new SolidColorBrush(Color.FromArgb(100, 100, 100, 100)), // Gris pour désactivé
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -7576,18 +7598,18 @@ namespace MacroEngine.UI
             {
                 if (canMoveDown)
                 {
-                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(60, 60, 60)); // Flèche en gris plus foncé au survol
+                    moveDownBtnText.Foreground = GetThemeBrush("TextSecondaryBrush"); // Flèche en gris plus foncé au survol
                     moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(15, 0, 0, 0)); // Fond gris très clair au survol
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0)); // Bordure du conteneur plus foncée au survol
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderMediumBrush"); // Bordure du conteneur plus foncée au survol
                 }
             };
             moveDownBtnBorder.MouseLeave += (s, e) => 
             {
                 if (canMoveDown)
                 {
-                    moveDownBtnText.Foreground = new SolidColorBrush(Color.FromRgb(80, 80, 80)); // Flèche en gris foncé
+                    moveDownBtnText.Foreground = GetThemeBrush("TextMutedBrush"); // Flèche en gris foncé
                     moveDownBtnBorder.Background = new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)); // Fond gris très clair
-                    moveButtonsContainer.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 0, 0, 0)); // Bordure du conteneur normale
+                    moveButtonsContainer.BorderBrush = GetThemeBrush("BorderLightBrush"); // Bordure du conteneur normale
                 }
             };
 
@@ -7811,8 +7833,8 @@ namespace MacroEngine.UI
                 FontSize = titleText.FontSize,
                 FontWeight = titleText.FontWeight,
                 Foreground = titleText.Foreground,
-                Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(100, 149, 237)),
+                Background = GetThemeBrush("BackgroundTertiaryBrush"),
+                BorderBrush = new SolidColorBrush(GetThemeColor("InfoColor")),
                 BorderThickness = new Thickness(2),
                 Padding = new Thickness(4),
                 Margin = originalMargin,
@@ -8394,7 +8416,7 @@ namespace MacroEngine.UI
                 FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(Color.FromRgb(34, 139, 34))
+                Foreground = new SolidColorBrush(GetThemeColor("SuccessColor"))
             };
             thenSection.Children.Add(thenHeader);
 
@@ -8404,7 +8426,7 @@ namespace MacroEngine.UI
                 {
                     Orientation = Orientation.Vertical,
                     Margin = new Thickness(0, 0, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, 34, 139, 34))
+                    Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("SuccessColor").R, GetThemeColor("SuccessColor").G, GetThemeColor("SuccessColor").B))
                 };
 
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
@@ -8433,7 +8455,7 @@ namespace MacroEngine.UI
                 FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(Color.FromRgb(200, 80, 80))
+                Foreground = new SolidColorBrush(GetThemeColor("ErrorColor"))
             };
             elseSection.Children.Add(elseHeader);
 
@@ -8443,7 +8465,7 @@ namespace MacroEngine.UI
                 {
                     Orientation = Orientation.Vertical,
                     Margin = new Thickness(0, 0, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, 200, 80, 80))
+                    Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("ErrorColor").R, GetThemeColor("ErrorColor").G, GetThemeColor("ErrorColor").B))
                 };
 
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
