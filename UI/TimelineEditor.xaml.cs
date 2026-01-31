@@ -806,6 +806,8 @@ namespace MacroEngine.UI
 
         private string GetTextActionTitle(TextAction ta)
         {
+            if (ta.HideInLogs && !string.IsNullOrEmpty(ta.Text))
+                return "Texte (masqué)";
             if (string.IsNullOrEmpty(ta.Text))
                 return "Texte vide";
             
@@ -820,6 +822,11 @@ namespace MacroEngine.UI
         {
             var details = new System.Text.StringBuilder();
             
+            if (ta.ClearBefore)
+                details.Append("Effacer avant • ");
+            if (ta.HideInLogs)
+                details.Append("Masqué logs • ");
+            
             if (ta.PasteAtOnce)
             {
                 details.Append("Coller");
@@ -833,10 +840,17 @@ namespace MacroEngine.UI
                 details.Append($"Vitesse: {ta.TypingSpeed} ms");
             }
             
-            if (!string.IsNullOrEmpty(ta.Text))
+            if (!string.IsNullOrEmpty(ta.Text) && !ta.HideInLogs)
             {
                 details.Append($" • {ta.Text.Length} caractère{(ta.Text.Length > 1 ? "s" : "")}");
             }
+            else if (!string.IsNullOrEmpty(ta.Text))
+            {
+                details.Append(" • ***");
+            }
+            
+            if (!string.IsNullOrEmpty(ta.Text) && ta.Text.Contains("{") && ta.Text.Contains("}"))
+                details.Append(" • variables");
             
             return details.ToString();
         }
@@ -2462,7 +2476,7 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(textLabel);
 
-            // TextBox pour le texte
+            // TextBox pour le texte (variables: ex. "Score: {score}")
             var textTextBox = new TextBox
             {
                 Text = ta.Text ?? "",
@@ -2474,7 +2488,8 @@ namespace MacroEngine.UI
                 Margin = new Thickness(0, 0, 8, 0),
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap,
-                MaxHeight = 60
+                MaxHeight = 60,
+                ToolTip = "Variables: utilisez {nomVariable} pour insérer une variable. Ex: Score: {score}"
             };
             textTextBox.TextChanged += (s, e) =>
             {
@@ -2524,6 +2539,58 @@ namespace MacroEngine.UI
                 RefreshBlocks();
             };
             editPanel.Children.Add(pasteAtOnceCheckBox);
+
+            // CheckBox Effacer avant (Ctrl+A + Suppr)
+            var clearBeforeCheckBox = new CheckBox
+            {
+                Content = "Effacer avant",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                IsChecked = ta.ClearBefore,
+                ToolTip = "Ctrl+A puis Suppr avant de saisir le texte"
+            };
+            clearBeforeCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ta.ClearBefore = true;
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                RefreshBlocks();
+            };
+            clearBeforeCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ta.ClearBefore = false;
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(clearBeforeCheckBox);
+
+            // CheckBox Masquer dans les logs (pour mots de passe)
+            var hideInLogsCheckBox = new CheckBox
+            {
+                Content = "Masquer dans les logs",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                IsChecked = ta.HideInLogs,
+                ToolTip = "Ne pas afficher le texte dans les logs (mots de passe)"
+            };
+            hideInLogsCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                ta.HideInLogs = true;
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                RefreshBlocks();
+            };
+            hideInLogsCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                ta.HideInLogs = false;
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(hideInLogsCheckBox);
 
             // CheckBox pour la frappe naturelle (masqué si "Coller")
             var naturalTypingCheckBox = new CheckBox

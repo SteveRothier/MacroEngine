@@ -579,6 +579,17 @@ namespace MacroEngine.Core.Engine
                     }
                     return $"Variable: {action.Name}";
 
+                case InputActionType.Text:
+                    if (action is TextAction textAction)
+                    {
+                        if (textAction.HideInLogs)
+                            return "Texte (masqué)";
+                        string preview = string.IsNullOrEmpty(textAction.Text) ? "vide" : (textAction.Text.Length > 40 ? textAction.Text.Substring(0, 40) + "..." : textAction.Text);
+                        preview = preview.Replace("\r", "").Replace("\n", " ");
+                        return $"Texte: \"{preview}\"";
+                    }
+                    return "Texte";
+
                 default:
                     return action.Name;
             }

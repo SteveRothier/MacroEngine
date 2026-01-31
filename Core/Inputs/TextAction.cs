@@ -1,7 +1,9 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Windows.Forms;
+using Engine = MacroEngine.Core.Engine;
 
 namespace MacroEngine.Core.Inputs
 {
@@ -15,7 +17,7 @@ namespace MacroEngine.Core.Inputs
         public InputActionType Type => InputActionType.Text;
 
         /// <summary>
-        /// Texte à saisir
+        /// Texte à saisir (peut contenir des variables ex: "Score: {score}")
         /// </summary>
         public string Text { get; set; } = string.Empty;
 
@@ -44,18 +46,34 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         public bool PasteAtOnce { get; set; } = false;
 
+        /// <summary>
+        /// Effacer le champ avant de saisir (Ctrl+A puis Suppr)
+        /// </summary>
+        public bool ClearBefore { get; set; } = false;
+
+        /// <summary>
+        /// Masquer le texte dans les logs (pour mots de passe)
+        /// </summary>
+        public bool HideInLogs { get; set; } = false;
+
         public void Execute()
         {
-            if (string.IsNullOrEmpty(Text))
+            string effectiveText = SubstituteVariables(Text ?? "");
+            if (string.IsNullOrEmpty(effectiveText))
                 return;
+
+            if (ClearBefore)
+            {
+                ExecuteClearBefore();
+            }
 
             if (PasteAtOnce)
             {
-                ExecutePasteAtOnce();
+                ExecutePasteAtOnce(effectiveText);
                 return;
             }
 
-            foreach (char c in Text)
+            foreach (char c in effectiveText)
             {
                 // Gérer les caractères spéciaux
                 if (c == '\n')
@@ -92,9 +110,54 @@ namespace MacroEngine.Core.Inputs
         }
 
         /// <summary>
+        /// Efface le champ avant saisie (Ctrl+A puis Suppr)
+        /// </summary>
+        private void ExecuteClearBefore()
+        {
+            // Ctrl+A : sélectionner tout
+            keybd_event(0x11, 0, 0, 0);   // VK_CONTROL down
+            Thread.Sleep(20);
+            keybd_event(0x41, 0, 0, 0);   // 'A' down
+            Thread.Sleep(20);
+            keybd_event(0x41, 0, KEYEVENTF_KEYUP, 0);
+            Thread.Sleep(20);
+            keybd_event(0x11, 0, KEYEVENTF_KEYUP, 0);
+            Thread.Sleep(30);
+            // Suppr : supprimer la sélection
+            keybd_event(0x2E, 0, 0, 0);   // VK_DELETE down
+            Thread.Sleep(20);
+            keybd_event(0x2E, 0, KEYEVENTF_KEYUP, 0);
+            Thread.Sleep(50);
+        }
+
+        /// <summary>
+        /// Remplace les variables {nomVariable} par leur valeur dans le texte
+        /// </summary>
+        private string SubstituteVariables(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            var store = Engine.ExecutionContext.Current?.Variables;
+            if (store == null)
+                return text;
+
+            return Regex.Replace(text, @"\{([^}]+)\}", match =>
+            {
+                string varName = match.Groups[1].Value.Trim();
+                if (string.IsNullOrEmpty(varName))
+                    return match.Value;
+                string value = store.GetText(varName);
+                if (store.TryGetValue(varName, out object? obj) && obj is double d && Math.Abs(d - (int)d) < 1e-9)
+                    value = ((int)d).ToString();
+                return value ?? "";
+            });
+        }
+
+        /// <summary>
         /// Colle le texte en une fois via le presse-papiers (Ctrl+V)
         /// </summary>
-        private void ExecutePasteAtOnce()
+        private void ExecutePasteAtOnce(string textToPaste)
         {
             string? previousClipboard = null;
             try
@@ -103,7 +166,7 @@ namespace MacroEngine.Core.Inputs
                 {
                     previousClipboard = Clipboard.GetText();
                 }
-                Clipboard.SetText(Text);
+                Clipboard.SetText(textToPaste);
                 Thread.Sleep(50); // Laisser le temps au presse-papiers
                 // Envoyer Ctrl+V
                 keybd_event(0x11, 0, 0, 0);   // VK_CONTROL down
@@ -241,7 +304,9 @@ namespace MacroEngine.Core.Inputs
                 UseNaturalTyping = this.UseNaturalTyping,
                 MinDelay = this.MinDelay,
                 MaxDelay = this.MaxDelay,
-                PasteAtOnce = this.PasteAtOnce
+                PasteAtOnce = this.PasteAtOnce,
+                ClearBefore = this.ClearBefore,
+                HideInLogs = this.HideInLogs
             };
         }
 
