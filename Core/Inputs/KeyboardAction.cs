@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
+using Engine = MacroEngine.Core.Engine;
 using MacroEngine.Core.Models;
 
 namespace MacroEngine.Core.Inputs
@@ -28,37 +30,74 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         public ModifierKeys Modifiers { get; set; } = ModifierKeys.None;
 
+        /// <summary>
+        /// Durée de maintien en ms pour "Maintenir" (0 = illimité, relâché à la fin de la macro ou par une action Relâcher).
+        /// </summary>
+        public int HoldDurationMs { get; set; }
+
+        /// <summary>
+        /// Relâche une touche (utilisé pour la relâche automatique à la fin de la macro).
+        /// </summary>
+        public static void ReleaseKey(ushort virtualKeyCode)
+        {
+            keybd_event((byte)virtualKeyCode, 0, KEYEVENTF_KEYUP, 0);
+            Thread.Sleep(10);
+        }
+
         public void Execute()
         {
-            if (Modifiers != ModifierKeys.None)
-            {
-                SendModifierKeys(Modifiers, true);
-            }
+            var context = Engine.ExecutionContext.Current;
 
-            if (ActionType == KeyboardActionType.Down || ActionType == KeyboardActionType.Press)
+            if (ActionType == KeyboardActionType.Press)
             {
+                if (Modifiers != ModifierKeys.None)
+                    SendModifierKeys(Modifiers, true);
                 SendKeyDown(VirtualKeyCode);
-                // Délai entre Down et Up pour que le système traite correctement la touche
-                if (ActionType == KeyboardActionType.Press)
-                {
-                    System.Threading.Thread.Sleep(80);
-                }
+                Thread.Sleep(80);
+                SendKeyUp(VirtualKeyCode);
+                Thread.Sleep(50);
+                if (Modifiers != ModifierKeys.None)
+                    SendModifierKeys(Modifiers, false);
+                return;
             }
 
-            if (ActionType == KeyboardActionType.Up || ActionType == KeyboardActionType.Press)
+            if (ActionType == KeyboardActionType.Down)
+            {
+                if (Modifiers != ModifierKeys.None)
+                    SendModifierKeys(Modifiers, true);
+                SendKeyDown(VirtualKeyCode);
+
+                if (HoldDurationMs > 0)
+                {
+                    Thread.Sleep(HoldDurationMs);
+                    SendKeyUp(VirtualKeyCode);
+                    if (Modifiers != ModifierKeys.None)
+                        SendModifierKeys(Modifiers, false);
+                }
+                else
+                {
+                    RegisterHeldKeys(context);
+                }
+                return;
+            }
+
+            if (ActionType == KeyboardActionType.Up)
             {
                 SendKeyUp(VirtualKeyCode);
-                // Délai après Up pour que le système finalise la touche
-                if (ActionType == KeyboardActionType.Press)
-                {
-                    System.Threading.Thread.Sleep(50);
-                }
+                context?.RemoveHeldKey(VirtualKeyCode);
+                if (Modifiers != ModifierKeys.None)
+                    SendModifierKeys(Modifiers, false);
             }
+        }
 
-            if (Modifiers != ModifierKeys.None)
-            {
-                SendModifierKeys(Modifiers, false);
-            }
+        private void RegisterHeldKeys(Engine.ExecutionContext? context)
+        {
+            if (context == null) return;
+            context.AddHeldKey(VirtualKeyCode);
+            if ((Modifiers & ModifierKeys.Control) != 0) context.AddHeldKey(VK_CONTROL);
+            if ((Modifiers & ModifierKeys.Alt) != 0) context.AddHeldKey(VK_MENU);
+            if ((Modifiers & ModifierKeys.Shift) != 0) context.AddHeldKey(VK_SHIFT);
+            if ((Modifiers & ModifierKeys.Windows) != 0) context.AddHeldKey(VK_LWIN);
         }
 
         private void SendModifierKeys(ModifierKeys modifiers, bool down)
@@ -101,7 +140,8 @@ namespace MacroEngine.Core.Inputs
                 Name = this.Name,
                 VirtualKeyCode = this.VirtualKeyCode,
                 ActionType = this.ActionType,
-                Modifiers = this.Modifiers
+                Modifiers = this.Modifiers,
+                HoldDurationMs = this.HoldDurationMs
             };
         }
 

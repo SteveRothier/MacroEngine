@@ -59,9 +59,10 @@ dotnet run --project MacroEngine.csproj
 | **Touche** | Type : Presser, Maintenir, Relâcher. Modificateurs : Ctrl, Alt, Shift, Win. Touche principale configurable. |
 | **Clic** | Type : Clic gauche/droit/milieu, Maintenir, Double-clic, Déplacer, Molette haut/bas/molette. Position (X, Y) ou position actuelle. Delta pour molette. Déplacer : relatif/absolu, vitesse (instantané/rapide/graduel), courbe d’accélération, trajectoire Bézier (point de contrôle). |
 | **Texte** | Texte à saisir. **Coller** : coller tout d’un coup (Ctrl+V). Sinon : **Vitesse** (délai en ms entre caractères) ou **Frappe naturelle** (délai aléatoire min–max en ms). |
+| **Variable** | **Nom** : nom de la variable (lettres, chiffres, tirets bas). **Type** : Nombre, Texte ou Booléen. **Opération** : **Définir** (valeur ou expression), **Incrémenter** / **Décrémenter** (avec **Pas** configurable, pour nombres), **Inverser** (pour booléens), **Expression** (ex. `counter + 1`, `baseDelay * 2`). Les variables sont partagées pendant l'exécution de la macro et utilisables dans les conditions **Si**. |
 | **Délai** | Durée. Unité : ms, s ou min. Option **aléatoire** : entre une durée min et max. |
 | **Répéter** | Mode : Une fois, Nombre (X fois), Infini. Nombre de répétitions. Délai entre chaque répétition (ms/s/min). Liste d’actions imbriquées. |
-| **Si** | Conditions multiples avec opérateurs ET/OU. Types : application active, touche enfoncée, processus en cours, couleur pixel, position souris, date/heure, image à l’écran, texte à l’écran. Blocs **Alors** et **Sinon** avec actions imbriquées. |
+| **Si** | Conditions multiples avec opérateurs ET/OU. Types : application active, touche enfoncée, processus en cours, couleur pixel, position souris, date/heure, image à l’écran, texte à l’écran, **variable** (valeur truthy : nombre ≠ 0, texte non vide, booléen true). Blocs **Alors** et **Sinon** avec actions imbriquées. |
 
 ## Statut du projet
 

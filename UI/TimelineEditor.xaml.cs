@@ -925,7 +925,10 @@ namespace MacroEngine.UI
             if (ka.ActionType != KeyboardActionType.Press)
             {
                 var actionType = ka.ActionType == KeyboardActionType.Down ? "Maintenir" : "Relâcher";
-                return $"{string.Join(" + ", parts)} ({actionType})";
+                var baseStr = $"{string.Join(" + ", parts)} ({actionType})";
+                if (ka.ActionType == KeyboardActionType.Down && ka.HoldDurationMs > 0)
+                    baseStr += $" pendant {ka.HoldDurationMs} ms";
+                return baseStr;
             }
             
             return parts.Count > 0 ? string.Join(" + ", parts) : "Touche ?";
@@ -1945,6 +1948,77 @@ namespace MacroEngine.UI
             
             editPanel.Children.Add(keyTextBox);
 
+            // Durée de maintien (ms) pour "Maintenir" — optionnel, vide ou 0 = illimité
+            var holdDurationLabel = new TextBlock
+            {
+                Text = "Durée (optionnel):",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 4, 0)
+            };
+            var holdDurationTextBox = new TextBox
+            {
+                Text = ka.HoldDurationMs > 0 ? ka.HoldDurationMs.ToString() : "",
+                MinWidth = 60,
+                MaxWidth = 80,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                ToolTip = "Durée en ms (laisser vide = illimité, relâché à la fin de la macro)"
+            };
+            // Placeholder visuel
+            var placeholderText = new TextBlock
+            {
+                Text = "ms",
+                FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(160, 160, 160)),
+                VerticalAlignment = VerticalAlignment.Center,
+                IsHitTestVisible = false,
+                Margin = new Thickness(-75, 0, 0, 0),
+                Visibility = string.IsNullOrEmpty(holdDurationTextBox.Text) ? Visibility.Visible : Visibility.Collapsed
+            };
+            holdDurationTextBox.TextChanged += (s, e) =>
+            {
+                placeholderText.Visibility = string.IsNullOrEmpty(holdDurationTextBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+            };
+            var holdDurationPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            holdDurationPanel.Children.Add(holdDurationLabel);
+            holdDurationPanel.Children.Add(holdDurationTextBox);
+            holdDurationPanel.Children.Add(placeholderText);
+            holdDurationPanel.Visibility = ka.ActionType == KeyboardActionType.Down ? Visibility.Visible : Visibility.Collapsed;
+            editPanel.Children.Add(holdDurationPanel);
+
+            void UpdateHoldDurationVisibility()
+            {
+                holdDurationPanel.Visibility = ka.ActionType == KeyboardActionType.Down ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            holdDurationTextBox.LostFocus += (s, e) =>
+            {
+                var text = holdDurationTextBox.Text.Trim();
+                int ms = 0;
+                if (!string.IsNullOrEmpty(text) && (!int.TryParse(text, out ms) || ms < 0))
+                {
+                    holdDurationTextBox.Text = ka.HoldDurationMs > 0 ? ka.HoldDurationMs.ToString() : "";
+                    return;
+                }
+                if (ka.HoldDurationMs != ms)
+                {
+                    SaveState();
+                    ka.HoldDurationMs = ms;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+
             // Gestion du changement de type d'action
             actionTypeComboBox.SelectionChanged += (s, e) =>
             {
@@ -1958,6 +2032,7 @@ namespace MacroEngine.UI
                         2 => KeyboardActionType.Up,
                         _ => KeyboardActionType.Press
                     };
+                    UpdateHoldDurationVisibility();
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
