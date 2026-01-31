@@ -5594,7 +5594,16 @@ namespace MacroEngine.UI
         /// </summary>
         private StackPanel CreateIfActionControls(IfAction ifAction, int index, Panel parentPanel)
         {
-            // Initialiser Conditions si vide (compatibilité avec l'ancien format)
+            // Vérifier si on utilise le mode groupes ou le mode plat
+            bool useGroups = ifAction.ConditionGroups != null && ifAction.ConditionGroups.Count > 0;
+
+            // Initialiser selon le mode
+            if (useGroups)
+            {
+                return CreateConditionGroupsUI(ifAction, index, parentPanel);
+            }
+
+            // Mode plat: Initialiser Conditions si vide (compatibilité avec l'ancien format)
             if (ifAction.Conditions == null || ifAction.Conditions.Count == 0)
             {
                 ifAction.Conditions = new List<ConditionItem>();
@@ -5938,6 +5947,383 @@ namespace MacroEngine.UI
                 }
             };
             mainPanel.Children.Add(fullConfigButton);
+
+            // Bouton "Mode groupes" pour basculer vers l'interface des groupes
+            var groupModeButton = new Button
+            {
+                Content = "📦 Mode groupes",
+                MinWidth = 110,
+                Height = 28,
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Basculer vers le mode groupes (A ET B) OU (C ET D)",
+                Padding = new Thickness(8, 0, 8, 0)
+            };
+            groupModeButton.Click += (s, e) =>
+            {
+                SaveState();
+                // Convertir les conditions existantes en un groupe
+                if (ifAction.ConditionGroups == null)
+                    ifAction.ConditionGroups = new List<ConditionGroup>();
+                
+                if (ifAction.ConditionGroups.Count == 0 && ifAction.Conditions != null && ifAction.Conditions.Count > 0)
+                {
+                    // Migrer les conditions existantes vers un groupe
+                    var group = new ConditionGroup
+                    {
+                        Name = "Groupe 1",
+                        Conditions = new List<ConditionItem>(ifAction.Conditions)
+                    };
+                    ifAction.ConditionGroups.Add(group);
+                }
+                else if (ifAction.ConditionGroups.Count == 0)
+                {
+                    // Créer un groupe vide avec une condition par défaut
+                    var group = new ConditionGroup
+                    {
+                        Name = "Groupe 1",
+                        Conditions = new List<ConditionItem> { new ConditionItem { ConditionType = ConditionType.Boolean, Condition = true } }
+                    };
+                    ifAction.ConditionGroups.Add(group);
+                }
+                
+                _currentMacro!.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            };
+            mainPanel.Children.Add(groupModeButton);
+
+            return mainPanel;
+        }
+
+        /// <summary>
+        /// Crée l'interface pour gérer les groupes de conditions visuellement (compacte, horizontale)
+        /// Format: (A ET B) OU (C ET D)
+        /// </summary>
+        private StackPanel CreateConditionGroupsUI(IfAction ifAction, int index, Panel parentPanel)
+        {
+            var mainPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            // Label "Si"
+            var ifLabel = new TextBlock
+            {
+                Text = "Si",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 6, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = new SolidColorBrush(Color.FromRgb(248, 239, 234))
+            };
+            mainPanel.Children.Add(ifLabel);
+
+            // Afficher chaque groupe
+            for (int gi = 0; gi < ifAction.ConditionGroups.Count; gi++)
+            {
+                var group = ifAction.ConditionGroups[gi];
+                var groupIndex = gi;
+
+                // Séparateur "OU" entre les groupes
+                if (gi > 0)
+                {
+                    var orLabel = new TextBlock
+                    {
+                        Text = "OU",
+                        FontSize = 11,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = new SolidColorBrush(Color.FromRgb(255, 140, 0)),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(6, 0, 6, 0)
+                    };
+                    mainPanel.Children.Add(orLabel);
+                }
+
+                // Bordure du groupe (parenthèses visuelles)
+                var groupBorder = new Border
+                {
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(100, 149, 237)),
+                    BorderThickness = new Thickness(2),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(4, 2, 4, 2),
+                    Background = new SolidColorBrush(Color.FromArgb(25, 100, 149, 237)),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+
+                var groupContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+                // Afficher les conditions du groupe
+                if (group.Conditions != null)
+                {
+                    for (int ci = 0; ci < group.Conditions.Count; ci++)
+                    {
+                        var condition = group.Conditions[ci];
+                        var conditionIndex = ci;
+
+                        // Séparateur "ET" entre les conditions
+                        if (ci > 0)
+                        {
+                            var andLabel = new TextBlock
+                            {
+                                Text = "ET",
+                                FontSize = 10,
+                                FontWeight = FontWeights.Bold,
+                                Foreground = new SolidColorBrush(Color.FromRgb(34, 139, 34)),
+                                VerticalAlignment = VerticalAlignment.Center,
+                                Margin = new Thickness(4, 0, 4, 0)
+                            };
+                            groupContent.Children.Add(andLabel);
+                        }
+
+                        // ComboBox compacte pour le type de condition
+                        var conditionTypeComboBox = new ComboBox
+                        {
+                            Width = 90,
+                            FontSize = 10,
+                            Height = 22,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Padding = new Thickness(2, 0, 2, 0)
+                        };
+                        conditionTypeComboBox.Items.Add("Booléen");
+                        conditionTypeComboBox.Items.Add("App");
+                        conditionTypeComboBox.Items.Add("Touche");
+                        conditionTypeComboBox.Items.Add("Processus");
+                        conditionTypeComboBox.Items.Add("Pixel");
+                        conditionTypeComboBox.Items.Add("Souris");
+                        conditionTypeComboBox.Items.Add("Temps");
+                        conditionTypeComboBox.Items.Add("Image");
+                        conditionTypeComboBox.Items.Add("Texte");
+                        conditionTypeComboBox.Items.Add("Variable");
+                        conditionTypeComboBox.SelectedIndex = (int)condition.ConditionType;
+
+                        conditionTypeComboBox.SelectionChanged += (s, e) =>
+                        {
+                            if (conditionTypeComboBox.SelectedIndex >= 0)
+                            {
+                                SaveState();
+                                condition.ConditionType = (ConditionType)conditionTypeComboBox.SelectedIndex;
+                                _currentMacro!.ModifiedAt = DateTime.Now;
+                                RefreshBlocks();
+                                MacroChanged?.Invoke(this, EventArgs.Empty);
+                            }
+                        };
+                        groupContent.Children.Add(conditionTypeComboBox);
+
+                        // Bouton configurer (petit)
+                        var configButton = new Button
+                        {
+                            Content = "⚙",
+                            Width = 20,
+                            Height = 20,
+                            FontSize = 9,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Margin = new Thickness(2, 0, 0, 0),
+                            Cursor = Cursors.Hand,
+                            ToolTip = "Configurer",
+                            Padding = new Thickness(0)
+                        };
+                        configButton.Click += (s, e) =>
+                        {
+                            var tempIfAction = new IfAction
+                            {
+                                Conditions = new List<ConditionItem> { condition },
+                                Operators = new List<LogicalOperator>()
+                            };
+                            var dialog = new ConditionConfigDialog(tempIfAction);
+                            dialog.Owner = Window.GetWindow(this);
+                            if (dialog.ShowDialog() == true && dialog.Result != null && dialog.Result.Conditions.Count > 0)
+                            {
+                                SaveState();
+                                var resultCondition = dialog.Result.Conditions[0];
+                                condition.ConditionType = resultCondition.ConditionType;
+                                condition.Condition = resultCondition.Condition;
+                                condition.ActiveApplicationConfig = resultCondition.ActiveApplicationConfig;
+                                condition.KeyboardKeyConfig = resultCondition.KeyboardKeyConfig;
+                                condition.ProcessRunningConfig = resultCondition.ProcessRunningConfig;
+                                condition.PixelColorConfig = resultCondition.PixelColorConfig;
+                                condition.MousePositionConfig = resultCondition.MousePositionConfig;
+                                condition.TimeDateConfig = resultCondition.TimeDateConfig;
+                                condition.ImageOnScreenConfig = resultCondition.ImageOnScreenConfig;
+                                condition.TextOnScreenConfig = resultCondition.TextOnScreenConfig;
+                                condition.VariableName = resultCondition.VariableName;
+                                _currentMacro!.ModifiedAt = DateTime.Now;
+                                RefreshBlocks();
+                                MacroChanged?.Invoke(this, EventArgs.Empty);
+                            }
+                        };
+                        groupContent.Children.Add(configButton);
+
+                        // Bouton supprimer condition (seulement si plus d'une condition)
+                        if (group.Conditions.Count > 1)
+                        {
+                            var removeConditionButton = new Button
+                            {
+                                Content = "✕",
+                                Width = 16,
+                                Height = 16,
+                                FontSize = 8,
+                                VerticalAlignment = VerticalAlignment.Center,
+                                Margin = new Thickness(1, 0, 0, 0),
+                                Cursor = Cursors.Hand,
+                                ToolTip = "Supprimer",
+                                Padding = new Thickness(0)
+                            };
+                            removeConditionButton.Click += (s, e) =>
+                            {
+                                SaveState();
+                                if (conditionIndex >= 0 && conditionIndex < group.Conditions.Count)
+                                {
+                                    group.Conditions.RemoveAt(conditionIndex);
+                                }
+                                _currentMacro!.ModifiedAt = DateTime.Now;
+                                RefreshBlocks();
+                                MacroChanged?.Invoke(this, EventArgs.Empty);
+                            };
+                            groupContent.Children.Add(removeConditionButton);
+                        }
+                    }
+                }
+
+                // Bouton ajouter condition (ET) dans ce groupe
+                var addConditionButton = new Button
+                {
+                    Content = "+",
+                    Width = 18,
+                    Height = 18,
+                    FontSize = 10,
+                    FontWeight = FontWeights.Bold,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(3, 0, 0, 0),
+                    Cursor = Cursors.Hand,
+                    ToolTip = "Ajouter condition (ET)",
+                    Padding = new Thickness(0)
+                };
+                addConditionButton.Click += (s, e) =>
+                {
+                    SaveState();
+                    if (group.Conditions == null)
+                        group.Conditions = new List<ConditionItem>();
+                    
+                    group.Conditions.Add(new ConditionItem { ConditionType = ConditionType.Boolean, Condition = true });
+                    
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                };
+                groupContent.Children.Add(addConditionButton);
+
+                // Bouton supprimer le groupe (seulement si plus d'un groupe)
+                if (ifAction.ConditionGroups.Count > 1)
+                {
+                    var removeGroupButton = new Button
+                    {
+                        Content = "🗑",
+                        Width = 18,
+                        Height = 18,
+                        FontSize = 9,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(2, 0, 0, 0),
+                        Cursor = Cursors.Hand,
+                        ToolTip = "Supprimer groupe",
+                        Padding = new Thickness(0)
+                    };
+                    removeGroupButton.Click += (s, e) =>
+                    {
+                        SaveState();
+                        if (groupIndex >= 0 && groupIndex < ifAction.ConditionGroups.Count)
+                        {
+                            ifAction.ConditionGroups.RemoveAt(groupIndex);
+                        }
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    };
+                    groupContent.Children.Add(removeGroupButton);
+                }
+
+                groupBorder.Child = groupContent;
+                mainPanel.Children.Add(groupBorder);
+            }
+
+            // Bouton pour ajouter un nouveau groupe (OU)
+            var addGroupButton = new Button
+            {
+                Content = "+OU",
+                MinWidth = 40,
+                Height = 22,
+                FontSize = 10,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Ajouter groupe (OU)",
+                Padding = new Thickness(4, 0, 4, 0),
+                Foreground = new SolidColorBrush(Color.FromRgb(255, 140, 0))
+            };
+            addGroupButton.Click += (s, e) =>
+            {
+                SaveState();
+                if (ifAction.ConditionGroups == null)
+                    ifAction.ConditionGroups = new List<ConditionGroup>();
+                
+                var newGroup = new ConditionGroup
+                {
+                    Name = $"Groupe {ifAction.ConditionGroups.Count + 1}",
+                    Conditions = new List<ConditionItem> { new ConditionItem { ConditionType = ConditionType.Boolean, Condition = true } }
+                };
+                ifAction.ConditionGroups.Add(newGroup);
+                
+                _currentMacro!.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            };
+            mainPanel.Children.Add(addGroupButton);
+
+            // Bouton pour revenir au mode simple
+            var simpleModeButton = new Button
+            {
+                Content = "↩",
+                Width = 22,
+                Height = 22,
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Revenir au mode simple",
+                Padding = new Thickness(0)
+            };
+            simpleModeButton.Click += (s, e) =>
+            {
+                SaveState();
+                // Convertir les groupes en conditions plates
+                if (ifAction.ConditionGroups != null && ifAction.ConditionGroups.Count > 0)
+                {
+                    var allConditions = new List<ConditionItem>();
+                    foreach (var g in ifAction.ConditionGroups)
+                    {
+                        if (g.Conditions != null)
+                            allConditions.AddRange(g.Conditions);
+                    }
+                    ifAction.Conditions = allConditions.Count > 0 ? allConditions : new List<ConditionItem> { new ConditionItem { ConditionType = ConditionType.Boolean, Condition = true } };
+                    
+                    // Recréer les opérateurs (tous AND par défaut)
+                    ifAction.Operators = new List<LogicalOperator>();
+                    for (int i = 0; i < ifAction.Conditions.Count - 1; i++)
+                        ifAction.Operators.Add(LogicalOperator.AND);
+                }
+                
+                // Vider les groupes
+                ifAction.ConditionGroups = new List<ConditionGroup>();
+                
+                _currentMacro!.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            };
+            mainPanel.Children.Add(simpleModeButton);
 
             return mainPanel;
         }
