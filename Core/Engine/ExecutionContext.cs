@@ -59,5 +59,46 @@ namespace MacroEngine.Core.Engine
                 _heldKeys.Clear();
             }
         }
+
+        private readonly List<uint> _heldMouseButtons = new List<uint>();
+
+        /// <summary>
+        /// Enregistre un bouton de souris comme maintenu (pour relâche automatique à la fin de la macro).
+        /// </summary>
+        public void AddHeldMouseButton(uint upFlag)
+        {
+            lock (_heldMouseButtons)
+            {
+                _heldMouseButtons.Add(upFlag);
+            }
+        }
+
+        /// <summary>
+        /// Retire un bouton de souris de la liste des boutons maintenus (après un Relâcher explicite).
+        /// </summary>
+        public void RemoveHeldMouseButton(uint upFlag)
+        {
+            lock (_heldMouseButtons)
+            {
+                int idx = _heldMouseButtons.IndexOf(upFlag);
+                if (idx >= 0)
+                    _heldMouseButtons.RemoveAt(idx);
+            }
+        }
+
+        /// <summary>
+        /// Relâche tous les boutons de souris encore maintenus (sécurité à la fin de la macro).
+        /// </summary>
+        public void ReleaseAllHeldMouseButtons()
+        {
+            lock (_heldMouseButtons)
+            {
+                for (int i = _heldMouseButtons.Count - 1; i >= 0; i--)
+                {
+                    MouseAction.ReleaseMouseButton(_heldMouseButtons[i]);
+                }
+                _heldMouseButtons.Clear();
+            }
+        }
     }
 }

@@ -1050,6 +1050,19 @@ namespace MacroEngine.UI
                 details.Append($"Delta: {ma.Delta}");
             }
             
+            // Durée de maintien pour Maintenir gauche/droit/milieu
+            bool isMaintenir = ma.ActionType == Core.Inputs.MouseActionType.LeftDown ||
+                              ma.ActionType == Core.Inputs.MouseActionType.RightDown ||
+                              ma.ActionType == Core.Inputs.MouseActionType.MiddleDown;
+            if (isMaintenir && ma.HoldDurationMs > 0)
+            {
+                if (details.Length > 0)
+                {
+                    details.Append(" • ");
+                }
+                details.Append($"pendant {ma.HoldDurationMs} ms");
+            }
+            
             return details.Length > 0 ? details.ToString() : "";
         }
 
@@ -3451,6 +3464,65 @@ namespace MacroEngine.UI
 
             editPanel.Children.Add(selectPointButton);
 
+            // Durée de maintien (ms) pour "Maintenir" — optionnel, vide ou 0 = illimité
+            bool IsMaintenirType(Core.Inputs.MouseActionType t) =>
+                t == Core.Inputs.MouseActionType.LeftDown || t == Core.Inputs.MouseActionType.RightDown || t == Core.Inputs.MouseActionType.MiddleDown;
+
+            bool showHoldDuration = IsMaintenirType(ma.ActionType);
+            var holdDurationLabel = new TextBlock
+            {
+                Text = "Durée (optionnel):",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 4, 0)
+            };
+            var holdDurationTextBox = new TextBox
+            {
+                Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "",
+                MinWidth = 60,
+                MaxWidth = 80,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                ToolTip = "Durée en ms (laisser vide = illimité, relâché à la fin de la macro)"
+            };
+            var holdDurationPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = showHoldDuration ? Visibility.Visible : Visibility.Collapsed
+            };
+            holdDurationPanel.Children.Add(holdDurationLabel);
+            holdDurationPanel.Children.Add(holdDurationTextBox);
+            editPanel.Children.Add(holdDurationPanel);
+
+            void UpdateHoldDurationVisibility()
+            {
+                holdDurationPanel.Visibility = IsMaintenirType(ma.ActionType) ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            holdDurationTextBox.LostFocus += (s, e) =>
+            {
+                var text = holdDurationTextBox.Text.Trim();
+                int ms = 0;
+                if (!string.IsNullOrEmpty(text) && (!int.TryParse(text, out ms) || ms < 0))
+                {
+                    holdDurationTextBox.Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "";
+                    return;
+                }
+                if (ma.HoldDurationMs != ms)
+                {
+                    SaveState();
+                    ma.HoldDurationMs = ms;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                    RefreshBlocks();
+                }
+            };
+
             // Fonction pour déterminer si le delta doit être affiché (pour toutes les actions de molette)
             bool ShouldShowDelta(Core.Inputs.MouseActionType actionType)
             {
@@ -3902,6 +3974,8 @@ namespace MacroEngine.UI
                     controlYTextBox.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
                     selectControlPointButton.Visibility = showBezierControls ? Visibility.Visible : Visibility.Collapsed;
                     
+                    UpdateHoldDurationVisibility();
+                    
                     _currentMacro.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
@@ -4255,6 +4329,48 @@ namespace MacroEngine.UI
 
             editPanel.Children.Add(selectPointButton);
 
+            // Durée de maintien (optionnel) pour Maintenir gauche/droit/milieu
+            bool IsMaintenirNested(Core.Inputs.MouseActionType t) =>
+                t == Core.Inputs.MouseActionType.LeftDown || t == Core.Inputs.MouseActionType.RightDown || t == Core.Inputs.MouseActionType.MiddleDown;
+            bool showHoldDurationNested = IsMaintenirNested(ma.ActionType);
+            var holdDurationLabelNested = new TextBlock
+            {
+                Text = "Durée (optionnel):",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 4, 0),
+                Visibility = showHoldDurationNested ? Visibility.Visible : Visibility.Collapsed
+            };
+            var holdDurationTextBoxNested = new TextBox
+            {
+                Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "",
+                Width = 60,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = showHoldDurationNested ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Durée en ms (laisser vide = illimité)"
+            };
+            holdDurationTextBoxNested.LostFocus += (s, e) =>
+            {
+                var text = holdDurationTextBoxNested.Text.Trim();
+                int ms = 0;
+                if (!string.IsNullOrEmpty(text) && (!int.TryParse(text, out ms) || ms < 0))
+                {
+                    holdDurationTextBoxNested.Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "";
+                    return;
+                }
+                if (ma.HoldDurationMs != ms)
+                {
+                    SaveState();
+                    ma.HoldDurationMs = ms;
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(holdDurationLabelNested);
+            editPanel.Children.Add(holdDurationTextBoxNested);
+
             // Fonction pour déterminer si les contrôles de déplacement doivent être affichés (uniquement pour Move)
             bool ShouldShowMoveControlsNested(Core.Inputs.MouseActionType actionType)
             {
@@ -4594,6 +4710,10 @@ namespace MacroEngine.UI
                     };
                     
                     // Mettre à jour la visibilité des contrôles selon le type d'action
+                    bool showHold = IsMaintenirNested(ma.ActionType);
+                    holdDurationLabelNested.Visibility = showHold ? Visibility.Visible : Visibility.Collapsed;
+                    holdDurationTextBoxNested.Visibility = showHold ? Visibility.Visible : Visibility.Collapsed;
+                    
                     bool showMoveControls = ShouldShowMoveControlsNested(ma.ActionType);
                     relativeMoveCheckBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
                     moveSpeedComboBoxNested.Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed;
@@ -6795,6 +6915,48 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(relativeMoveCheckBoxIf);
 
+            // Durée de maintien (optionnel) pour Maintenir gauche/droit/milieu
+            bool IsMaintenirIf(Core.Inputs.MouseActionType t) =>
+                t == Core.Inputs.MouseActionType.LeftDown || t == Core.Inputs.MouseActionType.RightDown || t == Core.Inputs.MouseActionType.MiddleDown;
+            bool showHoldDurationIf = IsMaintenirIf(ma.ActionType);
+            var holdDurationLabelIf = new TextBlock
+            {
+                Text = "Durée (optionnel):",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 4, 0),
+                Visibility = showHoldDurationIf ? Visibility.Visible : Visibility.Collapsed
+            };
+            var holdDurationTextBoxIf = new TextBox
+            {
+                Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "",
+                Width = 60,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = showHoldDurationIf ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Durée en ms (laisser vide = illimité)"
+            };
+            holdDurationTextBoxIf.LostFocus += (s, e) =>
+            {
+                var text = holdDurationTextBoxIf.Text.Trim();
+                int ms = 0;
+                if (!string.IsNullOrEmpty(text) && (!int.TryParse(text, out ms) || ms < 0))
+                {
+                    holdDurationTextBoxIf.Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "";
+                    return;
+                }
+                if (ma.HoldDurationMs != ms)
+                {
+                    SaveState();
+                    ma.HoldDurationMs = ms;
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(holdDurationLabelIf);
+            editPanel.Children.Add(holdDurationTextBoxIf);
+
             // ComboBox pour la vitesse de déplacement (uniquement pour Move)
             var moveSpeedComboBoxIf = new ComboBox
             {
@@ -7092,7 +7254,11 @@ namespace MacroEngine.UI
                         _ => Core.Inputs.MouseActionType.LeftClick
                     };
                     
-                    // Mettre à jour la visibilité des contrôles de déplacement
+                    // Mettre à jour la visibilité des contrôles
+                    bool showHoldIf = IsMaintenirIf(ma.ActionType);
+                    holdDurationLabelIf.Visibility = showHoldIf ? Visibility.Visible : Visibility.Collapsed;
+                    holdDurationTextBoxIf.Visibility = showHoldIf ? Visibility.Visible : Visibility.Collapsed;
+                    
                     bool showMoveControlsIf = ma.ActionType == Core.Inputs.MouseActionType.Move;
                     relativeMoveCheckBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;
                     moveSpeedComboBoxIf.Visibility = showMoveControlsIf ? Visibility.Visible : Visibility.Collapsed;

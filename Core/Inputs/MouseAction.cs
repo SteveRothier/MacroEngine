@@ -1,5 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
+using Engine = MacroEngine.Core.Engine;
 using MacroEngine.Core.Hooks;
 
 namespace MacroEngine.Core.Inputs
@@ -62,6 +64,33 @@ namespace MacroEngine.Core.Inputs
         /// Point de contrôle Y pour la courbe de Bézier - uniquement pour Move avec UseBezierPath
         /// </summary>
         public int ControlY { get; set; } = -1;
+
+        /// <summary>
+        /// Durée de maintien en ms pour "Maintenir" (0 = illimité, relâché à la fin de la macro ou par une action Relâcher).
+        /// </summary>
+        public int HoldDurationMs { get; set; }
+
+        /// <summary>
+        /// Relâche un bouton de souris (utilisé pour la relâche automatique à la fin de la macro).
+        /// </summary>
+        public static void ReleaseMouseButton(uint upFlags)
+        {
+            INPUT input = new INPUT
+            {
+                type = INPUT_MOUSE,
+                mi = new MOUSEINPUT
+                {
+                    dx = 0,
+                    dy = 0,
+                    mouseData = 0,
+                    dwFlags = upFlags,
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero
+                }
+            };
+            SendInput(1, new INPUT[] { input }, Marshal.SizeOf(typeof(INPUT)));
+            Thread.Sleep(10);
+        }
 
         public void Execute()
         {
@@ -132,21 +161,51 @@ namespace MacroEngine.Core.Inputs
                     break;
                 case MouseActionType.LeftDown:
                     MouseEvent(MOUSEEVENTF_LEFTDOWN);
+                    if (HoldDurationMs > 0)
+                    {
+                        Thread.Sleep(HoldDurationMs);
+                        MouseEvent(MOUSEEVENTF_LEFTUP);
+                    }
+                    else
+                    {
+                        Engine.ExecutionContext.Current?.AddHeldMouseButton(MOUSEEVENTF_LEFTUP);
+                    }
                     break;
                 case MouseActionType.LeftUp:
                     MouseEvent(MOUSEEVENTF_LEFTUP);
+                    Engine.ExecutionContext.Current?.RemoveHeldMouseButton(MOUSEEVENTF_LEFTUP);
                     break;
                 case MouseActionType.RightDown:
                     MouseEvent(MOUSEEVENTF_RIGHTDOWN);
+                    if (HoldDurationMs > 0)
+                    {
+                        Thread.Sleep(HoldDurationMs);
+                        MouseEvent(MOUSEEVENTF_RIGHTUP);
+                    }
+                    else
+                    {
+                        Engine.ExecutionContext.Current?.AddHeldMouseButton(MOUSEEVENTF_RIGHTUP);
+                    }
                     break;
                 case MouseActionType.RightUp:
                     MouseEvent(MOUSEEVENTF_RIGHTUP);
+                    Engine.ExecutionContext.Current?.RemoveHeldMouseButton(MOUSEEVENTF_RIGHTUP);
                     break;
                 case MouseActionType.MiddleDown:
                     MouseEvent(MOUSEEVENTF_MIDDLEDOWN);
+                    if (HoldDurationMs > 0)
+                    {
+                        Thread.Sleep(HoldDurationMs);
+                        MouseEvent(MOUSEEVENTF_MIDDLEUP);
+                    }
+                    else
+                    {
+                        Engine.ExecutionContext.Current?.AddHeldMouseButton(MOUSEEVENTF_MIDDLEUP);
+                    }
                     break;
                 case MouseActionType.MiddleUp:
                     MouseEvent(MOUSEEVENTF_MIDDLEUP);
+                    Engine.ExecutionContext.Current?.RemoveHeldMouseButton(MOUSEEVENTF_MIDDLEUP);
                     break;
                 case MouseActionType.Move:
                     // Déjà géré ci-dessus
@@ -213,7 +272,8 @@ namespace MacroEngine.Core.Inputs
                 MoveEasing = this.MoveEasing,
                 UseBezierPath = this.UseBezierPath,
                 ControlX = this.ControlX,
-                ControlY = this.ControlY
+                ControlY = this.ControlY,
+                HoldDurationMs = this.HoldDurationMs
             };
         }
 

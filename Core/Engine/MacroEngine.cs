@@ -467,6 +467,7 @@ namespace MacroEngine.Core.Engine
             }
             finally
             {
+                context.ReleaseAllHeldMouseButtons();
                 context.ReleaseAllHeldKeys();
                 context.Variables.Clear();
                 ExecutionContext.Current = null;
