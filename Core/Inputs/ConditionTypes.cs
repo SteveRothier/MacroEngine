@@ -429,4 +429,49 @@ namespace MacroEngine.Core.Inputs
         /// </summary>
         public string? VariableName { get; set; }
     }
+
+    /// <summary>
+    /// Groupe de conditions liées par AND.
+    /// Exemple: Groupe1 = (A AND B), Groupe2 = (C AND D)
+    /// Les groupes sont ensuite combinés avec OR: Groupe1 OR Groupe2 = (A AND B) OR (C AND D)
+    /// </summary>
+    public class ConditionGroup
+    {
+        /// <summary>
+        /// Liste des conditions dans ce groupe (toutes liées par AND)
+        /// </summary>
+        public List<ConditionItem> Conditions { get; set; } = new List<ConditionItem>();
+
+        /// <summary>
+        /// Nom du groupe (optionnel, pour l'UI)
+        /// </summary>
+        public string? Name { get; set; }
+    }
+
+    /// <summary>
+    /// Représente une branche Else If avec sa condition et ses actions
+    /// </summary>
+    public class ElseIfBranch
+    {
+        /// <summary>
+        /// Groupes de conditions pour ce Else If (évalués avec OR entre les groupes, AND dans chaque groupe)
+        /// Si non vide, utilisé à la place de Conditions/Operators
+        /// </summary>
+        public List<ConditionGroup> ConditionGroups { get; set; } = new List<ConditionGroup>();
+
+        /// <summary>
+        /// Conditions (mode plat, pour rétrocompatibilité). Utilisé si ConditionGroups est vide.
+        /// </summary>
+        public List<ConditionItem> Conditions { get; set; } = new List<ConditionItem>();
+
+        /// <summary>
+        /// Opérateurs logiques entre les conditions (mode plat, pour rétrocompatibilité)
+        /// </summary>
+        public List<LogicalOperator> Operators { get; set; } = new List<LogicalOperator>();
+
+        /// <summary>
+        /// Actions à exécuter si cette condition Else If est vraie
+        /// </summary>
+        public List<IInputAction> Actions { get; set; } = new List<IInputAction>();
+    }
 }

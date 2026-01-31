@@ -1165,7 +1165,21 @@ namespace MacroEngine.UI
 
         private string GetIfActionTitle(IfAction ifAction)
         {
-            // Si plusieurs conditions, afficher un résumé
+            // Mode groupes : (G1) OU (G2) où chaque groupe = conditions en ET
+            if (ifAction.ConditionGroups != null && ifAction.ConditionGroups.Count > 0)
+            {
+                var groupTexts = new List<string>();
+                foreach (var group in ifAction.ConditionGroups)
+                {
+                    if (group?.Conditions == null || group.Conditions.Count == 0) continue;
+                    var parts = group.Conditions.Select(c => GetConditionText(c)).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                    if (parts.Count > 0)
+                        groupTexts.Add(parts.Count == 1 ? parts[0] : "(" + string.Join(" ET ", parts) + ")");
+                }
+                return groupTexts.Count == 0 ? "Si" : "Si " + string.Join(" OU ", groupTexts);
+            }
+
+            // Si plusieurs conditions (mode plat), afficher un résumé
             if (ifAction.Conditions != null && ifAction.Conditions.Count > 1)
             {
                 var conditionTexts = new List<string>();
@@ -1175,7 +1189,6 @@ namespace MacroEngine.UI
                     var conditionText = GetConditionText(condition);
                     conditionTexts.Add(conditionText);
                     
-                    // Ajouter l'opérateur entre les conditions
                     if (i < ifAction.Conditions.Count - 1 && i < ifAction.Operators.Count)
                     {
                         var op = ifAction.Operators[i] == LogicalOperator.AND ? "ET" : "OU";
@@ -6045,7 +6058,21 @@ namespace MacroEngine.UI
         /// </summary>
         private string GetConditionPreview(IfAction ifAction)
         {
-            // Si plusieurs conditions, afficher toutes les conditions avec leurs opérateurs
+            // Mode groupes
+            if (ifAction.ConditionGroups != null && ifAction.ConditionGroups.Count > 0)
+            {
+                var groupPreviews = new List<string>();
+                foreach (var group in ifAction.ConditionGroups)
+                {
+                    if (group?.Conditions == null || group.Conditions.Count == 0) continue;
+                    var parts = group.Conditions.Select(c => GetConditionPreviewText(c)).Where(s => !string.IsNullOrEmpty(s)).ToList();
+                    if (parts.Count > 0)
+                        groupPreviews.Add(parts.Count == 1 ? parts[0] : "(" + string.Join(" ET ", parts) + ")");
+                }
+                return string.Join(" OU ", groupPreviews);
+            }
+
+            // Si plusieurs conditions (mode plat)
             if (ifAction.Conditions != null && ifAction.Conditions.Count > 1)
             {
                 var previews = new List<string>();
@@ -6056,7 +6083,6 @@ namespace MacroEngine.UI
                     if (!string.IsNullOrEmpty(preview))
                         previews.Add(preview);
                     
-                    // Ajouter l'opérateur entre les conditions
                     if (i < ifAction.Conditions.Count - 1 && i < ifAction.Operators.Count)
                     {
                         var op = ifAction.Operators[i] == LogicalOperator.AND ? "ET" : "OU";
@@ -6066,7 +6092,6 @@ namespace MacroEngine.UI
                 return string.Join(" ", previews);
             }
             
-            // Une seule condition ou compatibilité avec l'ancien format
             if (ifAction.Conditions != null && ifAction.Conditions.Count == 1)
             {
                 return GetConditionPreviewText(ifAction.Conditions[0]);
@@ -6102,6 +6127,33 @@ namespace MacroEngine.UI
                     : "Texte: (non configuré)",
                 _ => ""
             };
+        }
+
+        /// <summary>
+        /// Aperçu textuel d'une branche Else If (Conditions + Operators).
+        /// </summary>
+        private string GetConditionPreviewForBranch(ElseIfBranch branch)
+        {
+            if (branch == null) return "";
+            if (branch.Conditions == null || branch.Conditions.Count == 0) return "(vide)";
+            if (branch.Conditions.Count == 1) return GetConditionPreviewText(branch.Conditions[0]);
+            var previews = new List<string>();
+            for (int i = 0; i < branch.Conditions.Count; i++)
+            {
+                var p = GetConditionPreviewText(branch.Conditions[i]);
+                if (!string.IsNullOrEmpty(p)) previews.Add(p);
+                if (i < branch.Conditions.Count - 1 && branch.Operators != null && i < branch.Operators.Count)
+                    previews.Add(branch.Operators[i] == LogicalOperator.AND ? "ET" : "OU");
+            }
+            return string.Join(" ", previews);
+        }
+
+        private static List<IInputAction>? GetIfActionsList(IfAction ifAction, bool isThen, int elseIfBranchIndex)
+        {
+            if (isThen) return ifAction.ThenActions;
+            if (elseIfBranchIndex < 0) return ifAction.ElseActions;
+            if (ifAction.ElseIfBranches == null || elseIfBranchIndex >= ifAction.ElseIfBranches.Count) return null;
+            return ifAction.ElseIfBranches[elseIfBranchIndex].Actions;
         }
 
         private string GetConditionPreviewText(ConditionItem condition)
@@ -6193,9 +6245,50 @@ namespace MacroEngine.UI
             }
 
             // Panel pour ajouter des actions dans Then
-            var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, index, true);
+            var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, index, true, -1);
             thenSection.Children.Add(addThenActionsPanel);
             container.Children.Add(thenSection);
+
+            // Sections Else If
+            if (ifAction.ElseIfBranches != null)
+            {
+                for (int bi = 0; bi < ifAction.ElseIfBranches.Count; bi++)
+                {
+                    var branch = ifAction.ElseIfBranches[bi];
+                    var elseIfSection = new StackPanel
+                    {
+                        Orientation = Orientation.Vertical,
+                        Margin = new Thickness(20, 4, 0, 4)
+                    };
+                    var elseIfHeader = new TextBlock
+                    {
+                        Text = "Else If (" + GetConditionPreviewForBranch(branch) + "):",
+                        FontSize = 12,
+                        FontWeight = FontWeights.Bold,
+                        Margin = new Thickness(0, 0, 0, 4),
+                        Foreground = new SolidColorBrush(Color.FromRgb(180, 120, 60))
+                    };
+                    elseIfSection.Children.Add(elseIfHeader);
+                    if (branch.Actions != null && branch.Actions.Count > 0)
+                    {
+                        var elseIfContainer = new StackPanel
+                        {
+                            Orientation = Orientation.Vertical,
+                            Margin = new Thickness(0, 0, 0, 4),
+                            Background = new SolidColorBrush(Color.FromArgb(10, 180, 120, 60))
+                        };
+                        for (int i = 0; i < branch.Actions.Count; i++)
+                        {
+                            var nestedCard = CreateNestedIfActionCard(branch.Actions[i], index, i, false, bi);
+                            elseIfContainer.Children.Add(nestedCard);
+                        }
+                        elseIfSection.Children.Add(elseIfContainer);
+                    }
+                    var addElseIfPanel = CreateAddIfActionsPanel(ifAction, index, false, bi);
+                    elseIfSection.Children.Add(addElseIfPanel);
+                    container.Children.Add(elseIfSection);
+                }
+            }
 
             // Section Else
             var elseSection = new StackPanel
@@ -6235,7 +6328,7 @@ namespace MacroEngine.UI
             }
 
             // Panel pour ajouter des actions dans Else
-            var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, index, false);
+            var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, index, false, -1);
             elseSection.Children.Add(addElseActionsPanel);
             container.Children.Add(elseSection);
 
@@ -6798,9 +6891,9 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée une carte pour une action imbriquée dans un IfAction (Then ou Else)
+        /// Crée une carte pour une action imbriquée dans un IfAction (Then, Else If ou Else). elseIfBranchIndex &lt; 0 = Then ou Else.
         /// </summary>
-        private FrameworkElement CreateNestedIfActionCard(IInputAction action, int parentIndex, int nestedIndex, bool isThen)
+        private FrameworkElement CreateNestedIfActionCard(IInputAction action, int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex = -1)
         {
             // Si c'est un RepeatAction imbriqué, créer un conteneur récursif au lieu d'une simple carte
             if (action is RepeatAction nestedRepeatAction)
@@ -6808,8 +6901,7 @@ namespace MacroEngine.UI
                 return CreateNestedRepeatActionContainer(nestedRepeatAction, parentIndex, nestedIndex, isThen);
             }
 
-            // Réutiliser CreateActionCard avec NestedIfActionInfo pour que la croix supprime cette action imbriquée uniquement
-            var card = CreateActionCard(action, parentIndex, null, new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen });
+            var card = CreateActionCard(action, parentIndex, null, new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen, ElseIfBranchIndex = elseIfBranchIndex });
             
             var titleBlock = FindTitleBlockInCard(card);
             if (titleBlock != null)
@@ -6820,7 +6912,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedIfKeyboardAction(parentIndex, nestedIndex, isThen, titleBlock);
+                        EditNestedIfKeyboardAction(parentIndex, nestedIndex, isThen, elseIfBranchIndex, titleBlock);
                     };
                 }
                 else if (action is DelayAction)
@@ -6829,7 +6921,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedIfDelayAction(parentIndex, nestedIndex, isThen, titleBlock);
+                        EditNestedIfDelayAction(parentIndex, nestedIndex, isThen, elseIfBranchIndex, titleBlock);
                     };
                 }
                 else if (action is Core.Inputs.MouseAction)
@@ -6838,7 +6930,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedIfMouseAction(parentIndex, nestedIndex, isThen, titleBlock);
+                        EditNestedIfMouseAction(parentIndex, nestedIndex, isThen, elseIfBranchIndex, titleBlock);
                     };
                 }
                 else if (action is TextAction)
@@ -6888,7 +6980,7 @@ namespace MacroEngine.UI
             Grid.SetColumn(card, 0);
             container.Children.Add(card);
 
-            var moveButtonsContainer = CreateNestedIfMoveButtonsContainer(action, parentIndex, nestedIndex, isThen);
+            var moveButtonsContainer = CreateNestedIfMoveButtonsContainer(action, parentIndex, nestedIndex, isThen, elseIfBranchIndex);
             Grid.SetColumn(moveButtonsContainer, 1);
             container.Children.Add(moveButtonsContainer);
 
@@ -6898,7 +6990,7 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un panel avec des boutons pour ajouter des actions dans un IfAction (Then ou Else)
         /// </summary>
-        private FrameworkElement CreateAddIfActionsPanel(IfAction ifAction, int ifActionIndex, bool isThen)
+        private FrameworkElement CreateAddIfActionsPanel(IfAction ifAction, int ifActionIndex, bool isThen, int elseIfBranchIndex = -1)
         {
             var panel = new StackPanel
             {
@@ -6948,7 +7040,7 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un conteneur de boutons pour déplacer une action imbriquée dans un IfAction
         /// </summary>
-        private FrameworkElement CreateNestedIfMoveButtonsContainer(IInputAction action, int parentIndex, int nestedIndex, bool isThen)
+        private FrameworkElement CreateNestedIfMoveButtonsContainer(IInputAction action, int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex = -1)
         {
             var moveButtonsContainer = new Border
             {
@@ -7244,7 +7336,7 @@ namespace MacroEngine.UI
         }
 
         // Méthodes d'édition inline pour les actions imbriquées dans IfAction
-        private void EditNestedIfKeyboardAction(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)
+        private void EditNestedIfKeyboardAction(int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex, TextBlock titleText)
         {
             if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
                 return;
@@ -7275,7 +7367,7 @@ namespace MacroEngine.UI
             parentPanel.Children.Insert(idx, editPanel);
         }
 
-        private void EditNestedIfDelayAction(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)
+        private void EditNestedIfDelayAction(int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex, TextBlock titleText)
         {
             if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
                 return;
@@ -7398,7 +7490,7 @@ namespace MacroEngine.UI
             }));
         }
 
-        private void EditNestedIfMouseAction(int parentIndex, int nestedIndex, bool isThen, TextBlock titleText)
+        private void EditNestedIfMouseAction(int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex, TextBlock titleText)
         {
             if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
                 return;
@@ -8036,12 +8128,15 @@ namespace MacroEngine.UI
 
         /// <summary>
         /// Informations sur une action imbriquée dans un IfAction
+        /// IsThen=true -> ThenActions ; IsThen=false et ElseIfBranchIndex&lt;0 -> ElseActions ; IsThen=false et ElseIfBranchIndex>=0 -> ElseIfBranches[ElseIfBranchIndex].Actions
         /// </summary>
         private class NestedIfActionInfo
         {
             public int ParentIndex { get; set; }
             public int NestedIndex { get; set; }
             public bool IsThen { get; set; }
+            /// <summary>-1 = Else, >= 0 = index de la branche Else If</summary>
+            public int ElseIfBranchIndex { get; set; } = -1;
         }
 
         /// <summary>
@@ -8055,12 +8150,14 @@ namespace MacroEngine.UI
 
         /// <summary>
         /// Informations sur un IfAction (pour passer le contexte aux event handlers)
+        /// ElseIfBranchIndex &lt; 0 = Then ou Else, >= 0 = branche Else If
         /// </summary>
         private class IfActionInfo
         {
             public int IfActionIndex { get; set; }
             public string ActionType { get; set; } = "";
             public bool IsThen { get; set; }
+            public int ElseIfBranchIndex { get; set; } = -1;
         }
 
         #endregion

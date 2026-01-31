@@ -18,16 +18,25 @@ namespace MacroEngine.Core.Inputs
         public InputActionType Type => InputActionType.Condition;
 
         /// <summary>
-        /// Liste des conditions à évaluer
+        /// Liste des conditions à évaluer (mode plat, utilisé si ConditionGroups est vide)
         /// </summary>
         public List<ConditionItem> Conditions { get; set; } = new List<ConditionItem>();
 
         /// <summary>
-        /// Opérateurs logiques entre les conditions (AND/OR)
-        /// La liste doit avoir (Conditions.Count - 1) éléments
-        /// Exemple: [Condition1] AND [Condition2] OR [Condition3] -> [AND, OR]
+        /// Opérateurs logiques entre les conditions (AND/OR) — mode plat
         /// </summary>
         public List<LogicalOperator> Operators { get; set; } = new List<LogicalOperator>();
+
+        /// <summary>
+        /// Groupes de conditions : (A ET B) OU (C ET D). Chaque groupe est une liste de conditions en ET, les groupes sont en OU.
+        /// Si non vide, utilisé à la place de Conditions/Operators.
+        /// </summary>
+        public List<ConditionGroup> ConditionGroups { get; set; } = new List<ConditionGroup>();
+
+        /// <summary>
+        /// Branches Else If (facultatif). Évaluées dans l'ordre si la condition principale est fausse.
+        /// </summary>
+        public List<ElseIfBranch> ElseIfBranches { get; set; } = new List<ElseIfBranch>();
 
         // Propriétés de compatibilité avec l'ancien format (pour la rétrocompatibilité)
         /// <summary>
@@ -242,48 +251,88 @@ namespace MacroEngine.Core.Inputs
 
         public void Execute()
         {
-            bool conditionResult = EvaluateCondition();
+            bool conditionResult = EvaluateCondition(out _);
 
             if (conditionResult)
             {
-                // Exécuter les actions Then
-                if (ThenActions != null)
-                {
-                    foreach (var action in ThenActions)
-                    {
-                        if (action != null)
-                        {
-                            action.Execute();
-                        }
-                    }
-                }
+                ExecuteActions(ThenActions);
             }
             else
             {
-                // Exécuter les actions Else
-                if (ElseActions != null)
+                // Else If : tester chaque branche dans l'ordre
+                bool elseIfMatched = false;
+                if (ElseIfBranches != null)
+                {
+                    foreach (var branch in ElseIfBranches)
+                    {
+                        if (branch == null || branch.Conditions == null || branch.Conditions.Count == 0)
+                            continue;
+                        if (EvaluateBranch(branch, out _))
+                        {
+                            ExecuteActions(branch.Actions);
+                            elseIfMatched = true;
+                            break;
+                        }
+                    }
+                }
+                if (!elseIfMatched && ElseActions != null)
                 {
                     foreach (var action in ElseActions)
                     {
                         if (action != null)
-                        {
                             action.Execute();
-                        }
                     }
                 }
             }
         }
 
-        /// <summary>
-        /// Évalue la condition selon son type
-        /// </summary>
-        private bool EvaluateCondition()
+        private static void ExecuteActions(List<IInputAction>? actions)
         {
-            // Si aucune condition n'est définie, retourner false
+            if (actions == null) return;
+            foreach (var action in actions)
+            {
+                if (action != null)
+                    action.Execute();
+            }
+        }
+
+        /// <summary>
+        /// Évalue la condition principale (groupes OU mode plat). En mode debug, remplit ExecutionContext.ConditionDebugFailures.
+        /// </summary>
+        private bool EvaluateCondition(out List<string>? debugFailures)
+        {
+            debugFailures = null;
+            var context = ExecutionContext.Current;
+            if (context != null && context.ConditionDebugEnabled)
+                context.ConditionDebugFailures.Clear();
+
+            // Mode groupes : (G1) OU (G2) OU ... où chaque groupe = conditions en ET
+            if (ConditionGroups != null && ConditionGroups.Count > 0)
+            {
+                bool anyGroupTrue = false;
+                foreach (var group in ConditionGroups)
+                {
+                    if (group?.Conditions == null || group.Conditions.Count == 0) continue;
+                    bool groupResult = true;
+                    for (int j = 0; j < group.Conditions.Count; j++)
+                    {
+                        bool r = EvaluateConditionItem(group.Conditions[j]);
+                        if (!r && context?.ConditionDebugEnabled == true)
+                            context.ConditionDebugFailures.Add($"Groupe, condition: {GetConditionDescription(group.Conditions[j])}");
+                        groupResult = groupResult && r;
+                        if (!groupResult) break;
+                    }
+                    if (groupResult) { anyGroupTrue = true; break; }
+                }
+                if (context?.ConditionDebugEnabled == true && context.ConditionDebugFailures.Count > 0)
+                    debugFailures = context.ConditionDebugFailures;
+                return anyGroupTrue;
+            }
+
+            // Mode plat (Conditions + Operators) ou compatibilité
             if (Conditions == null || Conditions.Count == 0)
             {
-                // Compatibilité avec l'ancien format
-                return ConditionType switch
+                bool r = ConditionType switch
                 {
                     ConditionType.Boolean => Condition,
                     ConditionType.ActiveApplication => EvaluateActiveApplicationCondition(),
@@ -296,37 +345,148 @@ namespace MacroEngine.Core.Inputs
                     ConditionType.TextOnScreen => EvaluateTextOnScreenCondition(),
                     _ => Condition
                 };
+                if (!r && context?.ConditionDebugEnabled == true)
+                    context.ConditionDebugFailures.Add("Condition principale (ancien format)");
+                if (context?.ConditionDebugEnabled == true && context.ConditionDebugFailures.Count > 0)
+                    debugFailures = context.ConditionDebugFailures;
+                return r;
             }
 
-            // Si une seule condition, l'évaluer directement
             if (Conditions.Count == 1)
             {
-                return EvaluateConditionItem(Conditions[0]);
+                bool r = EvaluateConditionItem(Conditions[0]);
+                if (!r && context?.ConditionDebugEnabled == true)
+                    context.ConditionDebugFailures.Add(GetConditionDescription(Conditions[0]));
+                if (context?.ConditionDebugEnabled == true && context.ConditionDebugFailures.Count > 0)
+                    debugFailures = context.ConditionDebugFailures;
+                return r;
             }
 
-            // Évaluer toutes les conditions
             var results = new List<bool>();
-            foreach (var condition in Conditions)
+            for (int i = 0; i < Conditions.Count; i++)
             {
-                results.Add(EvaluateConditionItem(condition));
+                bool r = EvaluateConditionItem(Conditions[i]);
+                if (!r && context?.ConditionDebugEnabled == true)
+                    context.ConditionDebugFailures.Add($"Condition {i + 1}: {GetConditionDescription(Conditions[i])}");
+                results.Add(r);
             }
 
-            // Appliquer les opérateurs logiques
             bool result = results[0];
             for (int i = 0; i < Operators.Count && i < results.Count - 1; i++)
             {
                 bool nextResult = results[i + 1];
-                if (Operators[i] == LogicalOperator.AND)
-                {
-                    result = result && nextResult;
-                }
-                else // OR
-                {
-                    result = result || nextResult;
-                }
+                result = Operators[i] == LogicalOperator.AND ? (result && nextResult) : (result || nextResult);
             }
-
+            if (context?.ConditionDebugEnabled == true && context.ConditionDebugFailures.Count > 0)
+                debugFailures = context.ConditionDebugFailures;
             return result;
+        }
+
+        /// <summary>
+        /// Évalue une branche Else If (Conditions + Operators en mode plat). Utilisé par le moteur pour l'exécution asynchrone.
+        /// </summary>
+        public bool EvaluateElseIfBranch(ElseIfBranch branch)
+        {
+            return EvaluateBranch(branch, out _);
+        }
+
+        /// <summary>
+        /// Évalue une branche Else If (supporte les groupes et le mode plat).
+        /// </summary>
+        private bool EvaluateBranch(ElseIfBranch branch, out List<string>? debugFailures)
+        {
+            debugFailures = null;
+            var context = ExecutionContext.Current;
+            
+            // Mode groupes : (G1) OU (G2) OU ... où chaque groupe = conditions en ET
+            if (branch.ConditionGroups != null && branch.ConditionGroups.Count > 0)
+            {
+                bool anyGroupTrue = false;
+                foreach (var group in branch.ConditionGroups)
+                {
+                    if (group?.Conditions == null || group.Conditions.Count == 0) continue;
+                    bool groupResult = true;
+                    for (int j = 0; j < group.Conditions.Count; j++)
+                    {
+                        bool r = EvaluateConditionItem(group.Conditions[j]);
+                        if (!r && context?.ConditionDebugEnabled == true)
+                            context.ConditionDebugFailures.Add($"Else If Groupe, condition: {GetConditionDescription(group.Conditions[j])}");
+                        groupResult = groupResult && r;
+                        if (!groupResult) break;
+                    }
+                    if (groupResult) { anyGroupTrue = true; break; }
+                }
+                if (context?.ConditionDebugEnabled == true && context.ConditionDebugFailures.Count > 0)
+                    debugFailures = context.ConditionDebugFailures;
+                return anyGroupTrue;
+            }
+            
+            // Mode plat (Conditions + Operators)
+            if (branch.Conditions == null || branch.Conditions.Count == 0) return false;
+            if (branch.Conditions.Count == 1)
+            {
+                bool r = EvaluateConditionItem(branch.Conditions[0]);
+                if (!r && context?.ConditionDebugEnabled == true)
+                    context.ConditionDebugFailures.Add($"Else If: {GetConditionDescription(branch.Conditions[0])}");
+                if (context?.ConditionDebugEnabled == true && context.ConditionDebugFailures.Count > 0)
+                    debugFailures = context.ConditionDebugFailures;
+                return r;
+            }
+            
+            var results = new List<bool>();
+            for (int i = 0; i < branch.Conditions.Count; i++)
+            {
+                bool r = EvaluateConditionItem(branch.Conditions[i]);
+                if (!r && context?.ConditionDebugEnabled == true)
+                    context.ConditionDebugFailures.Add($"Else If condition {i + 1}: {GetConditionDescription(branch.Conditions[i])}");
+                results.Add(r);
+            }
+            
+            bool res = results[0];
+            for (int i = 0; i < branch.Operators.Count && i < results.Count - 1; i++)
+                res = branch.Operators[i] == LogicalOperator.AND ? (res && results[i + 1]) : (res || results[i + 1]);
+            
+            if (context?.ConditionDebugEnabled == true && context.ConditionDebugFailures.Count > 0)
+                debugFailures = context.ConditionDebugFailures;
+            return res;
+        }
+
+        /// <summary>
+        /// Description courte d'une condition (pour le mode debug).
+        /// </summary>
+        private static string GetConditionDescription(ConditionItem condition)
+        {
+            if (condition == null) return "(vide)";
+            return condition.ConditionType switch
+            {
+                ConditionType.Boolean => condition.Condition ? "Vrai" : "Faux",
+                ConditionType.ActiveApplication => condition.ActiveApplicationConfig != null && condition.ActiveApplicationConfig.ProcessNames != null && condition.ActiveApplicationConfig.ProcessNames.Count > 0
+                    ? $"Application active: {string.Join(", ", condition.ActiveApplicationConfig.ProcessNames.Take(2))}"
+                    : "Application active",
+                ConditionType.KeyboardKey => condition.KeyboardKeyConfig != null && condition.KeyboardKeyConfig.VirtualKeyCode != 0
+                    ? $"Touche clavier (VK {condition.KeyboardKeyConfig.VirtualKeyCode})"
+                    : "Touche clavier",
+                ConditionType.ProcessRunning => condition.ProcessRunningConfig != null && condition.ProcessRunningConfig.ProcessNames != null && condition.ProcessRunningConfig.ProcessNames.Count > 0
+                    ? $"Processus ouvert: {string.Join(", ", condition.ProcessRunningConfig.ProcessNames.Take(2))}"
+                    : "Processus ouvert",
+                ConditionType.PixelColor => condition.PixelColorConfig != null
+                    ? $"Pixel ({condition.PixelColorConfig.X},{condition.PixelColorConfig.Y}) = {condition.PixelColorConfig.ExpectedColor}"
+                    : "Pixel couleur",
+                ConditionType.MousePosition => condition.MousePositionConfig != null
+                    ? $"Position souris zone ({condition.MousePositionConfig.X1},{condition.MousePositionConfig.Y1})-({condition.MousePositionConfig.X2},{condition.MousePositionConfig.Y2})"
+                    : "Position souris",
+                ConditionType.TimeDate => condition.TimeDateConfig != null
+                    ? $"Temps/Date {condition.TimeDateConfig.ComparisonType} {condition.TimeDateConfig.Operator} {condition.TimeDateConfig.Value}"
+                    : "Temps/Date",
+                ConditionType.ImageOnScreen => condition.ImageOnScreenConfig != null && !string.IsNullOrEmpty(condition.ImageOnScreenConfig.ImagePath)
+                    ? $"Image: {System.IO.Path.GetFileName(condition.ImageOnScreenConfig.ImagePath)}"
+                    : "Image à l'écran",
+                ConditionType.TextOnScreen => condition.TextOnScreenConfig != null && !string.IsNullOrEmpty(condition.TextOnScreenConfig.Text)
+                    ? $"Texte à l'écran: \"{condition.TextOnScreenConfig.Text.Substring(0, Math.Min(15, condition.TextOnScreenConfig.Text.Length))}\"..."
+                    : "Texte à l'écran",
+                ConditionType.Variable => !string.IsNullOrEmpty(condition.VariableName) ? $"Variable \"{condition.VariableName}\"" : "Variable",
+                _ => condition.ConditionType.ToString()
+            };
         }
 
         /// <summary>
@@ -368,10 +528,11 @@ namespace MacroEngine.Core.Inputs
 
         /// <summary>
         /// Retourne le résultat de l'évaluation de la condition au moment de l'exécution (pour le moteur).
+        /// En mode debug, remplit ExecutionContext.ConditionDebugFailures avec les conditions qui ont échoué.
         /// </summary>
         public bool GetConditionResult()
         {
-            return EvaluateCondition();
+            return EvaluateCondition(out _);
         }
 
         /// <summary>
@@ -710,6 +871,16 @@ namespace MacroEngine.Core.Inputs
                 Name = this.Name,
                 Conditions = this.Conditions?.Select(c => CloneConditionItem(c)).ToList() ?? new List<ConditionItem>(),
                 Operators = this.Operators?.ToList() ?? new List<LogicalOperator>(),
+                ConditionGroups = this.ConditionGroups?.Select(g => new ConditionGroup
+                {
+                    Conditions = g.Conditions?.Select(c => CloneConditionItem(c)).ToList() ?? new List<ConditionItem>()
+                }).ToList() ?? new List<ConditionGroup>(),
+                ElseIfBranches = this.ElseIfBranches?.Select(b => new ElseIfBranch
+                {
+                    Conditions = b.Conditions?.Select(c => CloneConditionItem(c)).ToList() ?? new List<ConditionItem>(),
+                    Operators = b.Operators?.ToList() ?? new List<LogicalOperator>(),
+                    Actions = b.Actions?.Select(a => a?.Clone()).Where(a => a != null).Cast<IInputAction>().ToList() ?? new List<IInputAction>()
+                }).ToList() ?? new List<ElseIfBranch>(),
                 ThenActions = this.ThenActions?.Select(a => a?.Clone()).Where(a => a != null).Cast<IInputAction>().ToList() ?? new List<IInputAction>(),
                 ElseActions = this.ElseActions?.Select(a => a?.Clone()).Where(a => a != null).Cast<IInputAction>().ToList() ?? new List<IInputAction>()
             };

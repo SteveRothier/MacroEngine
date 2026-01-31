@@ -27,6 +27,11 @@ namespace MacroEngine.Core.Engine
         event EventHandler<ActionExecutedEventArgs> ActionExecuted;
 
         /// <summary>
+        /// Événement déclenché quand une condition Si échoue en mode debug (affiche quelle condition a échoué).
+        /// </summary>
+        event EventHandler<ConditionFailedEventArgs>? ConditionFailed;
+
+        /// <summary>
         /// État actuel du moteur
         /// </summary>
         MacroEngineState State { get; }
@@ -106,6 +111,18 @@ namespace MacroEngine.Core.Engine
         public IInputAction? Action { get; set; }
         public string ActionDescription { get; set; } = string.Empty;
         public DateTime Timestamp { get; set; } = DateTime.Now;
+    }
+
+    /// <summary>
+    /// Arguments pour l'échec d'une condition (mode debug).
+    /// </summary>
+    public class ConditionFailedEventArgs : EventArgs
+    {
+        public string Message { get; set; } = string.Empty;
+        /// <summary>
+        /// Liste des conditions qui ont échoué (pour affichage détaillé).
+        /// </summary>
+        public List<string> FailedConditions { get; set; } = new List<string>();
     }
 }
 

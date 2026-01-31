@@ -22,6 +22,21 @@ namespace MacroEngine.Core.Engine
         public MacroVariableStore Variables { get; } = new MacroVariableStore();
 
         /// <summary>
+        /// Active le mode debug pour les conditions (affiche quelle condition a échoué)
+        /// </summary>
+        public bool ConditionDebugEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Liste des conditions qui ont échoué (pour le mode debug)
+        /// </summary>
+        public List<string> ConditionDebugFailures { get; } = new List<string>();
+
+        /// <summary>
+        /// Information sur la dernière condition qui a échoué (pour le mode debug)
+        /// </summary>
+        public string? LastFailedConditionInfo { get; set; }
+
+        /// <summary>
         /// Enregistre une touche comme maintenue (pour relâche automatique à la fin de la macro).
         /// </summary>
         public void AddHeldKey(ushort virtualKeyCode)

@@ -147,6 +147,11 @@ namespace MacroEngine.Core.Models
         /// Code virtuel de la touche pour arrêter la macro en cours (par défaut F11 = 0x7A)
         /// </summary>
         public int StopMacroKeyCode { get; set; } = 0x7A; // F11 par défaut
+
+        /// <summary>
+        /// Mode debug : afficher quelle condition a échoué lors de l'évaluation des Si.
+        /// </summary>
+        public bool ConditionDebugEnabled { get; set; }
     }
 
     /// <summary>

@@ -25,6 +25,7 @@ namespace MacroEngine.Core.Engine
         public event EventHandler<MacroEngineEventArgs>? StateChanged;
         public event EventHandler<MacroEngineErrorEventArgs>? ErrorOccurred;
         public event EventHandler<ActionExecutedEventArgs>? ActionExecuted;
+        public event EventHandler<ConditionFailedEventArgs>? ConditionFailed;
 
         public MacroEngine(ILogger? logger = null)
         {
@@ -223,23 +224,44 @@ namespace MacroEngine.Core.Engine
                             Action = action,
                             ActionDescription = description
                         });
-                        
-                        // Évaluer la condition au runtime et exécuter les actions appropriées
-                        if (ifAction.GetConditionResult())
+
+                        var context = ExecutionContext.Current;
+                        bool conditionResult = ifAction.GetConditionResult();
+
+                        // Mode debug : afficher les conditions qui ont échoué
+                        if (context != null && context.ConditionDebugEnabled && context.ConditionDebugFailures != null && context.ConditionDebugFailures.Count > 0)
                         {
-                            // Exécuter les actions Then
-                            if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
+                            ConditionFailed?.Invoke(this, new ConditionFailedEventArgs
                             {
+                                Message = $"Condition non remplie ({context.ConditionDebugFailures.Count} échec(s))",
+                                FailedConditions = new List<string>(context.ConditionDebugFailures)
+                            });
+                        }
+
+                        if (conditionResult)
+                        {
+                            if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
                                 await ExecuteActionsAsync(ifAction.ThenActions);
-                            }
                         }
                         else
                         {
-                            // Exécuter les actions Else
-                            if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
+                            bool elseIfMatched = false;
+                            if (ifAction.ElseIfBranches != null)
                             {
-                                await ExecuteActionsAsync(ifAction.ElseActions);
+                                foreach (var branch in ifAction.ElseIfBranches)
+                                {
+                                    if (branch?.Conditions == null || branch.Conditions.Count == 0) continue;
+                                    if (ifAction.EvaluateElseIfBranch(branch))
+                                    {
+                                        if (branch.Actions != null && branch.Actions.Count > 0)
+                                            await ExecuteActionsAsync(branch.Actions);
+                                        elseIfMatched = true;
+                                        break;
+                                    }
+                                }
                             }
+                            if (!elseIfMatched && ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
+                                await ExecuteActionsAsync(ifAction.ElseActions);
                         }
                     }
                     else if (action is RepeatAction repeatAction)
@@ -460,6 +482,7 @@ namespace MacroEngine.Core.Engine
 
             // Contexte d'exécution (variables) pour cette macro
             var context = new ExecutionContext();
+            context.ConditionDebugEnabled = Config.ConditionDebugEnabled;
             ExecutionContext.Current = context;
             try
             {
