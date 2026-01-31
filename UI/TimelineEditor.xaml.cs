@@ -189,13 +189,14 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateActionCard(IInputAction action, int index, NestedActionInfo? nestedRepeatInfo = null, NestedIfActionInfo? nestedIfInfo = null)
         {
-            // Couleurs définies directement (pas de FindResource pour éviter les conflits)
+            // Couleurs de la palette sombre
+            Color bgBase = GetThemeColor("BackgroundTertiaryColor");       // #2D2934 Fond tertiaire
+            Color bgSecondary = GetThemeColor("BackgroundSecondaryColor"); // #25222B Fond secondaire
+            Color textMuted = GetThemeColor("TextMutedColor");             // #8A8794 Texte muted
+            
+            // Couleur principale de l'action (accent)
             Color primaryColor;
             Color hoverColor;
-            Color backgroundColor;
-            Color backgroundColorHover;
-            Color textColor;
-            Color iconColor; // Couleur de l'icône (peut être différente du texte)
             string icon;
             string title;
             string details;
@@ -205,44 +206,28 @@ namespace MacroEngine.UI
             {
                 case KeyboardAction ka:
                     primaryColor = Color.FromRgb(79, 163, 209);   // #4FA3D1 Bleu froid
-                    hoverColor = Color.FromRgb(62, 146, 192);      // #3E92C0
-                    backgroundColor = Color.FromRgb(79, 163, 209);
-                    backgroundColorHover = Color.FromRgb(62, 146, 192);
-                    textColor = Color.FromRgb(255, 255, 255);
-                    iconColor = Color.FromRgb(255, 255, 255);
+                    hoverColor = Color.FromRgb(99, 183, 229);     // Plus clair au hover
                     icon = "⌨";
                     title = GetKeyboardActionTitle(ka);
                     details = GetKeyboardActionDetails(ka);
                     break;
                 case Core.Inputs.MouseAction ma:
                     primaryColor = Color.FromRgb(79, 181, 140);   // #4FB58C Vert technique
-                    hoverColor = Color.FromRgb(62, 164, 123);      // #3EA47B
-                    backgroundColor = Color.FromRgb(79, 181, 140);
-                    backgroundColorHover = Color.FromRgb(62, 164, 123);
-                    textColor = Color.FromRgb(255, 255, 255);
-                    iconColor = Color.FromRgb(255, 255, 255);
+                    hoverColor = Color.FromRgb(99, 201, 160);
                     icon = "🖱";
                     title = GetMouseActionTitle(ma);
                     details = GetMouseActionDetails(ma);
                     break;
                 case DelayAction da:
                     primaryColor = Color.FromRgb(201, 122, 58);   // #C97A3A Orange timing
-                    hoverColor = Color.FromRgb(184, 105, 41);     // #B86929
-                    backgroundColor = Color.FromRgb(201, 122, 58);
-                    backgroundColorHover = Color.FromRgb(184, 105, 41);
-                    textColor = Color.FromRgb(255, 255, 255);
-                    iconColor = Color.FromRgb(255, 255, 255);
+                    hoverColor = Color.FromRgb(221, 142, 78);
                     icon = "⏱";
                     title = GetDelayActionTitle(da);
                     details = "Pause";
                     break;
                 case RepeatAction ra:
                     primaryColor = Color.FromRgb(138, 108, 209);   // #8A6CD1 Violet logique
-                    hoverColor = Color.FromRgb(121, 91, 192);      // #795BC0
-                    backgroundColor = Color.FromRgb(138, 108, 209);
-                    backgroundColorHover = Color.FromRgb(121, 91, 192);
-                    textColor = Color.FromRgb(255, 255, 255);
-                    iconColor = Color.FromRgb(255, 255, 255);
+                    hoverColor = Color.FromRgb(158, 128, 229);
                     icon = "🔁";
                     var actionsCount = ra.Actions?.Count ?? 0;
                     title = GetRepeatActionTitle(ra);
@@ -250,11 +235,7 @@ namespace MacroEngine.UI
                     break;
                 case IfAction ifAction:
                     primaryColor = Color.FromRgb(201, 74, 74);     // #C94A4A Rouge décisionnel
-                    hoverColor = Color.FromRgb(184, 57, 57);      // #B83939
-                    backgroundColor = Color.FromRgb(201, 74, 74);
-                    backgroundColorHover = Color.FromRgb(184, 57, 57);
-                    textColor = Color.FromRgb(255, 255, 255);
-                    iconColor = Color.FromRgb(255, 255, 255);
+                    hoverColor = Color.FromRgb(221, 94, 94);
                     icon = "🔀";
                     var thenCount = ifAction.ThenActions?.Count ?? 0;
                     var elseCount = ifAction.ElseActions?.Count ?? 0;
@@ -263,62 +244,79 @@ namespace MacroEngine.UI
                     break;
                 case TextAction ta:
                     primaryColor = Color.FromRgb(224, 177, 90);     // #E0B15A Jaune chaud
-                    hoverColor = Color.FromRgb(207, 160, 73);      // #CFA049
-                    backgroundColor = Color.FromRgb(224, 177, 90);
-                    backgroundColorHover = Color.FromRgb(207, 160, 73);
-                    textColor = Color.FromRgb(30, 27, 34);         // Contraste sur jaune
-                    iconColor = Color.FromRgb(30, 27, 34);
+                    hoverColor = Color.FromRgb(244, 197, 110);
                     icon = "📝";
                     title = GetTextActionTitle(ta);
                     details = GetTextActionDetails(ta);
                     break;
                 case VariableAction va:
                     primaryColor = Color.FromRgb(90, 163, 163);    // #5AA3A3 Cyan data
-                    hoverColor = Color.FromRgb(73, 146, 146);      // #499292
-                    backgroundColor = Color.FromRgb(90, 163, 163);
-                    backgroundColorHover = Color.FromRgb(73, 146, 146);
-                    textColor = Color.FromRgb(255, 255, 255);
-                    iconColor = Color.FromRgb(255, 255, 255);
+                    hoverColor = Color.FromRgb(110, 183, 183);
                     icon = "📦";
                     title = GetVariableActionTitle(va);
                     details = GetVariableActionDetails(va);
                     break;
                 default:
                     primaryColor = Color.FromRgb(122, 30, 58);    // #7A1E3A Pourpre signature
-                    hoverColor = Color.FromRgb(143, 42, 74);       // #8F2A4A
-                    backgroundColor = Color.FromRgb(122, 30, 58);
-                    backgroundColorHover = Color.FromRgb(143, 42, 74);
-                    textColor = Color.FromRgb(255, 255, 255);
-                    iconColor = Color.FromRgb(255, 255, 255);
+                    hoverColor = Color.FromRgb(142, 50, 78);
                     icon = "❓";
                     title = action.Type.ToString();
                     details = "";
                     break;
             }
 
-            // Carte Timeline avec fond coloré enrichi - largeur fixe pour toutes les actions
+            // Le texte et l'icône sont en blanc pour une meilleure lisibilité
+            Color textColor = Color.FromRgb(230, 228, 234); // #E6E4EA Texte principal clair
+            Color iconColor = Color.FromRgb(255, 255, 255); // Blanc pur
+
+            // Fond gris violacé avec gradient depuis le bas-gauche vers haut-droite
+            var gradientBrush = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 1),    // Bas-gauche
+                EndPoint = new Point(1, 0),       // Haut-droite
+                GradientStops = new GradientStopCollection
+                {
+                    new GradientStop(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B), 0.0),
+                    new GradientStop(bgBase, 0.35),
+                    new GradientStop(bgBase, 1.0)
+                }
+            };
+            
+            var gradientBrushHover = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 1),    // Bas-gauche
+                EndPoint = new Point(1, 0),       // Haut-droite
+                GradientStops = new GradientStopCollection
+                {
+                    new GradientStop(Color.FromArgb(120, hoverColor.R, hoverColor.G, hoverColor.B), 0.0),
+                    new GradientStop(bgSecondary, 0.4),
+                    new GradientStop(bgSecondary, 1.0)
+                }
+            };
+
+            // Carte Timeline avec fond gradient - largeur fixe pour toutes les actions
             var card = new Border
             {
-                Background = new SolidColorBrush(backgroundColor),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B)),
-                BorderThickness = new Thickness(0, 0, 0, 2), // Ligne de séparation plus visible - toujours la même épaisseur
+                Background = gradientBrush,
+                BorderBrush = new SolidColorBrush(Color.FromArgb(50, primaryColor.R, primaryColor.G, primaryColor.B)),
+                BorderThickness = new Thickness(1, 1, 1, 1),
                 Padding = new Thickness(14, 12, 14, 12),
-                Margin = new Thickness(0, 0, 0, 2),
+                Margin = new Thickness(0, 0, 0, 4),
                 Tag = index,
                 AllowDrop = true,
                 Cursor = Cursors.Hand,
                 MinHeight = 56,
                 MaxHeight = 64,
-                MinWidth = 400, // Largeur minimale pour toutes les actions
-                HorizontalAlignment = HorizontalAlignment.Stretch, // S'étend pour prendre toute la largeur disponible
+                MinWidth = 400,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                CornerRadius = new CornerRadius(8),
+                CornerRadius = new CornerRadius(10),
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
                 {
-                    Color = primaryColor,
-                    Opacity = 0.08,
-                    BlurRadius = 4,
-                    ShadowDepth = 1,
+                    Color = Colors.Black,
+                    Opacity = 0.25,
+                    BlurRadius = 6,
+                    ShadowDepth = 2,
                     Direction = 270
                 }
             };
@@ -331,52 +329,44 @@ namespace MacroEngine.UI
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge info optionnel
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) }); // Croix supprimer à droite
 
-            // Barre colorée à gauche (timeline) - avec effet lumineux enrichi
+            // Barre colorée à gauche (timeline) - accent vif
             var timelineBar = new Border
             {
                 Background = new SolidColorBrush(primaryColor),
-                Width = 5,
-                Margin = new Thickness(0, 4, 12, 4),
+                Width = 4,
+                Margin = new Thickness(0, 2, 14, 2),
                 VerticalAlignment = VerticalAlignment.Stretch,
-                CornerRadius = new CornerRadius(3, 0, 0, 3),
+                CornerRadius = new CornerRadius(2),
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
                 {
                     Color = primaryColor,
-                    Opacity = 0.35,
-                    BlurRadius = 3,
+                    Opacity = 0.6,
+                    BlurRadius = 6,
                     ShadowDepth = 0,
-                    Direction = 270
+                    Direction = 0
                 }
             };
             Grid.SetColumn(timelineBar, 0);
             contentGrid.Children.Add(timelineBar);
 
-            // Badge icône avec fond coloré plus prononcé
+            // Badge icône avec fond sombre et bordure colorée
             var iconBadge = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(25, iconColor.R, iconColor.G, iconColor.B)), // Fond avec teinte de l'icône
+                Background = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B)),
                 CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(9, 7, 9, 7),
+                Padding = new Thickness(8, 6, 8, 6),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 12, 0),
                 BorderThickness = new Thickness(1.5),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(35, iconColor.R, iconColor.G, iconColor.B)), // Bordure avec teinte de l'icône
+                BorderBrush = new SolidColorBrush(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B)),
                 MinWidth = 36,
-                MinHeight = 36,
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    Color = primaryColor,
-                    Opacity = 0.20,
-                    BlurRadius = 4,
-                    ShadowDepth = 1,
-                    Direction = 270
-                }
+                MinHeight = 36
             };
             
             var iconBlock = new TextBlock
             {
                 Text = icon,
-                FontSize = 18,
+                FontSize = 16,
                 Foreground = new SolidColorBrush(iconColor),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -387,7 +377,7 @@ namespace MacroEngine.UI
             Grid.SetColumn(iconBadge, 1);
             contentGrid.Children.Add(iconBadge);
 
-            // Texte (titre + détails sur une seule ligne) avec style enrichi
+            // Texte (titre + détails sur une seule ligne)
             var textPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -395,44 +385,44 @@ namespace MacroEngine.UI
                 Margin = new Thickness(0, 0, 8, 0)
             };
 
-            // Titre principal avec style plus prononcé et enrichi (texte coloré)
+            // Titre principal avec la couleur de l'action
             var titleBlock = new TextBlock
             {
                 Text = title,
-                FontSize = 13,
+                FontSize = 14,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(textColor), // Texte avec la couleur spécifiée
+                Foreground = new SolidColorBrush(textColor),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0), // Marge à droite pour séparer du badge détails
+                Margin = new Thickness(0, 0, 10, 0),
                 FontFamily = new FontFamily("Segoe UI Semibold")
             };
             textPanel.Children.Add(titleBlock);
 
-            // Détails avec badge optionnel (déclarés en dehors du if pour être accessibles dans les handlers)
+            // Détails avec badge optionnel
             TextBlock? detailsBlock = null;
             Border? detailsBadge = null;
             
             if (!string.IsNullOrEmpty(details))
             {
-                // Badge pour les détails avec fond coloré
+                // Badge pour les détails avec fond sombre
                 detailsBadge = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(15, textColor.R, textColor.G, textColor.B)), // Fond avec teinte du texte
+                    Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B)),
                     CornerRadius = new CornerRadius(4),
-                    Padding = new Thickness(6, 3, 6, 3),
+                    Padding = new Thickness(8, 3, 8, 3),
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(0, 0, 0, 0),
                     BorderThickness = new Thickness(1),
-                    BorderBrush = new SolidColorBrush(Color.FromArgb(20, textColor.R, textColor.G, textColor.B))
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B))
                 };
                 
                 detailsBlock = new TextBlock
                 {
                     Text = details,
-                    FontSize = 10,
-                    Foreground = new SolidColorBrush(Color.FromArgb(200, textColor.R, textColor.G, textColor.B)), // Texte avec teinte du texte avec opacité
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(textMuted),
                     VerticalAlignment = VerticalAlignment.Center,
-                    FontWeight = FontWeights.Medium,
+                    FontWeight = FontWeights.Regular,
                     FontFamily = new FontFamily("Segoe UI")
                 };
                 detailsBadge.Child = detailsBlock;
@@ -443,16 +433,16 @@ namespace MacroEngine.UI
             Grid.SetColumn(textPanel, 2);
             contentGrid.Children.Add(textPanel);
 
-            // Badge numéro avec style enrichi
+            // Badge numéro
             var infoBadge = new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(12, primaryColor.R, primaryColor.G, primaryColor.B)),
+                Background = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B)),
                 CornerRadius = new CornerRadius(6),
                 Padding = new Thickness(7, 3, 7, 3),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
                 BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B)),
                 Visibility = Visibility.Collapsed,
                 MinWidth = 24,
                 HorizontalAlignment = HorizontalAlignment.Center
@@ -462,7 +452,7 @@ namespace MacroEngine.UI
             {
                 Text = "#" + (index + 1).ToString(),
                 FontSize = 10,
-                Foreground = new SolidColorBrush(Color.FromArgb(200, primaryColor.R, primaryColor.G, primaryColor.B)),
+                Foreground = new SolidColorBrush(primaryColor),
                 FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -472,7 +462,7 @@ namespace MacroEngine.UI
             Grid.SetColumn(infoBadge, 3);
             contentGrid.Children.Add(infoBadge);
 
-            // Croix supprimer à droite : supprime l'action principale (index) ou l'action imbriquée (nestedRepeatInfo/nestedIfInfo)
+            // Croix supprimer à droite
             var deleteBtnContainer = new Border
             {
                 Background = Brushes.Transparent,
@@ -490,7 +480,7 @@ namespace MacroEngine.UI
                 Text = "×",
                 FontSize = 18,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(textColor),
+                Foreground = new SolidColorBrush(Color.FromRgb(200, 80, 80)), // Rouge pour la suppression
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
@@ -513,19 +503,20 @@ namespace MacroEngine.UI
 
             card.Child = contentGrid;
 
-            // Effets hover : changement de couleur uniquement, pas de changement de taille ni de bordure
+            // Effets hover : gradient plus intense, glow sur la barre (texte reste blanc)
             card.MouseEnter += (s, e) =>
             {
                 infoBadge.Visibility = Visibility.Visible;
                 deleteBtnContainer.Opacity = 1;
-                card.Background = new SolidColorBrush(backgroundColorHover);
+                card.Background = gradientBrushHover;
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(120, hoverColor.R, hoverColor.G, hoverColor.B));
                 timelineBar.Background = new SolidColorBrush(hoverColor);
-                // Pas de changement de bordure pour garder la même taille
+                iconBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(140, hoverColor.R, hoverColor.G, hoverColor.B));
+                iconBadge.Background = new SolidColorBrush(Color.FromArgb(50, hoverColor.R, hoverColor.G, hoverColor.B));
                 if (detailsBlock != null && detailsBadge != null)
                 {
-                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(25, textColor.R, textColor.G, textColor.B));
-                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(35, textColor.R, textColor.G, textColor.B));
-                    detailsBlock.Foreground = new SolidColorBrush(textColor); // Texte avec opacité complète au survol
+                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(40, hoverColor.R, hoverColor.G, hoverColor.B));
+                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(70, hoverColor.R, hoverColor.G, hoverColor.B));
                 }
             };
 
@@ -533,14 +524,15 @@ namespace MacroEngine.UI
             {
                 infoBadge.Visibility = Visibility.Collapsed;
                 deleteBtnContainer.Opacity = 0;
-                card.Background = new SolidColorBrush(backgroundColor);
+                card.Background = gradientBrush;
+                card.BorderBrush = new SolidColorBrush(Color.FromArgb(50, primaryColor.R, primaryColor.G, primaryColor.B));
                 timelineBar.Background = new SolidColorBrush(primaryColor);
-                // Pas de changement de bordure pour garder la même taille
+                iconBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B));
+                iconBadge.Background = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B));
                 if (detailsBlock != null && detailsBadge != null)
                 {
-                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(15, textColor.R, textColor.G, textColor.B));
-                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(20, textColor.R, textColor.G, textColor.B));
-                    detailsBlock.Foreground = new SolidColorBrush(Color.FromArgb(200, textColor.R, textColor.G, textColor.B)); // Texte normal avec opacité
+                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B));
+                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
                 }
             };
 
@@ -1851,11 +1843,12 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(actionTypeComboBox);
 
-            // CheckBoxes pour les modificateurs
+            // CheckBoxes pour les modificateurs (texte blanc clair)
             var ctrlCheckBox = new CheckBox
             {
                 Content = "Ctrl",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 IsChecked = ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Control)
@@ -1888,6 +1881,7 @@ namespace MacroEngine.UI
             {
                 Content = "Alt",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 4, 0),
                 IsChecked = ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Alt)
@@ -1920,6 +1914,7 @@ namespace MacroEngine.UI
             {
                 Content = "Shift",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 4, 0),
                 IsChecked = ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Shift)
@@ -1952,6 +1947,7 @@ namespace MacroEngine.UI
             {
                 Content = "Win",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 8, 0),
                 IsChecked = ka.Modifiers.HasFlag(Core.Inputs.ModifierKeys.Windows)
@@ -2051,11 +2047,12 @@ namespace MacroEngine.UI
             
             editPanel.Children.Add(keyTextBox);
 
-            // Durée de maintien (ms) pour "Maintenir" — optionnel, vide ou 0 = illimité
+            // Durée de maintien (ms) pour "Maintenir" — optionnel, vide ou 0 = illimité (texte blanc clair)
             var holdDurationLabel = new TextBlock
             {
                 Text = "Durée (optionnel):",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 4, 0)
             };
@@ -2274,12 +2271,13 @@ namespace MacroEngine.UI
                 Margin = originalMargin
             };
 
-            // Label "Délai:"
+            // Label "Délai:" (texte blanc clair)
             var delayLabel = new TextBlock
             {
                 Text = "Délai:",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(230, 228, 234)), // #E6E4EA
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
             };
@@ -2352,12 +2350,13 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(variableNameTextBox);
 
-            // Label "*" (visible si UseVariableDelay)
+            // Label "*" (visible si UseVariableDelay, texte blanc clair)
             var multiplyLabel = new TextBlock
             {
                 Text = "×",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 4, 0),
                 Visibility = da.UseVariableDelay ? Visibility.Visible : Visibility.Collapsed
@@ -2441,12 +2440,13 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(minDurationTextBox);
 
-            // Label "et" (visible seulement si aléatoire)
+            // Label "et" (visible seulement si aléatoire, texte blanc clair)
             var andLabel = new TextBlock
             {
                 Text = "et",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 4, 0),
                 Visibility = da.IsRandom ? Visibility.Visible : Visibility.Collapsed
@@ -2491,21 +2491,23 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(maxDurationTextBox);
 
-            // CheckBox pour le mode aléatoire (déclaré avant pour pouvoir être référencé)
+            // CheckBox pour le mode aléatoire (texte blanc clair)
             var randomCheckBox = new CheckBox
             {
                 Content = "Aléatoire",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
                 IsChecked = da.IsRandom
             };
             
-            // CheckBox pour le mode variable (déclaré avant pour pouvoir être référencé)
+            // CheckBox pour le mode variable (texte blanc clair)
             var variableCheckBox = new CheckBox
             {
                 Content = "Variable",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
                 IsChecked = da.UseVariableDelay,
@@ -2589,11 +2591,12 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(randomCheckBox);
 
-            // Label et TextBox pour Jitter (%)
+            // Label et TextBox pour Jitter (%) (texte blanc clair)
             var jitterLabel = new TextBlock
             {
                 Text = "Jitter (%):",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 ToolTip = "Variation aléatoire autour de la valeur (ex: ±10%)"
@@ -2750,11 +2753,12 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(textTextBox);
 
-            // CheckBox pour coller tout d'un coup
+            // CheckBox pour coller tout d'un coup (texte blanc clair)
             var pasteAtOnceCheckBox = new CheckBox
             {
                 Content = "Coller",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
                 IsChecked = ta.PasteAtOnce
@@ -2783,11 +2787,12 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(pasteAtOnceCheckBox);
 
-            // CheckBox Effacer avant (Ctrl+A + Suppr)
+            // CheckBox Effacer avant (texte blanc clair)
             var clearBeforeCheckBox = new CheckBox
             {
                 Content = "Effacer avant",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
                 IsChecked = ta.ClearBefore,
@@ -2809,11 +2814,12 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(clearBeforeCheckBox);
 
-            // CheckBox Masquer dans les logs (pour mots de passe)
+            // CheckBox Masquer dans les logs (texte blanc clair)
             var hideInLogsCheckBox = new CheckBox
             {
                 Content = "Masquer dans les logs",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
                 IsChecked = ta.HideInLogs,
@@ -2835,11 +2841,12 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(hideInLogsCheckBox);
 
-            // CheckBox pour la frappe naturelle (masqué si "Coller")
+            // CheckBox pour la frappe naturelle (texte blanc clair)
             var naturalTypingCheckBox = new CheckBox
             {
                 Content = "Frappe naturelle",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
                 IsChecked = ta.UseNaturalTyping,
@@ -2869,11 +2876,12 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(naturalTypingCheckBox);
 
-            // TextBox pour la vitesse de frappe (visible si pas de frappe naturelle et pas "Coller")
+            // TextBox pour la vitesse de frappe (visible si pas de frappe naturelle et pas "Coller", texte blanc clair)
             var speedLabel = new TextBlock
             {
                 Text = "Vitesse:",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = (ta.UseNaturalTyping || ta.PasteAtOnce) ? Visibility.Collapsed : Visibility.Visible
@@ -2921,17 +2929,19 @@ namespace MacroEngine.UI
             {
                 Text = "ms",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0),
                 Visibility = (ta.UseNaturalTyping || ta.PasteAtOnce) ? Visibility.Collapsed : Visibility.Visible
             };
             editPanel.Children.Add(msLabel);
 
-            // TextBox pour délai min (visible si frappe naturelle et pas "Coller")
+            // TextBox pour délai min (visible si frappe naturelle et pas "Coller", texte blanc clair)
             var minDelayLabel = new TextBlock
             {
                 Text = "Min:",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
@@ -2975,22 +2985,24 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(minDelayTextBox);
 
-            // Label "et"
+            // Label "et" (texte blanc clair)
             var andLabel = new TextBlock
             {
                 Text = "et",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 4, 0),
                 Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
             editPanel.Children.Add(andLabel);
 
-            // TextBox pour délai max (visible si frappe naturelle et pas "Coller")
+            // TextBox pour délai max (visible si frappe naturelle et pas "Coller", texte blanc clair)
             var maxDelayLabel = new TextBlock
             {
                 Text = "Max:",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 4, 0),
                 Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
@@ -3090,6 +3102,7 @@ namespace MacroEngine.UI
                 Text = "Nom:",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 6, 0)
             };
@@ -3119,6 +3132,7 @@ namespace MacroEngine.UI
                 Text = "Type:",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 6, 0)
             };
@@ -3129,6 +3143,7 @@ namespace MacroEngine.UI
                 Text = "Valeur:",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 6, 0),
                 Visibility = (va.Operation == VariableOperation.Set || va.Operation == VariableOperation.EvaluateExpression) ? Visibility.Visible : Visibility.Collapsed
@@ -3157,6 +3172,7 @@ namespace MacroEngine.UI
                 Text = "Pas:",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 6, 0),
                 Visibility = (va.Operation == VariableOperation.Increment || va.Operation == VariableOperation.Decrement) ? Visibility.Visible : Visibility.Collapsed
@@ -3192,6 +3208,7 @@ namespace MacroEngine.UI
                 Text = "Opération:",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 6, 0)
             };
@@ -3672,12 +3689,13 @@ namespace MacroEngine.UI
 
             bool showCoords = ShouldShowCoordinates(ma.ActionType);
 
-            // Label et TextBox pour X (seulement pour clics et Maintenir)
+            // Label et TextBox pour X (texte blanc clair)
             var xLabel = new TextBlock
             {
                 Text = "X:",
                 FontSize = 12,
                 FontWeight = FontWeights.Medium,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
@@ -3722,12 +3740,13 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(xTextBox);
 
-            // Label et TextBox pour Y (seulement pour clics et Maintenir)
+            // Label et TextBox pour Y (texte blanc clair)
             var yLabel = new TextBlock
             {
                 Text = "Y:",
                 FontSize = 12,
                 FontWeight = FontWeights.Medium,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
@@ -3833,6 +3852,7 @@ namespace MacroEngine.UI
             {
                 Content = "Zone conditionnelle",
                 FontSize = 11,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 4, 0),
                 IsChecked = ma.ConditionalZoneEnabled,
@@ -3932,6 +3952,7 @@ namespace MacroEngine.UI
             {
                 Text = "Durée (optionnel):",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 4, 0)
             };
@@ -3990,13 +4011,14 @@ namespace MacroEngine.UI
                        actionType == Core.Inputs.MouseActionType.Wheel;
             }
 
-            // Label et TextBox pour le delta de la molette (pour Molette haut, bas et Molette)
+            // Label et TextBox pour le delta de la molette (texte blanc clair)
             bool showDelta = ShouldShowDelta(ma.ActionType);
             var deltaLabel = new TextBlock
             {
                 Text = "Delta:",
                 FontSize = 12,
                 FontWeight = FontWeights.Medium,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = showDelta ? Visibility.Visible : Visibility.Collapsed
@@ -4072,6 +4094,7 @@ namespace MacroEngine.UI
             {
                 Text = "Durée (ms):",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = showScrollContinuous ? Visibility.Visible : Visibility.Collapsed
@@ -4101,6 +4124,7 @@ namespace MacroEngine.UI
             {
                 Text = "Intervalle (ms):",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = showScrollContinuous ? Visibility.Visible : Visibility.Collapsed
@@ -4965,6 +4989,7 @@ namespace MacroEngine.UI
             {
                 Text = "Durée (optionnel):",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 4, 0),
                 Visibility = showHoldDurationNested ? Visibility.Visible : Visibility.Collapsed
@@ -6615,32 +6640,41 @@ namespace MacroEngine.UI
             var actionContainer = CreateActionCardWithButtons(ifAction, index);
             container.Children.Add(actionContainer);
 
-            // Section Then
+            // Section Then avec bordure colorée
+            var thenColor = GetThemeColor("SuccessColor");
+            var thenSectionBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromArgb(100, thenColor.R, thenColor.G, thenColor.B)),
+                BorderThickness = new Thickness(3, 0, 0, 0),
+                Background = new SolidColorBrush(Color.FromArgb(15, thenColor.R, thenColor.G, thenColor.B)),
+                CornerRadius = new CornerRadius(0, 8, 8, 0),
+                Margin = new Thickness(24, 6, 0, 6),
+                Padding = new Thickness(12, 8, 8, 8)
+            };
+            
             var thenSection = new StackPanel
             {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(20, 4, 0, 4)
+                Orientation = Orientation.Vertical
             };
 
             // Header "Then"
             var thenHeader = new TextBlock
             {
-                Text = "Then:",
+                Text = "✓ Then",
                 FontSize = 12,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(GetThemeColor("SuccessColor"))
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 8),
+                Foreground = new SolidColorBrush(thenColor)
             };
             thenSection.Children.Add(thenHeader);
 
-            // Conteneur pour les actions Then avec indentation
+            // Conteneur pour les actions Then
             if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
             {
                 var thenContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("SuccessColor").R, GetThemeColor("SuccessColor").G, GetThemeColor("SuccessColor").B)) // Fond léger vert
+                    Margin = new Thickness(0, 0, 0, 4)
                 };
 
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
@@ -6655,26 +6689,37 @@ namespace MacroEngine.UI
             // Panel pour ajouter des actions dans Then
             var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, index, true, -1);
             thenSection.Children.Add(addThenActionsPanel);
-            container.Children.Add(thenSection);
+            thenSectionBorder.Child = thenSection;
+            container.Children.Add(thenSectionBorder);
 
-            // Sections Else If
+            // Sections Else If avec bordure colorée
+            var elseIfColor = GetThemeColor("WarningColor");
             if (ifAction.ElseIfBranches != null)
             {
                 for (int bi = 0; bi < ifAction.ElseIfBranches.Count; bi++)
                 {
                     var branch = ifAction.ElseIfBranches[bi];
+                    var elseIfSectionBorder = new Border
+                    {
+                        BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseIfColor.R, elseIfColor.G, elseIfColor.B)),
+                        BorderThickness = new Thickness(3, 0, 0, 0),
+                        Background = new SolidColorBrush(Color.FromArgb(15, elseIfColor.R, elseIfColor.G, elseIfColor.B)),
+                        CornerRadius = new CornerRadius(0, 8, 8, 0),
+                        Margin = new Thickness(24, 6, 0, 6),
+                        Padding = new Thickness(12, 8, 8, 8)
+                    };
+                    
                     var elseIfSection = new StackPanel
                     {
-                        Orientation = Orientation.Vertical,
-                        Margin = new Thickness(20, 4, 0, 4)
+                        Orientation = Orientation.Vertical
                     };
                     var elseIfHeader = new TextBlock
                     {
-                        Text = "Else If (" + GetConditionPreviewForBranch(branch) + "):",
+                        Text = "⟳ Else If (" + GetConditionPreviewForBranch(branch) + ")",
                         FontSize = 12,
-                        FontWeight = FontWeights.Bold,
-                        Margin = new Thickness(0, 0, 0, 4),
-                        Foreground = new SolidColorBrush(GetThemeColor("WarningColor"))
+                        FontWeight = FontWeights.SemiBold,
+                        Margin = new Thickness(0, 0, 0, 8),
+                        Foreground = new SolidColorBrush(elseIfColor)
                     };
                     elseIfSection.Children.Add(elseIfHeader);
                     if (branch.Actions != null && branch.Actions.Count > 0)
@@ -6682,8 +6727,7 @@ namespace MacroEngine.UI
                         var elseIfContainer = new StackPanel
                         {
                             Orientation = Orientation.Vertical,
-                            Margin = new Thickness(0, 0, 0, 4),
-                            Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("WarningColor").R, GetThemeColor("WarningColor").G, GetThemeColor("WarningColor").B))
+                            Margin = new Thickness(0, 0, 0, 4)
                         };
                         for (int i = 0; i < branch.Actions.Count; i++)
                         {
@@ -6694,36 +6738,46 @@ namespace MacroEngine.UI
                     }
                     var addElseIfPanel = CreateAddIfActionsPanel(ifAction, index, false, bi);
                     elseIfSection.Children.Add(addElseIfPanel);
-                    container.Children.Add(elseIfSection);
+                    elseIfSectionBorder.Child = elseIfSection;
+                    container.Children.Add(elseIfSectionBorder);
                 }
             }
 
-            // Section Else
+            // Section Else avec bordure colorée
+            var elseColor = GetThemeColor("ErrorColor");
+            var elseSectionBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseColor.R, elseColor.G, elseColor.B)),
+                BorderThickness = new Thickness(3, 0, 0, 0),
+                Background = new SolidColorBrush(Color.FromArgb(15, elseColor.R, elseColor.G, elseColor.B)),
+                CornerRadius = new CornerRadius(0, 8, 8, 0),
+                Margin = new Thickness(24, 6, 0, 6),
+                Padding = new Thickness(12, 8, 8, 8)
+            };
+            
             var elseSection = new StackPanel
             {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(20, 4, 0, 4)
+                Orientation = Orientation.Vertical
             };
 
             // Header "Else"
             var elseHeader = new TextBlock
             {
-                Text = "Else:",
+                Text = "✗ Else",
                 FontSize = 12,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(GetThemeColor("ErrorColor"))
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 8),
+                Foreground = new SolidColorBrush(elseColor)
             };
             elseSection.Children.Add(elseHeader);
 
-            // Conteneur pour les actions Else avec indentation
+            // Conteneur pour les actions Else
             if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
             {
                 var elseContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("ErrorColor").R, GetThemeColor("ErrorColor").G, GetThemeColor("ErrorColor").B)) // Fond léger rouge
+                    Margin = new Thickness(0, 0, 0, 4)
                 };
 
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
@@ -6738,7 +6792,8 @@ namespace MacroEngine.UI
             // Panel pour ajouter des actions dans Else
             var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, index, false, -1);
             elseSection.Children.Add(addElseActionsPanel);
-            container.Children.Add(elseSection);
+            elseSectionBorder.Child = elseSection;
+            container.Children.Add(elseSectionBorder);
 
             return container;
         }
@@ -6758,14 +6813,43 @@ namespace MacroEngine.UI
             var actionContainer = CreateActionCardWithButtons(ra, index);
             container.Children.Add(actionContainer);
 
-            // Créer un conteneur pour les actions imbriquées avec indentation
+            // Couleur du bloc Repeat (violet logique)
+            var loopColor = Color.FromRgb(138, 108, 209); // #8A6CD1
+            
+            // Conteneur stylisé pour les actions imbriquées
+            var nestedSectionBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromArgb(100, loopColor.R, loopColor.G, loopColor.B)),
+                BorderThickness = new Thickness(3, 0, 0, 0),
+                Background = new SolidColorBrush(Color.FromArgb(15, loopColor.R, loopColor.G, loopColor.B)),
+                CornerRadius = new CornerRadius(0, 8, 8, 0),
+                Margin = new Thickness(24, 6, 0, 6),
+                Padding = new Thickness(12, 8, 8, 8)
+            };
+            
+            var nestedSection = new StackPanel
+            {
+                Orientation = Orientation.Vertical
+            };
+            
+            // Header "Actions à répéter"
+            var loopHeader = new TextBlock
+            {
+                Text = "🔄 Actions à répéter",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 8),
+                Foreground = new SolidColorBrush(loopColor)
+            };
+            nestedSection.Children.Add(loopHeader);
+
+            // Créer un conteneur pour les actions imbriquées
             if (ra.Actions != null && ra.Actions.Count > 0)
             {
                 var nestedContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(20, 4, 0, 4), // Indentation
-                    Background = new SolidColorBrush(Color.FromArgb(10, 138, 43, 226)) // Fond léger violet
+                    Margin = new Thickness(0, 0, 0, 4)
                 };
 
                 for (int i = 0; i < ra.Actions.Count; i++)
@@ -6774,12 +6858,15 @@ namespace MacroEngine.UI
                     var nestedCard = CreateNestedActionCard(nestedAction, index, i);
                     nestedContainer.Children.Add(nestedCard);
                 }
-                container.Children.Add(nestedContainer);
+                nestedSection.Children.Add(nestedContainer);
             }
 
             // Ajouter un panel pour ajouter de nouvelles actions dans le RepeatAction
             var addActionsPanel = CreateAddActionsPanel(ra, index);
-            container.Children.Add(addActionsPanel);
+            nestedSection.Children.Add(addActionsPanel);
+            
+            nestedSectionBorder.Child = nestedSection;
+            container.Children.Add(nestedSectionBorder);
 
             return container;
         }
@@ -7103,16 +7190,18 @@ namespace MacroEngine.UI
                 Margin = new Thickness(20, 4, 0, 8) // Indentation
             };
 
-            // Fonction helper pour créer un bouton d'ajout
+            // Fonction helper pour créer un bouton d'ajout (texte blanc clair)
             Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
             {
                 var button = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)),
-                    CornerRadius = new CornerRadius(4),
-                    Padding = new Thickness(8, 4, 8, 4),
-                    Margin = new Thickness(0, 0, 4, 0),
+                    Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255)),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(10, 5, 10, 5),
+                    Margin = new Thickness(0, 0, 6, 0),
                     Cursor = Cursors.Hand,
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
                     Tag = new RepeatActionInfo { RepeatActionIndex = repeatActionIndex, ActionType = actionInstance.Type.ToString() }
                 };
                 button.MouseLeftButtonDown += AddActionToRepeat_Click;
@@ -7121,18 +7210,22 @@ namespace MacroEngine.UI
                 {
                     Text = $"{icon} {text}",
                     FontSize = 11,
-                    Foreground = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)),
+                    Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2 Texte secondaire clair
                     FontWeight = FontWeights.Medium
                 };
                 button.Child = textBlock;
 
                 button.MouseEnter += (s, e) =>
                 {
-                    button.Background = GetThemeBrush("BorderLightBrush");
+                    button.Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
+                    button.BorderBrush = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
+                    textBlock.Foreground = new SolidColorBrush(Color.FromRgb(230, 228, 234)); // Plus clair au hover
                 };
                 button.MouseLeave += (s, e) =>
                 {
-                    button.Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0));
+                    button.Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255));
+                    button.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                    textBlock.Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194));
                 };
 
                 return button;
@@ -7407,15 +7500,18 @@ namespace MacroEngine.UI
                 Margin = new Thickness(0, 4, 0, 8)
             };
 
+            // Fonction helper pour créer un bouton d'ajout (texte blanc clair)
             Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
             {
                 var button = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0)),
-                    CornerRadius = new CornerRadius(4),
-                    Padding = new Thickness(8, 4, 8, 4),
-                    Margin = new Thickness(0, 0, 4, 0),
+                    Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255)),
+                    CornerRadius = new CornerRadius(6),
+                    Padding = new Thickness(10, 5, 10, 5),
+                    Margin = new Thickness(0, 0, 6, 0),
                     Cursor = Cursors.Hand,
+                    BorderThickness = new Thickness(1),
+                    BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
                     Tag = new IfActionInfo { IfActionIndex = ifActionIndex, ActionType = actionInstance.Type.ToString(), IsThen = isThen }
                 };
                 button.MouseLeftButtonDown += AddActionToIf_Click;
@@ -7424,13 +7520,23 @@ namespace MacroEngine.UI
                 {
                     Text = $"{icon} {text}",
                     FontSize = 11,
-                    Foreground = new SolidColorBrush(Color.FromArgb(180, 0, 0, 0)),
+                    Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2 Texte secondaire clair
                     FontWeight = FontWeights.Medium
                 };
                 button.Child = textBlock;
 
-                button.MouseEnter += (s, e) => button.Background = GetThemeBrush("BorderLightBrush");
-                button.MouseLeave += (s, e) => button.Background = new SolidColorBrush(Color.FromArgb(20, 0, 0, 0));
+                button.MouseEnter += (s, e) =>
+                {
+                    button.Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
+                    button.BorderBrush = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
+                    textBlock.Foreground = new SolidColorBrush(Color.FromRgb(230, 228, 234));
+                };
+                button.MouseLeave += (s, e) =>
+                {
+                    button.Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255));
+                    button.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                    textBlock.Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+                };
 
                 return button;
             };
@@ -8017,6 +8123,7 @@ namespace MacroEngine.UI
             {
                 Text = "Durée (optionnel):",
                 FontSize = 12,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(12, 0, 4, 0),
                 Visibility = showHoldDurationIf ? Visibility.Visible : Visibility.Collapsed
@@ -8403,20 +8510,30 @@ namespace MacroEngine.UI
             var card = CreateActionCard(ifAction, repeatActionIndex);
             container.Children.Add(card);
 
-            // Section Then
+            // Section Then avec bordure colorée
+            var thenColor = GetThemeColor("SuccessColor");
+            var thenSectionBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromArgb(100, thenColor.R, thenColor.G, thenColor.B)),
+                BorderThickness = new Thickness(3, 0, 0, 0),
+                Background = new SolidColorBrush(Color.FromArgb(15, thenColor.R, thenColor.G, thenColor.B)),
+                CornerRadius = new CornerRadius(0, 8, 8, 0),
+                Margin = new Thickness(24, 6, 0, 6),
+                Padding = new Thickness(12, 8, 8, 8)
+            };
+            
             var thenSection = new StackPanel
             {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(20, 4, 0, 4)
+                Orientation = Orientation.Vertical
             };
 
             var thenHeader = new TextBlock
             {
-                Text = "Then:",
+                Text = "✓ Then",
                 FontSize = 12,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(GetThemeColor("SuccessColor"))
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 8),
+                Foreground = new SolidColorBrush(thenColor)
             };
             thenSection.Children.Add(thenHeader);
 
@@ -8425,8 +8542,7 @@ namespace MacroEngine.UI
                 var thenContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("SuccessColor").R, GetThemeColor("SuccessColor").G, GetThemeColor("SuccessColor").B))
+                    Margin = new Thickness(0, 0, 0, 4)
                 };
 
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
@@ -8440,22 +8556,33 @@ namespace MacroEngine.UI
 
             var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, true);
             thenSection.Children.Add(addThenActionsPanel);
-            container.Children.Add(thenSection);
+            thenSectionBorder.Child = thenSection;
+            container.Children.Add(thenSectionBorder);
 
-            // Section Else
+            // Section Else avec bordure colorée
+            var elseColor = GetThemeColor("ErrorColor");
+            var elseSectionBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseColor.R, elseColor.G, elseColor.B)),
+                BorderThickness = new Thickness(3, 0, 0, 0),
+                Background = new SolidColorBrush(Color.FromArgb(15, elseColor.R, elseColor.G, elseColor.B)),
+                CornerRadius = new CornerRadius(0, 8, 8, 0),
+                Margin = new Thickness(24, 6, 0, 6),
+                Padding = new Thickness(12, 8, 8, 8)
+            };
+            
             var elseSection = new StackPanel
             {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(20, 4, 0, 4)
+                Orientation = Orientation.Vertical
             };
 
             var elseHeader = new TextBlock
             {
-                Text = "Else:",
+                Text = "✗ Else",
                 FontSize = 12,
-                FontWeight = FontWeights.Bold,
-                Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(GetThemeColor("ErrorColor"))
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 8),
+                Foreground = new SolidColorBrush(elseColor)
             };
             elseSection.Children.Add(elseHeader);
 
@@ -8464,8 +8591,7 @@ namespace MacroEngine.UI
                 var elseContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, GetThemeColor("ErrorColor").R, GetThemeColor("ErrorColor").G, GetThemeColor("ErrorColor").B))
+                    Margin = new Thickness(0, 0, 0, 4)
                 };
 
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
@@ -8479,7 +8605,8 @@ namespace MacroEngine.UI
 
             var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, false);
             elseSection.Children.Add(addElseActionsPanel);
-            container.Children.Add(elseSection);
+            elseSectionBorder.Child = elseSection;
+            container.Children.Add(elseSectionBorder);
 
             return container;
         }
@@ -8499,14 +8626,43 @@ namespace MacroEngine.UI
             var card = CreateActionCard(repeatAction, ifActionIndex);
             container.Children.Add(card);
 
+            // Couleur du bloc Repeat (violet logique)
+            var loopColor = Color.FromRgb(138, 108, 209); // #8A6CD1
+            
+            // Conteneur stylisé pour les actions imbriquées
+            var nestedSectionBorder = new Border
+            {
+                BorderBrush = new SolidColorBrush(Color.FromArgb(100, loopColor.R, loopColor.G, loopColor.B)),
+                BorderThickness = new Thickness(3, 0, 0, 0),
+                Background = new SolidColorBrush(Color.FromArgb(15, loopColor.R, loopColor.G, loopColor.B)),
+                CornerRadius = new CornerRadius(0, 8, 8, 0),
+                Margin = new Thickness(24, 6, 0, 6),
+                Padding = new Thickness(12, 8, 8, 8)
+            };
+            
+            var nestedSection = new StackPanel
+            {
+                Orientation = Orientation.Vertical
+            };
+            
+            // Header
+            var loopHeader = new TextBlock
+            {
+                Text = "🔄 Actions à répéter",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 8),
+                Foreground = new SolidColorBrush(loopColor)
+            };
+            nestedSection.Children.Add(loopHeader);
+
             // Créer un conteneur pour les actions imbriquées
             if (repeatAction.Actions != null && repeatAction.Actions.Count > 0)
             {
                 var nestedContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(20, 4, 0, 4),
-                    Background = new SolidColorBrush(Color.FromArgb(10, 138, 43, 226))
+                    Margin = new Thickness(0, 0, 0, 4)
                 };
 
                 for (int i = 0; i < repeatAction.Actions.Count; i++)
@@ -8515,12 +8671,15 @@ namespace MacroEngine.UI
                     var nestedCard = CreateNestedActionCard(nestedAction, ifActionIndex, i);
                     nestedContainer.Children.Add(nestedCard);
                 }
-                container.Children.Add(nestedContainer);
+                nestedSection.Children.Add(nestedContainer);
             }
 
             // Ajouter un panel pour ajouter de nouvelles actions
             var addActionsPanel = CreateAddActionsPanel(repeatAction, ifActionIndex);
-            container.Children.Add(addActionsPanel);
+            nestedSection.Children.Add(addActionsPanel);
+            
+            nestedSectionBorder.Child = nestedSection;
+            container.Children.Add(nestedSectionBorder);
 
             return container;
         }
