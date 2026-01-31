@@ -791,17 +791,40 @@ namespace MacroEngine.UI
                 _ => "ms"
             };
 
-            if (da.IsRandom)
+            string result;
+            
+            if (da.UseVariableDelay)
+            {
+                // Mode basé sur variable
+                string varName = string.IsNullOrWhiteSpace(da.VariableName) ? "?" : da.VariableName;
+                if (Math.Abs(da.VariableMultiplier - 1.0) < 0.001)
+                {
+                    result = $"{varName}";
+                }
+                else
+                {
+                    result = $"{varName} × {da.VariableMultiplier:0.##}";
+                }
+            }
+            else if (da.IsRandom)
             {
                 double minValue = da.GetMinDurationInUnit(da.Unit);
                 double maxValue = da.GetMaxDurationInUnit(da.Unit);
-                return $"Entre {minValue:0.##} {unitLabel} et {maxValue:0.##} {unitLabel}";
+                result = $"Entre {minValue:0.##} {unitLabel} et {maxValue:0.##} {unitLabel}";
             }
             else
             {
                 double value = da.GetDurationInUnit(da.Unit);
-                return $"{value:0.##} {unitLabel}";
+                result = $"{value:0.##} {unitLabel}";
             }
+
+            // Ajouter jitter si configuré
+            if (da.JitterPercent > 0)
+            {
+                result += $" (±{da.JitterPercent:0.##}%)";
+            }
+
+            return result;
         }
 
         private string GetTextActionTitle(TextAction ta)
@@ -2227,7 +2250,7 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(delayLabel);
 
-            // TextBox pour la durée
+            // TextBox pour la durée (cachée si UseVariableDelay)
             var durationTextBox = new TextBox
             {
                 Text = da.GetDurationInUnit(da.Unit).ToString("0.##"),
@@ -2236,7 +2259,8 @@ namespace MacroEngine.UI
                 FontWeight = FontWeights.SemiBold,
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = da.UseVariableDelay ? Visibility.Collapsed : Visibility.Visible
             };
             durationTextBox.TextChanged += (s, e) =>
             {
@@ -2263,6 +2287,86 @@ namespace MacroEngine.UI
                 }
             };
             editPanel.Children.Add(durationTextBox);
+
+            // TextBox pour le nom de variable (visible si UseVariableDelay)
+            var variableNameTextBox = new TextBox
+            {
+                Text = da.VariableName ?? "",
+                Width = 100,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 4, 0),
+                Visibility = da.UseVariableDelay ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Nom de la variable à utiliser pour le délai"
+            };
+            variableNameTextBox.TextChanged += (s, e) =>
+            {
+                SaveState();
+                da.VariableName = variableNameTextBox.Text;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+            };
+            variableNameTextBox.LostFocus += (s, e) =>
+            {
+                RefreshBlocks();
+            };
+            editPanel.Children.Add(variableNameTextBox);
+
+            // Label "*" (visible si UseVariableDelay)
+            var multiplyLabel = new TextBlock
+            {
+                Text = "×",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 4, 0),
+                Visibility = da.UseVariableDelay ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(multiplyLabel);
+
+            // TextBox pour le multiplicateur (visible si UseVariableDelay)
+            var multiplierTextBox = new TextBox
+            {
+                Text = da.VariableMultiplier.ToString("0.##"),
+                Width = 60,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = da.UseVariableDelay ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Multiplicateur (ex: 1.5 pour baseDelay * 1.5)"
+            };
+            multiplierTextBox.TextChanged += (s, e) =>
+            {
+                if (TryParseDouble(multiplierTextBox.Text, out double value))
+                {
+                    SaveState();
+                    da.VariableMultiplier = value;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            multiplierTextBox.LostFocus += (s, e) =>
+            {
+                if (!TryParseDouble(multiplierTextBox.Text, out double value))
+                {
+                    multiplierTextBox.Text = da.VariableMultiplier.ToString("0.##");
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(multiplierTextBox);
 
             // TextBox pour la durée minimale (visible seulement si aléatoire)
             var minDurationTextBox = new TextBox
@@ -2352,7 +2456,7 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(maxDurationTextBox);
 
-            // CheckBox pour le mode aléatoire (déclaré après min/max pour pouvoir les référencer)
+            // CheckBox pour le mode aléatoire (déclaré avant pour pouvoir être référencé)
             var randomCheckBox = new CheckBox
             {
                 Content = "Aléatoire",
@@ -2361,14 +2465,71 @@ namespace MacroEngine.UI
                 Margin = new Thickness(8, 0, 8, 0),
                 IsChecked = da.IsRandom
             };
+            
+            // CheckBox pour le mode variable (déclaré avant pour pouvoir être référencé)
+            var variableCheckBox = new CheckBox
+            {
+                Content = "Variable",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                IsChecked = da.UseVariableDelay,
+                ToolTip = "Utiliser une variable pour définir le délai (ex: baseDelay * 1.5)"
+            };
+            
+            // Configurer les événements de variableCheckBox
+            variableCheckBox.Checked += (s, e) =>
+            {
+                SaveState();
+                da.UseVariableDelay = true;
+                da.IsRandom = false; // Désactiver le mode aléatoire
+                variableNameTextBox.Visibility = Visibility.Visible;
+                multiplyLabel.Visibility = Visibility.Visible;
+                multiplierTextBox.Visibility = Visibility.Visible;
+                durationTextBox.Visibility = Visibility.Collapsed;
+                minDurationTextBox.Visibility = Visibility.Collapsed;
+                andLabel.Visibility = Visibility.Collapsed;
+                maxDurationTextBox.Visibility = Visibility.Collapsed;
+                randomCheckBox.IsChecked = false;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            variableCheckBox.Unchecked += (s, e) =>
+            {
+                SaveState();
+                da.UseVariableDelay = false;
+                variableNameTextBox.Visibility = Visibility.Collapsed;
+                multiplyLabel.Visibility = Visibility.Collapsed;
+                multiplierTextBox.Visibility = Visibility.Collapsed;
+                durationTextBox.Visibility = Visibility.Visible;
+                if (_currentMacro != null)
+                {
+                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                RefreshBlocks();
+            };
+            // Insérer la CheckBox après le TextBox durée (position 2)
+            editPanel.Children.Insert(2, variableCheckBox);
+
+            // Configurer les événements de randomCheckBox
             randomCheckBox.Checked += (s, e) =>
             {
                 SaveState();
                 da.IsRandom = true;
+                da.UseVariableDelay = false; // Désactiver le mode variable
                 minDurationTextBox.Visibility = Visibility.Visible;
                 andLabel.Visibility = Visibility.Visible;
                 maxDurationTextBox.Visibility = Visibility.Visible;
                 durationTextBox.Visibility = Visibility.Collapsed;
+                variableNameTextBox.Visibility = Visibility.Collapsed;
+                multiplyLabel.Visibility = Visibility.Collapsed;
+                multiplierTextBox.Visibility = Visibility.Collapsed;
+                variableCheckBox.IsChecked = false;
                 if (_currentMacro != null)
                 {
                     _currentMacro.ModifiedAt = DateTime.Now;
@@ -2391,8 +2552,55 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            // Insérer la CheckBox après le TextBox durée (position 2)
-            editPanel.Children.Insert(2, randomCheckBox);
+            editPanel.Children.Add(randomCheckBox);
+
+            // Label et TextBox pour Jitter (%)
+            var jitterLabel = new TextBlock
+            {
+                Text = "Jitter (%):",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                ToolTip = "Variation aléatoire autour de la valeur (ex: ±10%)"
+            };
+            editPanel.Children.Add(jitterLabel);
+
+            var jitterTextBox = new TextBox
+            {
+                Text = da.JitterPercent.ToString("0.##"),
+                Width = 50,
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                TextAlignment = TextAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                ToolTip = "Ex: 10 pour ±10% de variation"
+            };
+            jitterTextBox.TextChanged += (s, e) =>
+            {
+                if (TryParseDouble(jitterTextBox.Text, out double value) && value >= 0)
+                {
+                    SaveState();
+                    da.JitterPercent = value;
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+            };
+            jitterTextBox.LostFocus += (s, e) =>
+            {
+                if (!TryParseDouble(jitterTextBox.Text, out double value) || value < 0)
+                {
+                    jitterTextBox.Text = da.JitterPercent.ToString("0.##");
+                }
+                else
+                {
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(jitterTextBox);
 
             // ComboBox pour l'unité de temps
             var unitComboBox = new ComboBox

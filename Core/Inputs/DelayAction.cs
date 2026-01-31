@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using Engine = MacroEngine.Core.Engine;
 
 namespace MacroEngine.Core.Inputs
 {
@@ -36,6 +37,26 @@ namespace MacroEngine.Core.Inputs
         /// Durée maximale en millisecondes (pour mode aléatoire)
         /// </summary>
         public int MaxDuration { get; set; } = 500;
+
+        /// <summary>
+        /// Active le mode basé sur variable
+        /// </summary>
+        public bool UseVariableDelay { get; set; } = false;
+
+        /// <summary>
+        /// Nom de la variable à utiliser pour le délai
+        /// </summary>
+        public string VariableName { get; set; } = "";
+
+        /// <summary>
+        /// Multiplicateur à appliquer à la valeur de la variable (ex: 1.5 pour baseDelay * 1.5)
+        /// </summary>
+        public double VariableMultiplier { get; set; } = 1.0;
+
+        /// <summary>
+        /// Pourcentage de jitter (variation aléatoire) autour de la valeur (ex: 10 pour ±10%)
+        /// </summary>
+        public double JitterPercent { get; set; } = 0;
 
         /// <summary>
         /// Obtient la durée dans l'unité spécifiée
@@ -123,9 +144,27 @@ namespace MacroEngine.Core.Inputs
 
         public void Execute()
         {
-            int delayToUse;
+            double delayToUse;
             
-            if (IsRandom)
+            if (UseVariableDelay && !string.IsNullOrWhiteSpace(VariableName))
+            {
+                // Mode basé sur variable
+                var context = Engine.ExecutionContext.Current;
+                if (context?.Variables != null)
+                {
+                    // Récupérer la valeur numérique de la variable
+                    double baseValue = context.Variables.GetNumber(VariableName);
+                    
+                    // Appliquer le multiplicateur
+                    delayToUse = baseValue * VariableMultiplier;
+                }
+                else
+                {
+                    // Variable non trouvée, utiliser Duration par défaut
+                    delayToUse = Duration;
+                }
+            }
+            else if (IsRandom)
             {
                 // Générer un délai aléatoire entre MinDuration et MaxDuration
                 if (MinDuration >= MaxDuration)
@@ -143,9 +182,19 @@ namespace MacroEngine.Core.Inputs
                 delayToUse = Duration;
             }
 
-            if (delayToUse > 0)
+            // Appliquer le jitter si configuré
+            if (JitterPercent > 0)
             {
-                Thread.Sleep(delayToUse);
+                var random = new Random();
+                // Générer une variation entre -JitterPercent% et +JitterPercent%
+                double jitterFactor = 1.0 + (random.NextDouble() * 2 - 1) * (JitterPercent / 100.0);
+                delayToUse *= jitterFactor;
+            }
+
+            int finalDelay = (int)Math.Round(delayToUse);
+            if (finalDelay > 0)
+            {
+                Thread.Sleep(finalDelay);
             }
         }
 
@@ -159,7 +208,11 @@ namespace MacroEngine.Core.Inputs
                 Unit = this.Unit,
                 IsRandom = this.IsRandom,
                 MinDuration = this.MinDuration,
-                MaxDuration = this.MaxDuration
+                MaxDuration = this.MaxDuration,
+                UseVariableDelay = this.UseVariableDelay,
+                VariableName = this.VariableName,
+                VariableMultiplier = this.VariableMultiplier,
+                JitterPercent = this.JitterPercent
             };
         }
     }
