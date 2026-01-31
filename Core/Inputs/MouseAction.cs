@@ -81,6 +81,11 @@ namespace MacroEngine.Core.Inputs
         public int ScrollIntervalMs { get; set; } = 50;
 
         /// <summary>
+        /// Direction du scroll continu (Haut ou Bas)
+        /// </summary>
+        public ScrollDirection ScrollDirection { get; set; } = ScrollDirection.Up;
+
+        /// <summary>
         /// Activer le clic conditionnel (exécuter seulement si le curseur est dans la zone)
         /// </summary>
         public bool ConditionalZoneEnabled { get; set; }
@@ -328,7 +333,8 @@ namespace MacroEngine.Core.Inputs
         {
             int duration = ScrollDurationMs > 0 ? ScrollDurationMs : 1000;
             int interval = ScrollIntervalMs > 0 ? ScrollIntervalMs : 50;
-            int delta = Delta != 0 ? Delta : 120;
+            int absDelta = Delta != 0 ? Math.Abs(Delta) : 120;
+            int delta = ScrollDirection == ScrollDirection.Up ? absDelta : -absDelta;
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
             while (stopwatch.ElapsedMilliseconds < duration)
@@ -357,6 +363,7 @@ namespace MacroEngine.Core.Inputs
                 HoldDurationMs = this.HoldDurationMs,
                 ScrollDurationMs = this.ScrollDurationMs,
                 ScrollIntervalMs = this.ScrollIntervalMs,
+                ScrollDirection = this.ScrollDirection,
                 ConditionalZoneEnabled = this.ConditionalZoneEnabled,
                 ConditionalZoneX1 = this.ConditionalZoneX1,
                 ConditionalZoneY1 = this.ConditionalZoneY1,
@@ -540,6 +547,15 @@ namespace MacroEngine.Core.Inputs
         EaseIn,      // Accélération (démarrage lent, fin rapide)
         EaseOut,     // Décélération (démarrage rapide, fin lente)
         EaseInOut    // Ease-in-out (démarrage et fin lents, milieu rapide)
+    }
+
+    /// <summary>
+    /// Direction du scroll continu (molette)
+    /// </summary>
+    public enum ScrollDirection
+    {
+        Up,    // Molette vers le haut
+        Down   // Molette vers le bas
     }
 }
 

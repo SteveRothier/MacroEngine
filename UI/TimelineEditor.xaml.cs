@@ -1067,7 +1067,8 @@ namespace MacroEngine.UI
             // Scroll continu
             if (ma.ActionType == Core.Inputs.MouseActionType.WheelContinuous)
             {
-                details.Append($"Delta: {(ma.Delta != 0 ? ma.Delta : 120)} • {ma.ScrollDurationMs}ms / {ma.ScrollIntervalMs}ms intervalle");
+                var dir = ma.ScrollDirection == Core.Inputs.ScrollDirection.Up ? "haut" : "bas";
+                details.Append($"{dir} • {ma.ScrollDurationMs}ms / {ma.ScrollIntervalMs}ms intervalle");
             }
             
             // Zone conditionnelle
@@ -3731,8 +3732,32 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(deltaTextBox);
 
-            // Contrôles pour Scroll continu (durée, intervalle)
+            // Contrôles pour Scroll continu (direction, durée, intervalle)
             bool showScrollContinuous = ma.ActionType == Core.Inputs.MouseActionType.WheelContinuous;
+            var scrollDirectionComboBox = new ComboBox
+            {
+                MinWidth = 90,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 4, 0),
+                Visibility = showScrollContinuous ? Visibility.Visible : Visibility.Collapsed,
+                ToolTip = "Direction du scroll"
+            };
+            scrollDirectionComboBox.Items.Add("Haut");
+            scrollDirectionComboBox.Items.Add("Bas");
+            scrollDirectionComboBox.SelectedIndex = ma.ScrollDirection == Core.Inputs.ScrollDirection.Up ? 0 : 1;
+            scrollDirectionComboBox.SelectionChanged += (s, e) =>
+            {
+                if (scrollDirectionComboBox.SelectedIndex >= 0)
+                {
+                    SaveState();
+                    ma.ScrollDirection = scrollDirectionComboBox.SelectedIndex == 0 ? Core.Inputs.ScrollDirection.Up : Core.Inputs.ScrollDirection.Down;
+                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                    RefreshBlocks();
+                }
+            };
+            editPanel.Children.Add(scrollDirectionComboBox);
+
             var scrollDurationLabel = new TextBlock
             {
                 Text = "Durée (ms):",
@@ -3794,6 +3819,7 @@ namespace MacroEngine.UI
             void UpdateScrollContinuousVisibility()
             {
                 bool show = ma.ActionType == Core.Inputs.MouseActionType.WheelContinuous;
+                scrollDirectionComboBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
                 scrollDurationLabel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
                 scrollDurationTextBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
                 scrollIntervalLabel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
