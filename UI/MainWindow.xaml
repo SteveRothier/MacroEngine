@@ -399,7 +399,7 @@
                         <Border Grid.Column="2" 
                                 Background="{StaticResource BackgroundTertiaryBrush}"
                                 CornerRadius="10"
-                                Padding="12">
+                                Padding="8">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -409,7 +409,7 @@
                                            Text="Zone de test" 
                                            Style="{StaticResource TextSecondary}"
                                            FontWeight="Medium"
-                                           Margin="0,0,0,8"/>
+                                           Margin="0,0,0,2"/>
                                 <TextBox x:Name="TestTextBox" 
                                          Grid.Row="1"
                                          Style="{StaticResource TextBoxModern}"
@@ -430,20 +430,20 @@
                  ══════════════════════════════════════════════════════════════════ -->
             <Border Grid.Column="4" 
                     Style="{StaticResource PanelCard}"
-                    Padding="16">
+                    Padding="10">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel>
                         <!-- Titre -->
                         <TextBlock Text="Propriétés" 
                                    Style="{StaticResource TextSubheading}"
-                                   Margin="0,0,0,16"/>
+                                   Margin="0,0,0,10"/>
 
                         <!-- Nom de la macro -->
                         <TextBlock Text="Nom" Style="{StaticResource TextLabel}"/>
                         <TextBox x:Name="MacroNameTextBox"
                                  Style="{StaticResource TextBoxModern}"
                                  TextChanged="MacroNameTextBox_TextChanged"
-                                 Margin="0,0,0,12"/>
+                                 Margin="0,0,0,6"/>
 
                         <!-- Description -->
                         <TextBlock Text="Description" Style="{StaticResource TextLabel}"/>
@@ -453,7 +453,7 @@
                                  AcceptsReturn="True"
                                  Height="60"
                                  TextChanged="MacroDescriptionTextBox_TextChanged"
-                                 Margin="0,0,0,12"/>
+                                 Margin="0,0,0,6"/>
 
                         <!-- Raccourci clavier -->
                         <TextBlock Text="Raccourci clavier" Style="{StaticResource TextLabel}"/>
