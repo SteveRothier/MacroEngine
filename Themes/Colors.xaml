@@ -179,14 +179,14 @@
                       Direction="270"/>
 
     <!-- ══════════════════════════════════════════════════════════════════════
-         CornerRadius
+         CornerRadius (réduits pour un look plus sobre)
          ══════════════════════════════════════════════════════════════════════ -->
     
-    <CornerRadius x:Key="RadiusActionBlock">12</CornerRadius>
-    <CornerRadius x:Key="RadiusButton">10</CornerRadius>
-    <CornerRadius x:Key="RadiusPanel">14</CornerRadius>
-    <CornerRadius x:Key="RadiusTextInput">8</CornerRadius>
-    <CornerRadius x:Key="RadiusWindow">16</CornerRadius>
-    <CornerRadius x:Key="RadiusSmall">4</CornerRadius>
+    <CornerRadius x:Key="RadiusActionBlock">6</CornerRadius>
+    <CornerRadius x:Key="RadiusButton">5</CornerRadius>
+    <CornerRadius x:Key="RadiusPanel">6</CornerRadius>
+    <CornerRadius x:Key="RadiusTextInput">4</CornerRadius>
+    <CornerRadius x:Key="RadiusWindow">8</CornerRadius>
+    <CornerRadius x:Key="RadiusSmall">2</CornerRadius>
 
 </ResourceDictionary>
