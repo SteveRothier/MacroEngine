@@ -52,6 +52,18 @@ dotnet run --project MacroEngine.csproj
 3. **Modifier une macro** : Double-cliquez sur une macro pour ouvrir l'éditeur
 4. **Configurer un raccourci** : Dans l'éditeur, définissez un raccourci personnalisé pour chaque macro
 
+### Presets d'actions
+
+Les **presets** vous permettent de sauvegarder et réutiliser des actions fréquentes :
+
+- **Sauvegarder un preset** : Clic droit sur une action → "💾 Sauvegarder comme preset"
+- **Insérer un preset** : Cliquez sur le bouton "📚 Presets" dans la barre d'outils
+- **Dupliquer une action** : Clic droit sur une action → "📋 Dupliquer cette action"
+- **Organisation** : Les presets sont classés par catégories (Clavier, Souris, Délais, etc.)
+- **Réutilisation** : Gagnez du temps en créant des bibliothèques d'actions réutilisables
+
+Les presets sont stockés dans `Data/presets.json` et peuvent contenir une ou plusieurs actions.
+
 ### Types d'actions et options
 
 | Type | Options |

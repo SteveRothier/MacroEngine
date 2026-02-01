@@ -11,6 +11,7 @@ using System.Windows.Media.Imaging;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Hooks;
+using MacroEngine.Core.Storage;
 
 namespace MacroEngine.UI
 {
@@ -32,6 +33,9 @@ namespace MacroEngine.UI
         private Stack<List<IInputAction>> _undoStack = new Stack<List<IInputAction>>();
         private Stack<List<IInputAction>> _redoStack = new Stack<List<IInputAction>>();
         private bool _isUndoRedo = false;
+        
+        // Gestionnaire de presets
+        private readonly PresetStorage _presetStorage = new PresetStorage();
 
         // Événement déclenché quand la macro est modifiée
         public event EventHandler? MacroChanged;
@@ -598,6 +602,33 @@ namespace MacroEngine.UI
                 var variableControlsPanel = CreateVariableActionControls(va, index, textPanel);
                 textPanel.Children.Insert(0, variableControlsPanel);
             }
+
+            // Menu contextuel pour sauvegarder comme preset
+            var contextMenu = new ContextMenu();
+            
+            var saveAsPresetItem = new MenuItem
+            {
+                Header = "💾 Sauvegarder comme preset",
+                FontSize = 13
+            };
+            saveAsPresetItem.Click += async (s, e) =>
+            {
+                await SaveActionAsPreset(action, index);
+            };
+            contextMenu.Items.Add(saveAsPresetItem);
+            
+            var duplicateItem = new MenuItem
+            {
+                Header = "📋 Dupliquer cette action",
+                FontSize = 13
+            };
+            duplicateItem.Click += (s, e) =>
+            {
+                DuplicateAction(index);
+            };
+            contextMenu.Items.Add(duplicateItem);
+            
+            card.ContextMenu = contextMenu;
 
             return card;
         }
@@ -8854,6 +8885,105 @@ namespace MacroEngine.UI
         private void RedoButton_Click(object sender, RoutedEventArgs e)
         {
             Redo();
+        }
+
+        #endregion
+
+        #region Presets
+
+        private void PresetsButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new PresetsDialog(_presetStorage);
+            dialog.PresetSelected += (s, preset) =>
+            {
+                InsertPreset(preset);
+            };
+            dialog.Owner = Window.GetWindow(this);
+            dialog.ShowDialog();
+        }
+
+        private async System.Threading.Tasks.Task SaveActionAsPreset(IInputAction action, int index)
+        {
+            try
+            {
+                // Demander un nom pour le preset
+                var dialog = new SavePresetDialog(action);
+                dialog.Owner = Window.GetWindow(this);
+                
+                if (dialog.ShowDialog() == true && dialog.PresetName != null)
+                {
+                    var preset = new ActionPreset
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        Name = dialog.PresetName,
+                        Description = dialog.PresetDescription ?? "",
+                        Category = dialog.PresetCategory ?? "Général",
+                        Actions = new List<IInputAction> { action.Clone() },
+                        CreatedAt = DateTime.Now,
+                        ModifiedAt = DateTime.Now
+                    };
+
+                    await _presetStorage.AddPresetAsync(preset);
+                    
+                    MessageBox.Show($"Preset '{preset.Name}' sauvegardé avec succès !", 
+                        "Preset sauvegardé", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur lors de la sauvegarde du preset:\n{ex.Message}",
+                    "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void DuplicateAction(int index)
+        {
+            if (_currentMacro == null || index < 0 || index >= _currentMacro.Actions.Count) return;
+
+            SaveState();
+
+            var actionToDuplicate = _currentMacro.Actions[index];
+            var duplicatedAction = actionToDuplicate.Clone();
+            
+            // Insérer juste après l'action originale
+            _currentMacro.Actions.Insert(index + 1, duplicatedAction);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        private void InsertPreset(ActionPreset preset)
+        {
+            try
+            {
+                if (_currentMacro == null || preset?.Actions == null || preset.Actions.Count == 0) return;
+
+                SaveState();
+
+                // Insérer toutes les actions du preset à la fin
+                foreach (var action in preset.Actions)
+                {
+                    if (action != null)
+                    {
+                        var clonedAction = action.Clone();
+                        if (clonedAction != null)
+                        {
+                            _currentMacro.Actions.Add(clonedAction);
+                        }
+                    }
+                }
+                
+                _currentMacro.ModifiedAt = DateTime.Now;
+                
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur lors de l'insertion du preset:\n{ex.Message}",
+                    "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         #endregion
