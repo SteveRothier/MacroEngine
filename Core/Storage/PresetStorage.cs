@@ -43,7 +43,7 @@ namespace MacroEngine.Core.Storage
                 {
                     PropertyNameCaseInsensitive = true,
                     WriteIndented = true,
-                    Converters = { new InputActionJsonConverter() }
+                    Converters = { new InputActionJsonConverter(), new InputActionListJsonConverter() }
                 };
 
                 var presets = JsonSerializer.Deserialize<List<ActionPreset>>(json, options) ?? new List<ActionPreset>();
@@ -76,7 +76,7 @@ namespace MacroEngine.Core.Storage
                 var options = new JsonSerializerOptions
                 {
                     WriteIndented = true,
-                    Converters = { new InputActionJsonConverter() }
+                    Converters = { new InputActionJsonConverter(), new InputActionListJsonConverter() }
                 };
 
                 string json = JsonSerializer.Serialize(presets ?? new List<ActionPreset>(), options);
@@ -207,6 +207,59 @@ namespace MacroEngine.Core.Storage
             public override void Write(Utf8JsonWriter writer, IInputAction value, JsonSerializerOptions options)
             {
                 JsonSerializer.Serialize(writer, value, value.GetType(), options);
+            }
+        }
+
+        /// <summary>
+        /// Convertisseur JSON pour les listes d'actions (nécessaire pour les actions imbriquées)
+        /// </summary>
+        private class InputActionListJsonConverter : JsonConverter<List<IInputAction>>
+        {
+            public override List<IInputAction> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+            {
+                var result = new List<IInputAction>();
+                
+                if (reader.TokenType != JsonTokenType.StartArray)
+                {
+                    return result;
+                }
+
+                var actionConverter = options.Converters.OfType<InputActionJsonConverter>().FirstOrDefault() 
+                    ?? new InputActionJsonConverter();
+
+                while (reader.Read())
+                {
+                    if (reader.TokenType == JsonTokenType.EndArray)
+                    {
+                        break;
+                    }
+
+                    if (reader.TokenType == JsonTokenType.StartObject)
+                    {
+                        var action = actionConverter.Read(ref reader, typeof(IInputAction), options);
+                        if (action != null)
+                        {
+                            result.Add(action);
+                        }
+                    }
+                }
+
+                return result;
+            }
+
+            public override void Write(Utf8JsonWriter writer, List<IInputAction> value, JsonSerializerOptions options)
+            {
+                writer.WriteStartArray();
+                
+                foreach (var action in value)
+                {
+                    if (action != null)
+                    {
+                        JsonSerializer.Serialize(writer, action, action.GetType(), options);
+                    }
+                }
+                
+                writer.WriteEndArray();
             }
         }
     }
