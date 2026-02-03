@@ -90,12 +90,27 @@ namespace MacroEngine.Core.Engine
                 State = MacroEngineState.Running;
             }
 
-            _logger?.Info($"Démarrage de la macro '{macro.Name}' ({macro.Actions?.Count ?? 0} actions)", "MacroEngine");
+            _logger?.Info($"Démarrage de la macro '{macro.Name}' ({macro.Actions?.Count ?? 0} actions)" + 
+                (macro.ContinuousMonitoring ? " [Surveillance continue]" : ""), "MacroEngine");
             _timingEngine.Reset();
 
             try
             {
-                await ExecuteMacroAsync(macro, _cancellationTokenSource.Token);
+                if (macro.ContinuousMonitoring)
+                {
+                    int intervalMs = macro.ContinuousMonitoringIntervalMs > 0 ? macro.ContinuousMonitoringIntervalMs : 200;
+                    while (!_cancellationTokenSource.Token.IsCancellationRequested && State != MacroEngineState.Stopping)
+                    {
+                        await ExecuteMacroAsync(macro, _cancellationTokenSource.Token);
+                        if (_cancellationTokenSource.Token.IsCancellationRequested || State == MacroEngineState.Stopping)
+                            break;
+                        await Task.Delay(intervalMs, _cancellationTokenSource.Token);
+                    }
+                }
+                else
+                {
+                    await ExecuteMacroAsync(macro, _cancellationTokenSource.Token);
+                }
                 return true;
             }
             catch (OperationCanceledException)

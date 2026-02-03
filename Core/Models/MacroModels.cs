@@ -52,6 +52,17 @@ namespace MacroEngine.Core.Models
         /// Indique si la macro doit s'exécuter automatiquement quand l'application cible passe au premier plan
         /// </summary>
         public bool AutoExecuteOnFocus { get; set; } = false;
+
+        /// <summary>
+        /// Surveillance continue : la macro s'exécute en boucle et réévalue les conditions (notamment If) en continu.
+        /// Utile pour réagir dès qu'une condition est remplie (ex. couleur à l'écran, application active).
+        /// </summary>
+        public bool ContinuousMonitoring { get; set; } = false;
+
+        /// <summary>
+        /// Délai en millisecondes entre chaque cycle en mode surveillance continue (défaut 200 ms).
+        /// </summary>
+        public int ContinuousMonitoringIntervalMs { get; set; } = 200;
     }
 
     /// <summary>

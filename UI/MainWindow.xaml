@@ -494,7 +494,25 @@
                                 Style="{StaticResource ButtonGhost}"
                                 Click="SelectApps_Click"
                                 HorizontalAlignment="Left"
-                                Margin="0,0,0,16"/>
+                                Margin="0,0,0,12"/>
+
+                        <!-- Surveillance continue -->
+                        <CheckBox x:Name="ContinuousMonitoringCheckBox"
+                                  Content="Surveillance continue"
+                                  Style="{StaticResource CheckBoxModern}"
+                                  Checked="ContinuousMonitoringCheckBox_Changed"
+                                  Unchecked="ContinuousMonitoringCheckBox_Changed"
+                                  Margin="0,0,0,6"
+                                  ToolTip="La macro s'exécute en boucle et réévalue les conditions (If) en continu. Utile pour réagir dès qu'une condition est remplie."/>
+                        <StackPanel x:Name="ContinuousMonitoringOptionsPanel" Visibility="Collapsed" Margin="24,0,0,12">
+                            <TextBlock Text="Intervalle (ms)" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
+                            <TextBox x:Name="ContinuousMonitoringIntervalTextBox"
+                                     Style="{StaticResource TextBoxModern}"
+                                     Width="80"
+                                     HorizontalAlignment="Left"
+                                     Text="200"
+                                     TextChanged="ContinuousMonitoringInterval_TextChanged"/>
+                        </StackPanel>
 
                         <Border Style="{StaticResource SeparatorHorizontal}"/>
 

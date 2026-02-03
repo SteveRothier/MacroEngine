@@ -2698,6 +2698,11 @@ namespace MacroEngine.UI
                 }
 
                 UpdateTargetAppsDisplay();
+
+                // Surveillance continue
+                ContinuousMonitoringCheckBox.IsChecked = _selectedMacro.ContinuousMonitoring;
+                ContinuousMonitoringOptionsPanel.Visibility = _selectedMacro.ContinuousMonitoring ? Visibility.Visible : Visibility.Collapsed;
+                ContinuousMonitoringIntervalTextBox.Text = _selectedMacro.ContinuousMonitoringIntervalMs.ToString();
             }
             else
             {
@@ -2705,6 +2710,26 @@ namespace MacroEngine.UI
                 MacroDescriptionTextBox.Text = "";
                 ShortcutDisplayText.Text = "Non défini";
                 UpdateTargetAppsDisplay();
+                ContinuousMonitoringCheckBox.IsChecked = false;
+                ContinuousMonitoringOptionsPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void ContinuousMonitoringCheckBox_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null) return;
+            _selectedMacro.ContinuousMonitoring = ContinuousMonitoringCheckBox.IsChecked == true;
+            ContinuousMonitoringOptionsPanel.Visibility = _selectedMacro.ContinuousMonitoring ? Visibility.Visible : Visibility.Collapsed;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+        }
+
+        private void ContinuousMonitoringInterval_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_selectedMacro == null) return;
+            if (int.TryParse(ContinuousMonitoringIntervalTextBox.Text, out int ms) && ms > 0 && ms <= 10000)
+            {
+                _selectedMacro.ContinuousMonitoringIntervalMs = ms;
+                _selectedMacro.ModifiedAt = DateTime.Now;
             }
         }
 

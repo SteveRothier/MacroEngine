@@ -62,7 +62,9 @@ namespace MacroEngine.Core.Storage
                     ShortcutKeyCode = m.ShortcutKeyCode,
                     TargetApplications = m.TargetApplications ?? new List<string>(),
                     AppTriggerMode = m.AppTriggerMode,
-                    AutoExecuteOnFocus = m.AutoExecuteOnFocus
+                    AutoExecuteOnFocus = m.AutoExecuteOnFocus,
+                    ContinuousMonitoring = m.ContinuousMonitoring,
+                    ContinuousMonitoringIntervalMs = m.ContinuousMonitoringIntervalMs
                 }).ToList() ?? new List<Macro>();
                 
                 _logger?.Info($"{macros.Count} macro(s) chargée(s) depuis {_macrosFilePath}", "MacroStorage");
@@ -104,7 +106,9 @@ namespace MacroEngine.Core.Storage
                     ShortcutKeyCode = m.ShortcutKeyCode,
                     TargetApplications = m.TargetApplications ?? new List<string>(),
                     AppTriggerMode = m.AppTriggerMode,
-                    AutoExecuteOnFocus = m.AutoExecuteOnFocus
+                    AutoExecuteOnFocus = m.AutoExecuteOnFocus,
+                    ContinuousMonitoring = m.ContinuousMonitoring,
+                    ContinuousMonitoringIntervalMs = m.ContinuousMonitoringIntervalMs
                 }).ToList();
 
                 var options = new JsonSerializerOptions
@@ -166,7 +170,9 @@ namespace MacroEngine.Core.Storage
                     ShortcutKeyCode = macro.ShortcutKeyCode,
                     TargetApplications = macro.TargetApplications ?? new List<string>(),
                     AppTriggerMode = macro.AppTriggerMode,
-                    AutoExecuteOnFocus = macro.AutoExecuteOnFocus
+                    AutoExecuteOnFocus = macro.AutoExecuteOnFocus,
+                    ContinuousMonitoring = macro.ContinuousMonitoring,
+                    ContinuousMonitoringIntervalMs = macro.ContinuousMonitoringIntervalMs
                 };
 
                 var options = new JsonSerializerOptions
@@ -230,7 +236,9 @@ namespace MacroEngine.Core.Storage
                     ShortcutKeyCode = macroData.ShortcutKeyCode,
                     TargetApplications = macroData.TargetApplications ?? new List<string>(),
                     AppTriggerMode = macroData.AppTriggerMode,
-                    AutoExecuteOnFocus = macroData.AutoExecuteOnFocus
+                    AutoExecuteOnFocus = macroData.AutoExecuteOnFocus,
+                    ContinuousMonitoring = macroData.ContinuousMonitoring,
+                    ContinuousMonitoringIntervalMs = macroData.ContinuousMonitoringIntervalMs
                 };
 
                 _logger?.Info($"Macro '{importedMacro.Name}' importée avec succès depuis {filePath}", "MacroStorage");
@@ -258,6 +266,8 @@ namespace MacroEngine.Core.Storage
             public List<string> TargetApplications { get; set; } = new List<string>();
             public AppTriggerMode AppTriggerMode { get; set; } = AppTriggerMode.Manual;
             public bool AutoExecuteOnFocus { get; set; } = false;
+            public bool ContinuousMonitoring { get; set; } = false;
+            public int ContinuousMonitoringIntervalMs { get; set; } = 200;
         }
 
         /// <summary>
