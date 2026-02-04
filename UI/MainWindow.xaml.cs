@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using Microsoft.Win32;
 using MacroEngine.Core.Engine;
@@ -47,6 +48,7 @@ namespace MacroEngine.UI
         private Dictionary<int, Macro> _macroShortcuts = new Dictionary<int, Macro>();
         private bool _isRecording = false;
         private bool _isRecordingPaused = false;
+        private bool _isCapturingShortcut = false;
         private bool _recordMouseClicks = true;
         private volatile bool _stopRequested = false;
         private DateTime _lastActionTime;
@@ -60,7 +62,7 @@ namespace MacroEngine.UI
         private const int MIN_KEY_INTERVAL_MS = 50; // Intervalle minimum entre deux touches enregistrées (50ms = 20 touches/seconde max)
         
         // Queue thread-safe pour les événements souris
-        private readonly System.Collections.Concurrent.ConcurrentQueue<(int X, int Y, MouseButton Button, DateTime Time)> _mouseEventQueue = new();
+        private readonly System.Collections.Concurrent.ConcurrentQueue<(int X, int Y, Core.Hooks.MouseButton Button, DateTime Time)> _mouseEventQueue = new();
         private System.Windows.Threading.DispatcherTimer? _mouseEventProcessorTimer;
         private int _rapidKeyWarningCount = 0;
         private DateTime _lastRapidKeyWarning = DateTime.MinValue;
@@ -1450,25 +1452,25 @@ namespace MacroEngine.UI
                     }
 
                     // Utiliser les modificateurs détectés par le hook (plus fiable)
-                    ModifierKeys modifiers = ModifierKeys.None;
-                    if (e.HasShift) modifiers |= ModifierKeys.Shift;
+                    Core.Inputs.ModifierKeys modifiers = Core.Inputs.ModifierKeys.None;
+                    if (e.HasShift) modifiers |= Core.Inputs.ModifierKeys.Shift;
                     
                     // Alt Gr = Ctrl + Alt (on les stocke tous les deux pour l'exécution)
                     if (e.HasAltGr)
                     {
-                        modifiers |= ModifierKeys.Control;
-                        modifiers |= ModifierKeys.Alt;
+                        modifiers |= Core.Inputs.ModifierKeys.Control;
+                        modifiers |= Core.Inputs.ModifierKeys.Alt;
                     }
                     else
                     {
                         // Si ce n'est pas Alt Gr, ajouter Ctrl et Alt séparément
-                        if (e.HasCtrl) modifiers |= ModifierKeys.Control;
-                        if (e.HasAlt) modifiers |= ModifierKeys.Alt;
+                        if (e.HasCtrl) modifiers |= Core.Inputs.ModifierKeys.Control;
+                        if (e.HasAlt) modifiers |= Core.Inputs.ModifierKeys.Alt;
                     }
                     
                     // Windows keys
                     if (IsKeyPressed(0x5B) || IsKeyPressed(0x5C))
-                        modifiers |= ModifierKeys.Windows;
+                        modifiers |= Core.Inputs.ModifierKeys.Windows;
 
                     // Utiliser le caractère Unicode si disponible (plus fiable pour multilingue)
                     // Sinon, utiliser GetKeyName comme fallback
@@ -1636,14 +1638,14 @@ namespace MacroEngine.UI
                 // Ajouter un délai si nécessaire
                 AddDelayIfNeeded();
 
-                var mouseAction = new MouseAction
+                var mouseAction = new Core.Inputs.MouseAction
                 {
                     Name = $"Clic {evt.Button}",
                     ActionType = evt.Button switch
                     {
-                        MouseButton.Left => MouseActionType.LeftClick,
-                        MouseButton.Right => MouseActionType.RightClick,
-                        MouseButton.Middle => MouseActionType.MiddleClick,
+                        Core.Hooks.MouseButton.Left => MouseActionType.LeftClick,
+                        Core.Hooks.MouseButton.Right => MouseActionType.RightClick,
+                        Core.Hooks.MouseButton.Middle => MouseActionType.MiddleClick,
                         _ => MouseActionType.LeftClick
                     },
                     X = evt.X,
@@ -1875,17 +1877,17 @@ namespace MacroEngine.UI
                    vkCode == 0x5B || vkCode == 0x5C;
         }
 
-        private string FormatKeyNameWithModifiers(string keyName, ModifierKeys modifiers)
+        private string FormatKeyNameWithModifiers(string keyName, Core.Inputs.ModifierKeys modifiers)
         {
             // Si on a un caractère Unicode (de ToUnicode), il contient déjà le caractère avec les modificateurs
             // Pas besoin d'afficher les modificateurs car le caractère est déjà le résultat final
             
-            if (modifiers == ModifierKeys.None)
+            if (modifiers == Core.Inputs.ModifierKeys.None)
                 return keyName;
 
             // Détecter Alt Gr (Ctrl + Alt ensemble) - ne pas afficher les modificateurs dans ce cas
-            bool hasCtrl = (modifiers & ModifierKeys.Control) != 0;
-            bool hasAlt = (modifiers & ModifierKeys.Alt) != 0;
+            bool hasCtrl = (modifiers & Core.Inputs.ModifierKeys.Control) != 0;
+            bool hasAlt = (modifiers & Core.Inputs.ModifierKeys.Alt) != 0;
             bool isAltGr = hasCtrl && hasAlt;
 
             // Si c'est Alt Gr, ne pas afficher les modificateurs (juste le caractère)
@@ -1899,7 +1901,7 @@ namespace MacroEngine.UI
             var parts = new List<string>();
             if (hasCtrl) parts.Add("Ctrl");
             if (hasAlt) parts.Add("Alt");
-            if ((modifiers & ModifierKeys.Windows) != 0) parts.Add("Win");
+            if ((modifiers & Core.Inputs.ModifierKeys.Windows) != 0) parts.Add("Win");
 
             return parts.Count > 0 ? string.Join("+", parts) + "+" + keyName : keyName;
         }
@@ -2694,13 +2696,113 @@ namespace MacroEngine.UI
                 return;
             }
 
-            // Capturer le prochain raccourci
-            StatusText.Text = "Appuyez sur une touche pour définir le raccourci...";
+            _isCapturingShortcut = true;
+            if (ShortcutDisplayText != null)
+                ShortcutDisplayText.Text = "⌨ En cours…";
+            StatusText.Text = "Appuyez sur une touche (Échap = annuler)";
             StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+            PreviewKeyDown += CaptureShortcut_PreviewKeyDown;
+            Focus();
+        }
 
-            // TODO: Implémenter la capture de raccourci
-            MessageBox.Show("Appuyez sur une touche de fonction (F1-F12) pour définir le raccourci.", 
-                "Définir un raccourci", MessageBoxButton.OK, MessageBoxImage.Information);
+        private void CaptureShortcut_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (!_isCapturingShortcut || _selectedMacro == null)
+                return;
+
+            PreviewKeyDown -= CaptureShortcut_PreviewKeyDown;
+            _isCapturingShortcut = false;
+
+            if (e.Key == Key.Escape)
+            {
+                if (ShortcutDisplayText != null)
+                    ShortcutDisplayText.Text = _selectedMacro.ShortcutKeyCode > 0 ? GetKeyName((ushort)_selectedMacro.ShortcutKeyCode) : "Non défini";
+                StatusText.Text = "Raccourci non modifié.";
+                StatusText.Foreground = System.Windows.Media.Brushes.Gray;
+                e.Handled = true;
+                return;
+            }
+
+            if (e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+                e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl ||
+                e.Key == Key.LeftAlt || e.Key == Key.RightAlt ||
+                e.Key == Key.LWin || e.Key == Key.RWin)
+            {
+                if (ShortcutDisplayText != null)
+                    ShortcutDisplayText.Text = _selectedMacro.ShortcutKeyCode > 0 ? GetKeyName((ushort)_selectedMacro.ShortcutKeyCode) : "Non défini";
+                StatusText.Text = "Appuyez sur une touche (Échap = annuler)";
+                PreviewKeyDown += CaptureShortcut_PreviewKeyDown;
+                _isCapturingShortcut = true;
+                e.Handled = true;
+                return;
+            }
+
+            e.Handled = true;
+            int vkCode = System.Windows.Input.KeyInterop.VirtualKeyFromKey(e.Key);
+            if (vkCode == 0)
+            {
+                if (ShortcutDisplayText != null)
+                    ShortcutDisplayText.Text = _selectedMacro.ShortcutKeyCode > 0 ? GetKeyName((ushort)_selectedMacro.ShortcutKeyCode) : "Non défini";
+                return;
+            }
+
+            _selectedMacro.ShortcutKeyCode = vkCode;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+
+            if (_appConfig != null &&
+                (_selectedMacro.ShortcutKeyCode == _appConfig.ExecuteMacroKeyCode ||
+                 _selectedMacro.ShortcutKeyCode == _appConfig.StopMacroKeyCode))
+            {
+                MessageBox.Show(
+                    $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par un raccourci global.\nVeuillez choisir un autre raccourci.",
+                    "Conflit de raccourci",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                _selectedMacro.ShortcutKeyCode = 0;
+            }
+            else
+            {
+                var conflictingMacro = _macros.FirstOrDefault(m =>
+                    m.Id != _selectedMacro.Id &&
+                    m.ShortcutKeyCode == _selectedMacro.ShortcutKeyCode &&
+                    m.ShortcutKeyCode != 0);
+                if (conflictingMacro != null)
+                {
+                    MessageBox.Show(
+                        $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par la macro '{conflictingMacro.Name}'.\nVeuillez choisir un autre raccourci.",
+                        "Conflit de raccourci",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+                    _selectedMacro.ShortcutKeyCode = 0;
+                }
+            }
+
+            UpdateMacroShortcuts();
+            if (_appConfig?.EnableHooks == true)
+            {
+                try
+                {
+                    _globalMacroShortcutsHook?.Uninstall();
+                    _globalMacroShortcutsHook?.Install();
+                }
+                catch { }
+            }
+
+            if (ShortcutDisplayText != null)
+                ShortcutDisplayText.Text = _selectedMacro.ShortcutKeyCode > 0 ? GetKeyName((ushort)_selectedMacro.ShortcutKeyCode) : "Non défini";
+            MacrosListBox.Items.Refresh();
+            _ = _macroStorage.SaveMacrosAsync(_macros);
+
+            if (_selectedMacro.ShortcutKeyCode != 0)
+            {
+                StatusText.Text = $"Raccourci : {GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Green;
+            }
+            else
+            {
+                StatusText.Text = "Raccourci non défini (conflit).";
+                StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+            }
         }
 
         private void SelectApps_Click(object sender, RoutedEventArgs e)
