@@ -534,8 +534,14 @@ namespace MacroEngine.Core.Inputs
         }
 
         /// <summary>
+        private static readonly object _mouseClickLock = new object();
+        private static readonly bool[] _lastMouseButtonPressed = new bool[3]; // 0=gauche 1=droit 2=milieu
+        private static readonly bool[] _pendingSingleClick = new bool[3];
+        private static readonly DateTime[] _mouseButtonPressStart = new DateTime[3];
+        private const int MouseHoldThresholdMs = 180;
+
         /// Évalue la condition "Clic souris" (bouton pressé ou molette récente).
-        /// ClickType: 0-2 = clic gauche/droit/milieu, 3-5 = maintenir gauche/droit/milieu, 6 = molette haut, 7 = molette bas.
+        /// ClickType: 0-2 = clic gauche/droit/milieu (clic unique), 3-5 = maintenir gauche/droit/milieu, 6 = molette haut, 7 = molette bas.
         /// </summary>
         private bool EvaluateMouseClickCondition(MouseClickCondition? config)
         {
@@ -544,17 +550,97 @@ namespace MacroEngine.Core.Inputs
                 return MouseWheelState.WasWheelUp();
             if (config.ClickType == 7)
                 return MouseWheelState.WasWheelDown();
-            int vKey = config.ClickType switch
+            int normalizedIndex = config.ClickType switch
             {
-                0 => 0x01, // Clic gauche
-                1 => 0x02, // Clic droit
-                2 => 0x04, // Clic milieu
-                3 => 0x01, // Maintenir gauche
-                4 => 0x02, // Maintenir droit
-                5 => 0x04, // Maintenir milieu
+                0 => 0,
+                1 => 1,
+                2 => 2,
+                3 => 0,
+                4 => 1,
+                5 => 2,
+                _ => 0
+            };
+            ushort vKey = normalizedIndex switch
+            {
+                0 => 0x01, // VK_LBUTTON
+                1 => 0x02, // VK_RBUTTON
+                2 => 0x04, // VK_MBUTTON
                 _ => 0x01
             };
-            return IsKeyPressed((ushort)vKey);
+            
+            // ClickType 0-2 => clic unique (edge)
+            if (config.ClickType is 0 or 1 or 2)
+            {
+                return WasSingleMouseClick(normalizedIndex, vKey);
+            }
+
+            // ClickType 3-5 => maintenir
+            return IsMouseButtonHeld(normalizedIndex, vKey);
+        }
+
+        /// <summary>
+        /// Détecte un clic unique (transition bouton relâché -> appuyé). Retourne true une seule fois par clic.
+        /// </summary>
+        private bool WasSingleMouseClick(int buttonIndex, ushort vKey)
+        {
+            lock (_mouseClickLock)
+            {
+                var (isPressed, pressEdge) = UpdateMouseButtonState(buttonIndex, vKey);
+                if (pressEdge)
+                {
+                    _pendingSingleClick[buttonIndex] = true;
+                }
+
+                if (_pendingSingleClick[buttonIndex])
+                {
+                    _pendingSingleClick[buttonIndex] = false;
+                    return true;
+                }
+
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// True uniquement si le bouton est maintenu pendant un certain temps (évite de déclencher pour un simple clic).
+        /// </summary>
+        private bool IsMouseButtonHeld(int buttonIndex, ushort vKey)
+        {
+            lock (_mouseClickLock)
+            {
+                var (isPressed, _) = UpdateMouseButtonState(buttonIndex, vKey);
+                if (!isPressed)
+                    return false;
+
+                var start = _mouseButtonPressStart[buttonIndex];
+                if (start == DateTime.MinValue)
+                    return false;
+
+                return (DateTime.UtcNow - start).TotalMilliseconds >= MouseHoldThresholdMs;
+            }
+        }
+
+        /// <summary>
+        /// Met à jour l'état pressé/relâché d'un bouton souris et retourne (isPressed, pressEdge).
+        /// </summary>
+        private (bool isPressed, bool pressEdge) UpdateMouseButtonState(int buttonIndex, ushort vKey)
+        {
+            bool isPressed = IsKeyPressed(vKey);
+            bool pressEdge = false;
+
+            if (isPressed && !_lastMouseButtonPressed[buttonIndex])
+            {
+                _mouseButtonPressStart[buttonIndex] = DateTime.UtcNow;
+                _lastMouseButtonPressed[buttonIndex] = true;
+                pressEdge = true;
+            }
+            else if (!isPressed && _lastMouseButtonPressed[buttonIndex])
+            {
+                _lastMouseButtonPressed[buttonIndex] = false;
+                _mouseButtonPressStart[buttonIndex] = DateTime.MinValue;
+            }
+
+            return (isPressed, pressEdge);
         }
 
         /// <summary>
