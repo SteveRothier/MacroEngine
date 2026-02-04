@@ -3852,6 +3852,8 @@ namespace MacroEngine.UI
                 Cursor = Cursors.Hand,
                 Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
             };
+            if (Application.Current.TryFindResource("TimelineClicButton") is Style clicBtnStyle)
+                selectPointButton.Style = clicBtnStyle;
 
             selectPointButton.Click += (s, e) =>
             {
@@ -3874,6 +3876,8 @@ namespace MacroEngine.UI
                 Cursor = Cursors.Hand,
                 Visibility = showCoords ? Visibility.Visible : Visibility.Collapsed
             };
+            if (Application.Current.TryFindResource("TimelineClicButton") is Style clicBtnStyle2)
+                previewPositionButton.Style = clicBtnStyle2;
             previewPositionButton.Click += (s, e) =>
             {
                 if (ma.X >= 0 && ma.Y >= 0)
@@ -3920,6 +3924,8 @@ namespace MacroEngine.UI
                 Cursor = Cursors.Hand,
                 Visibility = (showConditionalZone && ma.ConditionalZoneEnabled) ? Visibility.Visible : Visibility.Collapsed
             };
+            if (Application.Current.TryFindResource("TimelineClicButton") is Style clicBtnStyle3)
+                zoneButton.Style = clicBtnStyle3;
 
             var zoneLabel = new TextBlock
             {
@@ -5017,6 +5023,8 @@ namespace MacroEngine.UI
                 ToolTip = "Sélectionner un point à l'écran (comme la pipette)",
                 Cursor = Cursors.Hand
             };
+            if (Application.Current.TryFindResource("TimelineClicButton") is Style nestedClicStyle)
+                selectPointButton.Style = nestedClicStyle;
 
             selectPointButton.Click += (s, e) =>
             {
@@ -5856,6 +5864,8 @@ namespace MacroEngine.UI
                     Cursor = Cursors.Hand,
                     ToolTip = "Configurer cette condition"
                 };
+                if (Application.Current.TryFindResource("TimelineIfIconButton") is Style ifIconStyle)
+                    configButton.Style = ifIconStyle;
                 configButton.Click += (s, e) =>
                 {
                     // Créer un IfAction temporaire avec seulement cette condition pour le dialogue
@@ -5903,6 +5913,8 @@ namespace MacroEngine.UI
                     ToolTip = "Supprimer cette condition",
                     IsEnabled = ifAction.Conditions.Count > 1
                 };
+                if (Application.Current.TryFindResource("TimelineIfIconButton") is Style ifIconStyle2)
+                    removeButton.Style = ifIconStyle2;
                 removeButton.Click += (s, e) =>
                 {
                     if (ifAction.Conditions.Count <= 1)
@@ -6014,6 +6026,8 @@ namespace MacroEngine.UI
                 ToolTip = "Ajouter une nouvelle condition",
                 Padding = new Thickness(8, 0, 8, 0)
             };
+            if (Application.Current.TryFindResource("TimelineIfButton") is Style ifBtnStyle)
+                addButton.Style = ifBtnStyle;
             addButton.Click += (s, e) =>
             {
                 SaveState();
@@ -6048,6 +6062,8 @@ namespace MacroEngine.UI
                 Cursor = Cursors.Hand,
                 ToolTip = "Ouvrir le dialogue de configuration complet"
             };
+            if (Application.Current.TryFindResource("TimelineIfButton") is Style ifBtnStyle2)
+                fullConfigButton.Style = ifBtnStyle2;
             fullConfigButton.Click += (s, e) =>
             {
                 var dialog = new ConditionConfigDialog(ifAction);
@@ -6091,6 +6107,8 @@ namespace MacroEngine.UI
                 ToolTip = "Basculer vers le mode groupes (A ET B) OU (C ET D)",
                 Padding = new Thickness(8, 0, 8, 0)
             };
+            if (Application.Current.TryFindResource("TimelineIfButton") is Style groupModeBtnStyle)
+                groupModeButton.Style = groupModeBtnStyle;
             groupModeButton.Click += (s, e) =>
             {
                 SaveState();
@@ -6293,6 +6311,8 @@ namespace MacroEngine.UI
                             ToolTip = "Configurer",
                             Padding = new Thickness(0)
                         };
+                        if (Application.Current.TryFindResource("TimelineIfIconButton") is Style groupIfIconStyle)
+                            configButton.Style = groupIfIconStyle;
                         configButton.Click += (s, e) =>
                         {
                             var tempIfAction = new IfAction
@@ -6340,6 +6360,8 @@ namespace MacroEngine.UI
                                 ToolTip = "Supprimer",
                                 Padding = new Thickness(0)
                             };
+                            if (Application.Current.TryFindResource("TimelineIfIconButton") is Style groupIfIconStyle2)
+                                removeConditionButton.Style = groupIfIconStyle2;
                             removeConditionButton.Click += (s, e) =>
                             {
                                 SaveState();
@@ -6370,6 +6392,8 @@ namespace MacroEngine.UI
                     ToolTip = "Ajouter condition (ET)",
                     Padding = new Thickness(0)
                 };
+                if (Application.Current.TryFindResource("TimelineIfIconButton") is Style addCondBtnStyle)
+                    addConditionButton.Style = addCondBtnStyle;
                 addConditionButton.Click += (s, e) =>
                 {
                     SaveState();
@@ -6399,6 +6423,8 @@ namespace MacroEngine.UI
                         ToolTip = "Supprimer groupe",
                         Padding = new Thickness(0)
                     };
+                    if (Application.Current.TryFindResource("TimelineIfIconButton") is Style groupRemoveIconStyle)
+                        removeGroupButton.Style = groupRemoveIconStyle;
                     removeGroupButton.Click += (s, e) =>
                     {
                         SaveState();
@@ -6429,9 +6455,10 @@ namespace MacroEngine.UI
                 Margin = new Thickness(6, 0, 0, 0),
                 Cursor = Cursors.Hand,
                 ToolTip = "Ajouter groupe (OU)",
-                Padding = new Thickness(4, 0, 4, 0),
-                Foreground = new SolidColorBrush(GetThemeColor("WarningColor"))
+                Padding = new Thickness(4, 0, 4, 0)
             };
+            if (Application.Current.TryFindResource("TimelineIfButton") is Style addGrpBtnStyle)
+                addGroupButton.Style = addGrpBtnStyle;
             addGroupButton.Click += (s, e) =>
             {
                 SaveState();
@@ -6464,6 +6491,8 @@ namespace MacroEngine.UI
                 ToolTip = "Revenir au mode simple",
                 Padding = new Thickness(0)
             };
+            if (Application.Current.TryFindResource("TimelineIfIconButton") is Style simpleModeBtnStyle)
+                simpleModeButton.Style = simpleModeBtnStyle;
             simpleModeButton.Click += (s, e) =>
             {
                 SaveState();
@@ -6561,6 +6590,8 @@ namespace MacroEngine.UI
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand
             };
+            if (Application.Current.TryFindResource("TimelineIfButton") is Style groupsIfBtnStyle)
+                configButton.Style = groupsIfBtnStyle;
             configButton.Click += (s, e) =>
             {
                 var dialog = new ConditionConfigDialog(ifAction);
