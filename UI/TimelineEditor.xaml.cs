@@ -3498,15 +3498,12 @@ namespace MacroEngine.UI
         /// <summary>
         /// Édition inline d'une KeyboardAction imbriquée dans un RepeatAction
         /// </summary>
-        private void EditNestedKeyboardAction(int parentIndex, int nestedIndex, TextBlock titleText)
+        private void EditNestedKeyboardAction(NestedActionInfo info, TextBlock titleText)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+            if (!TryGetRepeatAndIndexFromNestedInfo(info, out var repeatAction, out var nestedIndex))
                 return;
 
-            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
-                return;
-
-            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
+            if (repeatAction!.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
                 return;
 
             if (repeatAction.Actions[nestedIndex] is not KeyboardAction ka)
@@ -3517,7 +3514,7 @@ namespace MacroEngine.UI
                 return;
 
             var originalMargin = titleText.Margin;
-            var editPanel = CreateKeyboardActionControls(ka, parentIndex, parentPanel);
+            var editPanel = CreateKeyboardActionControls(ka, info.ParentIndex >= 0 ? info.IfActionIndex : info.ParentIndex, parentPanel);
             editPanel.Margin = originalMargin;
 
             int idx = parentPanel.Children.IndexOf(titleText);
@@ -3529,17 +3526,14 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Édition inline d'une DelayAction imbriquée dans un RepeatAction
+        /// Édition inline d'une DelayAction imbriquée dans un RepeatAction (niveau racine ou Repeat dans If).
         /// </summary>
-        private void EditNestedDelayAction(int parentIndex, int nestedIndex, TextBlock titleText)
+        private void EditNestedDelayAction(NestedActionInfo info, TextBlock titleText)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+            if (!TryGetRepeatAndIndexFromNestedInfo(info, out var repeatAction, out var nestedIndex))
                 return;
 
-            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
-                return;
-
-            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
+            if (repeatAction!.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
                 return;
 
             if (repeatAction.Actions[nestedIndex] is not DelayAction da)
@@ -3549,8 +3543,9 @@ namespace MacroEngine.UI
             if (parentPanel == null)
                 return;
 
+            var indexForControls = info.IfActionIndex >= 0 ? info.IfActionIndex : info.ParentIndex;
             var originalMargin = titleText.Margin;
-            var editPanel = CreateDelayActionControls(da, parentIndex, parentPanel);
+            var editPanel = CreateDelayActionControls(da, indexForControls, parentPanel);
             editPanel.Margin = originalMargin;
 
             int idx = parentPanel.Children.IndexOf(titleText);
@@ -4843,15 +4838,12 @@ namespace MacroEngine.UI
         /// <summary>
         /// Édition inline d'une MouseAction imbriquée dans un RepeatAction
         /// </summary>
-        private void EditNestedMouseAction(int parentIndex, int nestedIndex, TextBlock titleText)
+        private void EditNestedMouseAction(NestedActionInfo info, TextBlock titleText)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+            if (!TryGetRepeatAndIndexFromNestedInfo(info, out var repeatAction, out var nestedIndex))
                 return;
 
-            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
-                return;
-
-            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
+            if (repeatAction!.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count)
                 return;
 
             if (repeatAction.Actions[nestedIndex] is not Core.Inputs.MouseAction ma)
@@ -7010,9 +7002,10 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée une carte pour une action imbriquée dans un RepeatAction
+        /// Crée une carte pour une action imbriquée dans un RepeatAction (niveau racine ou Repeat dans Then/Else d'un If).
+        /// Si ifActionIndex >= 0 : Repeat est dans le Then/Else du If à cet index ; sinon parentIndex = index du Repeat à la racine.
         /// </summary>
-        private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex)
+        private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex, int ifActionIndex = -1, bool isThen = false, int nestedRepeatIndex = -1)
         {
             // Si c'est un IfAction imbriqué, créer un conteneur récursif au lieu d'une simple carte
             if (action is IfAction nestedIfAction)
@@ -7020,8 +7013,12 @@ namespace MacroEngine.UI
                 return CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex);
             }
 
+            var info = ifActionIndex >= 0
+                ? new NestedActionInfo { ParentIndex = -1, NestedIndex = nestedIndex, IfActionIndex = ifActionIndex, IsThen = isThen, NestedRepeatIndex = nestedRepeatIndex }
+                : new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex };
+
             // Créer la carte visuelle avec CreateActionCard (croix = supprimer cette action imbriquée uniquement)
-            var card = CreateActionCard(action, parentIndex, new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex }, null);
+            var card = CreateActionCard(action, parentIndex, info, null);
             
             // Trouver le TextBlock titleBlock et ajouter les handlers d'édition appropriés
             var titleBlock = FindTitleBlockInCard(card);
@@ -7036,7 +7033,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedKeyboardAction(parentIndex, nestedIndex, titleBlock);
+                        EditNestedKeyboardAction(info, titleBlock);
                     };
                 }
                 else if (action is DelayAction)
@@ -7045,7 +7042,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedDelayAction(parentIndex, nestedIndex, titleBlock);
+                        EditNestedDelayAction(info, titleBlock);
                     };
                 }
                 else if (action is Core.Inputs.MouseAction)
@@ -7054,7 +7051,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedMouseAction(parentIndex, nestedIndex, titleBlock);
+                        EditNestedMouseAction(info, titleBlock);
                     };
                 }
                 else if (action is TextAction)
@@ -7064,7 +7061,8 @@ namespace MacroEngine.UI
                     if (textPanel != null)
                     {
                         textPanel.Children.Remove(titleBlock);
-                        var textControlsPanel = CreateTextActionControls((TextAction)action, parentIndex, textPanel);
+                        var indexForControls = info.IfActionIndex >= 0 ? info.IfActionIndex : info.ParentIndex;
+                        var textControlsPanel = CreateTextActionControls((TextAction)action, indexForControls, textPanel);
                         textPanel.Children.Insert(0, textControlsPanel);
                     }
                 }
@@ -7074,7 +7072,8 @@ namespace MacroEngine.UI
                     if (textPanel != null)
                     {
                         textPanel.Children.Remove(titleBlock);
-                        var variableControlsPanel = CreateVariableActionControls(vaNested, parentIndex, textPanel);
+                        var indexForControls = info.IfActionIndex >= 0 ? info.IfActionIndex : info.ParentIndex;
+                        var variableControlsPanel = CreateVariableActionControls(vaNested, indexForControls, textPanel);
                         textPanel.Children.Insert(0, variableControlsPanel);
                     }
                 }
@@ -7107,7 +7106,7 @@ namespace MacroEngine.UI
             container.Children.Add(card);
 
             // Boutons flèches pour les actions imbriquées
-            var moveButtonsContainer = CreateNestedMoveButtonsContainer(action, parentIndex, nestedIndex);
+            var moveButtonsContainer = CreateNestedMoveButtonsContainer(action, info);
             Grid.SetColumn(moveButtonsContainer, 1);
             container.Children.Add(moveButtonsContainer);
 
@@ -7144,7 +7143,7 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un conteneur avec les boutons monter/descendre pour les actions imbriquées
         /// </summary>
-        private FrameworkElement CreateNestedMoveButtonsContainer(IInputAction action, int parentIndex, int nestedIndex)
+        private FrameworkElement CreateNestedMoveButtonsContainer(IInputAction action, NestedActionInfo info)
         {
             // Conteneur séparé pour les boutons monter/descendre
             var moveButtonsContainer = new Border
@@ -7176,17 +7175,12 @@ namespace MacroEngine.UI
                 Visibility = Visibility.Visible
             };
 
-            // Vérifier si on peut monter/descendre
             bool canMoveUp = false;
             bool canMoveDown = false;
-
-            if (_currentMacro != null && parentIndex >= 0 && parentIndex < _currentMacro.Actions.Count)
+            if (TryGetRepeatAndIndexFromNestedInfo(info, out var repeatAction, out var nestedIndex) && repeatAction!.Actions != null)
             {
-                if (_currentMacro.Actions[parentIndex] is RepeatAction repeatAction && repeatAction.Actions != null)
-                {
-                    canMoveUp = nestedIndex > 0;
-                    canMoveDown = nestedIndex < repeatAction.Actions.Count - 1;
-                }
+                canMoveUp = nestedIndex > 0;
+                canMoveDown = nestedIndex < repeatAction.Actions.Count - 1;
             }
 
             // Bouton monter (▲)
@@ -7202,7 +7196,7 @@ namespace MacroEngine.UI
                 Cursor = canMoveUp ? Cursors.Hand : Cursors.Arrow,
                 Margin = new Thickness(0, 0, 0, 1),
                 Padding = new Thickness(0),
-                Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex }
+                Tag = info
             };
             
             var moveUpBtnText = new TextBlock
@@ -7225,7 +7219,7 @@ namespace MacroEngine.UI
             {
                 if (canMoveUp)
                 {
-                    MoveNestedActionUp(parentIndex, nestedIndex);
+                    MoveNestedActionUp(info);
                     e.Handled = true;
                 }
             };
@@ -7261,7 +7255,7 @@ namespace MacroEngine.UI
                 Cursor = canMoveDown ? Cursors.Hand : Cursors.Arrow,
                 Margin = new Thickness(0, 1, 0, 0),
                 Padding = new Thickness(0),
-                Tag = new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex }
+                Tag = info
             };
             
             var moveDownBtnText = new TextBlock
@@ -7284,7 +7278,7 @@ namespace MacroEngine.UI
             {
                 if (canMoveDown)
                 {
-                    MoveNestedActionDown(parentIndex, nestedIndex);
+                    MoveNestedActionDown(info);
                     e.Handled = true;
                 }
             };
@@ -7317,9 +7311,9 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée un panel avec des boutons pour ajouter des actions dans un RepeatAction
+        /// Crée un panel avec des boutons pour ajouter des actions dans un RepeatAction (niveau racine ou imbriqué dans If).
         /// </summary>
-        private FrameworkElement CreateAddActionsPanel(RepeatAction ra, int repeatActionIndex)
+        private FrameworkElement CreateAddActionsPanel(RepeatAction ra, int repeatActionIndex, int ifActionIndex = -1, bool isThen = false, int nestedRepeatIndex = -1)
         {
             var panel = new StackPanel
             {
@@ -7331,6 +7325,14 @@ namespace MacroEngine.UI
             // Fonction helper pour créer un bouton d'ajout (texte blanc clair)
             Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
             {
+                var tag = new RepeatActionInfo
+                {
+                    RepeatActionIndex = ifActionIndex >= 0 ? -1 : repeatActionIndex,
+                    ActionType = actionInstance.Type.ToString(),
+                    IfActionIndex = ifActionIndex,
+                    IsThen = isThen,
+                    NestedRepeatIndex = nestedRepeatIndex
+                };
                 var button = new Border
                 {
                     Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255)),
@@ -7340,7 +7342,7 @@ namespace MacroEngine.UI
                     Cursor = Cursors.Hand,
                     BorderThickness = new Thickness(1),
                     BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
-                    Tag = new RepeatActionInfo { RepeatActionIndex = repeatActionIndex, ActionType = actionInstance.Type.ToString() }
+                    Tag = tag
                 };
                 button.MouseLeftButtonDown += AddActionToRepeat_Click;
 
@@ -7389,10 +7391,25 @@ namespace MacroEngine.UI
             var button = sender as Border;
             if (button?.Tag is not RepeatActionInfo info) return;
 
-            var repeatActionIndex = info.RepeatActionIndex;
-            if (repeatActionIndex < 0 || repeatActionIndex >= _currentMacro.Actions.Count) return;
+            RepeatAction? repeatAction = null;
+            if (info.IfActionIndex >= 0)
+            {
+                // Repeat imbriqué dans le Then/Else d'un If
+                if (info.IfActionIndex >= _currentMacro.Actions.Count) return;
+                if (_currentMacro.Actions[info.IfActionIndex] is not IfAction ifAction) return;
+                var list = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
+                if (list == null || info.NestedRepeatIndex < 0 || info.NestedRepeatIndex >= list.Count) return;
+                repeatAction = list[info.NestedRepeatIndex] as RepeatAction;
+            }
+            else
+            {
+                // Repeat au niveau racine
+                var repeatActionIndex = info.RepeatActionIndex;
+                if (repeatActionIndex < 0 || repeatActionIndex >= _currentMacro.Actions.Count) return;
+                repeatAction = _currentMacro.Actions[repeatActionIndex] as RepeatAction;
+            }
 
-            if (_currentMacro.Actions[repeatActionIndex] is not RepeatAction repeatAction) return;
+            if (repeatAction == null) return;
 
             SaveState();
 
@@ -7453,25 +7470,21 @@ namespace MacroEngine.UI
         /// <summary>
         /// Déplace une action imbriquée vers le haut dans un RepeatAction
         /// </summary>
-        private void MoveNestedActionUp(int parentIndex, int nestedIndex)
+        private void MoveNestedActionUp(NestedActionInfo info)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+            if (!TryGetRepeatAndIndexFromNestedInfo(info, out var repeatAction, out var nestedIndex))
                 return;
 
-            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
-                return;
-
-            if (repeatAction.Actions == null || nestedIndex <= 0 || nestedIndex >= repeatAction.Actions.Count)
+            if (repeatAction!.Actions == null || nestedIndex <= 0 || nestedIndex >= repeatAction.Actions.Count)
                 return;
 
             SaveState();
-            
-            // Échanger l'action imbriquée avec celle au-dessus
+
             var action = repeatAction.Actions[nestedIndex];
             repeatAction.Actions.RemoveAt(nestedIndex);
             repeatAction.Actions.Insert(nestedIndex - 1, action);
-            _currentMacro.ModifiedAt = DateTime.Now;
-            
+            _currentMacro!.ModifiedAt = DateTime.Now;
+
             RefreshBlocks();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -7479,27 +7492,48 @@ namespace MacroEngine.UI
         /// <summary>
         /// Déplace une action imbriquée vers le bas dans un RepeatAction
         /// </summary>
-        private void MoveNestedActionDown(int parentIndex, int nestedIndex)
+        private void MoveNestedActionDown(NestedActionInfo info)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
+            if (!TryGetRepeatAndIndexFromNestedInfo(info, out var repeatAction, out var nestedIndex))
                 return;
 
-            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction)
-                return;
-
-            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count - 1)
+            if (repeatAction!.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count - 1)
                 return;
 
             SaveState();
-            
-            // Échanger l'action imbriquée avec celle en dessous
+
             var action = repeatAction.Actions[nestedIndex];
             repeatAction.Actions.RemoveAt(nestedIndex);
             repeatAction.Actions.Insert(nestedIndex + 1, action);
-            _currentMacro.ModifiedAt = DateTime.Now;
-            
+            _currentMacro!.ModifiedAt = DateTime.Now;
+
             RefreshBlocks();
             MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Résout le RepeatAction et l'index à partir de NestedActionInfo (Repeat au niveau racine ou Repeat dans Then/Else d'un If).
+        /// </summary>
+        private bool TryGetRepeatAndIndexFromNestedInfo(NestedActionInfo info, out RepeatAction? repeatAction, out int nestedIndex)
+        {
+            nestedIndex = info.NestedIndex;
+            repeatAction = null;
+            if (_currentMacro == null) return false;
+
+            if (info.IfActionIndex >= 0)
+            {
+                if (info.IfActionIndex >= _currentMacro.Actions.Count) return false;
+                if (_currentMacro.Actions[info.IfActionIndex] is not IfAction ifAction) return false;
+                var list = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
+                if (list == null || info.NestedRepeatIndex < 0 || info.NestedRepeatIndex >= list.Count) return false;
+                if (list[info.NestedRepeatIndex] is not RepeatAction rep) return false;
+                repeatAction = rep;
+                return true;
+            }
+            if (info.ParentIndex < 0 || info.ParentIndex >= _currentMacro.Actions.Count) return false;
+            if (_currentMacro.Actions[info.ParentIndex] is not RepeatAction repRoot) return false;
+            repeatAction = repRoot;
+            return true;
         }
 
         /// <summary>
@@ -7512,12 +7546,8 @@ namespace MacroEngine.UI
             var button = sender as Border;
             if (button?.Tag is not NestedActionInfo info) return;
 
-            var parentIndex = info.ParentIndex;
-            var nestedIndex = info.NestedIndex;
-
-            if (parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count) return;
-            if (_currentMacro.Actions[parentIndex] is not RepeatAction repeatAction) return;
-            if (repeatAction.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count) return;
+            if (!TryGetRepeatAndIndexFromNestedInfo(info, out var repeatAction, out var nestedIndex)) return;
+            if (repeatAction!.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count) return;
 
             SaveState();
 
@@ -8806,14 +8836,14 @@ namespace MacroEngine.UI
                 for (int i = 0; i < repeatAction.Actions.Count; i++)
                 {
                     var nestedAction = repeatAction.Actions[i];
-                    var nestedCard = CreateNestedActionCard(nestedAction, ifActionIndex, i);
+                    var nestedCard = CreateNestedActionCard(nestedAction, -1, i, ifActionIndex, isThen, nestedIndex);
                     nestedContainer.Children.Add(nestedCard);
                 }
                 nestedSection.Children.Add(nestedContainer);
             }
 
-            // Ajouter un panel pour ajouter de nouvelles actions
-            var addActionsPanel = CreateAddActionsPanel(repeatAction, ifActionIndex);
+            // Ajouter un panel pour ajouter de nouvelles actions (Repeat imbriqué dans If : ifActionIndex, isThen, nestedRepeatIndex)
+            var addActionsPanel = CreateAddActionsPanel(repeatAction, -1, ifActionIndex, isThen, nestedIndex);
             nestedSection.Children.Add(addActionsPanel);
             
             nestedSectionBorder.Child = nestedSection;
@@ -8823,12 +8853,19 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Informations sur une action imbriquée (pour passer le contexte aux event handlers)
+        /// Informations sur une action imbriquée (pour passer le contexte aux event handlers).
+        /// Si IfActionIndex >= 0 : l'action est dans un Repeat lui-même dans le Then/Else d'un If.
+        /// Sinon : l'action est dans un Repeat au niveau racine (ParentIndex = index du Repeat).
         /// </summary>
         private class NestedActionInfo
         {
             public int ParentIndex { get; set; }
             public int NestedIndex { get; set; }
+            /// <summary>Index de l'IfAction parent quand le Repeat est dans Then/Else ; -1 si Repeat au niveau racine.</summary>
+            public int IfActionIndex { get; set; } = -1;
+            public bool IsThen { get; set; }
+            /// <summary>Index du Repeat dans ThenActions ou ElseActions.</summary>
+            public int NestedRepeatIndex { get; set; } = -1;
         }
 
         /// <summary>
@@ -8846,11 +8883,18 @@ namespace MacroEngine.UI
 
         /// <summary>
         /// Informations sur un RepeatAction (pour passer le contexte aux event handlers)
+        /// Si IfActionIndex >= 0 : Repeat est dans le Then/Else d'un If (référence par IfActionIndex + IsThen + NestedRepeatIndex).
+        /// Sinon : Repeat est au niveau racine (RepeatActionIndex dans _currentMacro.Actions).
         /// </summary>
         private class RepeatActionInfo
         {
             public int RepeatActionIndex { get; set; }
             public string ActionType { get; set; } = "";
+            /// <summary>Index de l'IfAction parent quand Repeat est dans Then/Else ; -1 si Repeat au niveau racine.</summary>
+            public int IfActionIndex { get; set; } = -1;
+            public bool IsThen { get; set; }
+            /// <summary>Index du Repeat dans ThenActions ou ElseActions.</summary>
+            public int NestedRepeatIndex { get; set; }
         }
 
         /// <summary>
