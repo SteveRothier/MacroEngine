@@ -8790,8 +8790,8 @@ namespace MacroEngine.UI
                 Margin = new Thickness(0, 0, 0, 8)
             };
 
-            // Créer une carte simple pour le RepeatAction (sans boutons monter/descendre car c'est imbriqué)
-            var card = CreateActionCard(repeatAction, ifActionIndex);
+            // Créer une carte pour le RepeatAction avec NestedIfActionInfo pour que la croix supprime uniquement ce Repeat (pas tout le If)
+            var card = CreateActionCard(repeatAction, ifActionIndex, null, new NestedIfActionInfo { ParentIndex = ifActionIndex, NestedIndex = nestedIndex, IsThen = isThen, ElseIfBranchIndex = -1 });
             container.Children.Add(card);
 
             // Couleur du bloc Repeat (violet logique)
