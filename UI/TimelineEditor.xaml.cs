@@ -5425,9 +5425,12 @@ namespace MacroEngine.UI
                     controlYTextBoxNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
                     selectControlPointButtonNested.Visibility = showBezier ? Visibility.Visible : Visibility.Collapsed;
                     
-                    _currentMacro.ModifiedAt = DateTime.Now;
-                    RefreshBlocks();
-                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                    if (_currentMacro != null)
+                    {
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
                 }
             };
 
