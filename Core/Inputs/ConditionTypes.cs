@@ -57,7 +57,25 @@ namespace MacroEngine.Core.Inputs
         /// <summary>
         /// Valeur d'une variable (nombre, texte ou booléen)
         /// </summary>
-        Variable
+        Variable,
+
+        /// <summary>
+        /// Si un bouton de souris est pressé (clic gauche, droit, milieu)
+        /// </summary>
+        MouseClick
+    }
+
+    /// <summary>
+    /// Configuration pour condition "Clic souris" (bouton pressé ou molette).
+    /// </summary>
+    public class MouseClickCondition
+    {
+        /// <summary>
+        /// Type : 0 = Clic gauche, 1 = Clic droit, 2 = Clic milieu,
+        /// 3 = Maintenir gauche, 4 = Maintenir droit, 5 = Maintenir milieu,
+        /// 6 = Molette haut, 7 = Molette bas.
+        /// </summary>
+        public int ClickType { get; set; } = 0;
     }
 
     /// <summary>
@@ -423,6 +441,11 @@ namespace MacroEngine.Core.Inputs
         /// Configuration pour condition "Texte à l'écran"
         /// </summary>
         public TextOnScreenCondition? TextOnScreenConfig { get; set; }
+
+        /// <summary>
+        /// Configuration pour condition "Clic souris"
+        /// </summary>
+        public MouseClickCondition? MouseClickConfig { get; set; }
 
         /// <summary>
         /// Nom de la variable (pour ConditionType.Variable) — valeur booléenne ou vérité (nombre != 0, texte non vide)

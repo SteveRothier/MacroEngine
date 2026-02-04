@@ -1270,6 +1270,9 @@ namespace MacroEngine.UI
                 ConditionType.TextOnScreen => ifAction.TextOnScreenConfig != null
                     ? $"Si texte \"{ifAction.TextOnScreenConfig.Text}\" visible"
                     : "Si Texte à l'écran",
+                ConditionType.MouseClick => ifAction.Conditions?.FirstOrDefault()?.MouseClickConfig != null
+                    ? $"Si {GetMouseClickLabel(ifAction.Conditions!.First().MouseClickConfig!.ClickType)}"
+                    : "Si Clic",
                 ConditionType.Variable => !string.IsNullOrEmpty(ifAction.Conditions?.FirstOrDefault()?.VariableName)
                     ? $"Si variable \"{ifAction.Conditions[0].VariableName}\""
                     : "Si Variable",
@@ -1309,10 +1312,29 @@ namespace MacroEngine.UI
                 ConditionType.TextOnScreen => condition.TextOnScreenConfig != null && !string.IsNullOrEmpty(condition.TextOnScreenConfig.Text)
                     ? $"Si texte \"{(condition.TextOnScreenConfig.Text.Length > 30 ? condition.TextOnScreenConfig.Text.Substring(0, 30) + "..." : condition.TextOnScreenConfig.Text)}\" visible"
                     : "Si Texte à l'écran",
+                ConditionType.MouseClick => condition.MouseClickConfig != null
+                    ? $"Si {GetMouseClickLabel(condition.MouseClickConfig.ClickType)}"
+                    : "Si Clic",
                 ConditionType.Variable => !string.IsNullOrEmpty(condition.VariableName)
                     ? $"Si variable \"{condition.VariableName}\""
                     : "Si Variable",
                 _ => "Si"
+            };
+        }
+
+        private static string GetMouseClickLabel(int clickType)
+        {
+            return clickType switch
+            {
+                0 => "clic gauche",
+                1 => "clic droit",
+                2 => "clic milieu",
+                3 => "maintenir gauche",
+                4 => "maintenir droit",
+                5 => "maintenir milieu",
+                6 => "molette haut",
+                7 => "molette bas",
+                _ => "clic gauche"
             };
         }
 
@@ -5767,6 +5789,7 @@ namespace MacroEngine.UI
                 conditionTypeComboBox.Items.Add("Image à l'écran");
                 conditionTypeComboBox.Items.Add("Texte à l'écran");
                 conditionTypeComboBox.Items.Add("Variable");
+                conditionTypeComboBox.Items.Add("Clic");
                 conditionTypeComboBox.SelectedIndex = (int)condition.ConditionType;
 
                 conditionTypeComboBox.SelectionChanged += (s, e) =>
@@ -5785,12 +5808,46 @@ namespace MacroEngine.UI
                         condition.ImageOnScreenConfig = null;
                         condition.TextOnScreenConfig = null;
                         condition.VariableName = null;
+                        condition.MouseClickConfig = condition.ConditionType == ConditionType.MouseClick ? new MouseClickCondition() : null;
                         _currentMacro!.ModifiedAt = DateTime.Now;
                         RefreshBlocks();
                         MacroChanged?.Invoke(this, EventArgs.Empty);
                     }
                 };
                 conditionPanel.Children.Add(conditionTypeComboBox);
+
+                // Sous-combo pour le type de clic (visible uniquement si type = Clic)
+                var clickTypeComboBox = new ComboBox
+                {
+                    Width = 120,
+                    FontSize = 11,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 0, 0),
+                    Visibility = condition.ConditionType == ConditionType.MouseClick ? Visibility.Visible : Visibility.Collapsed
+                };
+                clickTypeComboBox.Items.Add("Clic gauche");
+                clickTypeComboBox.Items.Add("Clic droit");
+                clickTypeComboBox.Items.Add("Clic milieu");
+                clickTypeComboBox.Items.Add("Maintenir gauche");
+                clickTypeComboBox.Items.Add("Maintenir droit");
+                clickTypeComboBox.Items.Add("Maintenir milieu");
+                clickTypeComboBox.Items.Add("Molette haut");
+                clickTypeComboBox.Items.Add("Molette bas");
+                if (condition.MouseClickConfig != null)
+                    clickTypeComboBox.SelectedIndex = Math.Max(0, Math.Min(condition.MouseClickConfig.ClickType, 7));
+                else
+                    clickTypeComboBox.SelectedIndex = 0;
+                clickTypeComboBox.SelectionChanged += (s, e) =>
+                {
+                    if (clickTypeComboBox.SelectedIndex >= 0 && condition.MouseClickConfig != null)
+                    {
+                        SaveState();
+                        condition.MouseClickConfig.ClickType = clickTypeComboBox.SelectedIndex;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    }
+                };
+                conditionPanel.Children.Add(clickTypeComboBox);
 
                 // Bouton pour configurer cette condition
                 var configButton = new Button
@@ -5829,6 +5886,7 @@ namespace MacroEngine.UI
                         condition.TimeDateConfig = resultCondition.TimeDateConfig;
                         condition.ImageOnScreenConfig = resultCondition.ImageOnScreenConfig;
                         condition.TextOnScreenConfig = resultCondition.TextOnScreenConfig;
+                        condition.MouseClickConfig = resultCondition.MouseClickConfig != null ? new MouseClickCondition { ClickType = resultCondition.MouseClickConfig.ClickType } : null;
                         condition.VariableName = resultCondition.VariableName;
                         _currentMacro!.ModifiedAt = DateTime.Now;
                         RefreshBlocks();
@@ -6175,6 +6233,7 @@ namespace MacroEngine.UI
                         conditionTypeComboBox.Items.Add("Image");
                         conditionTypeComboBox.Items.Add("Texte");
                         conditionTypeComboBox.Items.Add("Variable");
+                        conditionTypeComboBox.Items.Add("Clic");
                         conditionTypeComboBox.SelectedIndex = (int)condition.ConditionType;
 
                         conditionTypeComboBox.SelectionChanged += (s, e) =>
@@ -6183,12 +6242,48 @@ namespace MacroEngine.UI
                             {
                                 SaveState();
                                 condition.ConditionType = (ConditionType)conditionTypeComboBox.SelectedIndex;
+                                condition.MouseClickConfig = condition.ConditionType == ConditionType.MouseClick ? new MouseClickCondition() : null;
                                 _currentMacro!.ModifiedAt = DateTime.Now;
                                 RefreshBlocks();
                                 MacroChanged?.Invoke(this, EventArgs.Empty);
                             }
                         };
                         groupContent.Children.Add(conditionTypeComboBox);
+
+                        // Sous-combo type de clic (visible si type = Clic)
+                        var groupClickTypeComboBox = new ComboBox
+                        {
+                            Width = 75,
+                            FontSize = 10,
+                            Height = 22,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Margin = new Thickness(2, 0, 0, 0),
+                            Padding = new Thickness(2, 0, 2, 0),
+                            Visibility = condition.ConditionType == ConditionType.MouseClick ? Visibility.Visible : Visibility.Collapsed
+                        };
+                        groupClickTypeComboBox.Items.Add("Gauche");
+                        groupClickTypeComboBox.Items.Add("Droit");
+                        groupClickTypeComboBox.Items.Add("Milieu");
+                        groupClickTypeComboBox.Items.Add("Mnt gauche");
+                        groupClickTypeComboBox.Items.Add("Mnt droit");
+                        groupClickTypeComboBox.Items.Add("Mnt milieu");
+                        groupClickTypeComboBox.Items.Add("Molette ↑");
+                        groupClickTypeComboBox.Items.Add("Molette ↓");
+                        if (condition.MouseClickConfig != null)
+                            groupClickTypeComboBox.SelectedIndex = Math.Max(0, Math.Min(condition.MouseClickConfig.ClickType, 7));
+                        else
+                            groupClickTypeComboBox.SelectedIndex = 0;
+                        groupClickTypeComboBox.SelectionChanged += (s, e) =>
+                        {
+                            if (groupClickTypeComboBox.SelectedIndex >= 0 && condition.MouseClickConfig != null)
+                            {
+                                SaveState();
+                                condition.MouseClickConfig.ClickType = groupClickTypeComboBox.SelectedIndex;
+                                _currentMacro!.ModifiedAt = DateTime.Now;
+                                MacroChanged?.Invoke(this, EventArgs.Empty);
+                            }
+                        };
+                        groupContent.Children.Add(groupClickTypeComboBox);
 
                         // Bouton configurer (petit)
                         var configButton = new Button
@@ -6226,6 +6321,7 @@ namespace MacroEngine.UI
                                 condition.TimeDateConfig = resultCondition.TimeDateConfig;
                                 condition.ImageOnScreenConfig = resultCondition.ImageOnScreenConfig;
                                 condition.TextOnScreenConfig = resultCondition.TextOnScreenConfig;
+                                condition.MouseClickConfig = resultCondition.MouseClickConfig != null ? new MouseClickCondition { ClickType = resultCondition.MouseClickConfig.ClickType } : null;
                                 condition.VariableName = resultCondition.VariableName;
                                 _currentMacro!.ModifiedAt = DateTime.Now;
                                 RefreshBlocks();
@@ -6439,6 +6535,12 @@ namespace MacroEngine.UI
                 case ConditionType.TextOnScreen:
                     ifAction.TextOnScreenConfig ??= new TextOnScreenCondition { Text = "" };
                     break;
+                case ConditionType.MouseClick:
+                    if (ifAction.Conditions == null || ifAction.Conditions.Count == 0)
+                        ifAction.Conditions = new List<ConditionItem> { new ConditionItem { ConditionType = ConditionType.MouseClick, MouseClickConfig = new MouseClickCondition() } };
+                    else if (ifAction.Conditions[0].MouseClickConfig == null)
+                        ifAction.Conditions[0].MouseClickConfig = new MouseClickCondition();
+                    break;
             }
         }
 
@@ -6588,6 +6690,9 @@ namespace MacroEngine.UI
                 ConditionType.TextOnScreen => ifAction.TextOnScreenConfig != null && !string.IsNullOrEmpty(ifAction.TextOnScreenConfig.Text)
                     ? $"Texte: \"{ifAction.TextOnScreenConfig.Text.Substring(0, Math.Min(20, ifAction.TextOnScreenConfig.Text.Length))}\"..."
                     : "Texte: (non configuré)",
+                ConditionType.MouseClick => ifAction.Conditions?.FirstOrDefault()?.MouseClickConfig != null
+                    ? $"Clic: {GetMouseClickLabel(ifAction.Conditions!.First().MouseClickConfig!.ClickType)}"
+                    : "Clic: (non configuré)",
                 _ => ""
             };
         }
@@ -6651,6 +6756,9 @@ namespace MacroEngine.UI
                 ConditionType.TextOnScreen => condition.TextOnScreenConfig != null && !string.IsNullOrEmpty(condition.TextOnScreenConfig.Text)
                     ? $"Texte: \"{condition.TextOnScreenConfig.Text.Substring(0, Math.Min(20, condition.TextOnScreenConfig.Text.Length))}\"..."
                     : "Texte: (non configuré)",
+                ConditionType.MouseClick => condition.MouseClickConfig != null
+                    ? $"Clic: {GetMouseClickLabel(condition.MouseClickConfig.ClickType)}"
+                    : "Clic: (non configuré)",
                 _ => ""
             };
         }

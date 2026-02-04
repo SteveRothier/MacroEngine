@@ -408,6 +408,7 @@ namespace MacroEngine.UI
                     _globalStopHook.Install();
                     UpdateMacroShortcuts();
                     _globalMacroShortcutsHook.Install();
+                    _mouseHook.Install(); // Pour capturer la molette (conditions "Molette haut/bas")
                     _logger?.Debug($"Hooks globaux installés - Exécuter: VK{_appConfig?.ExecuteMacroKeyCode:X2}, Arrêter: VK{_appConfig?.StopMacroKeyCode:X2}", "MainWindow");
                 }
             }
@@ -1060,6 +1061,17 @@ namespace MacroEngine.UI
                         break;
                 }
                 
+                // Si la macro utilise la molette (condition) ou la surveillance continue, installer le hook souris pour capturer la molette
+                bool mouseHookInstalledForExecution = false;
+                if ((_selectedMacro.ContinuousMonitoring || MacroHasMouseWheelCondition(_selectedMacro)) && !_mouseHook.IsEnabled)
+                {
+                    try
+                    {
+                        mouseHookInstalledForExecution = _mouseHook.Install();
+                    }
+                    catch { /* ignorer */ }
+                }
+
                 // Exécuter la macro avec répétition
                 int currentRepeat = 0;
                 bool success = true;
@@ -1120,6 +1132,12 @@ namespace MacroEngine.UI
                 }
                 
                 _stopRequested = false;
+
+                // Désinstaller le hook souris si on l'avait installé pour l'exécution (molette / surveillance continue)
+                if (mouseHookInstalledForExecution && !_isRecording)
+                {
+                    try { _mouseHook.Uninstall(); } catch { /* ignorer */ }
+                }
                 
                 Dispatcher.Invoke(() =>
                 {
@@ -1999,6 +2017,74 @@ namespace MacroEngine.UI
             {
                 System.Diagnostics.Debug.WriteLine($"[CacheControlButtonRects] Erreur: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Indique si la macro contient une condition "Molette haut/bas" (nécessite le hook souris pendant l'exécution).
+        /// </summary>
+        private static bool MacroHasMouseWheelCondition(Macro macro)
+        {
+            if (macro?.Actions == null) return false;
+            return ActionsContainMouseWheelCondition(macro.Actions);
+        }
+
+        private static bool ActionsContainMouseWheelCondition(IEnumerable<IInputAction> actions)
+        {
+            if (actions == null) return false;
+            foreach (var action in actions)
+            {
+                if (action is IfAction ifAction)
+                {
+                    if (IfActionHasMouseWheelCondition(ifAction)) return true;
+                    if (ifAction.ThenActions != null && ActionsContainMouseWheelCondition(ifAction.ThenActions)) return true;
+                    if (ifAction.ElseActions != null && ActionsContainMouseWheelCondition(ifAction.ElseActions)) return true;
+                    if (ifAction.ElseIfBranches != null)
+                    {
+                        foreach (var branch in ifAction.ElseIfBranches)
+                        {
+                            if (branch?.ConditionGroups != null)
+                            {
+                                foreach (var group in branch.ConditionGroups)
+                                {
+                                    if (group?.Conditions != null && group.Conditions.Any(c => c?.MouseClickConfig != null && (c.MouseClickConfig.ClickType == 6 || c.MouseClickConfig.ClickType == 7)))
+                                        return true;
+                                }
+                            }
+                            if (branch?.Conditions != null && branch.Conditions.Any(c => c?.MouseClickConfig != null && (c.MouseClickConfig.ClickType == 6 || c.MouseClickConfig.ClickType == 7)))
+                                return true;
+                            if (branch?.Actions != null && ActionsContainMouseWheelCondition(branch.Actions)) return true;
+                        }
+                    }
+                    if (ifAction.ConditionGroups != null)
+                    {
+                        foreach (var group in ifAction.ConditionGroups)
+                        {
+                            if (group?.Conditions != null && group.Conditions.Any(c => c?.MouseClickConfig != null && (c.MouseClickConfig.ClickType == 6 || c.MouseClickConfig.ClickType == 7)))
+                                return true;
+                        }
+                    }
+                    if (ifAction.Conditions != null && ifAction.Conditions.Any(c => c?.MouseClickConfig != null && (c.MouseClickConfig.ClickType == 6 || c.MouseClickConfig.ClickType == 7)))
+                        return true;
+                }
+                else if (action is RepeatAction repeatAction && repeatAction.Actions != null && ActionsContainMouseWheelCondition(repeatAction.Actions))
+                    return true;
+            }
+            return false;
+        }
+
+        private static bool IfActionHasMouseWheelCondition(IfAction ifAction)
+        {
+            if (ifAction.ConditionGroups != null)
+            {
+                foreach (var group in ifAction.ConditionGroups)
+                {
+                    if (group?.Conditions != null && group.Conditions.Any(c => c?.MouseClickConfig != null && (c.MouseClickConfig.ClickType == 6 || c.MouseClickConfig.ClickType == 7)))
+                        return true;
+                }
+            }
+            if (ifAction.Conditions != null && ifAction.Conditions.Any(c => c?.MouseClickConfig != null && (c.MouseClickConfig.ClickType == 6 || c.MouseClickConfig.ClickType == 7)))
+                return true;
+            return false;
         }
         
         private bool IsClickOnRecordingControls(int x, int y)

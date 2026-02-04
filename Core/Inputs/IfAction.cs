@@ -451,6 +451,22 @@ namespace MacroEngine.Core.Inputs
             return res;
         }
 
+        private static string GetMouseClickConditionLabel(int clickType)
+        {
+            return clickType switch
+            {
+                0 => "Clic gauche",
+                1 => "Clic droit",
+                2 => "Clic milieu",
+                3 => "Maintenir gauche",
+                4 => "Maintenir droit",
+                5 => "Maintenir milieu",
+                6 => "Molette haut",
+                7 => "Molette bas",
+                _ => "Clic gauche"
+            };
+        }
+
         /// <summary>
         /// Description courte d'une condition (pour le mode debug).
         /// </summary>
@@ -485,6 +501,9 @@ namespace MacroEngine.Core.Inputs
                     ? $"Texte à l'écran: \"{condition.TextOnScreenConfig.Text.Substring(0, Math.Min(15, condition.TextOnScreenConfig.Text.Length))}\"..."
                     : "Texte à l'écran",
                 ConditionType.Variable => !string.IsNullOrEmpty(condition.VariableName) ? $"Variable \"{condition.VariableName}\"" : "Variable",
+                ConditionType.MouseClick => condition.MouseClickConfig != null
+                    ? GetMouseClickConditionLabel(condition.MouseClickConfig.ClickType)
+                    : "Clic",
                 _ => condition.ConditionType.ToString()
             };
         }
@@ -509,8 +528,33 @@ namespace MacroEngine.Core.Inputs
                 ConditionType.ImageOnScreen => EvaluateImageOnScreenCondition(condition.ImageOnScreenConfig),
                 ConditionType.TextOnScreen => EvaluateTextOnScreenCondition(condition.TextOnScreenConfig),
                 ConditionType.Variable => EvaluateVariableCondition(condition.VariableName),
+                ConditionType.MouseClick => EvaluateMouseClickCondition(condition.MouseClickConfig),
                 _ => false
             };
+        }
+
+        /// <summary>
+        /// Évalue la condition "Clic souris" (bouton pressé ou molette récente).
+        /// ClickType: 0-2 = clic gauche/droit/milieu, 3-5 = maintenir gauche/droit/milieu, 6 = molette haut, 7 = molette bas.
+        /// </summary>
+        private bool EvaluateMouseClickCondition(MouseClickCondition? config)
+        {
+            if (config == null) return false;
+            if (config.ClickType == 6)
+                return MouseWheelState.WasWheelUp();
+            if (config.ClickType == 7)
+                return MouseWheelState.WasWheelDown();
+            int vKey = config.ClickType switch
+            {
+                0 => 0x01, // Clic gauche
+                1 => 0x02, // Clic droit
+                2 => 0x04, // Clic milieu
+                3 => 0x01, // Maintenir gauche
+                4 => 0x02, // Maintenir droit
+                5 => 0x04, // Maintenir milieu
+                _ => 0x01
+            };
+            return IsKeyPressed((ushort)vKey);
         }
 
         /// <summary>
@@ -1021,6 +1065,10 @@ namespace MacroEngine.Core.Inputs
                 {
                     Text = item.TextOnScreenConfig.Text,
                     SearchArea = item.TextOnScreenConfig.SearchArea?.ToArray()
+                } : null,
+                MouseClickConfig = item.MouseClickConfig != null ? new MouseClickCondition
+                {
+                    ClickType = item.MouseClickConfig.ClickType
                 } : null,
                 VariableName = item.VariableName
             };

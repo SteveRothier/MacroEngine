@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using MacroEngine.Core.Inputs;
 
 namespace MacroEngine.Core.Hooks
 {
@@ -139,6 +140,11 @@ namespace MacroEngine.Core.Hooks
                         break;
                     case WM_MOUSEMOVE:
                         MouseMove?.Invoke(this, args);
+                        break;
+                    case WM_MOUSEWHEEL:
+                        // mouseData: high word = delta (positif = haut, négatif = bas)
+                        int delta = (short)((hookStruct.mouseData >> 16) & 0xFFFF);
+                        MouseWheelState.LastDirection = delta > 0 ? 1 : -1;
                         break;
                 }
 

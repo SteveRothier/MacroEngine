@@ -302,6 +302,7 @@ namespace MacroEngine.UI
                 ConditionType.ImageOnScreen => "Image à l'écran",
                 ConditionType.TextOnScreen => "Texte à l'écran",
                 ConditionType.Variable => "Variable",
+                ConditionType.MouseClick => "Clic",
                 _ => "Inconnue"
             };
         }
@@ -335,6 +336,7 @@ namespace MacroEngine.UI
             typeComboBox.Items.Add("Image à l'écran");
             typeComboBox.Items.Add("Texte à l'écran");
             typeComboBox.Items.Add("Variable");
+            typeComboBox.Items.Add("Clic");
 
             typeComboBox.SelectedIndex = (int)condition.ConditionType;
             typeComboBox.SelectionChanged += (s, e) =>
@@ -352,6 +354,7 @@ namespace MacroEngine.UI
                     condition.ImageOnScreenConfig = null;
                     condition.TextOnScreenConfig = null;
                     condition.VariableName = null;
+                    condition.MouseClickConfig = null;
                     // Recharger l'UI
                     LoadConfiguration();
                 }
@@ -404,6 +407,9 @@ namespace MacroEngine.UI
                         break;
                     case ConditionType.Variable:
                         CreateVariableConfig();
+                        break;
+                    case ConditionType.MouseClick:
+                        CreateMouseClickConfig();
                         break;
                 }
             }
@@ -2797,6 +2803,64 @@ namespace MacroEngine.UI
 
             // Initialiser l'aperçu
             UpdatePreview();
+        }
+
+        private void CreateMouseClickConfig()
+        {
+            ConditionItem condition;
+            if (Result!.Conditions.Count == 0)
+            {
+                condition = new ConditionItem { ConditionType = ConditionType.MouseClick, MouseClickConfig = new MouseClickCondition() };
+                Result.Conditions.Add(condition);
+            }
+            else
+            {
+                condition = Result.Conditions[0];
+            }
+
+            if (condition.MouseClickConfig == null)
+                condition.MouseClickConfig = new MouseClickCondition();
+
+            var clickLabel = new TextBlock
+            {
+                Text = "Bouton de souris:",
+                FontSize = 13,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            ConfigContentPanel.Children.Add(clickLabel);
+
+            var clickComboBox = new ComboBox
+            {
+                FontSize = 12,
+                MinWidth = 180,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            clickComboBox.Items.Add("Clic gauche");
+            clickComboBox.Items.Add("Clic droit");
+            clickComboBox.Items.Add("Clic milieu");
+            clickComboBox.Items.Add("Maintenir gauche");
+            clickComboBox.Items.Add("Maintenir droit");
+            clickComboBox.Items.Add("Maintenir milieu");
+            clickComboBox.Items.Add("Molette haut");
+            clickComboBox.Items.Add("Molette bas");
+            clickComboBox.SelectedIndex = Math.Max(0, Math.Min(condition.MouseClickConfig.ClickType, 7));
+            clickComboBox.SelectionChanged += (s, e) =>
+            {
+                if (clickComboBox.SelectedIndex >= 0)
+                    condition.MouseClickConfig!.ClickType = clickComboBox.SelectedIndex;
+            };
+            ConfigContentPanel.Children.Add(clickComboBox);
+
+            var infoText = new TextBlock
+            {
+                Text = "Clic/Maintenir : vrai si le bouton est pressé. Molette : vrai si la molette a été utilisée récemment (haut/bas).",
+                FontSize = 11,
+                Foreground = new SolidColorBrush(Colors.Gray),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            ConfigContentPanel.Children.Add(infoText);
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)
