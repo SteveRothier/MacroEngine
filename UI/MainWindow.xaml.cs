@@ -721,7 +721,7 @@ namespace MacroEngine.UI
             Dispatcher.Invoke(() =>
             {
                 StatusText.Text = $"Erreur: {e.Message}";
-                MessageBox.Show(e.Message, "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
             });
         }
 
@@ -819,7 +819,8 @@ namespace MacroEngine.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Erreur lors du chargement des macros: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = $"Erreur chargement macros: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
             }
         }
 
@@ -938,8 +939,8 @@ namespace MacroEngine.UI
             catch (Exception ex)
             {
                 _logger?.Error("Erreur lors du chargement des profils", ex, "MainWindow");
-                MessageBox.Show($"Erreur lors du chargement des profils: {ex.Message}", 
-                               "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = $"Erreur chargement profils: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
             }
         }
 
@@ -992,7 +993,6 @@ namespace MacroEngine.UI
                     {
                         StatusText.Text = "Aucune macro sélectionnée";
                         StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                MessageBox.Show("Veuillez sélectionner une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                     });
                 return;
             }
@@ -1004,7 +1004,6 @@ namespace MacroEngine.UI
                 {
                     StatusText.Text = "La macro est désactivée";
                     StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                    MessageBox.Show("La macro sélectionnée est désactivée. Veuillez l'activer pour l'exécuter.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                 });
                 return;
             }
@@ -1015,7 +1014,6 @@ namespace MacroEngine.UI
                     {
                         StatusText.Text = "La macro sélectionnée ne contient aucune action";
                         StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                        MessageBox.Show("La macro sélectionnée ne contient aucune action", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                     });
                     return;
                 }
@@ -1026,7 +1024,6 @@ namespace MacroEngine.UI
                     {
                         StatusText.Text = "Impossible d'exécuter : enregistrement en cours";
                         StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                        MessageBox.Show("Veuillez arrêter l'enregistrement avant d'exécuter une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
                     });
                     return;
                 }
@@ -1167,9 +1164,8 @@ namespace MacroEngine.UI
             {
                 Dispatcher.Invoke(() =>
                 {
-                    StatusText.Text = $"Erreur: {ex.Message}";
+                    StatusText.Text = $"Erreur exécution: {ex.Message}";
                     StatusText.Foreground = System.Windows.Media.Brushes.Red;
-                    MessageBox.Show($"Erreur lors de l'exécution: {ex.Message}\n\nDétails: {ex.StackTrace}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
                 });
                 System.Diagnostics.Debug.WriteLine($"Erreur lors de l'exécution: {ex.Message}\n{ex.StackTrace}");
             }
@@ -1181,13 +1177,15 @@ namespace MacroEngine.UI
         {
             if (_selectedMacro == null)
             {
-                MessageBox.Show("Veuillez sélectionner une macro", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusText.Text = "Veuillez sélectionner une macro";
+                StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                 return;
             }
 
                 if (_macroEngine.State != MacroEngineState.Idle)
                 {
-                    MessageBox.Show("Veuillez arrêter l'exécution avant de commencer l'enregistrement", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    StatusText.Text = "Veuillez arrêter l'exécution avant de commencer l'enregistrement";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     return;
                 }
 
@@ -1200,9 +1198,8 @@ namespace MacroEngine.UI
             }
             catch (Exception ex)
             {
-                StatusText.Text = $"Erreur: {ex.Message}";
+                StatusText.Text = $"Erreur enregistrement: {ex.Message}";
                 StatusText.Foreground = System.Windows.Media.Brushes.Red;
-                MessageBox.Show($"Erreur lors de l'enregistrement: {ex.Message}\n\nDétails: {ex.StackTrace}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -2294,8 +2291,8 @@ namespace MacroEngine.UI
                     }
                     else
                     {
-                        MessageBox.Show("Veuillez sélectionner un profil à modifier.", 
-                                       "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                        StatusText.Text = "Veuillez sélectionner un profil à modifier.";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     }
                 };
 
@@ -2318,8 +2315,8 @@ namespace MacroEngine.UI
                     }
                     else
                     {
-                        MessageBox.Show("Veuillez sélectionner un profil à supprimer.", 
-                                       "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                        StatusText.Text = "Veuillez sélectionner un profil à supprimer.";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     }
                 };
 
@@ -2331,13 +2328,13 @@ namespace MacroEngine.UI
                         await RefreshProfilesList(profilesListBox);
                         await LoadProfilesAsync(); // Recharger dans MainWindow
                         
-                        MessageBox.Show($"Le profil '{profile.Name}' a été activé.", 
-                                       "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
+                        StatusText.Text = $"Profil '{profile.Name}' activé.";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Green;
                     }
                     else
                     {
-                        MessageBox.Show("Veuillez sélectionner un profil à activer.", 
-                                       "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                        StatusText.Text = "Veuillez sélectionner un profil à activer.";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     }
                 };
 
@@ -2357,8 +2354,8 @@ namespace MacroEngine.UI
             catch (Exception ex)
             {
                 _logger?.Error("Erreur lors de la gestion des profils", ex, "MainWindow");
-                MessageBox.Show($"Erreur: {ex.Message}", "Erreur", 
-                               MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = $"Erreur: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
             }
         }
 
@@ -2384,8 +2381,8 @@ namespace MacroEngine.UI
                 
                 if (profiles.Count == 0)
                 {
-                    MessageBox.Show("Aucun profil disponible. Créez d'abord un profil.", 
-                                   "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    StatusText.Text = "Aucun profil disponible. Créez d'abord un profil.";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     return;
                 }
 
@@ -2436,13 +2433,13 @@ namespace MacroEngine.UI
                         await LoadProfilesAsync();
                         selectWindow.Close();
                         
-                        MessageBox.Show($"Le profil '{profile.Name}' a été activé.", 
-                                       "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
+                        StatusText.Text = $"Profil '{profile.Name}' activé.";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Green;
                     }
                     else
                     {
-                        MessageBox.Show("Veuillez sélectionner un profil.", 
-                                       "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                        StatusText.Text = "Veuillez sélectionner un profil.";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     }
                 };
 
@@ -2460,8 +2457,8 @@ namespace MacroEngine.UI
             catch (Exception ex)
             {
                 _logger?.Error("Erreur lors du changement de profil", ex, "MainWindow");
-                MessageBox.Show($"Erreur: {ex.Message}", "Erreur", 
-                               MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = $"Erreur: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
             }
         }
 
@@ -2491,7 +2488,8 @@ namespace MacroEngine.UI
                         
                         _logger?.Info($"Configuration mise à jour - Exécuter: VK{_appConfig.ExecuteMacroKeyCode:X2}, Arrêter: VK{_appConfig.StopMacroKeyCode:X2}", "MainWindow");
                         
-                        MessageBox.Show("Configuration sauvegardée avec succès.", "Configuration", MessageBoxButton.OK, MessageBoxImage.Information);
+                        StatusText.Text = "Configuration sauvegardée.";
+                        StatusText.Foreground = System.Windows.Media.Brushes.Green;
                     }
                     else
                     {
@@ -2508,7 +2506,8 @@ namespace MacroEngine.UI
             catch (Exception ex)
             {
                 _logger?.Error("Erreur lors de l'ouverture de la fenêtre de configuration", ex, "MainWindow");
-                MessageBox.Show($"Erreur lors de l'ouverture de la configuration: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusText.Text = $"Erreur configuration: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
                 
                 // Réactiver les hooks en cas d'erreur
                 InitializeGlobalHooks();
@@ -2531,7 +2530,8 @@ namespace MacroEngine.UI
             {
                 if (_selectedMacro == null)
                 {
-                    MessageBox.Show("Aucune macro sélectionnée", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    StatusText.Text = "Aucune macro sélectionnée";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     return;
                 }
 
@@ -2543,13 +2543,11 @@ namespace MacroEngine.UI
 
                 StatusText.Text = $"Macro '{_selectedMacro.Name}' sauvegardée";
                 StatusText.Foreground = System.Windows.Media.Brushes.Green;
-                MessageBox.Show($"Macro '{_selectedMacro.Name}' sauvegardée avec succès", "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 StatusText.Text = $"Erreur lors de la sauvegarde: {ex.Message}";
                 StatusText.Foreground = System.Windows.Media.Brushes.Red;
-                MessageBox.Show($"Erreur lors de la sauvegarde: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -2559,7 +2557,8 @@ namespace MacroEngine.UI
             {
                 if (_selectedMacro == null)
                 {
-                    MessageBox.Show("Aucune macro sélectionnée", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                    StatusText.Text = "Aucune macro sélectionnée";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                     return;
                 }
 
@@ -2575,17 +2574,14 @@ namespace MacroEngine.UI
                 {
                     await _macroStorage.ExportMacroAsync(_selectedMacro, saveDialog.FileName);
                     
-                    StatusText.Text = $"Macro '{_selectedMacro.Name}' exportée avec succès";
+                    StatusText.Text = $"Macro '{_selectedMacro.Name}' exportée vers {System.IO.Path.GetFileName(saveDialog.FileName)}";
                     StatusText.Foreground = System.Windows.Media.Brushes.Green;
-                    MessageBox.Show($"Macro '{_selectedMacro.Name}' exportée avec succès vers:\n{saveDialog.FileName}", 
-                        "Export réussi", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
                 StatusText.Text = $"Erreur lors de l'export: {ex.Message}";
                 StatusText.Foreground = System.Windows.Media.Brushes.Red;
-                MessageBox.Show($"Erreur lors de l'export de la macro: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -2650,15 +2646,12 @@ namespace MacroEngine.UI
 
                     StatusText.Text = $"Macro '{importedMacro.Name}' importée avec succès";
                     StatusText.Foreground = System.Windows.Media.Brushes.Green;
-                    MessageBox.Show($"Macro '{importedMacro.Name}' importée avec succès depuis:\n{openDialog.FileName}", 
-                        "Import réussi", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
                 StatusText.Text = $"Erreur lors de l'import: {ex.Message}";
                 StatusText.Foreground = System.Windows.Media.Brushes.Red;
-                MessageBox.Show($"Erreur lors de l'import de la macro: {ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -2692,7 +2685,8 @@ namespace MacroEngine.UI
         {
             if (_selectedMacro == null)
             {
-                MessageBox.Show("Veuillez sélectionner une macro.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusText.Text = "Veuillez sélectionner une macro.";
+                StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                 return;
             }
 
@@ -2809,7 +2803,8 @@ namespace MacroEngine.UI
         {
             if (_selectedMacro == null)
             {
-                MessageBox.Show("Veuillez sélectionner une macro.", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusText.Text = "Veuillez sélectionner une macro.";
+                StatusText.Foreground = System.Windows.Media.Brushes.Orange;
                 return;
             }
 
