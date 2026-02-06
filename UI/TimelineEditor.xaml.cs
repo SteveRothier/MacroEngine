@@ -297,23 +297,23 @@ namespace MacroEngine.UI
                 }
             };
 
-            // Carte Timeline avec fond gradient - largeur fixe pour toutes les actions
+            // Carte Timeline avec fond gradient - compacte et professionnelle
             var card = new Border
             {
                 Background = gradientBrush,
                 BorderBrush = new SolidColorBrush(Color.FromArgb(50, primaryColor.R, primaryColor.G, primaryColor.B)),
                 BorderThickness = new Thickness(1, 1, 1, 1),
-                Padding = new Thickness(14, 12, 14, 12),
-                Margin = new Thickness(0, 0, 0, 4),
+                Padding = new Thickness(8, 4, 8, 4),
+                Margin = new Thickness(0, 0, 0, 2),
                 Tag = index,
                 AllowDrop = true,
                 Cursor = Cursors.Hand,
-                MinHeight = 56,
-                MaxHeight = 64,
+                MinHeight = 36,
+                MaxHeight = 42,
                 MinWidth = 400,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(2),
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
                 {
                     Color = Colors.Black,
@@ -330,16 +330,16 @@ namespace MacroEngine.UI
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge icône
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Texte
             contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge info optionnel
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(32) }); // Croix supprimer à droite
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) }); // Croix supprimer à droite
 
             // Barre colorée à gauche (timeline) - accent vif
             var timelineBar = new Border
             {
                 Background = new SolidColorBrush(primaryColor),
-                Width = 4,
-                Margin = new Thickness(0, 2, 14, 2),
+                Width = 3,
+                Margin = new Thickness(0, 1, 8, 1),
                 VerticalAlignment = VerticalAlignment.Stretch,
-                CornerRadius = new CornerRadius(2),
+                CornerRadius = new CornerRadius(0),
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
                 {
                     Color = primaryColor,
@@ -356,20 +356,20 @@ namespace MacroEngine.UI
             var iconBadge = new Border
             {
                 Background = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B)),
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(8, 6, 8, 6),
+                CornerRadius = new CornerRadius(2),
+                Padding = new Thickness(5, 3, 5, 3),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 12, 0),
-                BorderThickness = new Thickness(1.5),
+                Margin = new Thickness(0, 0, 8, 0),
+                BorderThickness = new Thickness(1),
                 BorderBrush = new SolidColorBrush(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B)),
-                MinWidth = 36,
-                MinHeight = 36
+                MinWidth = 26,
+                MinHeight = 26
             };
             
             var iconBlock = new TextBlock
             {
                 Text = icon,
-                FontSize = 16,
+                FontSize = 12,
                 Foreground = new SolidColorBrush(iconColor),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -392,11 +392,11 @@ namespace MacroEngine.UI
             var titleBlock = new TextBlock
             {
                 Text = title,
-                FontSize = 14,
+                FontSize = 12,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = new SolidColorBrush(textColor),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 10, 0),
+                Margin = new Thickness(0, 0, 8, 0),
                 FontFamily = new FontFamily("Segoe UI Semibold")
             };
             textPanel.Children.Add(titleBlock);
@@ -411,8 +411,8 @@ namespace MacroEngine.UI
                 detailsBadge = new Border
                 {
                     Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B)),
-                    CornerRadius = new CornerRadius(4),
-                    Padding = new Thickness(8, 3, 8, 3),
+                    CornerRadius = new CornerRadius(1),
+                    Padding = new Thickness(5, 1, 5, 1),
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(0, 0, 0, 0),
                     BorderThickness = new Thickness(1),
@@ -440,8 +440,8 @@ namespace MacroEngine.UI
             var infoBadge = new Border
             {
                 Background = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B)),
-                CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(7, 3, 7, 3),
+                CornerRadius = new CornerRadius(2),
+                Padding = new Thickness(4, 1, 4, 1),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 8, 0),
                 BorderThickness = new Thickness(1),
@@ -469,9 +469,9 @@ namespace MacroEngine.UI
             var deleteBtnContainer = new Border
             {
                 Background = Brushes.Transparent,
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(4, 4, 4, 4),
-                Margin = new Thickness(4, 0, 0, 0),
+                CornerRadius = new CornerRadius(1),
+                Padding = new Thickness(2, 2, 2, 2),
+                Margin = new Thickness(2, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Cursor = Cursors.Hand,
@@ -481,7 +481,7 @@ namespace MacroEngine.UI
             var deleteCrossText = new TextBlock
             {
                 Text = "×",
-                FontSize = 18,
+                FontSize = 14,
                 FontWeight = FontWeights.Bold,
                 Foreground = new SolidColorBrush(Color.FromRgb(200, 80, 80)), // Rouge pour la suppression
                 VerticalAlignment = VerticalAlignment.Center,
@@ -654,16 +654,16 @@ namespace MacroEngine.UI
             // Conteneur séparé pour les boutons monter/descendre complètement à l'extérieur à droite
             var moveButtonsContainer = new Border
             {
-                Background = Brushes.Transparent, // Fond transparent pour ne voir que les boutons
-                BorderThickness = new Thickness(1.5), // Bordure commune pour le conteneur
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(1),
                 BorderBrush = GetThemeBrush("BorderLightBrush"),
-                CornerRadius = new CornerRadius(4), // Coins arrondis
-                Padding = new Thickness(2, 2, 2, 2), // Padding réduit
-                Margin = new Thickness(10, 0, 0, 0), // Marge à gauche pour séparer de la carte
-                VerticalAlignment = VerticalAlignment.Stretch, // Même hauteur que les actions
+                CornerRadius = new CornerRadius(2),
+                Padding = new Thickness(2, 2, 2, 2),
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                MinHeight = 48, // Même hauteur minimale que les actions
-                MaxHeight = 48, // Même hauteur maximale que les actions
+                MinHeight = 40,
+                MaxHeight = 40,
                 Visibility = Visibility.Visible
             };
             
@@ -687,8 +687,8 @@ namespace MacroEngine.UI
             bool canMoveUp = index > 0;
             var moveUpBtnBorder = new Border
             {
-                Width = 30,
-                Height = 30,
+                Width = 24,
+                Height = 24,
                 Background = canMoveUp
                     ? new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)) // Fond gris très clair
                     : new SolidColorBrush(Color.FromArgb(2, 150, 150, 150)), // Fond très clair pour désactivé
@@ -703,13 +703,13 @@ namespace MacroEngine.UI
             var moveUpBtnText = new TextBlock
             {
                 Text = "▲",
-                FontSize = 14,
+                FontSize = 11,
                 FontWeight = FontWeights.Bold,
                 Foreground = GetThemeBrush("TextMutedBrush"),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
-                LineHeight = 36,
+                LineHeight = 24,
                 LineStackingStrategy = LineStackingStrategy.BlockLineHeight
             };
             if (!canMoveUp) moveUpBtnText.Opacity = 0.6;
@@ -745,8 +745,8 @@ namespace MacroEngine.UI
             bool canMoveDown = _currentMacro != null && index < _currentMacro.Actions.Count - 1;
             var moveDownBtnBorder = new Border
             {
-                Width = 30,
-                Height = 30,
+                Width = 24,
+                Height = 24,
                 Background = canMoveDown
                     ? new SolidColorBrush(Color.FromArgb(5, 0, 0, 0)) // Fond gris très clair
                     : new SolidColorBrush(Color.FromArgb(2, 150, 150, 150)), // Fond très clair pour désactivé
@@ -761,7 +761,7 @@ namespace MacroEngine.UI
             var moveDownBtnText = new TextBlock
             {
                 Text = "▼",
-                FontSize = 14,
+                FontSize = 11,
                 FontWeight = FontWeights.Bold,
                 Foreground = canMoveDown
                     ? GetThemeBrush("TextMutedBrush") // Flèche en gris foncé
@@ -1488,7 +1488,7 @@ namespace MacroEngine.UI
                 Width = width,
                 Height = height,
                 Background = visualBrush,
-                CornerRadius = new CornerRadius(4),
+                CornerRadius = new CornerRadius(2),
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
                 {
                     Color = Colors.Black,
@@ -6196,7 +6196,7 @@ namespace MacroEngine.UI
                 {
                     BorderBrush = new SolidColorBrush(GetThemeColor("InfoColor")),
                     BorderThickness = new Thickness(2),
-                    CornerRadius = new CornerRadius(4),
+                    CornerRadius = new CornerRadius(2),
                     Padding = new Thickness(4, 2, 4, 2),
                     Background = new SolidColorBrush(Color.FromArgb(25, GetThemeColor("InfoColor").R, GetThemeColor("InfoColor").G, GetThemeColor("InfoColor").B)),
                     VerticalAlignment = VerticalAlignment.Center
@@ -6809,11 +6809,11 @@ namespace MacroEngine.UI
             var thenSectionBorder = new Border
             {
                 BorderBrush = new SolidColorBrush(Color.FromArgb(100, thenColor.R, thenColor.G, thenColor.B)),
-                BorderThickness = new Thickness(3, 0, 0, 0),
+                BorderThickness = new Thickness(2, 0, 0, 0),
                 Background = new SolidColorBrush(Color.FromArgb(15, thenColor.R, thenColor.G, thenColor.B)),
-                CornerRadius = new CornerRadius(0, 8, 8, 0),
-                Margin = new Thickness(24, 6, 0, 6),
-                Padding = new Thickness(12, 8, 8, 8)
+                CornerRadius = new CornerRadius(0, 2, 2, 0),
+                Margin = new Thickness(20, 4, 0, 4),
+                Padding = new Thickness(10, 6, 6, 6)
             };
             
             var thenSection = new StackPanel
@@ -6866,11 +6866,11 @@ namespace MacroEngine.UI
                     var elseIfSectionBorder = new Border
                     {
                         BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseIfColor.R, elseIfColor.G, elseIfColor.B)),
-                        BorderThickness = new Thickness(3, 0, 0, 0),
+                        BorderThickness = new Thickness(2, 0, 0, 0),
                         Background = new SolidColorBrush(Color.FromArgb(15, elseIfColor.R, elseIfColor.G, elseIfColor.B)),
-                        CornerRadius = new CornerRadius(0, 8, 8, 0),
-                        Margin = new Thickness(24, 6, 0, 6),
-                        Padding = new Thickness(12, 8, 8, 8)
+                        CornerRadius = new CornerRadius(0, 2, 2, 0),
+                        Margin = new Thickness(20, 4, 0, 4),
+                        Padding = new Thickness(10, 6, 6, 6)
                     };
                     
                     var elseIfSection = new StackPanel
@@ -6912,11 +6912,11 @@ namespace MacroEngine.UI
             var elseSectionBorder = new Border
             {
                 BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseColor.R, elseColor.G, elseColor.B)),
-                BorderThickness = new Thickness(3, 0, 0, 0),
+                BorderThickness = new Thickness(2, 0, 0, 0),
                 Background = new SolidColorBrush(Color.FromArgb(15, elseColor.R, elseColor.G, elseColor.B)),
-                CornerRadius = new CornerRadius(0, 8, 8, 0),
-                Margin = new Thickness(24, 6, 0, 6),
-                Padding = new Thickness(12, 8, 8, 8)
+                CornerRadius = new CornerRadius(0, 2, 2, 0),
+                Margin = new Thickness(20, 4, 0, 4),
+                Padding = new Thickness(10, 6, 6, 6)
             };
             
             var elseSection = new StackPanel
@@ -6984,11 +6984,11 @@ namespace MacroEngine.UI
             var nestedSectionBorder = new Border
             {
                 BorderBrush = new SolidColorBrush(Color.FromArgb(100, loopColor.R, loopColor.G, loopColor.B)),
-                BorderThickness = new Thickness(3, 0, 0, 0),
+                BorderThickness = new Thickness(2, 0, 0, 0),
                 Background = new SolidColorBrush(Color.FromArgb(15, loopColor.R, loopColor.G, loopColor.B)),
-                CornerRadius = new CornerRadius(0, 8, 8, 0),
-                Margin = new Thickness(24, 6, 0, 6),
-                Padding = new Thickness(12, 8, 8, 8)
+                CornerRadius = new CornerRadius(0, 2, 2, 0),
+                Margin = new Thickness(20, 4, 0, 4),
+                Padding = new Thickness(10, 6, 6, 6)
             };
             
             var nestedSection = new StackPanel
@@ -7763,13 +7763,13 @@ namespace MacroEngine.UI
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(1.5),
                 BorderBrush = GetThemeBrush("BorderLightBrush"),
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(2, 2, 2, 2),
-                Margin = new Thickness(10, 0, 0, 0),
+                CornerRadius = new CornerRadius(2),
+                Padding = new Thickness(1, 1, 1, 1),
+                Margin = new Thickness(8, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                MinHeight = 48,
-                MaxHeight = 48,
+                MinHeight = 34,
+                MaxHeight = 34,
                 Visibility = Visibility.Visible
             };
 
@@ -8717,11 +8717,11 @@ namespace MacroEngine.UI
             var thenSectionBorder = new Border
             {
                 BorderBrush = new SolidColorBrush(Color.FromArgb(100, thenColor.R, thenColor.G, thenColor.B)),
-                BorderThickness = new Thickness(3, 0, 0, 0),
+                BorderThickness = new Thickness(2, 0, 0, 0),
                 Background = new SolidColorBrush(Color.FromArgb(15, thenColor.R, thenColor.G, thenColor.B)),
-                CornerRadius = new CornerRadius(0, 8, 8, 0),
-                Margin = new Thickness(24, 6, 0, 6),
-                Padding = new Thickness(12, 8, 8, 8)
+                CornerRadius = new CornerRadius(0, 2, 2, 0),
+                Margin = new Thickness(20, 4, 0, 4),
+                Padding = new Thickness(10, 6, 6, 6)
             };
             
             var thenSection = new StackPanel
@@ -8766,11 +8766,11 @@ namespace MacroEngine.UI
             var elseSectionBorder = new Border
             {
                 BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseColor.R, elseColor.G, elseColor.B)),
-                BorderThickness = new Thickness(3, 0, 0, 0),
+                BorderThickness = new Thickness(2, 0, 0, 0),
                 Background = new SolidColorBrush(Color.FromArgb(15, elseColor.R, elseColor.G, elseColor.B)),
-                CornerRadius = new CornerRadius(0, 8, 8, 0),
-                Margin = new Thickness(24, 6, 0, 6),
-                Padding = new Thickness(12, 8, 8, 8)
+                CornerRadius = new CornerRadius(0, 2, 2, 0),
+                Margin = new Thickness(20, 4, 0, 4),
+                Padding = new Thickness(10, 6, 6, 6)
             };
             
             var elseSection = new StackPanel
@@ -8835,11 +8835,11 @@ namespace MacroEngine.UI
             var nestedSectionBorder = new Border
             {
                 BorderBrush = new SolidColorBrush(Color.FromArgb(100, loopColor.R, loopColor.G, loopColor.B)),
-                BorderThickness = new Thickness(3, 0, 0, 0),
+                BorderThickness = new Thickness(2, 0, 0, 0),
                 Background = new SolidColorBrush(Color.FromArgb(15, loopColor.R, loopColor.G, loopColor.B)),
-                CornerRadius = new CornerRadius(0, 8, 8, 0),
-                Margin = new Thickness(24, 6, 0, 6),
-                Padding = new Thickness(12, 8, 8, 8)
+                CornerRadius = new CornerRadius(0, 2, 2, 0),
+                Margin = new Thickness(20, 4, 0, 4),
+                Padding = new Thickness(10, 6, 6, 6)
             };
             
             var nestedSection = new StackPanel
