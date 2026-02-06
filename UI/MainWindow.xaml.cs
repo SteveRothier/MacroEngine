@@ -640,7 +640,7 @@ namespace MacroEngine.UI
         {
             // Appeler la même logique que MacroEditor_MacroModified
             MacroEditor_MacroModified(sender, e);
-            
+            UpdateMacroSummary();
             // Mettre à jour les raccourcis globaux (au cas où IsEnabled a changé)
             UpdateMacroShortcuts();
         }
@@ -2869,7 +2869,7 @@ namespace MacroEngine.UI
             {
                 MacroNameTextBox.Text = _selectedMacro.Name;
                 MacroDescriptionTextBox.Text = _selectedMacro.Description ?? "";
-                
+                UpdateMacroSummary();
                 // Afficher le raccourci
                 if (_selectedMacro.ShortcutKeyCode > 0)
                 {
@@ -2891,11 +2891,411 @@ namespace MacroEngine.UI
             {
                 MacroNameTextBox.Text = "";
                 MacroDescriptionTextBox.Text = "";
+                MacroSummaryText.Text = "";
                 ShortcutDisplayText.Text = "Non défini";
                 UpdateTargetAppsDisplay();
                 ContinuousMonitoringCheckBox.IsChecked = false;
                 ContinuousMonitoringOptionsPanel.Visibility = Visibility.Collapsed;
             }
+        }
+
+        /// <summary>
+        /// Met à jour le résumé de la macro (ce qu'elle fait) dans le panneau propriétés.
+        /// </summary>
+        private void UpdateMacroSummary()
+        {
+            MacroSummaryText.Text = GetMacroSummary(_selectedMacro);
+        }
+
+        /// <summary>
+        /// Génère un résumé lisible et logique décrivant ce que fait la macro (phrases naturelles).
+        /// Regroupe les actions consécutives identiques ou de même catégorie (ex. "fait 3 pauses", "appuie sur les touches A, B, C").
+        /// </summary>
+        private string GetMacroSummary(Macro? macro)
+        {
+            if (macro == null) return "";
+            var actions = macro.Actions;
+            if (actions == null || actions.Count == 0) return "Aucune action définie.";
+            const int maxActions = 20;
+            const int maxLength = 400;
+            var items = new List<(string phrase, string category)>();
+            for (int i = 0; i < Math.Min(actions.Count, maxActions); i++)
+            {
+                var phrase = GetActionSummaryPhrase(actions[i], nestedDepth: 0);
+                if (!string.IsNullOrEmpty(phrase))
+                    items.Add((phrase, GetCategoryKey(phrase)));
+            }
+            var grouped = MergeConsecutiveItems(items);
+            var parts = grouped.Select(g => FormatGroupedPhrase(g.phrases, g.counts)).ToList();
+            string description = parts.Count == 1 ? parts[0] : string.Join(", puis ", parts);
+            if (description.Length > maxLength)
+                description = description.Substring(0, maxLength - 1).TrimEnd() + "…";
+            if (actions.Count > maxActions)
+                description += " (plus d'actions à la suite)";
+            if (!description.EndsWith(".") && !description.EndsWith("…") && !description.EndsWith(")"))
+                description += ".";
+            if (description.Length > 0)
+                description = char.ToUpperInvariant(description[0]) + description.Substring(1);
+            return description;
+        }
+
+        /// <summary>
+        /// Fusionne les items consécutifs identiques (même phrase) ou de même catégorie (pour regroupement sémantique).
+        /// </summary>
+        private static List<(List<string> phrases, List<int> counts)> MergeConsecutiveItems(List<(string phrase, string category)> items)
+        {
+            var result = new List<(List<string> phrases, List<int> counts)>();
+            foreach (var (phrase, category) in items)
+            {
+                bool merged = false;
+                if (result.Count > 0)
+                {
+                    var last = result[result.Count - 1];
+                    bool samePhrase = last.phrases.Count == 1 && string.Equals(last.phrases[0], phrase, StringComparison.OrdinalIgnoreCase);
+                    bool sameCategory = !string.IsNullOrEmpty(category) && last.phrases.Count > 0 &&
+                        GetCategoryKey(last.phrases[0]) == category && GetCategoryKey(phrase) == category;
+                    if (samePhrase)
+                    {
+                        result[result.Count - 1] = (last.phrases, new List<int> { last.counts[0] + 1 });
+                        merged = true;
+                    }
+                    else if (sameCategory && CanMergeCategory(category, last.phrases, phrase))
+                    {
+                        last.phrases.Add(phrase);
+                        last.counts.Add(1);
+                        result[result.Count - 1] = (last.phrases, last.counts);
+                        merged = true;
+                    }
+                }
+                if (!merged)
+                    result.Add((new List<string> { phrase }, new List<int> { 1 }));
+            }
+            return result;
+        }
+
+        private static string GetCategoryKey(string phrase)
+        {
+            if (phrase.StartsWith("appuie sur la touche ", StringComparison.OrdinalIgnoreCase)) return "key_press";
+            if (phrase.StartsWith("maintient la touche ", StringComparison.OrdinalIgnoreCase)) return "key_down";
+            if (phrase.StartsWith("relâche la touche ", StringComparison.OrdinalIgnoreCase)) return "key_up";
+            if (phrase == "fait un clic gauche" || phrase == "fait un clic droit" || phrase == "fait un clic milieu" ||
+                phrase == "fait un double-clic gauche" || phrase == "fait un double-clic droit") return "click";
+            if (phrase.StartsWith("fait une pause", StringComparison.OrdinalIgnoreCase)) return "pause";
+            if (phrase == "scroll avec la molette vers le haut" || phrase == "scroll avec la molette vers le bas") return "wheel";
+            return "";
+        }
+
+        private static bool CanMergeCategory(string category, List<string> existingPhrases, string newPhrase)
+        {
+            const int maxMerged = 5;
+            if (existingPhrases.Count >= maxMerged) return false;
+            if (category == "key_press" || category == "key_down" || category == "key_up") return true;
+            if (category == "click") return true;
+            if (category == "pause") return true;
+            if (category == "wheel") return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Formate un groupe de phrases (même phrase répétée ou catégorie commune) pour le résumé.
+        /// </summary>
+        private static string FormatGroupedPhrase(List<string> phrases, List<int> counts)
+        {
+            if (phrases == null || phrases.Count == 0) return "";
+            if (phrases.Count == 1 && counts.Count == 1)
+                return FormatGroupedPhraseSingle(phrases[0], counts[0]);
+            string cat = GetCategoryKey(phrases[0]);
+            if (cat == "key_press" && phrases.All(p => p.StartsWith("appuie sur la touche ", StringComparison.OrdinalIgnoreCase)))
+            {
+                var keys = new List<string>();
+                for (int i = 0; i < phrases.Count; i++)
+                {
+                    string key = phrases[i].Substring("appuie sur la touche ".Length);
+                    for (int j = 0; j < counts[i]; j++) keys.Add(key);
+                }
+                return FormatKeyList(keys, "appuie sur les touches ");
+            }
+            if (cat == "key_down" && phrases.All(p => p.StartsWith("maintient la touche ", StringComparison.OrdinalIgnoreCase)))
+            {
+                var keys = new List<string>();
+                for (int i = 0; i < phrases.Count; i++)
+                {
+                    string key = phrases[i].Substring("maintient la touche ".Length).Replace(" enfoncée", "");
+                    for (int j = 0; j < counts[i]; j++) keys.Add(key);
+                }
+                return FormatKeyList(keys, "maintient les touches ");
+            }
+            if (cat == "key_up" && phrases.All(p => p.StartsWith("relâche la touche ", StringComparison.OrdinalIgnoreCase)))
+            {
+                var keys = new List<string>();
+                for (int i = 0; i < phrases.Count; i++)
+                {
+                    string key = phrases[i].Substring("relâche la touche ".Length);
+                    for (int j = 0; j < counts[i]; j++) keys.Add(key);
+                }
+                return FormatKeyList(keys, "relâche les touches ");
+            }
+            if (cat == "click")
+            {
+                int total = counts.Sum();
+                var types = new List<string>();
+                for (int i = 0; i < phrases.Count; i++)
+                {
+                    string t = phrases[i] switch
+                    {
+                        "fait un clic gauche" => "gauche",
+                        "fait un clic droit" => "droit",
+                        "fait un clic milieu" => "milieu",
+                        "fait un double-clic gauche" => "double gauche",
+                        "fait un double-clic droit" => "double droit",
+                        _ => "clic"
+                    };
+                    for (int j = 0; j < counts[i]; j++) types.Add(t);
+                }
+                string detail = types.Count <= 3 ? string.Join(", ", types) : $"{string.Join(", ", types.Take(2))}, … ({total} au total)";
+                return total == 1 ? phrases[0] : $"fait {total} clics ({detail})";
+            }
+            if (cat == "pause")
+            {
+                int total = counts.Sum();
+                return total == 1 ? phrases[0] : $"fait {total} pauses";
+            }
+            if (cat == "wheel")
+            {
+                int total = counts.Sum();
+                bool allUp = phrases.All(p => p.Contains("haut", StringComparison.OrdinalIgnoreCase));
+                bool allDown = phrases.All(p => p.Contains("bas", StringComparison.OrdinalIgnoreCase));
+                if (total == 1) return phrases[0];
+                if (allUp) return $"scroll {total} fois avec la molette vers le haut";
+                if (allDown) return $"scroll {total} fois avec la molette vers le bas";
+                return $"scroll {total} fois avec la molette";
+            }
+            return FormatGroupedPhraseSingle(phrases[0], counts[0]);
+        }
+
+        private static string FormatKeyList(List<string> keys, string prefix)
+        {
+            const int maxShow = 4;
+            var distinct = keys.Distinct().ToList();
+            if (distinct.Count == 1) return $"{prefix.TrimEnd().Replace("les touches", "la touche")} {distinct[0]} (×{keys.Count})";
+            string list = distinct.Count <= maxShow
+                ? string.Join(", ", distinct.Take(maxShow))
+                : string.Join(", ", distinct.Take(maxShow - 1)) + " et " + (distinct.Count - maxShow + 1) + " autres";
+            if (keys.Count > 1) list += $" (×{keys.Count})";
+            return prefix + list;
+        }
+
+        /// <summary>
+        /// Formate une phrase unique répétée (count > 1 = pluriel / N fois).
+        /// </summary>
+        private static string FormatGroupedPhraseSingle(string phrase, int count)
+        {
+            if (count <= 1) return phrase;
+            if (phrase.StartsWith("fait une pause aléatoire", StringComparison.OrdinalIgnoreCase))
+                return $"fait {count} pauses aléatoires";
+            if (phrase.StartsWith("fait une pause selon la variable ", StringComparison.OrdinalIgnoreCase))
+                return $"fait {count} pauses selon la variable {phrase.Substring("fait une pause selon la variable ".Length)}";
+            if (phrase == "fait une pause (durée variable)")
+                return $"fait {count} pauses (durée variable)";
+            if (phrase == "fait une pause")
+                return $"fait {count} pauses";
+            if (phrase == "fait un clic gauche") return $"fait {count} clics gauches";
+            if (phrase == "fait un clic droit") return $"fait {count} clics droits";
+            if (phrase == "fait un clic milieu") return $"fait {count} clics milieux";
+            if (phrase == "fait un double-clic gauche") return $"fait {count} double-clics gauches";
+            if (phrase == "fait un double-clic droit") return $"fait {count} double-clics droits";
+            if (phrase == "déplace le curseur") return $"déplace {count} fois le curseur";
+            if (phrase == "utilise la molette") return $"utilise {count} fois la molette";
+            if (phrase == "scroll en continu") return $"scroll {count} fois en continu";
+            if (phrase.StartsWith("appuie sur la touche ", StringComparison.OrdinalIgnoreCase))
+                return $"appuie {count} fois sur la touche {phrase.Substring("appuie sur la touche ".Length)}";
+            if (phrase.StartsWith("maintient la touche ", StringComparison.OrdinalIgnoreCase))
+                return $"maintient {count} fois la touche {phrase.Substring("maintient la touche ".Length)}";
+            if (phrase.StartsWith("relâche la touche ", StringComparison.OrdinalIgnoreCase))
+                return $"relâche {count} fois la touche {phrase.Substring("relâche la touche ".Length)}";
+            if (phrase.StartsWith("maintient le clic ", StringComparison.OrdinalIgnoreCase))
+                return $"maintient {count} fois le clic {phrase.Substring("maintient le clic ".Length)}";
+            if (phrase.StartsWith("relâche le clic ", StringComparison.OrdinalIgnoreCase))
+                return $"relâche {count} fois le clic {phrase.Substring("relâche le clic ".Length)}";
+            if (phrase.StartsWith("scroll avec la molette vers le ", StringComparison.OrdinalIgnoreCase))
+                return $"scroll {count} fois avec la molette vers le {phrase.Substring("scroll avec la molette vers le ".Length)}";
+            const string tapePrefix = "tape le texte ";
+            if (phrase.StartsWith(tapePrefix, StringComparison.OrdinalIgnoreCase))
+                return phrase.Length > tapePrefix.Length ? $"tape {count} fois le texte {phrase.Substring(tapePrefix.Length)}" : $"tape {count} fois du texte";
+            const string collePrefix = "colle le texte ";
+            if (phrase.StartsWith(collePrefix, StringComparison.OrdinalIgnoreCase))
+                return phrase.Length > collePrefix.Length ? $"colle {count} fois le texte {phrase.Substring(collePrefix.Length)}" : $"colle {count} fois du texte";
+            if (phrase.StartsWith("définit la variable ", StringComparison.OrdinalIgnoreCase))
+                return $"définit {count} fois la variable {phrase.Substring("définit la variable ".Length)}";
+            if (phrase.StartsWith("incrémente ", StringComparison.OrdinalIgnoreCase))
+                return $"incrémente {count} fois {phrase.Substring("incrémente ".Length)}";
+            if (phrase.StartsWith("décrémente ", StringComparison.OrdinalIgnoreCase))
+                return $"décrémente {count} fois {phrase.Substring("décrémente ".Length)}";
+            if (phrase.StartsWith("inverse la valeur de ", StringComparison.OrdinalIgnoreCase))
+                return $"inverse {count} fois la valeur de {phrase.Substring("inverse la valeur de ".Length)}";
+            if (phrase.StartsWith("modifie ", StringComparison.OrdinalIgnoreCase))
+                return $"modifie {count} fois {phrase.Substring("modifie ".Length)}";
+            if (phrase == "saisit du texte vide") return $"saisit {count} fois du texte vide";
+            if (phrase == "tape du texte (masqué)" || phrase == "colle du texte (masqué)")
+                return phrase.StartsWith("tape") ? $"tape {count} fois du texte (masqué)" : $"colle {count} fois du texte (masqué)";
+            if (phrase == "effectue une action souris") return $"effectue {count} actions souris";
+            return $"{phrase} (×{count})";
+        }
+
+        /// <summary>
+        /// Formate une phrase pour le résumé : si count > 1, utilise un pluriel ou "N fois".
+        /// </summary>
+        private static string FormatGroupedPhrase(string phrase, int count)
+        {
+            if (count <= 1) return phrase;
+            if (phrase.StartsWith("fait une pause aléatoire", StringComparison.OrdinalIgnoreCase))
+                return $"fait {count} pauses aléatoires";
+            if (phrase.StartsWith("fait une pause selon la variable ", StringComparison.OrdinalIgnoreCase))
+                return $"fait {count} pauses selon la variable {phrase.Substring("fait une pause selon la variable ".Length)}";
+            if (phrase == "fait une pause (durée variable)")
+                return $"fait {count} pauses (durée variable)";
+            if (phrase == "fait une pause")
+                return $"fait {count} pauses";
+            if (phrase == "fait un clic gauche") return $"fait {count} clics gauches";
+            if (phrase == "fait un clic droit") return $"fait {count} clics droits";
+            if (phrase == "fait un clic milieu") return $"fait {count} clics milieux";
+            if (phrase == "fait un double-clic gauche") return $"fait {count} double-clics gauches";
+            if (phrase == "fait un double-clic droit") return $"fait {count} double-clics droits";
+            if (phrase == "déplace le curseur") return $"déplace {count} fois le curseur";
+            if (phrase == "utilise la molette") return $"utilise {count} fois la molette";
+            if (phrase == "scroll en continu") return $"scroll {count} fois en continu";
+            if (phrase.StartsWith("appuie sur la touche ", StringComparison.OrdinalIgnoreCase))
+                return $"appuie {count} fois sur la touche {phrase.Substring("appuie sur la touche ".Length)}";
+            if (phrase.StartsWith("maintient la touche ", StringComparison.OrdinalIgnoreCase))
+                return $"maintient {count} fois la touche {phrase.Substring("maintient la touche ".Length)}";
+            if (phrase.StartsWith("relâche la touche ", StringComparison.OrdinalIgnoreCase))
+                return $"relâche {count} fois la touche {phrase.Substring("relâche la touche ".Length)}";
+            if (phrase.StartsWith("maintient le clic ", StringComparison.OrdinalIgnoreCase))
+                return $"maintient {count} fois le clic {phrase.Substring("maintient le clic ".Length)}";
+            if (phrase.StartsWith("relâche le clic ", StringComparison.OrdinalIgnoreCase))
+                return $"relâche {count} fois le clic {phrase.Substring("relâche le clic ".Length)}";
+            if (phrase.StartsWith("scroll avec la molette vers le ", StringComparison.OrdinalIgnoreCase))
+                return $"scroll {count} fois avec la molette vers le {phrase.Substring("scroll avec la molette vers le ".Length)}";
+            const string tapePrefix = "tape le texte ";
+            if (phrase.StartsWith(tapePrefix, StringComparison.OrdinalIgnoreCase))
+                return phrase.Length > tapePrefix.Length ? $"tape {count} fois le texte {phrase.Substring(tapePrefix.Length)}" : $"tape {count} fois du texte";
+            const string collePrefix = "colle le texte ";
+            if (phrase.StartsWith(collePrefix, StringComparison.OrdinalIgnoreCase))
+                return phrase.Length > collePrefix.Length ? $"colle {count} fois le texte {phrase.Substring(collePrefix.Length)}" : $"colle {count} fois du texte";
+            if (phrase.StartsWith("définit la variable ", StringComparison.OrdinalIgnoreCase))
+                return $"définit {count} fois la variable {phrase.Substring("définit la variable ".Length)}";
+            if (phrase.StartsWith("incrémente ", StringComparison.OrdinalIgnoreCase))
+                return $"incrémente {count} fois {phrase.Substring("incrémente ".Length)}";
+            if (phrase.StartsWith("décrémente ", StringComparison.OrdinalIgnoreCase))
+                return $"décrémente {count} fois {phrase.Substring("décrémente ".Length)}";
+            if (phrase.StartsWith("inverse la valeur de ", StringComparison.OrdinalIgnoreCase))
+                return $"inverse {count} fois la valeur de {phrase.Substring("inverse la valeur de ".Length)}";
+            if (phrase.StartsWith("modifie ", StringComparison.OrdinalIgnoreCase))
+                return $"modifie {count} fois {phrase.Substring("modifie ".Length)}";
+            return $"{phrase} (×{count})";
+        }
+
+        /// <summary>
+        /// Retourne une phrase courte et naturelle décrivant une action (pour le résumé de macro).
+        /// </summary>
+        private string GetActionSummaryPhrase(IInputAction action, int nestedDepth)
+        {
+            const int maxNested = 2;
+            if (action == null) return "";
+
+            if (action is KeyboardAction ka)
+            {
+                string key = ka.VirtualKeyCode != 0 ? GetKeyName(ka.VirtualKeyCode) : "?";
+                return ka.ActionType switch
+                {
+                    Core.Inputs.KeyboardActionType.Down => $"maintient la touche {key} enfoncée",
+                    Core.Inputs.KeyboardActionType.Up => $"relâche la touche {key}",
+                    _ => $"appuie sur la touche {key}"
+                };
+            }
+            if (action is DelayAction da)
+            {
+                if (da.UseVariableDelay)
+                    return string.IsNullOrWhiteSpace(da.VariableName) ? "fait une pause (durée variable)" : $"fait une pause selon la variable {da.VariableName}";
+                if (da.IsRandom)
+                    return "fait une pause aléatoire";
+                return "fait une pause";
+            }
+            if (action is Core.Inputs.MouseAction ma)
+            {
+                return ma.ActionType switch
+                {
+                    Core.Inputs.MouseActionType.LeftClick => "fait un clic gauche",
+                    Core.Inputs.MouseActionType.RightClick => "fait un clic droit",
+                    Core.Inputs.MouseActionType.MiddleClick => "fait un clic milieu",
+                    Core.Inputs.MouseActionType.DoubleLeftClick => "fait un double-clic gauche",
+                    Core.Inputs.MouseActionType.DoubleRightClick => "fait un double-clic droit",
+                    Core.Inputs.MouseActionType.Move => "déplace le curseur",
+                    Core.Inputs.MouseActionType.LeftDown => "maintient le clic gauche enfoncé",
+                    Core.Inputs.MouseActionType.RightDown => "maintient le clic droit enfoncé",
+                    Core.Inputs.MouseActionType.MiddleDown => "maintient le clic milieu enfoncé",
+                    Core.Inputs.MouseActionType.LeftUp => "relâche le clic gauche",
+                    Core.Inputs.MouseActionType.RightUp => "relâche le clic droit",
+                    Core.Inputs.MouseActionType.MiddleUp => "relâche le clic milieu",
+                    Core.Inputs.MouseActionType.WheelUp => "scroll avec la molette vers le haut",
+                    Core.Inputs.MouseActionType.WheelDown => "scroll avec la molette vers le bas",
+                    Core.Inputs.MouseActionType.Wheel => "utilise la molette",
+                    Core.Inputs.MouseActionType.WheelContinuous => "scroll en continu",
+                    _ => "effectue une action souris"
+                };
+            }
+            if (action is TextAction ta)
+            {
+                if (ta.HideInLogs && !string.IsNullOrEmpty(ta.Text))
+                    return ta.PasteAtOnce ? "colle du texte (masqué)" : "tape du texte (masqué)";
+                if (string.IsNullOrEmpty(ta.Text)) return "saisit du texte vide";
+                string preview = ta.Text.Length <= 18 ? ta.Text : ta.Text.Substring(0, 15) + "…";
+                return ta.PasteAtOnce ? $"colle le texte « {preview} »" : $"tape le texte « {preview} »";
+            }
+            if (action is VariableAction va)
+            {
+                string name = string.IsNullOrWhiteSpace(va.VariableName) ? "variable" : va.VariableName;
+                return va.Operation switch
+                {
+                    Core.Inputs.VariableOperation.Set => $"définit la variable {name}",
+                    Core.Inputs.VariableOperation.Increment => $"incrémente {name}",
+                    Core.Inputs.VariableOperation.Decrement => $"décrémente {name}",
+                    Core.Inputs.VariableOperation.Toggle => $"inverse la valeur de {name}",
+                    _ => $"modifie {name}"
+                };
+            }
+            if (action is RepeatAction ra && nestedDepth < maxNested && ra.Actions != null && ra.Actions.Count > 0)
+            {
+                string repeatDesc = ra.RepeatMode switch
+                {
+                    MacroEngine.Core.Models.RepeatMode.RepeatCount => ra.RepeatCount == 1 ? "une fois" : $"{ra.RepeatCount} fois",
+                    MacroEngine.Core.Models.RepeatMode.UntilStopped => "en boucle jusqu'à arrêt",
+                    MacroEngine.Core.Models.RepeatMode.WhileKeyPressed => "tant qu'une touche reste pressée",
+                    MacroEngine.Core.Models.RepeatMode.WhileClickPressed => "tant qu'un bouton de souris reste enfoncé",
+                    _ => "une fois"
+                };
+                var inner = new List<string>();
+                int limit = Math.Min(ra.Actions.Count, 4);
+                for (int i = 0; i < limit; i++)
+                    inner.Add(GetActionSummaryPhrase(ra.Actions[i], nestedDepth + 1));
+                string innerStr = string.Join(", puis ", inner);
+                if (ra.Actions.Count > limit) innerStr += ", etc.";
+                return $"répète {repeatDesc} la séquence : {innerStr}";
+            }
+            if (action is IfAction ifa && nestedDepth < maxNested)
+            {
+                string cond = "une condition";
+                if (ifa.ConditionGroups != null && ifa.ConditionGroups.Count > 0)
+                {
+                    var first = ifa.ConditionGroups[0];
+                    if (first?.Conditions != null && first.Conditions.Count > 0)
+                        cond = first.Conditions.Count == 1 ? "une condition" : $"{first.Conditions.Count} conditions (toutes requises)";
+                }
+                else if (ifa.Conditions != null && ifa.Conditions.Count > 0)
+                    cond = ifa.Conditions.Count == 1 ? "une condition" : $"{ifa.Conditions.Count} conditions";
+                return $"vérifie {cond}, puis exécute des actions selon le résultat (alors / sinon)";
+            }
+            return action.Name ?? action.Type.ToString();
         }
 
         private void ContinuousMonitoringCheckBox_Changed(object sender, RoutedEventArgs e)

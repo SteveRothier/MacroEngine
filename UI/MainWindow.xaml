@@ -455,6 +455,21 @@
                                  TextChanged="MacroDescriptionTextBox_TextChanged"
                                  Margin="0,0,0,6"/>
 
+                        <!-- Résumé de la macro (ce qu'elle fait) -->
+                        <TextBlock Text="Résumé" Style="{StaticResource TextLabel}"/>
+                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                                CornerRadius="6"
+                                Padding="10,8"
+                                Margin="0,0,0,6">
+                            <TextBlock x:Name="MacroSummaryText"
+                                       Text="Aucune action"
+                                       Style="{StaticResource TextMuted}"
+                                       TextWrapping="Wrap"
+                                       FontSize="12"
+                                       MaxHeight="80"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </Border>
+
                         <!-- Raccourci clavier -->
                         <TextBlock Text="Raccourci clavier" Style="{StaticResource TextLabel}"/>
                         <Grid Margin="0,0,0,12">

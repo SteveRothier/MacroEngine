@@ -269,7 +269,7 @@
         </Setter>
     </Style>
 
-    <!-- Boutons action Clic (Sélectionner, Aperçu, Définir zone) – accent vert souris -->
+    <!-- Boutons action Clic (icônes Sélectionner, Aperçu, Définir zone) – accent vert souris -->
     <Style x:Key="TimelineClicButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>

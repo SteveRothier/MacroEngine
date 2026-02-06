@@ -3841,11 +3841,12 @@ namespace MacroEngine.UI
             // Bouton pour sélectionner un point à l'écran (seulement pour clics et Maintenir)
             var selectPointButton = new Button
             {
-                Content = "🎯 Sélectionner",
-                MinWidth = 110,
+                Content = "🎯",
+                MinWidth = 32,
+                Width = 32,
                 Height = 24,
                 FontSize = 12,
-                Padding = new Thickness(6, 0, 6, 0),
+                Padding = new Thickness(4, 0, 4, 0),
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 ToolTip = "Sélectionner un point à l'écran (comme la pipette)",
@@ -3865,8 +3866,9 @@ namespace MacroEngine.UI
             // Bouton Aperçu position (snap visuel)
             var previewPositionButton = new Button
             {
-                Content = "👁 Aperçu",
-                MinWidth = 70,
+                Content = "👁",
+                MinWidth = 32,
+                Width = 32,
                 Height = 24,
                 FontSize = 11,
                 Padding = new Thickness(4, 0, 4, 0),
@@ -5013,11 +5015,12 @@ namespace MacroEngine.UI
             // Bouton pour sélectionner un point à l'écran (comme la pipette)
             var selectPointButton = new Button
             {
-                Content = "🎯 Sélectionner",
-                MinWidth = 110,
+                Content = "🎯",
+                MinWidth = 32,
+                Width = 32,
                 Height = 24,
                 FontSize = 12,
-                Padding = new Thickness(6, 0, 6, 0),
+                Padding = new Thickness(4, 0, 4, 0),
                 Margin = new Thickness(0),
                 VerticalAlignment = VerticalAlignment.Center,
                 ToolTip = "Sélectionner un point à l'écran (comme la pipette)",
