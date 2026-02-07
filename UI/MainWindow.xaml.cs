@@ -269,14 +269,14 @@ namespace MacroEngine.UI
             {
                 var keyCode = _appConfig.ExecuteMacroKeyCode != 0 ? _appConfig.ExecuteMacroKeyCode : 0x79;
                 var keyName = GetKeyNameForShortcut((ushort)keyCode);
-                ExecuteButton.Content = $"▶ Exécuter ({keyName})";
+                ExecuteButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Play, $" Exécuter ({keyName})");
             }
             
             if (StopButton != null && _appConfig != null)
             {
                 var keyCode = _appConfig.StopMacroKeyCode != 0 ? _appConfig.StopMacroKeyCode : 0x7A;
                 var keyName = GetKeyNameForShortcut((ushort)keyCode);
-                StopButton.Content = $"⏹ Arrêter ({keyName})";
+                StopButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Stop, $" Arrêter ({keyName})");
             }
         }
         
@@ -1301,12 +1301,12 @@ namespace MacroEngine.UI
             }
 
             // Mettre à jour l'interface
-            StartButton.Content = "● Enregistrement...";
+            StartButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Record, " Enregistrement...");
             StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris (max 20 touches/seconde)";
             StatusText.Foreground = System.Windows.Media.Brushes.Black;
             ExecuteButton.IsEnabled = false; // Désactiver l'exécution pendant l'enregistrement
             PauseButton.IsEnabled = true;
-            PauseButton.Content = "⏸ Pause";
+            PauseButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Pause, " Pause");
             StopButton.IsEnabled = true;
             _isRecordingPaused = false;
             
@@ -1340,7 +1340,7 @@ namespace MacroEngine.UI
             ProcessRemainingKeys();
 
             // Mettre à jour l'interface
-            StartButton.Content = "● Enregistrer";
+            StartButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Record, " Enregistrer");
             StatusText.Text = $"Enregistrement terminé. {_selectedMacro?.Actions?.Count ?? 0} action(s) enregistrée(s)";
             ExecuteButton.IsEnabled = _macroEngine.State == MacroEngineState.Idle; // Réactiver l'exécution si le moteur est inactif
             PauseButton.IsEnabled = false;
@@ -1923,14 +1923,14 @@ namespace MacroEngine.UI
                 {
                     // Mettre en pause l'enregistrement
                     _isRecordingPaused = true;
-                    PauseButton.Content = "▶ Reprendre";
+                    PauseButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Play, " Reprendre");
                     StatusText.Text = "Enregistrement en pause";
                 }
                 else
                 {
                     // Reprendre l'enregistrement
                     _isRecordingPaused = false;
-                    PauseButton.Content = "⏸ Pause";
+                    PauseButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Pause, " Pause");
                     StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris";
                 }
             }
@@ -2703,7 +2703,11 @@ namespace MacroEngine.UI
 
             _isCapturingShortcut = true;
             if (ShortcutDisplayText != null)
-                ShortcutDisplayText.Text = "⌨ En cours…";
+            {
+                ShortcutDisplayText.Inlines.Clear();
+                ShortcutDisplayText.Inlines.Add(new System.Windows.Documents.Run(LucideIcons.Keyboard) { FontFamily = (System.Windows.Media.FontFamily)Application.Current.FindResource("FontLucide") });
+                ShortcutDisplayText.Inlines.Add(new System.Windows.Documents.Run(" En cours…"));
+            }
             StatusText.Text = "Appuyez sur une touche (Échap = annuler)";
             StatusText.Foreground = System.Windows.Media.Brushes.Orange;
             PreviewKeyDown += CaptureShortcut_PreviewKeyDown;
@@ -3411,7 +3415,7 @@ namespace MacroEngine.UI
         private void UpdateMaximizeButtonContent()
         {
             if (MaximizeButton != null)
-                MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+                MaximizeButton.Content = LucideIcons.CreateIcon(WindowState == WindowState.Maximized ? LucideIcons.Square : LucideIcons.Maximize, 14);
         }
 
         protected override void OnStateChanged(EventArgs e)

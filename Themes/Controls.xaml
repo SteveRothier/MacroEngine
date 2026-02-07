@@ -862,7 +862,8 @@
                             CornerRadius="{StaticResource RadiusActionBlock}"
                             Width="{TemplateBinding Width}"
                             Height="{TemplateBinding Height}">
-                        <TextBlock Text="+" 
+                        <TextBlock Text="&#xE081;" 
+                                   FontFamily="{StaticResource FontLucide}"
                                    HorizontalAlignment="Center" 
                                    VerticalAlignment="Center"
                                    FontSize="{TemplateBinding FontSize}"
@@ -904,7 +905,8 @@
                             CornerRadius="{StaticResource RadiusActionBlock}"
                             Width="{TemplateBinding Width}"
                             Height="{TemplateBinding Height}">
-                        <TextBlock Text="✕" 
+                        <TextBlock Text="&#xE084;" 
+                                   FontFamily="{StaticResource FontLucide}"
                                    HorizontalAlignment="Center" 
                                    VerticalAlignment="Center"
                                    FontSize="{TemplateBinding FontSize}"

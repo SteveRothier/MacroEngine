@@ -90,7 +90,7 @@
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="✓" Foreground="Green" FontWeight="Bold" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="&#xE06C;" FontFamily="{StaticResource FontLucide}" Foreground="Green" FontWeight="Bold" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </DataTemplate>

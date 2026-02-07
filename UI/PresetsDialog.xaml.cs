@@ -167,7 +167,7 @@ namespace MacroEngine.UI
             // Bouton Supprimer
             var deleteButton = new Button
             {
-                Content = "🗑",
+                Content = LucideIcons.CreateIcon(LucideIcons.Trash, 16),
                 Style = (Style)FindResource("ButtonIcon"),
                 ToolTip = "Supprimer ce preset"
             };

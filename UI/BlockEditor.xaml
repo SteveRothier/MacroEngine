@@ -43,7 +43,7 @@
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="⌨" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="&#xE284;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="+ Touche" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Border>
@@ -75,7 +75,7 @@
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="🖱" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="&#xE11F;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="+ Clic" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Border>
@@ -159,7 +159,7 @@
                         IsEnabled="False"
                         Margin="0,0,4,0"
                         ToolTip="Annuler (Ctrl+Z)">
-                    <TextBlock Text="↶" FontSize="16"/>
+                    <TextBlock Text="&#xE148;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
                 </Button>
                 <Button x:Name="RedoButton"
                         Style="{StaticResource ButtonIcon}"
@@ -167,7 +167,7 @@
                         IsEnabled="False"
                         Margin="0,0,12,0"
                         ToolTip="Refaire (Ctrl+Y)">
-                    <TextBlock Text="↷" FontSize="16"/>
+                    <TextBlock Text="&#xE149;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
                 </Button>
 
                 <!-- Séparateur vertical -->
@@ -205,7 +205,8 @@
                                     VerticalAlignment="Center"
                                     HorizontalAlignment="Center"
                                     Visibility="Visible">
-                            <TextBlock Text="🎯" 
+                            <TextBlock Text="&#xE0AC;" 
+                                       FontFamily="{StaticResource FontLucide}"
                                        FontSize="48" 
                                        HorizontalAlignment="Center"
                                        Margin="0,0,0,16"/>

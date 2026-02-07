@@ -195,25 +195,25 @@ namespace MacroEngine.UI
             {
                 case KeyboardAction:
                     styleName = "BlockKeyboard";
-                    icon = "⌨";
+                    icon = LucideIcons.Keyboard;
                     blockColor = (SolidColorBrush)FindResource("BlockKeyboardBrush");
                     darkColor = (SolidColorBrush)FindResource("BlockKeyboardDarkBrush");
                     break;
                 case Core.Inputs.MouseAction:
                     styleName = "BlockMouse";
-                    icon = "🖱";
+                    icon = LucideIcons.Mouse;
                     blockColor = (SolidColorBrush)FindResource("BlockMouseBrush");
                     darkColor = (SolidColorBrush)FindResource("BlockMouseDarkBrush");
                     break;
                 case DelayAction:
                     styleName = "BlockDelay";
-                    icon = "⏱";
+                    icon = LucideIcons.Timer;
                     blockColor = (SolidColorBrush)FindResource("BlockDelayBrush");
                     darkColor = (SolidColorBrush)FindResource("BlockDelayDarkBrush");
                     break;
                 default:
                     styleName = "BlockKeyboard";
-                    icon = "❓";
+                    icon = LucideIcons.HelpCircle;
                     blockColor = (SolidColorBrush)FindResource("BlockKeyboardBrush");
                     darkColor = (SolidColorBrush)FindResource("BlockKeyboardDarkBrush");
                     break;
@@ -280,7 +280,7 @@ namespace MacroEngine.UI
             // Bouton supprimer
             var deleteButton = new Button
             {
-                Content = "✕",
+                Content = LucideIcons.CreateIcon(LucideIcons.Close, 14),
                 Style = (Style)FindResource("BlockDeleteButton"),
                 Tag = index
             };
@@ -335,6 +335,7 @@ namespace MacroEngine.UI
                 Text = icon,
                 Style = (Style)FindResource("BlockIcon")
             };
+            iconText.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
             Grid.SetColumn(iconText, 0);
             grid.Children.Add(iconText);
 
@@ -423,6 +424,7 @@ namespace MacroEngine.UI
                 Text = icon,
                 Style = (Style)FindResource("BlockIcon")
             };
+            iconText.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
             Grid.SetColumn(iconText, 0);
             grid.Children.Add(iconText);
 

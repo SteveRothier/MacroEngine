@@ -93,19 +93,22 @@
                         <Button x:Name="MinimizeButton"
                                 Style="{StaticResource WindowCaptionButtonStyle}"
                                 Foreground="White"
-                                Content="─"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE11C;"
                                 ToolTip="Réduire"
                                 Click="MinimizeButton_Click"/>
                         <Button x:Name="MaximizeButton"
                                 Style="{StaticResource WindowCaptionButtonStyle}"
                                 Foreground="White"
-                                Content="□"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE167;"
                                 ToolTip="Agrandir"
                                 Click="MaximizeButton_Click"/>
                         <Button x:Name="CloseButton"
                                 Style="{StaticResource WindowCaptionCloseButtonStyle}"
                                 Foreground="White"
-                                Content="✕"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE1B2;"
                                 ToolTip="Fermer"
                                 Click="CloseButton_Click"/>
                     </StackPanel>

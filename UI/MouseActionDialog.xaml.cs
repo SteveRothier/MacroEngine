@@ -90,7 +90,7 @@ namespace MacroEngine.UI
         private void StopCapture()
         {
             _isCapturing = false;
-            CapturePositionButton.Content = "🎯 Capturer position (cliquez puis pointez)";
+            CapturePositionButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Crosshair, " Capturer position (cliquez puis pointez)");
             CaptureStatusText.Text = $"Position capturée: ({XTextBox.Text}, {YTextBox.Text})";
             CaptureStatusText.Foreground = System.Windows.Media.Brushes.Green;
 

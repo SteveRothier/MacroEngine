@@ -148,7 +148,7 @@ namespace MacroEngine.UI
                         
                         var removeButton = new Button
                         {
-                            Content = "✕",
+                            Content = LucideIcons.CreateIcon(LucideIcons.Close, 10),
                             Width = 24,
                             Height = 24,
                             Margin = new Thickness(10, 0, 0, 0),
@@ -709,7 +709,7 @@ namespace MacroEngine.UI
 
                         var removeButton = new Button
                         {
-                            Content = "✕",
+                            Content = LucideIcons.CreateIcon(LucideIcons.Close, 10),
                             FontSize = 10,
                             Padding = new Thickness(3, 0, 3, 0),
                             Margin = new Thickness(5, 0, 0, 0),
@@ -1412,7 +1412,7 @@ namespace MacroEngine.UI
 
                         var removeButton = new Button
                         {
-                            Content = "✕",
+                            Content = LucideIcons.CreateIcon(LucideIcons.Close, 10),
                             FontSize = 10,
                             Padding = new Thickness(3, 0, 3, 0),
                             Margin = new Thickness(5, 0, 0, 0),

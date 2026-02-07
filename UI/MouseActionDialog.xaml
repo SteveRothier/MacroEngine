@@ -68,9 +68,13 @@
                 <TextBlock Text="Cliquez sur le bouton puis sur l'écran pour capturer la position."
                            TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,10"/>
                 <Button x:Name="CapturePositionButton" 
-                        Content="🎯 Capturer position (cliquez puis pointez)"
                         Click="CapturePositionButton_Click"
-                        Padding="10,8"/>
+                        Padding="10,8">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <TextBlock Text="&#xE0AC;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Capturer position (cliquez puis pointez)" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
                 <TextBlock x:Name="CaptureStatusText" 
                            Text="" 
                            Foreground="Green" 

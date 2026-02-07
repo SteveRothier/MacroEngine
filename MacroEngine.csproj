@@ -28,5 +28,9 @@
     <Folder Include="Data\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="Assets\Fonts\lucide.ttf" />
+  </ItemGroup>
+
 </Project>
 

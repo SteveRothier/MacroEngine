@@ -17,13 +17,14 @@
 
         <!-- En-tête -->
         <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="📚 Presets d'Actions"
-                       Style="{StaticResource TextHeading}"
-                       FontSize="20"
-                       Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE100;" FontFamily="{StaticResource FontLucide}" FontSize="20" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <TextBlock Text="Presets d'Actions" Style="{StaticResource TextHeading}" FontSize="20" VerticalAlignment="Center"/>
+            </StackPanel>
             <TextBlock Text="Sélectionnez un preset pour l'insérer dans votre macro"
                        Style="{StaticResource TextMuted}"
-                       FontSize="13"/>
+                       FontSize="13"
+                       Margin="0,0,0,8"/>
         </StackPanel>
 
         <!-- Liste des presets -->
@@ -45,7 +46,8 @@
                                     HorizontalAlignment="Center"
                                     Visibility="Collapsed"
                                     Margin="0,60,0,0">
-                            <TextBlock Text="📦" 
+                            <TextBlock Text="&#xE061;" 
+                                       FontFamily="{StaticResource FontLucide}"
                                        FontSize="48" 
                                        HorizontalAlignment="Center"
                                        Margin="0,0,0,16"/>

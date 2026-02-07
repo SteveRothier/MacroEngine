@@ -12,19 +12,23 @@
         WindowStyle="None"
         ResizeMode="CanResizeWithGrip"
         Background="{StaticResource BackgroundPrimaryBrush}">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+    <!-- Cadre de la fenêtre (bordure visible en mode restauré) -->
+    <Border Background="{StaticResource BackgroundPrimaryBrush}"
+            BorderBrush="{StaticResource BorderLightBrush}"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- ══════════════════════════════════════════════════════════════════
-             BARRE DE TITRE PERSONNALISÉE + TOPBAR (Réduire / Agrandir / Fermer)
-             ══════════════════════════════════════════════════════════════════ -->
-        <Border x:Name="TitleBarBorder"
-                Grid.Row="0" 
-                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+            <!-- ══════════════════════════════════════════════════════════════════
+                 BARRE DE TITRE PERSONNALISÉE + TOPBAR (Réduire / Agrandir / Fermer)
+                 ══════════════════════════════════════════════════════════════════ -->
+            <Border x:Name="TitleBarBorder"
+                    Grid.Row="0"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
                 Background="{StaticResource BackgroundSecondaryBrush}"
                 BorderBrush="{StaticResource BorderLightBrush}"
                 BorderThickness="0,0,0,1"
@@ -51,7 +55,8 @@
                             CornerRadius="8" 
                             Background="{StaticResource AccentPrimaryBrush}"
                             Margin="0,0,12,0">
-                        <TextBlock Text="⌨" 
+                        <TextBlock Text="&#xE284;" 
+                                   FontFamily="{StaticResource FontLucide}"
                                    FontSize="18" 
                                    Foreground="White"
                                    HorizontalAlignment="Center" 
@@ -75,7 +80,7 @@
                             Padding="14,8"
                             Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="▶" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="&#xE080;" FontFamily="{StaticResource FontLucide}" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Exécuter" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -111,7 +116,7 @@
                             Margin="0,0,12,0"
                             IsEnabled="False"
                             ToolTip="Arrêter">
-                        <TextBlock Text="⏹" FontSize="14"/>
+                        <TextBlock Text="&#xE083;" FontFamily="{StaticResource FontLucide}" FontSize="14"/>
                     </Button>
 
                 </StackPanel>
@@ -145,18 +150,18 @@
                     <Button Style="{StaticResource ButtonIcon}"
                             Click="Settings_Click"
                             ToolTip="Paramètres">
-                        <TextBlock Text="⚙" FontSize="16"/>
+                        <TextBlock Text="&#xE30B;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
                     </Button>
 
                     <!-- Logs -->
                     <Button Style="{StaticResource ButtonIcon}"
                             Click="ShowLogs_Click"
                             ToolTip="Journaux">
-                        <TextBlock Text="📋" FontSize="16"/>
+                        <TextBlock Text="&#xE085;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
                     </Button>
                 </StackPanel>
 
-                <!-- Boutons barre de titre : Réduire / Agrandir / Fermer -->
+                <!-- Boutons barre de titre : Réduire / Agrandir / Fermer (icônes Lucide) -->
                 <StackPanel Grid.Column="3"
                             Orientation="Horizontal"
                             VerticalAlignment="Stretch"
@@ -164,29 +169,32 @@
                     <Button x:Name="MinimizeButton"
                             Style="{StaticResource WindowCaptionButtonStyle}"
                             Foreground="{StaticResource TextPrimaryBrush}"
-                            Content="─"
+                            FontFamily="{StaticResource FontLucide}"
+                            Content="&#xE11C;"
                             ToolTip="Réduire"
                             Click="MinimizeButton_Click"/>
                     <Button x:Name="MaximizeButton"
                             Style="{StaticResource WindowCaptionButtonStyle}"
                             Foreground="{StaticResource TextPrimaryBrush}"
-                            Content="□"
+                            FontFamily="{StaticResource FontLucide}"
+                            Content="&#xE167;"
                             ToolTip="Agrandir"
                             Click="MaximizeButton_Click"/>
                     <Button x:Name="CloseButton"
                             Style="{StaticResource WindowCaptionCloseButtonStyle}"
                             Foreground="{StaticResource TextPrimaryBrush}"
-                            Content="✕"
+                            FontFamily="{StaticResource FontLucide}"
+                            Content="&#xE1B2;"
                             ToolTip="Fermer"
                             Click="CloseButton_Click"/>
                 </StackPanel>
             </Grid>
-        </Border>
+            </Border>
 
-        <!-- ══════════════════════════════════════════════════════════════════
-             ZONE PRINCIPALE - Layout 3 colonnes
-             ══════════════════════════════════════════════════════════════════ -->
-        <Grid Grid.Row="1" Margin="12,8">
+            <!-- ══════════════════════════════════════════════════════════════════
+                 ZONE PRINCIPALE - Layout 3 colonnes
+                 ══════════════════════════════════════════════════════════════════ -->
+            <Grid Grid.Row="1" Margin="12,12">
             <Grid.ColumnDefinitions>
                 <!-- Sidebar gauche -->
                 <ColumnDefinition Width="260"/>
@@ -230,7 +238,7 @@
                             Margin="0,0,0,12"
                             ToolTip="Nouvelle macro">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <TextBlock Text="➕" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="&#xE081;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Nouvelle Macro" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -247,7 +255,7 @@
                                 Click="ImportMacro_Click"
                                 HorizontalAlignment="Stretch">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="📂" Margin="0,0,6,0"/>
+                                <TextBlock Text="&#xE0D7;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0"/>
                                 <TextBlock Text="Importer"/>
                             </StackPanel>
                         </Button>
@@ -256,7 +264,7 @@
                                 Click="ExportMacro_Click"
                                 HorizontalAlignment="Stretch">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                <TextBlock Text="📤" Margin="0,0,6,0"/>
+                                <TextBlock Text="&#xE19E;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0"/>
                                 <TextBlock Text="Exporter"/>
                             </StackPanel>
                         </Button>
@@ -297,19 +305,21 @@
                                                  Style="{StaticResource StatusDotStyle}"/>
                                         
                                         <!-- Badge de raccourci clavier (compact) -->
-                                        <TextBlock Grid.Column="2"
-                                                   FontSize="10"
-                                                   FontWeight="Medium"
-                                                   Foreground="{StaticResource TextMutedBrush}"
-                                                   VerticalAlignment="Center"
-                                                   Margin="6,0,0,0"
-                                                   Visibility="{Binding ShortcutKeyCode, Converter={StaticResource ShortcutVisibilityConverter}}">
-                                            <TextBlock.Text>
-                                                <MultiBinding StringFormat="⌨ {0}">
-                                                    <Binding Path="ShortcutKeyCode" Converter="{StaticResource KeyCodeToNameConverter}"/>
-                                                </MultiBinding>
-                                            </TextBlock.Text>
-                                        </TextBlock>
+                                        <StackPanel Grid.Column="2"
+                                                    Orientation="Horizontal"
+                                                    VerticalAlignment="Center"
+                                                    Margin="6,0,0,0"
+                                                    Visibility="{Binding ShortcutKeyCode, Converter={StaticResource ShortcutVisibilityConverter}}">
+                                            <TextBlock Text="&#xE284;"
+                                                       FontFamily="{StaticResource FontLucide}"
+                                                       FontSize="10"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       Margin="0,0,4,0"/>
+                                            <TextBlock FontSize="10"
+                                                       FontWeight="Medium"
+                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                       Text="{Binding ShortcutKeyCode, Converter={StaticResource KeyCodeToNameConverter}}"/>
+                                        </StackPanel>
                                     </Grid>
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
@@ -318,11 +328,15 @@
 
                     <!-- Bouton Supprimer -->
                     <Button Grid.Row="3"
-                            Content="🗑 Supprimer"
                             Style="{StaticResource ButtonGhost}"
                             Click="DeleteMacro_Click"
                             HorizontalAlignment="Stretch"
-                            Margin="0,8,0,0"/>
+                            Margin="0,8,0,0">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                            <TextBlock Text="&#xE18E;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
 
                     <!-- Séparateur -->
                     <Border Grid.Row="4" 
@@ -599,37 +613,38 @@
                     </StackPanel>
                 </ScrollViewer>
             </Border>
-        </Grid>
-
-        <!-- ══════════════════════════════════════════════════════════════════
-             STATUSBAR - Barre de statut
-             ══════════════════════════════════════════════════════════════════ -->
-        <Border Grid.Row="2" 
-                Background="{StaticResource BackgroundSecondaryBrush}"
-                BorderBrush="{StaticResource BorderLightBrush}"
-                BorderThickness="0,1,0,0"
-                Padding="16,0"
-                Height="28">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- Message de statut -->
-                <TextBlock x:Name="StatusText" 
-                           Text="Prêt"
-                           Style="{StaticResource TextSecondary}"
-                           VerticalAlignment="Center"/>
-
-                <!-- Heure -->
-                <TextBlock x:Name="TimeText" 
-                           Grid.Column="1"
-                           Text="00:00:00" 
-                           Style="{StaticResource TextMono}"
-                           VerticalAlignment="Center"/>
             </Grid>
-        </Border>
-    </Grid>
+
+            <!-- ══════════════════════════════════════════════════════════════════
+                 STATUSBAR - Barre de statut
+                 ══════════════════════════════════════════════════════════════════ -->
+            <Border Grid.Row="2"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="16,0"
+                    Height="28">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Message de statut -->
+                    <TextBlock x:Name="StatusText"
+                               Text="Prêt"
+                               Style="{StaticResource TextSecondary}"
+                               VerticalAlignment="Center"/>
+
+                    <!-- Heure -->
+                    <TextBlock x:Name="TimeText"
+                               Grid.Column="1"
+                               Text="00:00:00"
+                               Style="{StaticResource TextMono}"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
 </Window>
 

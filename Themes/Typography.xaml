@@ -9,6 +9,8 @@
     <!-- Familles de polices -->
     <FontFamily x:Key="FontPrimary">Inter, Segoe UI, sans-serif</FontFamily>
     <FontFamily x:Key="FontMono">Consolas, Courier New, monospace</FontFamily>
+    <!-- Police d'icônes Lucide (pack URI vers la ressource embarquée) -->
+    <FontFamily x:Key="FontLucide">/MacroEngine;component/Assets/Fonts/lucide.ttf#lucide</FontFamily>
 
     <!-- Tailles de police -->
     <sys:Double x:Key="FontSizeXS" xmlns:sys="clr-namespace:System;assembly=mscorlib">11</sys:Double>

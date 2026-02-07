@@ -210,7 +210,7 @@ namespace MacroEngine.UI
                 case KeyboardAction ka:
                     primaryColor = Color.FromRgb(79, 163, 209);   // #4FA3D1 Bleu froid
                     hoverColor = Color.FromRgb(99, 183, 229);     // Plus clair au hover
-                    icon = "⌨";
+                    icon = LucideIcons.Keyboard;
                     title = GetKeyboardActionTitle(ka);
                     details = GetKeyboardActionDetails(ka);
                     break;
@@ -224,7 +224,7 @@ namespace MacroEngine.UI
                 case DelayAction da:
                     primaryColor = Color.FromRgb(201, 122, 58);   // #C97A3A Orange timing
                     hoverColor = Color.FromRgb(221, 142, 78);
-                    icon = "⏱";
+                    icon = LucideIcons.Timer;
                     title = GetDelayActionTitle(da);
                     details = "Pause";
                     break;
@@ -239,7 +239,7 @@ namespace MacroEngine.UI
                 case IfAction ifAction:
                     primaryColor = Color.FromRgb(201, 74, 74);     // #C94A4A Rouge décisionnel
                     hoverColor = Color.FromRgb(221, 94, 94);
-                    icon = "🔀";
+                    icon = LucideIcons.HelpCircle;
                     var thenCount = ifAction.ThenActions?.Count ?? 0;
                     var elseCount = ifAction.ElseActions?.Count ?? 0;
                     title = GetIfActionTitle(ifAction);
@@ -255,14 +255,14 @@ namespace MacroEngine.UI
                 case VariableAction va:
                     primaryColor = Color.FromRgb(90, 163, 163);    // #5AA3A3 Cyan data
                     hoverColor = Color.FromRgb(110, 183, 183);
-                    icon = "📦";
+                    icon = LucideIcons.Box;
                     title = GetVariableActionTitle(va);
                     details = GetVariableActionDetails(va);
                     break;
                 default:
                     primaryColor = Color.FromRgb(122, 30, 58);    // #7A1E3A Pourpre signature
                     hoverColor = Color.FromRgb(142, 50, 78);
-                    icon = "❓";
+                    icon = LucideIcons.HelpCircle;
                     title = action.Type.ToString();
                     details = "";
                     break;
@@ -373,9 +373,9 @@ namespace MacroEngine.UI
                 Foreground = new SolidColorBrush(iconColor),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
-                FontFamily = new FontFamily("Segoe UI Emoji"),
                 FontWeight = FontWeights.Medium
             };
+            iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
             iconBadge.Child = iconBlock;
             Grid.SetColumn(iconBadge, 1);
             contentGrid.Children.Add(iconBadge);
@@ -3839,11 +3839,10 @@ namespace MacroEngine.UI
             // Bouton pour sélectionner un point à l'écran (seulement pour clics et Maintenir)
             var selectPointButton = new Button
             {
-                Content = "🎯",
+                Content = LucideIcons.CreateIcon(LucideIcons.Crosshair, 12),
                 MinWidth = 32,
                 Width = 32,
                 Height = 24,
-                FontSize = 12,
                 Padding = new Thickness(4, 0, 4, 0),
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -3864,11 +3863,10 @@ namespace MacroEngine.UI
             // Bouton Aperçu position (snap visuel)
             var previewPositionButton = new Button
             {
-                Content = "👁",
+                Content = LucideIcons.CreateIcon(LucideIcons.Eye, 11),
                 MinWidth = 32,
                 Width = 32,
                 Height = 24,
-                FontSize = 11,
                 Padding = new Thickness(4, 0, 4, 0),
                 Margin = new Thickness(4, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -3913,10 +3911,9 @@ namespace MacroEngine.UI
 
             var zoneButton = new Button
             {
-                Content = "📐 Définir zone",
+                Content = LucideIcons.CreateIconWithText(LucideIcons.Square, " Définir zone", 11),
                 MinWidth = 90,
                 Height = 22,
-                FontSize = 11,
                 Padding = new Thickness(4, 0, 4, 0),
                 Margin = new Thickness(4, 0, 4, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -4462,10 +4459,9 @@ namespace MacroEngine.UI
             // Bouton pour sélectionner le point de contrôle à l'écran (uniquement pour Move avec Bézier)
             var selectControlPointButton = new Button
             {
-                Content = "🎯 Ctrl",
+                Content = LucideIcons.CreateIconWithText(LucideIcons.Crosshair, " Ctrl", 12),
                 MinWidth = 70,
                 Height = 24,
-                FontSize = 12,
                 Padding = new Thickness(6, 0, 6, 0),
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -5013,11 +5009,10 @@ namespace MacroEngine.UI
             // Bouton pour sélectionner un point à l'écran (comme la pipette)
             var selectPointButton = new Button
             {
-                Content = "🎯",
+                Content = LucideIcons.CreateIcon(LucideIcons.Crosshair, 12),
                 MinWidth = 32,
                 Width = 32,
                 Height = 24,
-                FontSize = 12,
                 Padding = new Thickness(4, 0, 4, 0),
                 Margin = new Thickness(0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -5324,10 +5319,9 @@ namespace MacroEngine.UI
 
             var selectControlPointButtonNested = new Button
             {
-                Content = "🎯 Ctrl",
+                Content = LucideIcons.CreateIconWithText(LucideIcons.Crosshair, " Ctrl", 12),
                 MinWidth = 70,
                 Height = 24,
-                FontSize = 12,
                 Padding = new Thickness(6, 0, 6, 0),
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -5856,10 +5850,9 @@ namespace MacroEngine.UI
                 // Bouton pour configurer cette condition
                 var configButton = new Button
                 {
-                    Content = "⚙",
+                    Content = LucideIcons.CreateIcon(LucideIcons.Settings, 12),
                     Width = 28,
                     Height = 28,
-                    FontSize = 12,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(4, 0, 0, 0),
                     Cursor = Cursors.Hand
@@ -5903,10 +5896,9 @@ namespace MacroEngine.UI
                 // Bouton pour supprimer cette condition (toujours visible, mais désactivé si seule condition)
                 var removeButton = new Button
                 {
-                    Content = "✕",
+                    Content = LucideIcons.CreateIcon(LucideIcons.Close, 10),
                     Width = 24,
                     Height = 24,
-                    FontSize = 10,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(4, 0, 0, 0),
                     Cursor = Cursors.Hand,
@@ -6015,11 +6007,10 @@ namespace MacroEngine.UI
             // Bouton pour ajouter une nouvelle condition
             var addButton = new Button
             {
-                Content = "➕",
+                Content = LucideIcons.CreateIcon(LucideIcons.Plus, 12),
                 MinWidth = 32,
                 Width = 32,
                 Height = 28,
-                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand,
@@ -6052,11 +6043,10 @@ namespace MacroEngine.UI
             // Bouton "Configurer..." pour ouvrir le dialogue complet
             var fullConfigButton = new Button
             {
-                Content = "⚙",
+                Content = LucideIcons.CreateIcon(LucideIcons.Settings, 12),
                 MinWidth = 32,
                 Width = 32,
                 Height = 28,
-                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand
@@ -6096,11 +6086,10 @@ namespace MacroEngine.UI
             // Bouton "Mode groupes" pour basculer vers l'interface des groupes
             var groupModeButton = new Button
             {
-                Content = "📦",
+                Content = LucideIcons.CreateIcon(LucideIcons.Box, 12),
                 MinWidth = 32,
                 Width = 32,
                 Height = 28,
-                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand,
@@ -6301,10 +6290,9 @@ namespace MacroEngine.UI
                         // Bouton configurer (petit)
                         var configButton = new Button
                         {
-                            Content = "⚙",
+                            Content = LucideIcons.CreateIcon(LucideIcons.Settings, 9),
                             Width = 20,
                             Height = 20,
-                            FontSize = 9,
                             VerticalAlignment = VerticalAlignment.Center,
                             Margin = new Thickness(2, 0, 0, 0),
                             Cursor = Cursors.Hand,
@@ -6349,10 +6337,9 @@ namespace MacroEngine.UI
                         {
                             var removeConditionButton = new Button
                             {
-                                Content = "✕",
+                                Content = LucideIcons.CreateIcon(LucideIcons.Close, 8),
                                 Width = 16,
                                 Height = 16,
-                                FontSize = 8,
                                 VerticalAlignment = VerticalAlignment.Center,
                                 Margin = new Thickness(1, 0, 0, 0),
                                 Cursor = Cursors.Hand,
@@ -6380,11 +6367,9 @@ namespace MacroEngine.UI
                 // Bouton ajouter condition (ET) dans ce groupe
                 var addConditionButton = new Button
                 {
-                    Content = "+",
+                    Content = LucideIcons.CreateIcon(LucideIcons.Plus, 10),
                     Width = 18,
                     Height = 18,
-                    FontSize = 10,
-                    FontWeight = FontWeights.Bold,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(3, 0, 0, 0),
                     Cursor = Cursors.Hand,
@@ -6411,10 +6396,9 @@ namespace MacroEngine.UI
                 {
                     var removeGroupButton = new Button
                     {
-                        Content = "🗑",
+                        Content = LucideIcons.CreateIcon(LucideIcons.Trash, 9),
                         Width = 18,
                         Height = 18,
-                        FontSize = 9,
                         VerticalAlignment = VerticalAlignment.Center,
                         Margin = new Thickness(2, 0, 0, 0),
                         Cursor = Cursors.Hand,
@@ -6479,10 +6463,9 @@ namespace MacroEngine.UI
             // Bouton pour revenir au mode simple
             var simpleModeButton = new Button
             {
-                Content = "↩",
+                Content = LucideIcons.CreateIcon(LucideIcons.Undo, 11),
                 Width = 22,
                 Height = 22,
-                FontSize = 11,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(6, 0, 0, 0),
                 Cursor = Cursors.Hand,
@@ -6580,11 +6563,10 @@ namespace MacroEngine.UI
             // Ajouter un bouton "Configurer..." pour toutes les conditions (même les simples)
             var configButton = new Button
             {
-                Content = "⚙",
+                Content = LucideIcons.CreateIcon(LucideIcons.Settings, 12),
                 MinWidth = 32,
                 Width = 32,
                 Height = 28,
-                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand
@@ -7379,37 +7361,42 @@ namespace MacroEngine.UI
                 };
                 button.MouseLeftButtonDown += AddActionToRepeat_Click;
 
-                var textBlock = new TextBlock
-                {
-                    Text = $"{icon} {text}",
-                    FontSize = 11,
-                    Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2 Texte secondaire clair
-                    FontWeight = FontWeights.Medium
-                };
-                button.Child = textBlock;
+                var iconBlock = new TextBlock { Text = icon, FontSize = 11 };
+                iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
+                var textBlock = new TextBlock { Text = " " + text, FontSize = 11, FontWeight = FontWeights.Medium };
+                var brush = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+                iconBlock.Foreground = brush;
+                textBlock.Foreground = brush;
+                var sp = new StackPanel { Orientation = Orientation.Horizontal };
+                sp.Children.Add(iconBlock);
+                sp.Children.Add(textBlock);
+                button.Child = sp;
 
                 button.MouseEnter += (s, e) =>
                 {
                     button.Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
                     button.BorderBrush = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
-                    textBlock.Foreground = new SolidColorBrush(Color.FromRgb(230, 228, 234)); // Plus clair au hover
+                    var hoverBrush = new SolidColorBrush(Color.FromRgb(230, 228, 234));
+                    iconBlock.Foreground = hoverBrush;
+                    textBlock.Foreground = hoverBrush;
                 };
                 button.MouseLeave += (s, e) =>
                 {
                     button.Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255));
                     button.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
-                    textBlock.Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+                    iconBlock.Foreground = brush;
+                    textBlock.Foreground = brush;
                 };
 
                 return button;
             };
 
-            panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
-            panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
-            panel.Children.Add(createAddButton("📝", "Texte", new TextAction()));
-            panel.Children.Add(createAddButton("📦", "Variable", new VariableAction()));
-            panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
-            panel.Children.Add(createAddButton("🔀", "Si", new IfAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Keyboard, "Touche", new KeyboardAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Mouse, "Clic", new Core.Inputs.MouseAction()));
+            panel.Children.Add(createAddButton(LucideIcons.FileText, "Texte", new TextAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Box, "Variable", new VariableAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Timer, "Délai", new DelayAction()));
+            panel.Children.Add(createAddButton(LucideIcons.HelpCircle, "Si", new IfAction()));
 
             return panel;
         }
@@ -7717,37 +7704,42 @@ namespace MacroEngine.UI
                 };
                 button.MouseLeftButtonDown += AddActionToIf_Click;
 
-                var textBlock = new TextBlock
-                {
-                    Text = $"{icon} {text}",
-                    FontSize = 11,
-                    Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)), // #B9B6C2 Texte secondaire clair
-                    FontWeight = FontWeights.Medium
-                };
-                button.Child = textBlock;
+                var iconBlock = new TextBlock { Text = icon, FontSize = 11 };
+                iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
+                var textBlock = new TextBlock { Text = " " + text, FontSize = 11, FontWeight = FontWeights.Medium };
+                var brush = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+                iconBlock.Foreground = brush;
+                textBlock.Foreground = brush;
+                var sp = new StackPanel { Orientation = Orientation.Horizontal };
+                sp.Children.Add(iconBlock);
+                sp.Children.Add(textBlock);
+                button.Child = sp;
 
                 button.MouseEnter += (s, e) =>
                 {
                     button.Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
                     button.BorderBrush = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
-                    textBlock.Foreground = new SolidColorBrush(Color.FromRgb(230, 228, 234));
+                    var hoverBrush = new SolidColorBrush(Color.FromRgb(230, 228, 234));
+                    iconBlock.Foreground = hoverBrush;
+                    textBlock.Foreground = hoverBrush;
                 };
                 button.MouseLeave += (s, e) =>
                 {
                     button.Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255));
                     button.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
-                    textBlock.Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+                    iconBlock.Foreground = brush;
+                    textBlock.Foreground = brush;
                 };
 
                 return button;
             };
 
-            panel.Children.Add(createAddButton("⌨", "Touche", new KeyboardAction()));
-            panel.Children.Add(createAddButton("🖱", "Clic", new Core.Inputs.MouseAction()));
-            panel.Children.Add(createAddButton("📝", "Texte", new TextAction()));
-            panel.Children.Add(createAddButton("📦", "Variable", new VariableAction()));
-            panel.Children.Add(createAddButton("⏱", "Délai", new DelayAction()));
-            panel.Children.Add(createAddButton("🔁", "Répéter", new RepeatAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Keyboard, "Touche", new KeyboardAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Mouse, "Clic", new Core.Inputs.MouseAction()));
+            panel.Children.Add(createAddButton(LucideIcons.FileText, "Texte", new TextAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Box, "Variable", new VariableAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Timer, "Délai", new DelayAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Repeat, "Répéter", new RepeatAction()));
 
             return panel;
         }
@@ -8565,10 +8557,9 @@ namespace MacroEngine.UI
 
             var selectControlPointButtonIf = new Button
             {
-                Content = "🎯 Ctrl",
+                Content = LucideIcons.CreateIconWithText(LucideIcons.Crosshair, " Ctrl", 12),
                 MinWidth = 70,
                 Height = 24,
-                FontSize = 12,
                 Padding = new Thickness(6, 0, 6, 0),
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center,
