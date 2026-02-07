@@ -624,7 +624,12 @@ namespace MacroEngine.UI
             };
             duplicateItem.Click += (s, e) =>
             {
-                DuplicateAction(index);
+                if (nestedRepeatInfo != null)
+                    DuplicateNestedActionInRepeat(nestedRepeatInfo);
+                else if (nestedIfInfo != null)
+                    DuplicateNestedActionInIf(nestedIfInfo);
+                else
+                    DuplicateAction(index);
             };
             contextMenu.Items.Add(duplicateItem);
             
@@ -9129,6 +9134,62 @@ namespace MacroEngine.UI
             _currentMacro.Actions.Insert(index + 1, duplicatedAction);
             _currentMacro.ModifiedAt = DateTime.Now;
             
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Duplique uniquement l'action imbriquée dans un Repeat (pas tout le bloc Repeat).
+        /// </summary>
+        private void DuplicateNestedActionInRepeat(NestedActionInfo info)
+        {
+            if (_currentMacro == null) return;
+            if (!TryGetRepeatAndIndexFromNestedInfo(info, out var repeatAction, out var nestedIndex)) return;
+            if (repeatAction!.Actions == null || nestedIndex < 0 || nestedIndex >= repeatAction.Actions.Count) return;
+
+            SaveState();
+
+            var actionToDuplicate = repeatAction.Actions[nestedIndex];
+            var duplicatedAction = actionToDuplicate.Clone();
+            if (duplicatedAction == null) return;
+
+            repeatAction.Actions.Insert(nestedIndex + 1, duplicatedAction);
+            _currentMacro.ModifiedAt = DateTime.Now;
+            RefreshBlocks();
+            MacroChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Duplique uniquement l'action imbriquée dans un If (Then, Else ou Else If), pas tout le bloc If.
+        /// </summary>
+        private void DuplicateNestedActionInIf(NestedIfActionInfo info)
+        {
+            if (_currentMacro == null || info.ParentIndex < 0 || info.ParentIndex >= _currentMacro.Actions.Count) return;
+            if (_currentMacro.Actions[info.ParentIndex] is not IfAction ifAction) return;
+
+            var list = GetIfActionsList(ifAction, info.IsThen, info.ElseIfBranchIndex);
+            if (list == null)
+            {
+                list = new List<IInputAction>();
+                if (info.IsThen)
+                    ifAction.ThenActions = list;
+                else if (info.ElseIfBranchIndex < 0)
+                    ifAction.ElseActions = list;
+                else if (ifAction.ElseIfBranches != null && info.ElseIfBranchIndex < ifAction.ElseIfBranches.Count)
+                    ifAction.ElseIfBranches[info.ElseIfBranchIndex].Actions = list;
+                else
+                    return;
+            }
+            if (info.NestedIndex < 0 || info.NestedIndex >= list.Count) return;
+
+            SaveState();
+
+            var actionToDuplicate = list[info.NestedIndex];
+            var duplicatedAction = actionToDuplicate.Clone();
+            if (duplicatedAction == null) return;
+
+            list.Insert(info.NestedIndex + 1, duplicatedAction);
+            _currentMacro.ModifiedAt = DateTime.Now;
             RefreshBlocks();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }

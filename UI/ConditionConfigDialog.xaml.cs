@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shell;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Processes;
 
@@ -22,16 +23,36 @@ namespace MacroEngine.UI
         {
             InitializeComponent();
             _originalAction = ifAction;
-            
+
+            // Supprimer la barre blanche du cadre système (Windows 10/11) en utilisant WindowChrome
+            var chrome = new WindowChrome
+            {
+                CaptionHeight = 44,
+                ResizeBorderThickness = new Thickness(5),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            };
+            WindowChrome.SetWindowChrome(this, chrome);
+
             // Créer une copie pour l'édition
             Result = ifAction.Clone() as IfAction;
-            
+
             if (Result == null)
             {
                 Result = new IfAction();
             }
 
             LoadConfiguration();
+        }
+
+        private static Brush? GetDialogBrush(string key)
+        {
+            return Application.Current.TryFindResource(key) as Brush;
+        }
+
+        private static SolidColorBrush DialogBrush(string key)
+        {
+            return GetDialogBrush(key) as SolidColorBrush ?? new SolidColorBrush(Colors.White);
         }
 
         private void LoadConfiguration()
@@ -99,11 +120,11 @@ namespace MacroEngine.UI
                     // Panel pour une condition
                     var conditionPanel = new Border
                     {
-                        BorderBrush = new SolidColorBrush(Colors.LightGray),
+                        BorderBrush = DialogBrush("BorderLightBrush"),
                         BorderThickness = new Thickness(1),
                         Padding = new Thickness(12),
                         Margin = new Thickness(0, 0, 0, 12),
-                        Background = new SolidColorBrush(Colors.White)
+                        Background = DialogBrush("BackgroundTertiaryBrush")
                     };
 
                     var conditionContent = new StackPanel();
@@ -524,7 +545,7 @@ namespace MacroEngine.UI
             var descriptionText = new TextBlock
             {
                 Text = "Sélectionnez les applications pour lesquelles cette condition sera vraie.",
-                Foreground = new SolidColorBrush(Colors.Gray),
+                Foreground = Brushes.White,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 10),
                 FontSize = 12
@@ -667,7 +688,7 @@ namespace MacroEngine.UI
                     selectedAppsPanel.Children.Add(new TextBlock
                     {
                         Text = "Aucune application sélectionnée",
-                        Foreground = new SolidColorBrush(Colors.Gray),
+                        Foreground = Brushes.White,
                         FontStyle = FontStyles.Italic
                     });
                 }
@@ -677,7 +698,7 @@ namespace MacroEngine.UI
                     {
                         var border = new Border
                         {
-                            Background = new SolidColorBrush(Color.FromRgb(173, 216, 230)),
+                            Background = DialogBrush("BackgroundTertiaryBrush"),
                             CornerRadius = new CornerRadius(3),
                             Padding = new Thickness(5, 2, 5, 2),
                             Margin = new Thickness(0, 0, 5, 5)
@@ -913,8 +934,8 @@ namespace MacroEngine.UI
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 0, 12),
                 IsReadOnly = true,
-                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+                Background = DialogBrush("BackgroundTertiaryBrush"),
+                BorderBrush = DialogBrush("BorderLightBrush"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(5),
                 Cursor = System.Windows.Input.Cursors.Hand,
@@ -927,8 +948,8 @@ namespace MacroEngine.UI
                 if (!keyCaptured)
                 {
                     keyTextBox.Text = "Appuyez sur une touche...";
-                    keyTextBox.Background = new SolidColorBrush(Color.FromRgb(255, 255, 200));
-                    keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(255, 165, 0));
+                    keyTextBox.Background = DialogBrush("AccentSelectionBrush");
+                    keyTextBox.BorderBrush = DialogBrush("BorderFocusBrush");
                 }
             };
 
@@ -952,14 +973,14 @@ namespace MacroEngine.UI
                     if (!keyCaptured && condition.KeyboardKeyConfig.VirtualKeyCode == 0)
                     {
                         keyTextBox.Text = "Appuyez sur une touche...";
-                        keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
-                        keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+                        keyTextBox.Background = DialogBrush("BackgroundTertiaryBrush");
+                        keyTextBox.BorderBrush = DialogBrush("BorderLightBrush");
                     }
                     else
                     {
                         keyTextBox.Text = GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode);
-                        keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
-                        keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+                        keyTextBox.Background = DialogBrush("BackgroundTertiaryBrush");
+                        keyTextBox.BorderBrush = DialogBrush("BorderLightBrush");
                     }
                     return;
                 }
@@ -973,8 +994,8 @@ namespace MacroEngine.UI
                         condition.KeyboardKeyConfig!.VirtualKeyCode = (ushort)virtualKeyCode;
                         keyTextBox.Text = GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode);
                         keyCaptured = true;
-                        keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
-                        keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+                        keyTextBox.Background = DialogBrush("BackgroundTertiaryBrush");
+                        keyTextBox.BorderBrush = DialogBrush("BorderLightBrush");
                         e.Handled = true;
                         Keyboard.ClearFocus();
                     }
@@ -995,8 +1016,8 @@ namespace MacroEngine.UI
                 {
                     keyTextBox.Text = GetKeyName(condition.KeyboardKeyConfig.VirtualKeyCode);
                 }
-                keyTextBox.Background = new SolidColorBrush(Color.FromRgb(245, 245, 245));
-                keyTextBox.BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200));
+                keyTextBox.Background = DialogBrush("BackgroundTertiaryBrush");
+                keyTextBox.BorderBrush = DialogBrush("BorderLightBrush");
             };
 
             ConfigContentPanel.Children.Add(keyTextBox);
@@ -1227,7 +1248,7 @@ namespace MacroEngine.UI
             var descriptionText = new TextBlock
             {
                 Text = "Sélectionnez les processus qui doivent être ouverts pour que cette condition soit vraie.",
-                Foreground = new SolidColorBrush(Colors.Gray),
+                Foreground = Brushes.White,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 10),
                 FontSize = 12
@@ -1370,7 +1391,7 @@ namespace MacroEngine.UI
                     selectedAppsPanel.Children.Add(new TextBlock
                     {
                         Text = "Aucun processus sélectionné",
-                        Foreground = new SolidColorBrush(Colors.Gray),
+                        Foreground = Brushes.White,
                         FontStyle = FontStyles.Italic
                     });
                 }
@@ -1380,7 +1401,7 @@ namespace MacroEngine.UI
                     {
                         var border = new Border
                         {
-                            Background = new SolidColorBrush(Color.FromRgb(173, 216, 230)),
+                            Background = DialogBrush("BackgroundTertiaryBrush"),
                             CornerRadius = new CornerRadius(3),
                             Padding = new Thickness(5, 2, 5, 2),
                             Margin = new Thickness(0, 0, 5, 5)
@@ -1600,7 +1621,7 @@ namespace MacroEngine.UI
             {
                 Width = 40,
                 Height = 40,
-                BorderBrush = new SolidColorBrush(System.Windows.Media.Colors.Gray),
+                BorderBrush = DialogBrush("BorderLightBrush"),
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center
@@ -1620,7 +1641,7 @@ namespace MacroEngine.UI
             }
             catch
             {
-                colorPreviewBorder.Background = new SolidColorBrush(System.Windows.Media.Colors.Black);
+                colorPreviewBorder.Background = DialogBrush("BackgroundSecondaryBrush");
             }
 
             var colorTextBox = new TextBox
@@ -1931,7 +1952,7 @@ namespace MacroEngine.UI
             {
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 215)),
+                Foreground = Brushes.White,
                 Margin = new Thickness(0, 0, 0, 15),
                 TextWrapping = TextWrapping.Wrap
             };
@@ -2318,7 +2339,7 @@ namespace MacroEngine.UI
                             VerticalAlignment = VerticalAlignment.Center,
                             Margin = new Thickness(5, 0, 5, 0),
                             FontSize = 11,
-                            Foreground = new SolidColorBrush(Colors.Gray)
+                            Foreground = Brushes.White
                         });
                         yearPanel.Children.Add(yearTextBox);
                         
@@ -2352,9 +2373,9 @@ namespace MacroEngine.UI
             // Aperçu de l'image
             var imagePreviewBorder = new Border
             {
-                BorderBrush = new SolidColorBrush(Colors.LightGray),
+                BorderBrush = DialogBrush("BorderLightBrush"),
                 BorderThickness = new Thickness(1),
-                Background = new SolidColorBrush(Colors.White),
+                Background = DialogBrush("BackgroundTertiaryBrush"),
                 Width = 200,
                 Height = 150,
                 Margin = new Thickness(0, 0, 0, 12),
@@ -2576,7 +2597,7 @@ namespace MacroEngine.UI
                     ? $"({condition.ImageOnScreenConfig.SearchArea[0]}, {condition.ImageOnScreenConfig.SearchArea[1]}) - ({condition.ImageOnScreenConfig.SearchArea[2]}, {condition.ImageOnScreenConfig.SearchArea[3]})"
                     : "Tout l'écran"),
                 FontSize = 11,
-                Foreground = new SolidColorBrush(Colors.Gray),
+                Foreground = Brushes.White,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 10, 0)
             };
@@ -2661,7 +2682,7 @@ namespace MacroEngine.UI
             {
                 FontSize = 14,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 215)),
+                Foreground = Brushes.White,
                 Margin = new Thickness(0, 0, 0, 15),
                 TextWrapping = TextWrapping.Wrap
             };
@@ -2673,13 +2694,13 @@ namespace MacroEngine.UI
                 if (string.IsNullOrWhiteSpace(text))
                 {
                     previewTextBlock.Text = "Aucun texte défini";
-                    previewTextBlock.Foreground = new SolidColorBrush(Colors.Gray);
+                    previewTextBlock.Foreground = Brushes.White;
                 }
                 else
                 {
                     var previewText = text.Length > 50 ? text.Substring(0, 50) + "..." : text;
                     previewTextBlock.Text = $"Rechercher: \"{previewText}\"";
-                    previewTextBlock.Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 215));
+                    previewTextBlock.Foreground = Brushes.White;
                 }
             }
 
@@ -2730,7 +2751,7 @@ namespace MacroEngine.UI
                     ? $"({condition.TextOnScreenConfig.SearchArea[0]}, {condition.TextOnScreenConfig.SearchArea[1]}) - ({condition.TextOnScreenConfig.SearchArea[2]}, {condition.TextOnScreenConfig.SearchArea[3]})"
                     : "Tout l'écran"),
                 FontSize = 11,
-                Foreground = new SolidColorBrush(Colors.Gray),
+                Foreground = Brushes.White,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 10, 0)
             };
@@ -2795,7 +2816,7 @@ namespace MacroEngine.UI
             {
                 Text = "💡 Astuce: Le texte sera recherché à l'écran en utilisant la reconnaissance optique de caractères (OCR).\nAssurez-vous que le texte est clairement visible et lisible.",
                 FontSize = 11,
-                Foreground = new SolidColorBrush(Colors.Gray),
+                Foreground = Brushes.White,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 8, 0, 0)
             };
@@ -2856,11 +2877,56 @@ namespace MacroEngine.UI
             {
                 Text = "Clic/Maintenir : vrai si le bouton est pressé. Molette : vrai si la molette a été utilisée récemment (haut/bas).",
                 FontSize = 11,
-                Foreground = new SolidColorBrush(Colors.Gray),
+                Foreground = Brushes.White,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 4, 0, 0)
             };
             ConfigContentPanel.Children.Add(infoText);
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+            {
+                if (e.ClickCount == 2)
+                {
+                    // Double-clic : basculer Agrandir / Restaurer
+                    WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+                }
+                else
+                {
+                    DragMove();
+                }
+            }
+        }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            UpdateMaximizeButtonContent();
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void UpdateMaximizeButtonContent()
+        {
+            if (MaximizeButton != null)
+                MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            base.OnStateChanged(e);
+            UpdateMaximizeButtonContent();
         }
 
         private void OkButton_Click(object sender, RoutedEventArgs e)

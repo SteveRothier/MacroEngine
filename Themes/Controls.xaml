@@ -269,6 +269,42 @@
         </Setter>
     </Style>
 
+    <!-- Boutons barre de titre fenêtre (Réduire / Agrandir) -->
+    <Style x:Key="WindowCaptionButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width" Value="46"/>
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            Width="{TemplateBinding Width}"
+                            Height="{TemplateBinding Height}">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="{StaticResource BackgroundSecondaryBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Bouton Fermer barre de titre (même style que Réduire/Agrandir) -->
+    <Style x:Key="WindowCaptionCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource WindowCaptionButtonStyle}"/>
+
     <!-- Boutons action Clic (icônes Sélectionner, Aperçu, Définir zone) – accent vert souris -->
     <Style x:Key="TimelineClicButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
