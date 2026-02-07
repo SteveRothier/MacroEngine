@@ -3,11 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="MacroEngine" 
         Height="800" Width="1200"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
         Background="{StaticResource BackgroundPrimaryBrush}">
     <Grid>
         <Grid.RowDefinitions>
@@ -17,21 +20,26 @@
         </Grid.RowDefinitions>
 
         <!-- ══════════════════════════════════════════════════════════════════
-             TOPBAR - Barre supérieure moderne
+             BARRE DE TITRE PERSONNALISÉE + TOPBAR (Réduire / Agrandir / Fermer)
              ══════════════════════════════════════════════════════════════════ -->
-        <Border Grid.Row="0" 
+        <Border x:Name="TitleBarBorder"
+                Grid.Row="0" 
+                shell:WindowChrome.IsHitTestVisibleInChrome="True"
                 Background="{StaticResource BackgroundSecondaryBrush}"
                 BorderBrush="{StaticResource BorderLightBrush}"
                 BorderThickness="0,0,0,1"
                 Padding="16,0"
-                Height="56">
+                Height="56"
+                MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <!-- Logo et titre -->
                     <ColumnDefinition Width="Auto"/>
                     <!-- Toolbar centrale -->
                     <ColumnDefinition Width="*"/>
-                    <!-- Actions droite -->
+                    <!-- Actions droite (menu, paramètres, logs) -->
+                    <ColumnDefinition Width="Auto"/>
+                    <!-- Boutons fenêtre Réduire / Agrandir / Fermer -->
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
@@ -146,6 +154,31 @@
                             ToolTip="Journaux">
                         <TextBlock Text="📋" FontSize="16"/>
                     </Button>
+                </StackPanel>
+
+                <!-- Boutons barre de titre : Réduire / Agrandir / Fermer -->
+                <StackPanel Grid.Column="3"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Stretch"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <Button x:Name="MinimizeButton"
+                            Style="{StaticResource WindowCaptionButtonStyle}"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            Content="─"
+                            ToolTip="Réduire"
+                            Click="MinimizeButton_Click"/>
+                    <Button x:Name="MaximizeButton"
+                            Style="{StaticResource WindowCaptionButtonStyle}"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            Content="□"
+                            ToolTip="Agrandir"
+                            Click="MaximizeButton_Click"/>
+                    <Button x:Name="CloseButton"
+                            Style="{StaticResource WindowCaptionCloseButtonStyle}"
+                            Foreground="{StaticResource TextPrimaryBrush}"
+                            Content="✕"
+                            ToolTip="Fermer"
+                            Click="CloseButton_Click"/>
                 </StackPanel>
             </Grid>
         </Border>

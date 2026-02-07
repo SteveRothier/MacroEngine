@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Shell;
 using Microsoft.Win32;
 using MacroEngine.Core.Engine;
 using MacroEngine.Core.Logging;
@@ -85,7 +86,17 @@ namespace MacroEngine.UI
         public MainWindow()
         {
             InitializeComponent();
-            
+
+            // Barre de titre personnalisée (supprime la barre blanche du cadre système)
+            var chrome = new WindowChrome
+            {
+                CaptionHeight = 56,
+                ResizeBorderThickness = new Thickness(5),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            };
+            WindowChrome.SetWindowChrome(this, chrome);
+
             // Initialiser le système de logging
             _logEntries = new ObservableCollection<LogEntry>();
             _logger = new Logger
@@ -3364,6 +3375,49 @@ namespace MacroEngine.UI
             _logger?.Dispose();
 
             Application.Current.Shutdown();
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+            {
+                if (e.ClickCount == 2)
+                {
+                    WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+                }
+                else
+                {
+                    DragMove();
+                }
+            }
+        }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            UpdateMaximizeButtonContent();
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            Exit_Click(sender, e);
+        }
+
+        private void UpdateMaximizeButtonContent()
+        {
+            if (MaximizeButton != null)
+                MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            base.OnStateChanged(e);
+            UpdateMaximizeButtonContent();
         }
     }
 
