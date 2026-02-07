@@ -58,6 +58,12 @@ namespace MacroEngine.UI
             return new SolidColorBrush(Colors.Gray);
         }
 
+        /// <summary>Style input action : texte seul, barre horizontale au-dessus quand sélectionné.</summary>
+        private static Style? GetActionTextBoxStyle()
+        {
+            return Application.Current?.TryFindResource("TextBoxAction") as Style;
+        }
+
         public TimelineEditor()
         {
             InitializeComponent();
@@ -2064,6 +2070,7 @@ namespace MacroEngine.UI
             // TextBox pour capturer la touche principale
             var keyTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ka.VirtualKeyCode == 0 ? "Appuyez sur une touche..." : GetKeyName(ka.VirtualKeyCode),
                 MinWidth = 150,
                 MaxWidth = 200,
@@ -2146,6 +2153,7 @@ namespace MacroEngine.UI
             };
             var holdDurationTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ka.HoldDurationMs > 0 ? ka.HoldDurationMs.ToString() : "",
                 MinWidth = 60,
                 MaxWidth = 80,
@@ -2248,6 +2256,7 @@ namespace MacroEngine.UI
             
             var textBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = "Appuyez sur une touche...",
                 MinWidth = 150,
                 MaxWidth = 300,
@@ -2374,6 +2383,7 @@ namespace MacroEngine.UI
             // TextBox pour la durée normale (cachée si Aléatoire ou UseVariableDelay)
             var durationTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.GetDurationInUnit(da.Unit).ToString("0.##"),
                 Width = 80,
                 FontSize = 13,
@@ -2412,6 +2422,7 @@ namespace MacroEngine.UI
             // Délais aléatoire (Min et Max) – à la place du délai normal quand Aléatoire est coché
             var minDurationTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.GetMinDurationInUnit(da.Unit).ToString("0.##"),
                 Width = 70,
                 FontSize = 13,
@@ -2461,6 +2472,7 @@ namespace MacroEngine.UI
 
             var maxDurationTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.GetMaxDurationInUnit(da.Unit).ToString("0.##"),
                 Width = 70,
                 FontSize = 13,
@@ -2539,6 +2551,7 @@ namespace MacroEngine.UI
             // TextBox pour le nom de variable (visible si UseVariableDelay)
             var variableNameTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.VariableName ?? "",
                 Width = 100,
                 FontSize = 13,
@@ -2580,6 +2593,7 @@ namespace MacroEngine.UI
 
             var multiplierTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.VariableMultiplier.ToString("0.##"),
                 Width = 60,
                 FontSize = 13,
@@ -2717,6 +2731,7 @@ namespace MacroEngine.UI
 
             var jitterTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.JitterPercent.ToString("0.##"),
                 Width = 50,
                 FontSize = 13,
@@ -2837,6 +2852,7 @@ namespace MacroEngine.UI
             // TextBox pour le texte (variables: ex. "Score: {score}")
             var textTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ta.Text ?? "",
                 MinWidth = 200,
                 MaxWidth = 400,
@@ -3032,6 +3048,7 @@ namespace MacroEngine.UI
 
             var speedTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ta.TypingSpeed.ToString(),
                 Width = 60,
                 FontSize = 13,
@@ -3092,6 +3109,7 @@ namespace MacroEngine.UI
 
             var minDelayTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ta.MinDelay.ToString(),
                 Width = 50,
                 FontSize = 13,
@@ -3153,6 +3171,7 @@ namespace MacroEngine.UI
 
             var maxDelayTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ta.MaxDelay.ToString(),
                 Width = 50,
                 FontSize = 13,
@@ -3252,6 +3271,7 @@ namespace MacroEngine.UI
 
             var nameTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = va.VariableName ?? "",
                 MinWidth = 80,
                 MaxWidth = 150,
@@ -3292,6 +3312,7 @@ namespace MacroEngine.UI
             };
             var valueTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = va.Value ?? "",
                 MinWidth = 120,
                 MaxWidth = 250,
@@ -3321,6 +3342,7 @@ namespace MacroEngine.UI
             };
             var stepTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = va.Step.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 Width = 50,
                 FontSize = 13,
@@ -3486,6 +3508,7 @@ namespace MacroEngine.UI
             
             var textBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.Duration.ToString(),
                 MinWidth = 60,
                 MaxWidth = 120,
@@ -3670,6 +3693,7 @@ namespace MacroEngine.UI
 
             var textBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.Duration.ToString(),
                 MinWidth = 60,
                 MaxWidth = 120,
@@ -3841,6 +3865,7 @@ namespace MacroEngine.UI
 
             var xTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.X >= 0 ? ma.X.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -3892,6 +3917,7 @@ namespace MacroEngine.UI
 
             var yTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.Y >= 0 ? ma.Y.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -4130,6 +4156,7 @@ namespace MacroEngine.UI
             };
             var holdDurationTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "",
                 MinWidth = 60,
                 MaxWidth = 80,
@@ -4199,6 +4226,7 @@ namespace MacroEngine.UI
 
             var deltaTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.Delta.ToString(),
                 Width = 60,
                 FontSize = 12,
@@ -4273,6 +4301,7 @@ namespace MacroEngine.UI
             };
             var scrollDurationTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.ScrollDurationMs > 0 ? ma.ScrollDurationMs.ToString() : "1000",
                 Width = 60,
                 FontSize = 12,
@@ -4303,6 +4332,7 @@ namespace MacroEngine.UI
             };
             var scrollIntervalTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.ScrollIntervalMs > 0 ? ma.ScrollIntervalMs.ToString() : "50",
                 Width = 50,
                 FontSize = 12,
@@ -4494,6 +4524,7 @@ namespace MacroEngine.UI
 
             var controlXTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -4543,6 +4574,7 @@ namespace MacroEngine.UI
 
             var controlYTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -5045,6 +5077,7 @@ namespace MacroEngine.UI
 
             var xTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.X >= 0 ? ma.X.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -5093,6 +5126,7 @@ namespace MacroEngine.UI
 
             var yTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.Y >= 0 ? ma.Y.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -5166,6 +5200,7 @@ namespace MacroEngine.UI
             };
             var holdDurationTextBoxNested = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "",
                 Width = 60,
                 FontSize = 12,
@@ -5356,6 +5391,7 @@ namespace MacroEngine.UI
 
             var controlXTextBoxNested = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -5404,6 +5440,7 @@ namespace MacroEngine.UI
 
             var controlYTextBoxNested = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -5620,6 +5657,7 @@ namespace MacroEngine.UI
             // Input pour le nombre de répétitions (X fois) - inline
             var repeatCountTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ra.RepeatCount.ToString(),
                 MinWidth = 50,
                 MaxWidth = 80,
@@ -5642,6 +5680,7 @@ namespace MacroEngine.UI
             // Input pour la touche à surveiller (Tant qu'une touche est pressée) - inline
             var keyCodeTextBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ra.KeyCodeToMonitor == 0 ? "Cliquez pour capturer" : GetKeyName(ra.KeyCodeToMonitor),
                 MinWidth = 120,
                 MaxWidth = 150,
@@ -8250,6 +8289,7 @@ namespace MacroEngine.UI
 
             var textBox = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = da.Duration.ToString(),
                 FontSize = titleText.FontSize,
                 FontWeight = titleText.FontWeight,
@@ -8445,6 +8485,7 @@ namespace MacroEngine.UI
             };
             var holdDurationTextBoxIf = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.HoldDurationMs > 0 ? ma.HoldDurationMs.ToString() : "",
                 Width = 60,
                 FontSize = 12,
@@ -8594,6 +8635,7 @@ namespace MacroEngine.UI
 
             var controlXTextBoxIf = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.ControlX >= 0 ? ma.ControlX.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
@@ -8642,6 +8684,7 @@ namespace MacroEngine.UI
 
             var controlYTextBoxIf = new TextBox
             {
+                Style = GetActionTextBoxStyle(),
                 Text = ma.ControlY >= 0 ? ma.ControlY.ToString() : "-1",
                 Width = 60,
                 FontSize = 12,
