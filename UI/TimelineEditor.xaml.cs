@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -21,13 +20,6 @@ namespace MacroEngine.UI
     public partial class TimelineEditor : UserControl
     {
         private Macro? _currentMacro;
-        private int _draggedIndex = -1;
-        private FrameworkElement? _draggedElement;
-        private Point _dragStartPoint;
-        private Point _dragOffset;
-        
-        // Popup pour le drag visuel
-        private Popup? _dragPopup;
         
         // Historique Undo/Redo
         private Stack<List<IInputAction>> _undoStack = new Stack<List<IInputAction>>();
@@ -312,8 +304,6 @@ namespace MacroEngine.UI
                 Padding = new Thickness(8, 4, 8, 4),
                 Margin = new Thickness(0, 0, 0, 2),
                 Tag = index,
-                AllowDrop = true,
-                Cursor = Cursors.Hand,
                 MinHeight = 36,
                 MaxHeight = 42,
                 MinWidth = 400,
@@ -544,14 +534,6 @@ namespace MacroEngine.UI
                     detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
                 }
             };
-
-            // Événements drag & drop
-            card.MouseLeftButtonDown += ActionCard_MouseLeftButtonDown;
-            card.MouseMove += ActionCard_MouseMove;
-            card.MouseLeftButtonUp += ActionCard_MouseLeftButtonUp;
-            card.Drop += ActionCard_Drop;
-            card.DragEnter += ActionCard_DragEnter;
-            card.DragLeave += ActionCard_DragLeave;
 
             // Édition inline
             if (action is KeyboardAction ka2)
@@ -1412,285 +1394,6 @@ namespace MacroEngine.UI
             }
         }
 
-        #region Drag & Drop
-
-        private void ActionCard_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            // Ne pas démarrer le drag si on clique sur un contrôle interactif (ComboBox, TextBox, Button, etc.)
-            // Vérifier aussi les parents au cas où OriginalSource est un élément enfant (ex: ToggleButton dans ComboBox)
-            DependencyObject? current = e.OriginalSource as DependencyObject;
-            while (current != null && current != sender)
-            {
-                if (current is ComboBox || current is TextBox || 
-                    current is Button || current is ToggleButton ||
-                    current is CheckBox || current is RadioButton ||
-                    current is ComboBoxItem || current is Popup)
-                {
-                    // C'est un contrôle interactif, ne pas démarrer le drag
-                    return;
-                }
-                // Si c'est un TextBlock qui est le titre (éditable), permettre l'édition mais pas le drag
-                if (current is TextBlock textBlock && textBlock.Cursor == Cursors.Hand)
-                {
-                    // C'est un titre éditable, laisser le handler du titre gérer l'événement
-                    return;
-                }
-                current = System.Windows.Media.VisualTreeHelper.GetParent(current);
-            }
-            
-            if (sender is FrameworkElement element && element.Tag is int index)
-            {
-                _dragStartPoint = e.GetPosition(this);
-                _draggedIndex = index;
-                _draggedElement = element;
-                _dragOffset = e.GetPosition(element);
-            }
-        }
-
-        private void ActionCard_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (e.LeftButton != MouseButtonState.Pressed || _draggedElement == null || _draggedIndex < 0)
-                return;
-
-            Point currentPos = e.GetPosition(this);
-            Vector diff = _dragStartPoint - currentPos;
-
-            // Démarrer le drag si on a bougé assez
-            if (Math.Abs(diff.X) > SystemParameters.MinimumHorizontalDragDistance ||
-                Math.Abs(diff.Y) > SystemParameters.MinimumVerticalDragDistance)
-            {
-                CreateDragVisual(_draggedElement);
-                _draggedElement.Opacity = 0.3;
-                
-                DataObject dragData = new DataObject("ActionIndex", _draggedIndex);
-                
-                _draggedElement.GiveFeedback += DraggedElement_GiveFeedback;
-                
-                DragDrop.DoDragDrop(_draggedElement, dragData, DragDropEffects.Move);
-                
-                _draggedElement.GiveFeedback -= DraggedElement_GiveFeedback;
-                HideDragVisual();
-                
-                _draggedElement.Opacity = 1.0;
-                _draggedElement = null;
-                _draggedIndex = -1;
-            }
-        }
-
-        private void ActionCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            _draggedElement = null;
-            _draggedIndex = -1;
-        }
-
-        private void CreateDragVisual(FrameworkElement element)
-        {
-            double width = element.ActualWidth > 0 ? element.ActualWidth : 500;
-            double height = element.ActualHeight > 0 ? element.ActualHeight : 44; // Hauteur Timeline compacte
-            
-            var visualBrush = new VisualBrush(element)
-            {
-                Opacity = 0.9,
-                Stretch = Stretch.None
-            };
-
-            var dragBorder = new Border
-            {
-                Width = width,
-                Height = height,
-                Background = visualBrush,
-                CornerRadius = new CornerRadius(2),
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    Color = Colors.Black,
-                    Opacity = 0.3,
-                    BlurRadius = 8,
-                    ShadowDepth = 3
-                }
-            };
-
-            _dragPopup = new Popup
-            {
-                Child = dragBorder,
-                AllowsTransparency = true,
-                IsHitTestVisible = false,
-                Placement = PlacementMode.Absolute,
-                IsOpen = true
-            };
-            
-            UpdateDragVisualPosition();
-        }
-
-        private void DraggedElement_GiveFeedback(object sender, GiveFeedbackEventArgs e)
-        {
-            UpdateDragVisualPosition();
-            e.Handled = true;
-        }
-
-        private void UpdateDragVisualPosition()
-        {
-            if (_dragPopup != null)
-            {
-                var mousePos = GetMousePositionScreen();
-                _dragPopup.HorizontalOffset = mousePos.X - _dragOffset.X;
-                _dragPopup.VerticalOffset = mousePos.Y - _dragOffset.Y;
-            }
-        }
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetCursorPos(out POINT lpPoint);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct POINT
-        {
-            public int X;
-            public int Y;
-        }
-
-        private Point GetMousePositionScreen()
-        {
-            GetCursorPos(out POINT point);
-            return new Point(point.X, point.Y);
-        }
-
-        private void HideDragVisual()
-        {
-            if (_dragPopup != null)
-            {
-                _dragPopup.IsOpen = false;
-                _dragPopup = null;
-            }
-        }
-
-        private void ActionCard_DragEnter(object sender, DragEventArgs e)
-        {
-            if (sender is Border card && card.Tag is int index)
-            {
-                // Mettre en surbrillance la carte cible sans changer la taille
-                card.Background = GetThemeBrush("BackgroundTertiaryBrush"); // Fond légèrement grisé
-                // BorderThickness reste constante pour ne pas changer la taille
-                card.BorderBrush = GetThemeBrush("AccentPrimaryBrush"); // Bordure pourpre
-            }
-        }
-
-        private void ActionCard_DragLeave(object sender, DragEventArgs e)
-        {
-            if (sender is Border card && card.Tag is int index && _currentMacro != null)
-            {
-                // Restaurer le style normal (mêmes couleurs que CreateActionCard)
-                if (index < _currentMacro.Actions.Count)
-                {
-                    var action = _currentMacro.Actions[index];
-                    Color bgColor = action switch
-                    {
-                        KeyboardAction => Color.FromRgb(79, 163, 209),
-                        Core.Inputs.MouseAction => Color.FromRgb(79, 181, 140),
-                        DelayAction => Color.FromRgb(201, 122, 58),
-                        RepeatAction => Color.FromRgb(138, 108, 209),
-                        IfAction => Color.FromRgb(201, 74, 74),
-                        TextAction => Color.FromRgb(224, 177, 90),
-                        VariableAction => Color.FromRgb(90, 163, 163),
-                        _ => Color.FromRgb(122, 30, 58)
-                    };
-                    card.Background = new SolidColorBrush(bgColor);
-                    card.BorderThickness = new Thickness(0, 0, 0, 2);
-                    var restoredAction = _currentMacro.Actions[index];
-                    Color primaryColor = restoredAction switch
-                    {
-                        KeyboardAction => Color.FromRgb(79, 163, 209),
-                        Core.Inputs.MouseAction => Color.FromRgb(79, 181, 140),
-                        DelayAction => Color.FromRgb(201, 122, 58),
-                        RepeatAction => Color.FromRgb(138, 108, 209),
-                        IfAction => Color.FromRgb(201, 74, 74),
-                        TextAction => Color.FromRgb(224, 177, 90),
-                        VariableAction => Color.FromRgb(90, 163, 163),
-                        _ => Color.FromRgb(122, 30, 58)
-                    };
-                    card.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
-                }
-            }
-        }
-
-        private void ActionCard_Drop(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent("ActionIndex") && sender is Border targetCard)
-            {
-                // Trouver l'index de la carte cible via son Tag
-                int targetIndex = -1;
-                if (targetCard.Tag is int idx)
-                {
-                    targetIndex = idx;
-                }
-                else
-                {
-                    // Si le Tag n'est pas sur le Border, chercher dans le parent
-                    var parent = targetCard.Parent as FrameworkElement;
-                    while (parent != null && targetIndex == -1)
-                    {
-                        if (parent.Tag is int i)
-                        {
-                            targetIndex = i;
-                            break;
-                        }
-                        parent = parent.Parent as FrameworkElement;
-                    }
-                }
-
-                if (targetIndex >= 0)
-                {
-                    int sourceIndex = (int)e.Data.GetData("ActionIndex");
-                    
-                    if (sourceIndex != targetIndex && _currentMacro != null)
-                    {
-                        SaveState();
-                        
-                        var action = _currentMacro.Actions[sourceIndex];
-                        _currentMacro.Actions.RemoveAt(sourceIndex);
-                        
-                        if (sourceIndex < targetIndex)
-                            targetIndex--;
-                        
-                        _currentMacro.Actions.Insert(targetIndex, action);
-                        _currentMacro.ModifiedAt = DateTime.Now;
-                        
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    }
-                }
-            }
-            
-            e.Handled = true;
-        }
-
-        private void TimelineStackPanel_DragOver(object sender, DragEventArgs e)
-        {
-            e.Effects = e.Data.GetDataPresent("ActionIndex") ? DragDropEffects.Move : DragDropEffects.None;
-            e.Handled = true;
-        }
-
-        private void TimelineStackPanel_Drop(object sender, DragEventArgs e)
-        {
-            // Drop à la fin de la liste si on drop sur le conteneur
-            if (e.Data.GetDataPresent("ActionIndex") && _currentMacro != null)
-            {
-                SaveState();
-                
-                int sourceIndex = (int)e.Data.GetData("ActionIndex");
-                var action = _currentMacro.Actions[sourceIndex];
-                _currentMacro.Actions.RemoveAt(sourceIndex);
-                _currentMacro.Actions.Add(action);
-                _currentMacro.ModifiedAt = DateTime.Now;
-                
-                RefreshBlocks();
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }
-            
-            e.Handled = true;
-        }
-
-        #endregion
-
         #region Boutons d'ajout
 
         private void AddKeyboard_Click(object sender, RoutedEventArgs e)
@@ -2273,10 +1976,6 @@ namespace MacroEngine.UI
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold
             };
-            
-            // Empêcher le TextBox de déclencher le drag & drop
-            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
-            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
             
             // Événement PreviewKeyDown pour capturer la touche avant qu'elle ne soit traitée
             textBox.PreviewKeyDown += (s, e) =>
@@ -3528,10 +3227,6 @@ namespace MacroEngine.UI
             // Validation : n'accepter que les nombres entiers
             textBox.PreviewTextInput += (s, e) => e.Handled = !int.TryParse(e.Text, out _);
             
-            // Empêcher le TextBox de déclencher le drag & drop
-            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
-            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
-            
             // Sauvegarder automatiquement quand on perd le focus (clic ailleurs)
             textBox.LostFocus += (s, e) =>
             {
@@ -3710,8 +3405,6 @@ namespace MacroEngine.UI
                 FontWeight = FontWeights.SemiBold
             };
 
-            textBox.PreviewMouseLeftButtonDown += (s, e) => e.Handled = true;
-            textBox.PreviewMouseMove += (s, e) => e.Handled = true;
             textBox.PreviewTextInput += (s, e) => e.Handled = !char.IsDigit(e.Text, 0);
 
             textBox.PreviewKeyDown += (s, e) =>
@@ -7255,16 +6948,6 @@ namespace MacroEngine.UI
                 }
             }
 
-            // Retirer les handlers drag & drop de la carte (les actions imbriquées ne doivent pas être déplaçables entre RepeatActions)
-            card.MouseLeftButtonDown -= ActionCard_MouseLeftButtonDown;
-            card.MouseMove -= ActionCard_MouseMove;
-            card.MouseLeftButtonUp -= ActionCard_MouseLeftButtonUp;
-            card.Drop -= ActionCard_Drop;
-            card.DragEnter -= ActionCard_DragEnter;
-            card.DragLeave -= ActionCard_DragLeave;
-            card.AllowDrop = false;
-            card.Cursor = Cursors.Arrow;
-
             // Conteneur Grid pour la carte + boutons flèches + bouton supprimer
             var container = new Grid
             {
@@ -7805,15 +7488,6 @@ namespace MacroEngine.UI
                     }
                 }
             }
-
-            card.MouseLeftButtonDown -= ActionCard_MouseLeftButtonDown;
-            card.MouseMove -= ActionCard_MouseMove;
-            card.MouseLeftButtonUp -= ActionCard_MouseLeftButtonUp;
-            card.Drop -= ActionCard_Drop;
-            card.DragEnter -= ActionCard_DragEnter;
-            card.DragLeave -= ActionCard_DragLeave;
-            card.AllowDrop = false;
-            card.Cursor = Cursors.Arrow;
 
             var container = new Grid
             {

@@ -331,10 +331,7 @@
                           Padding="12">
                 <StackPanel x:Name="TimelineStackPanel" 
                            Orientation="Vertical"
-                           HorizontalAlignment="Stretch"
-                           AllowDrop="True"
-                           Drop="TimelineStackPanel_Drop"
-                           DragOver="TimelineStackPanel_DragOver">
+                           HorizontalAlignment="Stretch">
                     
                     <!-- Message si aucune action -->
                     <StackPanel x:Name="EmptyStatePanel"
