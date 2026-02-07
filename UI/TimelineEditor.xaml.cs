@@ -217,7 +217,7 @@ namespace MacroEngine.UI
                 case Core.Inputs.MouseAction ma:
                     primaryColor = Color.FromRgb(79, 181, 140);   // #4FB58C Vert technique
                     hoverColor = Color.FromRgb(99, 201, 160);
-                    icon = "🖱";
+                    icon = LucideIcons.Mouse;
                     title = GetMouseActionTitle(ma);
                     details = GetMouseActionDetails(ma);
                     break;
@@ -231,7 +231,7 @@ namespace MacroEngine.UI
                 case RepeatAction ra:
                     primaryColor = Color.FromRgb(138, 108, 209);   // #8A6CD1 Violet logique
                     hoverColor = Color.FromRgb(158, 128, 229);
-                    icon = "🔁";
+                    icon = LucideIcons.Repeat;
                     var actionsCount = ra.Actions?.Count ?? 0;
                     title = GetRepeatActionTitle(ra);
                     details = $"{actionsCount} action{(actionsCount > 1 ? "s" : "")}";
@@ -248,7 +248,7 @@ namespace MacroEngine.UI
                 case TextAction ta:
                     primaryColor = Color.FromRgb(224, 177, 90);     // #E0B15A Jaune chaud
                     hoverColor = Color.FromRgb(244, 197, 110);
-                    icon = "📝";
+                    icon = LucideIcons.FileText;
                     title = GetTextActionTitle(ta);
                     details = GetTextActionDetails(ta);
                     break;
@@ -1900,7 +1900,35 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(actionTypeComboBox);
 
-            // CheckBoxes pour les modificateurs (texte blanc clair)
+            // Panneau avancé : modificateurs (Ctrl, Alt, Shift, Win)
+            var advancedPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            var advancedButton = new Button
+            {
+                Content = "Avancé",
+                FontSize = 11,
+                Padding = new Thickness(6, 2, 6, 2),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = Cursors.Hand,
+                ToolTip = "Afficher les options avancées (modificateurs)"
+            };
+            if (Application.Current.TryFindResource("ButtonGhost") is Style ghostStyle)
+                advancedButton.Style = ghostStyle;
+            advancedButton.Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+            bool advancedVisible = false;
+            advancedButton.Click += (s, e) =>
+            {
+                advancedVisible = !advancedVisible;
+                advancedPanel.Visibility = advancedVisible ? Visibility.Visible : Visibility.Collapsed;
+                advancedButton.Content = advancedVisible ? "▲ Avancé" : "Avancé";
+            };
+
+            // CheckBoxes pour les modificateurs (texte blanc clair) — dans panneau avancé
             var ctrlCheckBox = new CheckBox
             {
                 Content = "Ctrl",
@@ -1932,7 +1960,7 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(ctrlCheckBox);
+            advancedPanel.Children.Add(ctrlCheckBox);
 
             var altCheckBox = new CheckBox
             {
@@ -1965,7 +1993,7 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(altCheckBox);
+            advancedPanel.Children.Add(altCheckBox);
 
             var shiftCheckBox = new CheckBox
             {
@@ -1998,7 +2026,7 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(shiftCheckBox);
+            advancedPanel.Children.Add(shiftCheckBox);
 
             var winCheckBox = new CheckBox
             {
@@ -2031,7 +2059,7 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(winCheckBox);
+            advancedPanel.Children.Add(winCheckBox);
 
             // TextBox pour capturer la touche principale
             var keyTextBox = new TextBox
@@ -2103,6 +2131,9 @@ namespace MacroEngine.UI
             };
             
             editPanel.Children.Add(keyTextBox);
+
+            editPanel.Children.Add(advancedButton);
+            editPanel.Children.Add(advancedPanel);
 
             // Durée de maintien (ms) pour "Maintenir" — optionnel, vide ou 0 = illimité (texte blanc clair)
             var holdDurationLabel = new TextBlock
@@ -2465,7 +2496,35 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(maxDurationTextBox);
 
-            // CheckBox pour le mode variable (texte blanc clair)
+            // Panneau avancé : Variable, Jitter
+            var delayAdvancedPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            var delayAdvancedButton = new Button
+            {
+                Content = "Avancé",
+                FontSize = 11,
+                Padding = new Thickness(6, 2, 6, 2),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = Cursors.Hand,
+                ToolTip = "Afficher les options avancées (variable, jitter)"
+            };
+            if (Application.Current.TryFindResource("ButtonGhost") is Style delayGhostStyle)
+                delayAdvancedButton.Style = delayGhostStyle;
+            delayAdvancedButton.Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+            bool delayAdvancedVisible = false;
+            delayAdvancedButton.Click += (s, e) =>
+            {
+                delayAdvancedVisible = !delayAdvancedVisible;
+                delayAdvancedPanel.Visibility = delayAdvancedVisible ? Visibility.Visible : Visibility.Collapsed;
+                delayAdvancedButton.Content = delayAdvancedVisible ? "▲ Avancé" : "Avancé";
+            };
+
+            // CheckBox pour le mode variable (texte blanc clair) — dans panneau avancé
             var variableCheckBox = new CheckBox
             {
                 Content = "Variable",
@@ -2504,8 +2563,8 @@ namespace MacroEngine.UI
             {
                 RefreshBlocks();
             };
-            editPanel.Children.Add(variableCheckBox);
-            editPanel.Children.Add(variableNameTextBox);
+            delayAdvancedPanel.Children.Add(variableCheckBox);
+            delayAdvancedPanel.Children.Add(variableNameTextBox);
 
             var multiplyLabel = new TextBlock
             {
@@ -2517,7 +2576,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(4, 0, 4, 0),
                 Visibility = da.UseVariableDelay ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(multiplyLabel);
+            delayAdvancedPanel.Children.Add(multiplyLabel);
 
             var multiplierTextBox = new TextBox
             {
@@ -2555,7 +2614,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(multiplierTextBox);
+            delayAdvancedPanel.Children.Add(multiplierTextBox);
 
             // CheckBox pour le mode aléatoire (texte blanc clair)
             var randomCheckBox = new CheckBox
@@ -2641,7 +2700,10 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(randomCheckBox);
 
-            // Label et TextBox pour Jitter (%) (texte blanc clair)
+            editPanel.Children.Add(delayAdvancedButton);
+            editPanel.Children.Add(delayAdvancedPanel);
+
+            // Label et TextBox pour Jitter (%) — dans panneau avancé
             var jitterLabel = new TextBlock
             {
                 Text = "Jitter (%):",
@@ -2651,7 +2713,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(8, 0, 4, 0),
                 ToolTip = "Variation aléatoire autour de la valeur (ex: ±10%)"
             };
-            editPanel.Children.Add(jitterLabel);
+            delayAdvancedPanel.Children.Add(jitterLabel);
 
             var jitterTextBox = new TextBox
             {
@@ -2688,7 +2750,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(jitterTextBox);
+            delayAdvancedPanel.Children.Add(jitterTextBox);
 
             // ComboBox pour l'unité de temps
             var unitComboBox = new ComboBox
@@ -2803,7 +2865,37 @@ namespace MacroEngine.UI
             };
             editPanel.Children.Add(textTextBox);
 
-            // CheckBox pour coller tout d'un coup (texte blanc clair)
+            // Panneau avancé texte : Coller, Effacer avant, Masquer logs, Frappe naturelle, vitesse, etc.
+            var textAdvancedPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            var textAdvancedButton = new Button
+            {
+                Content = "Avancé",
+                FontSize = 11,
+                Padding = new Thickness(6, 2, 6, 2),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = Cursors.Hand,
+                ToolTip = "Afficher les options avancées (coller, effacer, vitesse, etc.)"
+            };
+            if (Application.Current.TryFindResource("ButtonGhost") is Style textGhostStyle)
+                textAdvancedButton.Style = textGhostStyle;
+            textAdvancedButton.Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+            bool textAdvancedVisible = false;
+            textAdvancedButton.Click += (s, e) =>
+            {
+                textAdvancedVisible = !textAdvancedVisible;
+                textAdvancedPanel.Visibility = textAdvancedVisible ? Visibility.Visible : Visibility.Collapsed;
+                textAdvancedButton.Content = textAdvancedVisible ? "▲ Avancé" : "Avancé";
+            };
+            editPanel.Children.Add(textAdvancedButton);
+            editPanel.Children.Add(textAdvancedPanel);
+
+            // CheckBox pour coller tout d'un coup (texte blanc clair) — dans panneau avancé
             var pasteAtOnceCheckBox = new CheckBox
             {
                 Content = "Coller",
@@ -2835,7 +2927,7 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(pasteAtOnceCheckBox);
+            textAdvancedPanel.Children.Add(pasteAtOnceCheckBox);
 
             // CheckBox Effacer avant (texte blanc clair)
             var clearBeforeCheckBox = new CheckBox
@@ -2862,7 +2954,7 @@ namespace MacroEngine.UI
                 if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(clearBeforeCheckBox);
+            textAdvancedPanel.Children.Add(clearBeforeCheckBox);
 
             // CheckBox Masquer dans les logs (texte blanc clair)
             var hideInLogsCheckBox = new CheckBox
@@ -2889,7 +2981,7 @@ namespace MacroEngine.UI
                 if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(hideInLogsCheckBox);
+            textAdvancedPanel.Children.Add(hideInLogsCheckBox);
 
             // CheckBox pour la frappe naturelle (texte blanc clair)
             var naturalTypingCheckBox = new CheckBox
@@ -2924,7 +3016,7 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(naturalTypingCheckBox);
+            textAdvancedPanel.Children.Add(naturalTypingCheckBox);
 
             // TextBox pour la vitesse de frappe (visible si pas de frappe naturelle et pas "Coller", texte blanc clair)
             var speedLabel = new TextBlock
@@ -2936,7 +3028,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = (ta.UseNaturalTyping || ta.PasteAtOnce) ? Visibility.Collapsed : Visibility.Visible
             };
-            editPanel.Children.Add(speedLabel);
+            textAdvancedPanel.Children.Add(speedLabel);
 
             var speedTextBox = new TextBox
             {
@@ -2973,7 +3065,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(speedTextBox);
+            textAdvancedPanel.Children.Add(speedTextBox);
 
             var msLabel = new TextBlock
             {
@@ -2984,7 +3076,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(0, 0, 8, 0),
                 Visibility = (ta.UseNaturalTyping || ta.PasteAtOnce) ? Visibility.Collapsed : Visibility.Visible
             };
-            editPanel.Children.Add(msLabel);
+            textAdvancedPanel.Children.Add(msLabel);
 
             // TextBox pour délai min (visible si frappe naturelle et pas "Coller", texte blanc clair)
             var minDelayLabel = new TextBlock
@@ -2996,7 +3088,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(minDelayLabel);
+            textAdvancedPanel.Children.Add(minDelayLabel);
 
             var minDelayTextBox = new TextBox
             {
@@ -3033,7 +3125,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(minDelayTextBox);
+            textAdvancedPanel.Children.Add(minDelayTextBox);
 
             // Label "et" (texte blanc clair)
             var andLabel = new TextBlock
@@ -3045,7 +3137,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(4, 0, 4, 0),
                 Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(andLabel);
+            textAdvancedPanel.Children.Add(andLabel);
 
             // TextBox pour délai max (visible si frappe naturelle et pas "Coller", texte blanc clair)
             var maxDelayLabel = new TextBlock
@@ -3057,7 +3149,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(0, 0, 4, 0),
                 Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(maxDelayLabel);
+            textAdvancedPanel.Children.Add(maxDelayLabel);
 
             var maxDelayTextBox = new TextBox
             {
@@ -3094,7 +3186,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(maxDelayTextBox);
+            textAdvancedPanel.Children.Add(maxDelayTextBox);
 
             var msLabel2 = new TextBlock
             {
@@ -3104,7 +3196,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(0, 0, 0, 0),
                 Visibility = (ta.UseNaturalTyping && !ta.PasteAtOnce) ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(msLabel2);
+            textAdvancedPanel.Children.Add(msLabel2);
 
             // Mettre à jour la visibilité des contrôles quand le mode frappe naturelle change
             naturalTypingCheckBox.Checked += (s, e) =>
@@ -3860,7 +3952,37 @@ namespace MacroEngine.UI
 
             editPanel.Children.Add(selectPointButton);
 
-            // Bouton Aperçu position (snap visuel)
+            // Panneau avancé souris : aperçu, zone conditionnelle, durée, delta, scroll, relatif, vitesse, Bézier
+            var mouseAdvancedPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            var mouseAdvancedButton = new Button
+            {
+                Content = "Avancé",
+                FontSize = 11,
+                Padding = new Thickness(6, 2, 6, 2),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = Cursors.Hand,
+                ToolTip = "Afficher les options avancées (zone, durée, delta, relatif, etc.)"
+            };
+            if (Application.Current.TryFindResource("ButtonGhost") is Style mouseGhostStyle)
+                mouseAdvancedButton.Style = mouseGhostStyle;
+            mouseAdvancedButton.Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+            bool mouseAdvancedVisible = false;
+            mouseAdvancedButton.Click += (s, e) =>
+            {
+                mouseAdvancedVisible = !mouseAdvancedVisible;
+                mouseAdvancedPanel.Visibility = mouseAdvancedVisible ? Visibility.Visible : Visibility.Collapsed;
+                mouseAdvancedButton.Content = mouseAdvancedVisible ? "▲ Avancé" : "Avancé";
+            };
+            editPanel.Children.Add(mouseAdvancedButton);
+            editPanel.Children.Add(mouseAdvancedPanel);
+
+            // Bouton Aperçu position (snap visuel) — dans panneau avancé
             var previewPositionButton = new Button
             {
                 Content = LucideIcons.CreateIcon(LucideIcons.Eye, 11),
@@ -3887,7 +4009,7 @@ namespace MacroEngine.UI
                     MessageBox.Show("Veuillez d'abord définir une position X/Y valide.", "Position non définie", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             };
-            editPanel.Children.Add(previewPositionButton);
+            mouseAdvancedPanel.Children.Add(previewPositionButton);
 
             // Zone conditionnelle (clic seulement si curseur dans la zone)
             bool IsClickType(Core.Inputs.MouseActionType t) =>
@@ -3967,9 +4089,9 @@ namespace MacroEngine.UI
                 }
             };
 
-            editPanel.Children.Add(conditionalZoneCheckBox);
-            editPanel.Children.Add(zoneButton);
-            editPanel.Children.Add(zoneLabel);
+            mouseAdvancedPanel.Children.Add(conditionalZoneCheckBox);
+            mouseAdvancedPanel.Children.Add(zoneButton);
+            mouseAdvancedPanel.Children.Add(zoneLabel);
 
             void UpdateConditionalZoneVisibility()
             {
@@ -4024,7 +4146,7 @@ namespace MacroEngine.UI
             };
             holdDurationPanel.Children.Add(holdDurationLabel);
             holdDurationPanel.Children.Add(holdDurationTextBox);
-            editPanel.Children.Add(holdDurationPanel);
+            mouseAdvancedPanel.Children.Add(holdDurationPanel);
 
             void UpdateHoldDurationVisibility()
             {
@@ -4073,7 +4195,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = showDelta ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(deltaLabel);
+            mouseAdvancedPanel.Children.Add(deltaLabel);
 
             var deltaTextBox = new TextBox
             {
@@ -4112,7 +4234,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(deltaTextBox);
+            mouseAdvancedPanel.Children.Add(deltaTextBox);
 
             // Contrôles pour Scroll continu (direction, durée, intervalle)
             bool showScrollContinuous = ma.ActionType == Core.Inputs.MouseActionType.WheelContinuous;
@@ -4138,7 +4260,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(scrollDirectionComboBox);
+            mouseAdvancedPanel.Children.Add(scrollDirectionComboBox);
 
             var scrollDurationLabel = new TextBlock
             {
@@ -4167,8 +4289,8 @@ namespace MacroEngine.UI
                     if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
                 }
             };
-            editPanel.Children.Add(scrollDurationLabel);
-            editPanel.Children.Add(scrollDurationTextBox);
+            mouseAdvancedPanel.Children.Add(scrollDurationLabel);
+            mouseAdvancedPanel.Children.Add(scrollDurationTextBox);
 
             var scrollIntervalLabel = new TextBlock
             {
@@ -4197,8 +4319,8 @@ namespace MacroEngine.UI
                     if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
                 }
             };
-            editPanel.Children.Add(scrollIntervalLabel);
-            editPanel.Children.Add(scrollIntervalTextBox);
+            mouseAdvancedPanel.Children.Add(scrollIntervalLabel);
+            mouseAdvancedPanel.Children.Add(scrollIntervalTextBox);
 
             void UpdateScrollContinuousVisibility()
             {
@@ -4250,7 +4372,7 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(relativeMoveCheckBox);
+            mouseAdvancedPanel.Children.Add(relativeMoveCheckBox);
 
             // ComboBox pour la vitesse de déplacement (uniquement pour Move)
             var moveSpeedComboBox = new ComboBox
@@ -4295,7 +4417,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(moveSpeedComboBox);
+            mouseAdvancedPanel.Children.Add(moveSpeedComboBox);
 
             // ComboBox pour le type d'easing (uniquement pour Move)
             var moveEasingComboBox = new ComboBox
@@ -4343,7 +4465,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(moveEasingComboBox);
+            mouseAdvancedPanel.Children.Add(moveEasingComboBox);
 
             // CheckBox pour activer le mode Bézier (uniquement pour Move)
             var bezierCheckBox = new CheckBox
@@ -4356,7 +4478,7 @@ namespace MacroEngine.UI
                 IsChecked = ma.UseBezierPath,
                 Visibility = showMoveControls ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(bezierCheckBox);
+            mouseAdvancedPanel.Children.Add(bezierCheckBox);
 
             // Label et TextBox pour le point de contrôle X (uniquement pour Move avec Bézier)
             var controlXLabel = new TextBlock
@@ -4368,7 +4490,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = (showMoveControls && ma.UseBezierPath) ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(controlXLabel);
+            mouseAdvancedPanel.Children.Add(controlXLabel);
 
             var controlXTextBox = new TextBox
             {
@@ -4405,7 +4527,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(controlXTextBox);
+            mouseAdvancedPanel.Children.Add(controlXTextBox);
 
             // Label et TextBox pour le point de contrôle Y (uniquement pour Move avec Bézier)
             var controlYLabel = new TextBlock
@@ -4417,7 +4539,7 @@ namespace MacroEngine.UI
                 Margin = new Thickness(8, 0, 4, 0),
                 Visibility = (showMoveControls && ma.UseBezierPath) ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(controlYLabel);
+            mouseAdvancedPanel.Children.Add(controlYLabel);
 
             var controlYTextBox = new TextBox
             {
@@ -4454,7 +4576,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(controlYTextBox);
+            mouseAdvancedPanel.Children.Add(controlYTextBox);
 
             // Bouton pour sélectionner le point de contrôle à l'écran (uniquement pour Move avec Bézier)
             var selectControlPointButton = new Button
@@ -4487,7 +4609,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(selectControlPointButton);
+            mouseAdvancedPanel.Children.Add(selectControlPointButton);
 
             // Ajouter les handlers après la déclaration de toutes les variables
             bezierCheckBox.Checked += (s, e) =>

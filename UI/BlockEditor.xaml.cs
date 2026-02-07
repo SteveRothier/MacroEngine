@@ -389,6 +389,7 @@ namespace MacroEngine.UI
                 Text = icon,
                 Style = (Style)FindResource("BlockIcon")
             };
+            iconText.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
             Grid.SetColumn(iconText, 0);
             grid.Children.Add(iconText);
 
@@ -471,6 +472,7 @@ namespace MacroEngine.UI
                 Text = icon,
                 Style = (Style)FindResource("BlockIcon")
             };
+            iconText.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
             Grid.SetColumn(iconText, 0);
             grid.Children.Add(iconText);
 

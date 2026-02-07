@@ -75,7 +75,7 @@
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="🖱" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="&#xE11F;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="+ Clic" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Border>
@@ -171,7 +171,7 @@
                                                 CornerRadius="8"
                                                 Padding="12,8">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="⏱" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="&#xE087;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="+ Délai" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Border>
