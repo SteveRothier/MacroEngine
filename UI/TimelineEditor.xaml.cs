@@ -5864,8 +5864,7 @@ namespace MacroEngine.UI
                     FontSize = 12,
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(4, 0, 0, 0),
-                    Cursor = Cursors.Hand,
-                    ToolTip = "Configurer cette condition"
+                    Cursor = Cursors.Hand
                 };
                 if (Application.Current.TryFindResource("TimelineIfIconButton") is Style ifIconStyle)
                     configButton.Style = ifIconStyle;
@@ -6018,16 +6017,15 @@ namespace MacroEngine.UI
             // Bouton pour ajouter une nouvelle condition
             var addButton = new Button
             {
-                Content = "Ajouter condition",
-                MinWidth = 120,
+                Content = "➕",
+                MinWidth = 32,
+                Width = 32,
                 Height = 28,
-                FontSize = 11,
-                FontWeight = FontWeights.SemiBold,
+                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand,
-                ToolTip = "Ajouter une nouvelle condition",
-                Padding = new Thickness(8, 0, 8, 0)
+                Padding = new Thickness(4, 0, 4, 0)
             };
             if (Application.Current.TryFindResource("TimelineIfButton") is Style ifBtnStyle)
                 addButton.Style = ifBtnStyle;
@@ -6056,14 +6054,14 @@ namespace MacroEngine.UI
             // Bouton "Configurer..." pour ouvrir le dialogue complet
             var fullConfigButton = new Button
             {
-                Content = "Configurer...",
-                Width = 100,
+                Content = "⚙",
+                MinWidth = 32,
+                Width = 32,
                 Height = 28,
-                FontSize = 11,
+                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
-                Cursor = Cursors.Hand,
-                ToolTip = "Ouvrir le dialogue de configuration complet"
+                Cursor = Cursors.Hand
             };
             if (Application.Current.TryFindResource("TimelineIfButton") is Style ifBtnStyle2)
                 fullConfigButton.Style = ifBtnStyle2;
@@ -6100,15 +6098,16 @@ namespace MacroEngine.UI
             // Bouton "Mode groupes" pour basculer vers l'interface des groupes
             var groupModeButton = new Button
             {
-                Content = "📦 Mode groupes",
-                MinWidth = 110,
+                Content = "📦",
+                MinWidth = 32,
+                Width = 32,
                 Height = 28,
-                FontSize = 11,
+                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand,
                 ToolTip = "Basculer vers le mode groupes (A ET B) OU (C ET D)",
-                Padding = new Thickness(8, 0, 8, 0)
+                Padding = new Thickness(4, 0, 4, 0)
             };
             if (Application.Current.TryFindResource("TimelineIfButton") is Style groupModeBtnStyle)
                 groupModeButton.Style = groupModeBtnStyle;
@@ -6311,7 +6310,6 @@ namespace MacroEngine.UI
                             VerticalAlignment = VerticalAlignment.Center,
                             Margin = new Thickness(2, 0, 0, 0),
                             Cursor = Cursors.Hand,
-                            ToolTip = "Configurer",
                             Padding = new Thickness(0)
                         };
                         if (Application.Current.TryFindResource("TimelineIfIconButton") is Style groupIfIconStyle)
@@ -6392,7 +6390,6 @@ namespace MacroEngine.UI
                     VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(3, 0, 0, 0),
                     Cursor = Cursors.Hand,
-                    ToolTip = "Ajouter condition (ET)",
                     Padding = new Thickness(0)
                 };
                 if (Application.Current.TryFindResource("TimelineIfIconButton") is Style addCondBtnStyle)
@@ -6585,10 +6582,11 @@ namespace MacroEngine.UI
             // Ajouter un bouton "Configurer..." pour toutes les conditions (même les simples)
             var configButton = new Button
             {
-                Content = "Configurer...",
-                Width = 100,
+                Content = "⚙",
+                MinWidth = 32,
+                Width = 32,
                 Height = 28,
-                FontSize = 11,
+                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand

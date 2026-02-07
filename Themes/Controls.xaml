@@ -308,7 +308,7 @@
         </Setter>
     </Style>
 
-    <!-- Boutons action If (Ajouter condition, Configurer...) – accent rouge condition -->
+    <!-- Boutons action If (icônes seules : ➕, ⚙, 📦) – accent rouge condition -->
     <Style x:Key="TimelineIfButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
