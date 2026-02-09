@@ -28,10 +28,14 @@
             </ComboBox>
             <Button Content="Effacer" 
                     Click="ClearLogs_Click" 
+                    ClickMode="Press"
+                    Focusable="False"
                     Padding="10,5" 
                     Margin="5,0,5,0"/>
             <Button Content="Actualiser" 
                     Click="RefreshLogs_Click" 
+                    ClickMode="Press"
+                    Focusable="False"
                     Padding="10,5" 
                     Margin="5,0,5,0"/>
             <CheckBox x:Name="AutoScrollCheckBox" 

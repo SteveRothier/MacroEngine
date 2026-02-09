@@ -7,7 +7,8 @@
         Title="Ajouter une action souris" 
         Height="350" Width="400"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        PreviewKeyDown="Window_PreviewKeyDown">
     <Grid Margin="15">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -69,6 +70,8 @@
                            TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,10"/>
                 <Button x:Name="CapturePositionButton" 
                         Click="CapturePositionButton_Click"
+                        ClickMode="Press"
+                        Focusable="False"
                         Padding="10,8">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <TextBlock Text="&#xE0AC;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0" VerticalAlignment="Center"/>
@@ -99,10 +102,14 @@
                     HorizontalAlignment="Right">
             <Button Content="Annuler" 
                     Click="CancelButton_Click" 
+                    ClickMode="Press"
+                    Focusable="False"
                     Padding="20,8" 
                     Margin="0,0,10,0"/>
             <Button Content="Ajouter" 
                     Click="OkButton_Click" 
+                    ClickMode="Press"
+                    Focusable="False"
                     Padding="20,8"
                     IsDefault="True"/>
         </StackPanel>

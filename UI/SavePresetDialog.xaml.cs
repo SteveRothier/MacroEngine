@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using System.Windows.Controls;
 using MacroEngine.Core.Inputs;
 
 namespace MacroEngine.UI
@@ -24,6 +25,16 @@ namespace MacroEngine.UI
 
             // Pré-sélectionner la catégorie basée sur le type d'action
             CategoryComboBox.Text = GetSuggestedCategory(action);
+        }
+
+        private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != System.Windows.Input.Key.Escape)
+                return;
+            if (System.Windows.Input.Keyboard.FocusedElement is not TextBox)
+                return;
+            Focus();
+            e.Handled = true;
         }
 
         private string GetSuggestedName(IInputAction action)

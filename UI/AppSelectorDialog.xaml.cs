@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using MacroEngine.Core.Processes;
 
 namespace MacroEngine.UI
@@ -37,6 +38,16 @@ namespace MacroEngine.UI
             InitializeComponent();
             ProcessListView.ItemsSource = _filteredProcesses;
             LoadProcesses();
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape)
+                return;
+            if (Keyboard.FocusedElement is not TextBox)
+                return;
+            Focus();
+            e.Handled = true;
         }
 
         private void LoadProcesses()

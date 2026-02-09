@@ -2884,6 +2884,16 @@ namespace MacroEngine.UI
             ConfigContentPanel.Children.Add(infoText);
         }
 
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape)
+                return;
+            if (Keyboard.FocusedElement is not TextBox)
+                return;
+            RootBorder.Focus();
+            e.Handled = true;
+        }
+
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             if (e.ChangedButton == MouseButton.Left)

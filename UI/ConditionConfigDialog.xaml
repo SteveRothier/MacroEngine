@@ -7,10 +7,13 @@
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         ResizeMode="CanResizeWithGrip"
-        Background="{StaticResource BackgroundPrimaryBrush}">
+        Background="{StaticResource BackgroundPrimaryBrush}"
+        PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <!-- Style boutons du contenu (Ajouter une condition, Ajouter, Rafraîchir, etc.) -->
         <Style x:Key="DialogContentButton" TargetType="Button">
+            <Setter Property="ClickMode" Value="Press"/>
+            <Setter Property="Focusable" Value="False"/>
             <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
@@ -49,9 +52,12 @@
             <Setter Property="MinHeight" Value="26"/>
         </Style>
     </Window.Resources>
-    <Border Background="{StaticResource BackgroundPrimaryBrush}"
+    <Border x:Name="RootBorder"
+            Background="{StaticResource BackgroundPrimaryBrush}"
             BorderBrush="{StaticResource BorderLightBrush}"
-            BorderThickness="1">
+            BorderThickness="1"
+            Focusable="True"
+            KeyboardNavigation.IsTabStop="False">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -92,6 +98,8 @@
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button x:Name="MinimizeButton"
                                 Style="{StaticResource WindowCaptionButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
                                 Foreground="White"
                                 FontFamily="{StaticResource FontLucide}"
                                 Content="&#xE11C;"
@@ -99,6 +107,8 @@
                                 Click="MinimizeButton_Click"/>
                         <Button x:Name="MaximizeButton"
                                 Style="{StaticResource WindowCaptionButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
                                 Foreground="White"
                                 FontFamily="{StaticResource FontLucide}"
                                 Content="&#xE167;"
@@ -106,6 +116,8 @@
                                 Click="MaximizeButton_Click"/>
                         <Button x:Name="CloseButton"
                                 Style="{StaticResource WindowCaptionCloseButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
                                 Foreground="White"
                                 FontFamily="{StaticResource FontLucide}"
                                 Content="&#xE1B2;"
@@ -242,6 +254,8 @@
                     <Button x:Name="CancelButton"
                             Content="Annuler"
                             Style="{StaticResource ButtonSecondary}"
+                            ClickMode="Press"
+                            Focusable="False"
                             Width="90"
                             Height="34"
                             Click="CancelButton_Click"
@@ -250,6 +264,8 @@
                     <Button x:Name="OkButton"
                             Content="OK"
                             Style="{StaticResource ButtonPrimary}"
+                            ClickMode="Press"
+                            Focusable="False"
                             Width="90"
                             Height="34"
                             Click="OkButton_Click"

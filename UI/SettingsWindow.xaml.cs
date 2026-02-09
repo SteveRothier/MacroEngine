@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Shell;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Hooks;
 using MacroEngine.Core.Services;
@@ -26,6 +27,15 @@ namespace MacroEngine.UI
         {
             InitializeComponent();
             _config = config ?? new MacroEngineConfig();
+
+            var chrome = new WindowChrome
+            {
+                CaptionHeight = 44,
+                ResizeBorderThickness = new Thickness(5),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            };
+            WindowChrome.SetWindowChrome(this, chrome);
             
             // Utiliser les valeurs par défaut si elles sont à 0 (non initialisées)
             _capturedExecuteKeyCode = _config.ExecuteMacroKeyCode != 0 ? _config.ExecuteMacroKeyCode : 0x79; // F10 par défaut
@@ -37,6 +47,60 @@ namespace MacroEngine.UI
             
             UpdateKeyDisplay();
             LoadTesseractInfo();
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+            {
+                if (e.ClickCount == 2)
+                {
+                    WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+                }
+                else
+                {
+                    DragMove();
+                }
+            }
+        }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            UpdateMaximizeButtonContent();
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private void UpdateMaximizeButtonContent()
+        {
+            if (MaximizeButton != null)
+                MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            base.OnStateChanged(e);
+            UpdateMaximizeButtonContent();
+        }
+
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape)
+                return;
+            if (Keyboard.FocusedElement is not System.Windows.Controls.TextBox)
+                return;
+            Focus();
+            e.Handled = true;
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)

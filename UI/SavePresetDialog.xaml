@@ -6,7 +6,8 @@
         Height="320"
         WindowStartupLocation="CenterOwner"
         Background="{StaticResource BackgroundPrimaryBrush}"
-        ResizeMode="NoResize">
+        ResizeMode="NoResize"
+        PreviewKeyDown="Window_PreviewKeyDown">
 
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -81,11 +82,15 @@
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Annuler"
                     Style="{StaticResource ButtonSecondary}"
+                    ClickMode="Press"
+                    Focusable="False"
                     Width="100"
                     Margin="0,0,12,0"
                     Click="CancelButton_Click"/>
             <Button Content="Sauvegarder"
                     Style="{StaticResource ButtonPrimary}"
+                    ClickMode="Press"
+                    Focusable="False"
                     Width="120"
                     Click="SaveButton_Click"/>
         </StackPanel>

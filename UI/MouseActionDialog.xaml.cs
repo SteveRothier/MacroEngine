@@ -27,6 +27,16 @@ namespace MacroEngine.UI
             UpdatePositionFieldsState();
         }
 
+        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Escape)
+                return;
+            if (Keyboard.FocusedElement is not TextBox)
+                return;
+            Focus();
+            e.Handled = true;
+        }
+
         private void UseCurrentPositionCheckBox_Changed(object sender, RoutedEventArgs e)
         {
             UpdatePositionFieldsState();

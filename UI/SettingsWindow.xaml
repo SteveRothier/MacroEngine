@@ -1,122 +1,222 @@
 <Window x:Class="MacroEngine.UI.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Configuration" 
         Height="600" Width="600"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize"
-        MinHeight="500" MinWidth="500">
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        MinHeight="500" MinWidth="500"
+        Background="{StaticResource BackgroundPrimaryBrush}"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <Border x:Name="RootBorder"
+            Background="{StaticResource BackgroundPrimaryBrush}"
+            BorderBrush="{StaticResource BorderLightBrush}"
+            BorderThickness="1"
+            Focusable="True"
+            KeyboardNavigation.IsTabStop="False">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Configuration des Raccourcis" FontSize="18" FontWeight="Bold" Margin="0,0,0,20"/>
-
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel>
-                <GroupBox Header="Raccourcis Clavier" Margin="0,0,0,20">
-                    <StackPanel Margin="10">
-                        <TextBlock Text="Raccourci pour exécuter la macro sélectionnée:" Margin="0,0,0,5"/>
-                        <Grid Margin="0,0,0,15">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="ExecuteKeyTextBox" 
-                                     Grid.Column="0"
-                                     IsReadOnly="True"
-                                     PreviewKeyDown="ExecuteKeyTextBox_PreviewKeyDown"
-                                     KeyDown="ExecuteKeyTextBox_KeyDown"
-                                     GotFocus="ExecuteKeyTextBox_GotFocus"
-                                     LostFocus="ExecuteKeyTextBox_LostFocus"
-                                     Margin="0,0,10,0"/>
-                            <Button x:Name="CaptureExecuteKeyButton" 
-                                    Grid.Column="1"
-                                    Content="Modifier"
-                                    Click="CaptureExecuteKeyButton_Click"
-                                    Width="80"/>
-                        </Grid>
-
-                        <TextBlock Text="Raccourci pour arrêter la macro en cours:" Margin="0,0,0,5"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="StopKeyTextBox" 
-                                     Grid.Column="0"
-                                     IsReadOnly="True"
-                                     PreviewKeyDown="StopKeyTextBox_PreviewKeyDown"
-                                     KeyDown="StopKeyTextBox_KeyDown"
-                                     GotFocus="StopKeyTextBox_GotFocus"
-                                     LostFocus="StopKeyTextBox_LostFocus"
-                                     Margin="0,0,10,0"/>
-                            <Button x:Name="CaptureStopKeyButton" 
-                                    Grid.Column="1"
-                                    Content="Modifier"
-                                    Click="CaptureStopKeyButton_Click"
-                                    Width="80"/>
-                        </Grid>
+            <!-- Barre de titre personnalisée (réduire / redimensionner / fermer) -->
+            <Border x:Name="TitleBarBorder"
+                    Grid.Row="0"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,0,0,0"
+                    Height="44"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBlock Text="Paramètres"
+                                   Style="{StaticResource TextHeading}"
+                                   Foreground="White"
+                                   FontSize="15"
+                                   VerticalAlignment="Center"/>
                     </StackPanel>
-                </GroupBox>
-
-                <GroupBox Header="Fichiers Tesseract (OCR)">
-                    <StackPanel Margin="10">
-                        <TextBlock Text="Chemin du dossier tessdata:" Margin="0,0,0,5" FontWeight="SemiBold"/>
-                        <Grid Margin="0,0,0,10">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="TessdataPathTextBox" 
-                                     Grid.Column="0"
-                                     IsReadOnly="True"
-                                     Margin="0,0,10,0"
-                                     TextWrapping="Wrap"/>
-                            <Button x:Name="OpenTessdataFolderButton" 
-                                    Grid.Column="1"
-                                    Content="Ouvrir"
-                                    Click="OpenTessdataFolderButton_Click"
-                                    Width="80"/>
-                        </Grid>
-
-                        <TextBlock Text="Fichiers présents:" Margin="0,10,0,5" FontWeight="SemiBold"/>
-                        <ListBox x:Name="TessdataFilesListBox" 
-                                 MaxHeight="150"
-                                 Margin="0,0,0,10">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="&#xE06C;" FontFamily="{StaticResource FontLucide}" Foreground="Green" FontWeight="Bold" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <TextBlock x:Name="TessdataStatusTextBlock" 
-                                   Margin="0,5,0,0"
-                                   TextWrapping="Wrap"
-                                   FontStyle="Italic"/>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Stretch"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="MinimizeButton"
+                                Style="{StaticResource WindowCaptionButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="White"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE11C;"
+                                ToolTip="Réduire"
+                                Click="MinimizeButton_Click"/>
+                        <Button x:Name="MaximizeButton"
+                                Style="{StaticResource WindowCaptionButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="White"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE167;"
+                                ToolTip="Agrandir"
+                                Click="MaximizeButton_Click"/>
+                        <Button x:Name="CloseButton"
+                                Style="{StaticResource WindowCaptionCloseButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="White"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE1B2;"
+                                ToolTip="Fermer"
+                                Click="CloseButton_Click"/>
                     </StackPanel>
-                </GroupBox>
-            </StackPanel>
-        </ScrollViewer>
+                </Grid>
+            </Border>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="OK" 
-                    Click="OkButton_Click" 
-                    Width="80" 
-                    Margin="0,0,10,0"
-                    IsDefault="True"/>
-            <Button Content="Annuler" 
-                    Click="CancelButton_Click" 
-                    Width="80"
-                    IsCancel="True"/>
-        </StackPanel>
-    </Grid>
+            <!-- Contenu -->
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="20,16"
+                          Background="{StaticResource BackgroundPrimaryBrush}">
+                <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                        BorderBrush="{StaticResource BorderInternalBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusPanel}"
+                        Padding="16,12">
+                    <StackPanel>
+                        <GroupBox Header="Raccourcis Clavier" Margin="0,0,0,20">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Raccourci pour exécuter la macro sélectionnée:" Margin="0,0,0,5"/>
+                                <Grid Margin="0,0,0,15">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="ExecuteKeyTextBox" 
+                                             Grid.Column="0"
+                                             IsReadOnly="True"
+                                             PreviewKeyDown="ExecuteKeyTextBox_PreviewKeyDown"
+                                             KeyDown="ExecuteKeyTextBox_KeyDown"
+                                             GotFocus="ExecuteKeyTextBox_GotFocus"
+                                             LostFocus="ExecuteKeyTextBox_LostFocus"
+                                             Margin="0,0,10,0"/>
+                                    <Button x:Name="CaptureExecuteKeyButton" 
+                                            Grid.Column="1"
+                                            Content="Modifier"
+                                            Click="CaptureExecuteKeyButton_Click"
+                                            ClickMode="Press"
+                                            Focusable="False"
+                                            Width="80"/>
+                                </Grid>
+
+                                <TextBlock Text="Raccourci pour arrêter la macro en cours:" Margin="0,0,0,5"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="StopKeyTextBox" 
+                                             Grid.Column="0"
+                                             IsReadOnly="True"
+                                             PreviewKeyDown="StopKeyTextBox_PreviewKeyDown"
+                                             KeyDown="StopKeyTextBox_KeyDown"
+                                             GotFocus="StopKeyTextBox_GotFocus"
+                                             LostFocus="StopKeyTextBox_LostFocus"
+                                             Margin="0,0,10,0"/>
+                                    <Button x:Name="CaptureStopKeyButton" 
+                                            Grid.Column="1"
+                                            Content="Modifier"
+                                            Click="CaptureStopKeyButton_Click"
+                                            ClickMode="Press"
+                                            Focusable="False"
+                                            Width="80"/>
+                                </Grid>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Fichiers Tesseract (OCR)">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Chemin du dossier tessdata:" Margin="0,0,0,5" FontWeight="SemiBold"/>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TessdataPathTextBox" 
+                                             Grid.Column="0"
+                                             IsReadOnly="True"
+                                             Margin="0,0,10,0"
+                                             TextWrapping="Wrap"/>
+                                    <Button x:Name="OpenTessdataFolderButton" 
+                                            Grid.Column="1"
+                                            Content="Ouvrir"
+                                            Click="OpenTessdataFolderButton_Click"
+                                            ClickMode="Press"
+                                            Focusable="False"
+                                            Width="80"/>
+                                </Grid>
+
+                                <TextBlock Text="Fichiers présents:" Margin="0,10,0,5" FontWeight="SemiBold"/>
+                                <ListBox x:Name="TessdataFilesListBox" 
+                                         MaxHeight="150"
+                                         Margin="0,0,0,10">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE06C;" FontFamily="{StaticResource FontLucide}" Foreground="Green" FontWeight="Bold" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+
+                                <TextBlock x:Name="TessdataStatusTextBlock" 
+                                           Margin="0,5,0,0"
+                                           TextWrapping="Wrap"
+                                           FontStyle="Italic"/>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+
+            <!-- Pied -->
+            <Border Grid.Row="2"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="20,14">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="OK" 
+                            Click="OkButton_Click" 
+                            Style="{StaticResource ButtonPrimary}"
+                            ClickMode="Press"
+                            Focusable="False"
+                            Width="90"
+                            Height="34"
+                            Margin="0,0,10,0"
+                            IsDefault="True"/>
+                    <Button Content="Annuler" 
+                            Click="CancelButton_Click" 
+                            Style="{StaticResource ButtonSecondary}"
+                            ClickMode="Press"
+                            Focusable="False"
+                            Width="90"
+                            Height="34"
+                            IsCancel="True"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
 </Window>
-

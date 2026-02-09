@@ -1,77 +1,154 @@
 <Window x:Class="MacroEngine.UI.PresetsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Gestionnaire de Presets"
         Width="700"
         Height="550"
         WindowStartupLocation="CenterOwner"
-        Background="{StaticResource BackgroundPrimaryBrush}"
-        ResizeMode="CanResize">
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        Background="{StaticResource BackgroundPrimaryBrush}">
+    <Border x:Name="RootBorder"
+            Background="{StaticResource BackgroundPrimaryBrush}"
+            BorderBrush="{StaticResource BorderLightBrush}"
+            BorderThickness="1"
+            Focusable="True"
+            KeyboardNavigation.IsTabStop="False">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-    <Grid Margin="20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <!-- En-tête -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="&#xE100;" FontFamily="{StaticResource FontLucide}" FontSize="20" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                <TextBlock Text="Presets d'Actions" Style="{StaticResource TextHeading}" FontSize="20" VerticalAlignment="Center"/>
-            </StackPanel>
-            <TextBlock Text="Sélectionnez un preset pour l'insérer dans votre macro"
-                       Style="{StaticResource TextMuted}"
-                       FontSize="13"
-                       Margin="0,0,0,8"/>
-        </StackPanel>
-
-        <!-- Liste des presets -->
-        <Border Grid.Row="1"
-                Background="{StaticResource BackgroundSecondaryBrush}"
-                CornerRadius="8"
-                BorderBrush="{StaticResource BorderLightBrush}"
-                BorderThickness="1"
-                Padding="12"
-                Margin="0,0,0,16">
-            
-            <Grid>
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel x:Name="PresetsStackPanel">
-                        <!-- Message si aucun preset -->
-                        <StackPanel x:Name="EmptyStatePanel"
-                                    VerticalAlignment="Center"
-                                    HorizontalAlignment="Center"
-                                    Visibility="Collapsed"
-                                    Margin="0,60,0,0">
-                            <TextBlock Text="&#xE061;" 
-                                       FontFamily="{StaticResource FontLucide}"
-                                       FontSize="48" 
-                                       HorizontalAlignment="Center"
-                                       Margin="0,0,0,16"/>
-                            <TextBlock Text="Aucun preset sauvegardé" 
-                                       Style="{StaticResource TextHeading}"
-                                       HorizontalAlignment="Center"
-                                       Margin="0,0,0,8"/>
-                            <TextBlock Text="Faites clic droit sur une action pour la sauvegarder" 
-                                       Style="{StaticResource TextMuted}"
-                                       HorizontalAlignment="Center"/>
-                        </StackPanel>
-                        
-                        <!-- Les cartes de preset seront ajoutées dynamiquement ici -->
+            <!-- Barre de titre personnalisée (réduire / redimensionner / fermer) -->
+            <Border x:Name="TitleBarBorder"
+                    Grid.Row="0"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,0,0,0"
+                    Height="44"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBlock Text="Gestionnaire de Presets"
+                                   Style="{StaticResource TextHeading}"
+                                   Foreground="White"
+                                   FontSize="15"
+                                   VerticalAlignment="Center"/>
                     </StackPanel>
-                </ScrollViewer>
-            </Grid>
-        </Border>
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Stretch"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="MinimizeButton"
+                                Style="{StaticResource WindowCaptionButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="White"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE11C;"
+                                ToolTip="Réduire"
+                                Click="MinimizeButton_Click"/>
+                        <Button x:Name="MaximizeButton"
+                                Style="{StaticResource WindowCaptionButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="White"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE167;"
+                                ToolTip="Agrandir"
+                                Click="MaximizeButton_Click"/>
+                        <Button x:Name="CloseButton"
+                                Style="{StaticResource WindowCaptionCloseButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="White"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE1B2;"
+                                ToolTip="Fermer"
+                                Click="CloseButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
-        <!-- Boutons d'action -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="Fermer"
-                    Style="{StaticResource ButtonSecondary}"
-                    Width="100"
-                    Click="CloseButton_Click"/>
-        </StackPanel>
-    </Grid>
+            <!-- Contenu -->
+            <ScrollViewer Grid.Row="1"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          Padding="20,16"
+                          Background="{StaticResource BackgroundPrimaryBrush}">
+                <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                        BorderBrush="{StaticResource BorderInternalBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{StaticResource RadiusPanel}"
+                        Padding="16,12">
+                    <StackPanel>
+                        <TextBlock Text="Sélectionnez un preset pour l'insérer dans votre macro"
+                                   Style="{StaticResource TextMuted}"
+                                   FontSize="13"
+                                   Margin="0,0,0,12"/>
+                        <Border Background="{StaticResource BackgroundSecondaryBrush}"
+                                CornerRadius="8"
+                                BorderBrush="{StaticResource BorderLightBrush}"
+                                BorderThickness="1"
+                                Padding="12"
+                                MinHeight="200">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel x:Name="PresetsStackPanel">
+                                    <StackPanel x:Name="EmptyStatePanel"
+                                                VerticalAlignment="Center"
+                                                HorizontalAlignment="Center"
+                                                Visibility="Collapsed"
+                                                Margin="0,60,0,0">
+                                        <TextBlock Text="&#xE061;" 
+                                                   FontFamily="{StaticResource FontLucide}"
+                                                   FontSize="48" 
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   Margin="0,0,0,16"/>
+                                        <TextBlock Text="Aucun preset sauvegardé" 
+                                                   Style="{StaticResource TextHeading}"
+                                                   Foreground="White"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,8"/>
+                                        <TextBlock Text="Faites clic droit sur une action pour la sauvegarder" 
+                                                   Style="{StaticResource TextMuted}"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </ScrollViewer>
+
+            <!-- Pied -->
+            <Border Grid.Row="2"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="20,14">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Fermer"
+                            Style="{StaticResource ButtonSecondary}"
+                            ClickMode="Press"
+                            Focusable="False"
+                            Width="100"
+                            Click="CloseButton_Click"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Border>
 </Window>

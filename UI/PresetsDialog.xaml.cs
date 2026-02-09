@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shell;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Storage;
 
@@ -22,11 +23,58 @@ namespace MacroEngine.UI
         {
             InitializeComponent();
             _presetStorage = presetStorage;
-            
+
+            var chrome = new WindowChrome
+            {
+                CaptionHeight = 44,
+                ResizeBorderThickness = new Thickness(5),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            };
+            WindowChrome.SetWindowChrome(this, chrome);
+
             Loaded += async (s, e) =>
             {
                 await LoadPresets();
             };
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+            {
+                if (e.ClickCount == 2)
+                {
+                    WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+                }
+                else
+                {
+                    DragMove();
+                }
+            }
+        }
+
+        private void MinimizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        private void MaximizeButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            UpdateMaximizeButtonContent();
+        }
+
+        private void UpdateMaximizeButtonContent()
+        {
+            if (MaximizeButton != null)
+                MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            base.OnStateChanged(e);
+            UpdateMaximizeButtonContent();
         }
 
         private async System.Threading.Tasks.Task LoadPresets()
