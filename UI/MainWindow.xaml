@@ -380,7 +380,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
-                        <RowDefinition Height="180"/>
+                        <RowDefinition x:Name="BottomPanelRow" Height="180"/>
                     </Grid.RowDefinitions>
                     
                     <!-- Éditeur de macro -->
@@ -395,7 +395,7 @@
                         </Grid.ColumnDefinitions>
                         
                         <!-- Actions exécutées -->
-                        <Border Grid.Column="0" 
+                        <Border x:Name="ActionsPanelBorder" Grid.Column="0" 
                                 Background="{StaticResource BackgroundTertiaryBrush}"
                                 CornerRadius="10"
                                 Padding="12">
@@ -443,7 +443,7 @@
                         </Border>
                         
                         <!-- Zone de test -->
-                        <Border Grid.Column="2" 
+                        <Border x:Name="TestPanelBorder" Grid.Column="2" 
                                 Background="{StaticResource BackgroundTertiaryBrush}"
                                 CornerRadius="10"
                                 Padding="8">

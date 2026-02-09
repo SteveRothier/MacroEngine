@@ -47,6 +47,13 @@ namespace MacroEngine.UI
             
             UpdateKeyDisplay();
             LoadTesseractInfo();
+            ShowActionsPanelCheckBox.IsChecked = _config.ShowActionsPanel;
+            ShowTestPanelCheckBox.IsChecked = _config.ShowTestPanel;
+            if (!_config.ShowTestAndActionsPanel)
+            {
+                ShowActionsPanelCheckBox.IsChecked = false;
+                ShowTestPanelCheckBox.IsChecked = false;
+            }
 
             Loaded += (s, _) => ApplySettingsNavSelection();
         }
@@ -567,7 +574,10 @@ namespace MacroEngine.UI
                 ActiveProfileId = _config.ActiveProfileId,
                 GlobalSettings = _config.GlobalSettings,
                 ExecuteMacroKeyCode = _capturedExecuteKeyCode,
-                StopMacroKeyCode = _capturedStopKeyCode
+                StopMacroKeyCode = _capturedStopKeyCode,
+                ShowActionsPanel = ShowActionsPanelCheckBox.IsChecked == true,
+                ShowTestPanel = ShowTestPanelCheckBox.IsChecked == true,
+                ShowTestAndActionsPanel = (ShowActionsPanelCheckBox.IsChecked == true || ShowTestPanelCheckBox.IsChecked == true)
             };
 
             DialogResult = true;

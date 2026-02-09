@@ -261,6 +261,21 @@ namespace MacroEngine.UI
             
             // Mettre à jour le texte du bouton Exécuter avec le raccourci
             UpdateExecuteButtonText();
+            
+            ApplyTestAndActionsPanelVisibility();
+        }
+        
+        private void ApplyTestAndActionsPanelVisibility()
+        {
+            if (BottomPanelRow == null || _appConfig == null)
+                return;
+            bool showActions = _appConfig.ShowActionsPanel;
+            bool showTest = _appConfig.ShowTestPanel;
+            if (ActionsPanelBorder != null)
+                ActionsPanelBorder.Visibility = showActions ? Visibility.Visible : Visibility.Collapsed;
+            if (TestPanelBorder != null)
+                TestPanelBorder.Visibility = showTest ? Visibility.Visible : Visibility.Collapsed;
+            BottomPanelRow.Height = (showActions || showTest) ? new GridLength(180) : new GridLength(0);
         }
         
         private void UpdateExecuteButtonText()
@@ -2493,6 +2508,8 @@ namespace MacroEngine.UI
                         
                         // Mettre à jour le texte du bouton Exécuter avec le nouveau raccourci
                         UpdateExecuteButtonText();
+                        
+                        ApplyTestAndActionsPanelVisibility();
                         
                         _logger?.Info($"Configuration mise à jour - Exécuter: VK{_appConfig.ExecuteMacroKeyCode:X2}, Arrêter: VK{_appConfig.StopMacroKeyCode:X2}", "MainWindow");
                         

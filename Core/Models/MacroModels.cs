@@ -163,6 +163,21 @@ namespace MacroEngine.Core.Models
         /// Mode debug : afficher quelle condition a échoué lors de l'évaluation des Si.
         /// </summary>
         public bool ConditionDebugEnabled { get; set; }
+
+        /// <summary>
+        /// Afficher la zone de test et les actions exécutées en bas de l'éditeur (option globale, ancienne config).
+        /// </summary>
+        public bool ShowTestAndActionsPanel { get; set; } = true;
+
+        /// <summary>
+        /// Afficher la zone « Actions exécutées » en bas de l'éditeur de macros.
+        /// </summary>
+        public bool ShowActionsPanel { get; set; } = true;
+
+        /// <summary>
+        /// Afficher la zone de test en bas de l'éditeur de macros.
+        /// </summary>
+        public bool ShowTestPanel { get; set; } = true;
     }
 
     /// <summary>

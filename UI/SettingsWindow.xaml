@@ -202,6 +202,24 @@
                                             Padding="14,8" MinWidth="90"/>
                                 </Grid>
                             </Border>
+
+                            <!-- Option interface : zone de test et actions exécutées -->
+                            <TextBlock Text="Interface"
+                                       Style="{StaticResource TextHeading}"
+                                       FontSize="16" Foreground="{StaticResource TextPrimaryBrush}"
+                                       Margin="0,24,0,8"/>
+                            <CheckBox x:Name="ShowActionsPanelCheckBox"
+                                      Content="Afficher les actions exécutées en bas de l'éditeur"
+                                      Style="{StaticResource CheckBoxModern}"
+                                      IsChecked="True"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Margin="0,0,0,4"/>
+                            <CheckBox x:Name="ShowTestPanelCheckBox"
+                                      Content="Afficher la zone de test en bas de l'éditeur"
+                                      Style="{StaticResource CheckBoxModern}"
+                                      IsChecked="True"
+                                      Foreground="{StaticResource TextPrimaryBrush}"
+                                      Margin="0,0,0,8"/>
                         </StackPanel>
 
                         <!-- Panneau OCR -->
