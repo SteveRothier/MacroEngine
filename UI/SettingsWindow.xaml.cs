@@ -47,6 +47,18 @@ namespace MacroEngine.UI
             
             UpdateKeyDisplay();
             LoadTesseractInfo();
+
+            Loaded += (s, _) => ApplySettingsNavSelection();
+        }
+
+        private void ApplySettingsNavSelection()
+        {
+            if (SettingsNavListBox == null || ShortcutsPanel == null || OcrPanel == null)
+                return;
+            int idx = SettingsNavListBox.SelectedIndex;
+            if (idx < 0) idx = 0;
+            ShortcutsPanel.Visibility = idx == 0 ? Visibility.Visible : Visibility.Collapsed;
+            OcrPanel.Visibility = idx == 1 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -79,6 +91,11 @@ namespace MacroEngine.UI
         {
             DialogResult = false;
             Close();
+        }
+
+        private void SettingsNavListBox_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            ApplySettingsNavSelection();
         }
 
         private void UpdateMaximizeButtonContent()
