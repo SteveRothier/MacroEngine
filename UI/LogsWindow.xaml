@@ -3,98 +3,269 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         mc:Ignorable="d"
-        Title="Journaux (Logs) - MacroEngine" 
+        Title="Journaux (Logs) - MacroEngine"
         Height="600" Width="1000"
-        WindowStartupLocation="CenterScreen">
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        MinHeight="400" MinWidth="700"
+        Background="{StaticResource BackgroundPrimaryBrush}">
+    <Border x:Name="RootBorder"
+            Background="{StaticResource BackgroundPrimaryBrush}"
+            BorderBrush="{StaticResource BorderLightBrush}"
+            BorderThickness="1"
+            Focusable="True"
+            KeyboardNavigation.IsTabStop="False">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-        <!-- Barre d'outils -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10">
-            <TextBlock Text="Niveau de log minimum:" VerticalAlignment="Center" Margin="0,0,10,0"/>
-            <ComboBox x:Name="LogLevelComboBox" 
-                      Width="120" 
-                      SelectionChanged="LogLevelComboBox_SelectionChanged"
-                      VerticalAlignment="Center" Margin="0,0,10,0">
-                <ComboBoxItem Content="Debug" Tag="Debug"/>
-                <ComboBoxItem Content="Info" Tag="Info" IsSelected="True"/>
-                <ComboBoxItem Content="Warning" Tag="Warning"/>
-                <ComboBoxItem Content="Error" Tag="Error"/>
-            </ComboBox>
-            <Button Content="Effacer" 
-                    Click="ClearLogs_Click" 
-                    ClickMode="Press"
-                    Focusable="False"
-                    Padding="10,5" 
-                    Margin="5,0,5,0"/>
-            <Button Content="Actualiser" 
-                    Click="RefreshLogs_Click" 
-                    ClickMode="Press"
-                    Focusable="False"
-                    Padding="10,5" 
-                    Margin="5,0,5,0"/>
-            <CheckBox x:Name="AutoScrollCheckBox" 
-                      Content="Défilement automatique" 
-                      IsChecked="True"
-                      VerticalAlignment="Center" 
-                      Margin="10,0,0,0"/>
-        </StackPanel>
+            <!-- Barre de titre personnalisée (réduire / agrandir / fermer) -->
+            <Border x:Name="TitleBarBorder"
+                    Grid.Row="0"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,0,0,0"
+                    Height="44"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- Titre + icône -->
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBlock Text="&#xE085;"
+                                   FontFamily="{StaticResource FontLucide}"
+                                   FontSize="18"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Margin="0,0,10,0"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="Journaux (Logs)"
+                                   Style="{StaticResource TextHeading}"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   FontSize="15"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <!-- Boutons Réduire / Agrandir / Fermer -->
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Stretch"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="MinimizeButton"
+                                Style="{StaticResource WindowCaptionButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="{StaticResource TextPrimaryBrush}"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE11C;"
+                                ToolTip="Réduire"
+                                Click="MinimizeButton_Click"/>
+                        <Button x:Name="MaximizeButton"
+                                Style="{StaticResource WindowCaptionButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="{StaticResource TextPrimaryBrush}"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE167;"
+                                ToolTip="Agrandir"
+                                Click="MaximizeButton_Click"/>
+                        <Button x:Name="CloseButton"
+                                Style="{StaticResource WindowCaptionCloseButtonStyle}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Foreground="{StaticResource TextPrimaryBrush}"
+                                FontFamily="{StaticResource FontLucide}"
+                                Content="&#xE1B2;"
+                                ToolTip="Fermer"
+                                Click="CloseButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
-        <!-- Liste des logs -->
-        <DataGrid Grid.Row="1" 
-                  x:Name="LogsDataGrid"
-                  AutoGenerateColumns="False"
-                  IsReadOnly="True"
-                  GridLinesVisibility="All"
-                  HeadersVisibility="Column"
-                  SelectionMode="Single"
-                  SelectionUnit="FullRow"
-                  CanUserResizeColumns="True"
-                  CanUserReorderColumns="False"
-                  Margin="10">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Heure" Binding="{Binding Timestamp, StringFormat='HH:mm:ss.fff'}" Width="100"/>
-                <DataGridTextColumn Header="Niveau" Binding="{Binding Level}" Width="80">
-                    <DataGridTextColumn.ElementStyle>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="FontWeight" Value="Bold"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Level}" Value="Error">
-                                    <Setter Property="Foreground" Value="Red"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Level}" Value="Warning">
-                                    <Setter Property="Foreground" Value="Orange"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Level}" Value="Info">
-                                    <Setter Property="Foreground" Value="Blue"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Level}" Value="Debug">
-                                    <Setter Property="Foreground" Value="Gray"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </DataGridTextColumn.ElementStyle>
-                </DataGridTextColumn>
-                <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="150"/>
-                <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
+            <!-- Contenu principal -->
+            <Grid Grid.Row="1" Margin="16,12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-        <!-- Zone de détails (stack trace pour les exceptions) -->
-        <GroupBox Grid.Row="2" Header="Détails" Margin="10,5,10,10">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="150">
-                <TextBlock x:Name="DetailsTextBlock" 
-                           TextWrapping="Wrap" 
-                           Padding="5"
-                           FontFamily="Consolas"
-                           FontSize="11"/>
-            </ScrollViewer>
-        </GroupBox>
-    </Grid>
+                <!-- Barre d'outils -->
+                <Border Grid.Row="0"
+                        Background="{StaticResource BackgroundTertiaryBrush}"
+                        BorderBrush="{StaticResource BorderLightBrush}"
+                        BorderThickness="0,0,0,1"
+                        CornerRadius="6"
+                        Padding="12,10"
+                        Margin="0,0,0,12">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Niveau de log minimum :"
+                                   Style="{StaticResource TextSecondary}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,10,0"/>
+                        <ComboBox x:Name="LogLevelComboBox"
+                                  Width="120"
+                                  Style="{StaticResource ComboBoxModern}"
+                                  SelectionChanged="LogLevelComboBox_SelectionChanged"
+                                  VerticalAlignment="Center"
+                                  Margin="0,0,16,0">
+                            <ComboBoxItem Content="Debug" Tag="Debug"/>
+                            <ComboBoxItem Content="Info" Tag="Info" IsSelected="True"/>
+                            <ComboBoxItem Content="Warning" Tag="Warning"/>
+                            <ComboBoxItem Content="Error" Tag="Error"/>
+                        </ComboBox>
+                        <Button Content="Effacer"
+                                Click="ClearLogs_Click"
+                                Style="{StaticResource ButtonGhost}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Padding="12,8"
+                                Margin="0,0,8,0"/>
+                        <Button Content="Actualiser"
+                                Click="RefreshLogs_Click"
+                                Style="{StaticResource ButtonSecondary}"
+                                ClickMode="Press"
+                                Focusable="False"
+                                Padding="12,8"
+                                Margin="0,0,16,0"/>
+                        <CheckBox x:Name="AutoScrollCheckBox"
+                                  Content="Défilement automatique"
+                                  Style="{StaticResource CheckBoxModern}"
+                                  IsChecked="True"
+                                  VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Liste des logs (DataGrid thème sombre) -->
+                <Border Grid.Row="1"
+                        Background="{StaticResource BackgroundSecondaryBrush}"
+                        BorderBrush="{StaticResource BorderLightBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Margin="0,0,0,12">
+                    <DataGrid x:Name="LogsDataGrid"
+                              Background="{StaticResource BackgroundSecondaryBrush}"
+                              Foreground="{StaticResource TextPrimaryBrush}"
+                              BorderThickness="0"
+                              RowBackground="{StaticResource BackgroundSecondaryBrush}"
+                              AlternatingRowBackground="{StaticResource BackgroundTertiaryBrush}"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="{StaticResource BorderInternalBrush}"
+                              HeadersVisibility="Column"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
+                              CanUserResizeColumns="True"
+                              CanUserReorderColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              Margin="0">
+                        <DataGrid.ColumnHeaderStyle>
+                            <Style TargetType="DataGridColumnHeader">
+                                <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                <Setter Property="BorderThickness" Value="0,0,0,1"/>
+                                <Setter Property="Padding" Value="12,10"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Setter Property="FontSize" Value="12"/>
+                            </Style>
+                        </DataGrid.ColumnHeaderStyle>
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow">
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="{StaticResource AccentSelectionBrush}"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.RowStyle>
+                        <DataGrid.CellStyle>
+                            <Style TargetType="DataGridCell">
+                                <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="Padding" Value="12,6"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGrid.CellStyle>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Heure" Binding="{Binding Timestamp, StringFormat='HH:mm:ss.fff'}" Width="100"/>
+                            <DataGridTextColumn Header="Niveau" Binding="{Binding Level}" Width="80">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="FontWeight" Value="SemiBold"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Level}" Value="Error">
+                                                <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="Warning">
+                                                <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="Info">
+                                                <Setter Property="Foreground" Value="{StaticResource InfoBrush}"/>
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding Level}" Value="Debug">
+                                                <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="150"/>
+                            <DataGridTextColumn Header="Message" Binding="{Binding Message}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Border>
+
+                <!-- Zone Détails (remplace GroupBox) -->
+                <Border Grid.Row="2"
+                        Background="{StaticResource BackgroundTertiaryBrush}"
+                        BorderBrush="{StaticResource BorderLightBrush}"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="12,10">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0"
+                                   Text="Détails"
+                                   Style="{StaticResource TextSubheading}"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   Margin="0,0,0,8"/>
+                        <ScrollViewer Grid.Row="1"
+                                      VerticalScrollBarVisibility="Auto"
+                                      MaxHeight="150">
+                            <TextBlock x:Name="DetailsTextBlock"
+                                       TextWrapping="Wrap"
+                                       Padding="4"
+                                       FontFamily="Consolas"
+                                       FontSize="11"
+                                       Foreground="{StaticResource TextSecondaryBrush}"/>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>
-
