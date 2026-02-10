@@ -270,18 +270,40 @@
                         </Button>
                     </Grid>
 
-                    <!-- Liste des macros -->
+                    <!-- Liste des macros (centrée dans son container) -->
                     <Border Grid.Row="2"
                             Background="{StaticResource BackgroundPrimaryBrush}"
                             BorderBrush="{StaticResource BorderLightBrush}"
                             BorderThickness="1"
                             CornerRadius="4"
-                            Padding="8">
+                            Padding="8"
+                            HorizontalAlignment="Center"
+                            MaxWidth="228">
                         <ListBox x:Name="MacrosListBox" 
                                  SelectionChanged="MacrosListBox_SelectionChanged"
                                  Background="Transparent"
                                  BorderThickness="0"
                                  ItemContainerStyle="{StaticResource MacroListItemStyle}">
+                            <ListBox.Resources>
+                                <!-- Template sans colonne scrollbar : le contenu prend toute la largeur pour que la liste soit centrée -->
+                                <Style TargetType="ScrollViewer">
+                                    <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+                                    <Setter Property="VerticalScrollBarVisibility" Value="Hidden"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ScrollViewer">
+                                                <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                                        CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                                        CanHorizontallyScroll="False"
+                                                                        CanVerticallyScroll="False"
+                                                                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                                        Content="{TemplateBinding Content}"
+                                                                        Margin="{TemplateBinding Padding}"/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.Resources>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
                                     <Grid>
