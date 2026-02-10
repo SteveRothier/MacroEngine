@@ -220,14 +220,8 @@
                         <RowDefinition Height="Auto"/>
                         <!-- Boutons Importer/Exporter -->
                         <RowDefinition Height="Auto"/>
-                        <!-- Liste des macros -->
+                        <!-- Liste des macros + espace restant pour Supprimer / Profils -->
                         <RowDefinition Height="*"/>
-                        <!-- Bouton Supprimer -->
-                        <RowDefinition Height="Auto"/>
-                        <!-- Séparateur -->
-                        <RowDefinition Height="Auto"/>
-                        <!-- Section Profils -->
-                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- Bouton Nouvelle Macro (pleine largeur) -->
@@ -270,15 +264,23 @@
                         </Button>
                     </Grid>
 
-                    <!-- Liste des macros (centrée dans son container) -->
-                    <Border Grid.Row="2"
-                            Background="{StaticResource BackgroundPrimaryBrush}"
-                            BorderBrush="{StaticResource BorderLightBrush}"
-                            BorderThickness="1"
-                            CornerRadius="4"
-                            Padding="8"
-                            HorizontalAlignment="Center"
-                            MaxWidth="228">
+                    <!-- Liste des macros + espace restant pour Profils -->
+                    <Grid Grid.Row="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <!-- Liste des macros (centrée, en haut) -->
+                        <Border Grid.Row="0"
+                                Background="{StaticResource BackgroundPrimaryBrush}"
+                                BorderBrush="{StaticResource BorderLightBrush}"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Padding="8"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Top"
+                                MaxWidth="228"
+                                MaxHeight="480">
                         <ListBox x:Name="MacrosListBox" 
                                  SelectionChanged="MacrosListBox_SelectionChanged"
                                  Background="Transparent"
@@ -289,6 +291,7 @@
                                 <Style TargetType="ScrollViewer">
                                     <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
                                     <Setter Property="VerticalScrollBarVisibility" Value="Hidden"/>
+                                    <Setter Property="CanContentScroll" Value="False"/>
                                     <Setter Property="Template">
                                         <Setter.Value>
                                             <ControlTemplate TargetType="ScrollViewer">
@@ -346,50 +349,63 @@
                                 </DataTemplate>
                             </ListBox.ItemTemplate>
                         </ListBox>
-                    </Border>
-
-                    <!-- Bouton Supprimer -->
-                    <Button Grid.Row="3"
-                            Style="{StaticResource ButtonGhost}"
-                            Click="DeleteMacro_Click"
-                            HorizontalAlignment="Stretch"
-                            Margin="0,8,0,0">
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <TextBlock Text="&#xE18E;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- Séparateur -->
-                    <Border Grid.Row="4" 
-                            Style="{StaticResource SeparatorHorizontal}"
-                            Margin="0,16,0,8"/>
-
-                    <!-- Section Profils -->
-                    <StackPanel Grid.Row="5">
-                        <TextBlock Text="Profil actif" 
-                                   Style="{StaticResource TextSubheading}"
-                                   Margin="0,0,0,8"/>
-                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                                CornerRadius="8"
-                                Padding="12,10">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="ActiveProfileText" 
-                                           Text="Aucun" 
-                                           Style="{StaticResource TextBody}"
-                                           VerticalAlignment="Center"/>
-                                <Button Grid.Column="1"
-                                        Content="Changer"
-                                        Style="{StaticResource ButtonGhost}"
-                                        Click="ChangeProfile_Click"
-                                        Padding="8,4"/>
-                            </Grid>
                         </Border>
-                    </StackPanel>
+
+                        <!-- Espace restant : Supprimer + Séparateur + Profils -->
+                        <StackPanel Grid.Row="1" VerticalAlignment="Top" Margin="0,12,0,0">
+                            <Button Style="{StaticResource ButtonGhost}"
+                                    Click="DeleteMacro_Click"
+                                    HorizontalAlignment="Stretch"
+                                    Margin="0,0,0,8">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE18E;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Border Style="{StaticResource SeparatorHorizontal}"
+                                    Margin="0,0,0,12"/>
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Profil actif" 
+                                               Style="{StaticResource TextSubheading}"
+                                               VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1"
+                                            Style="{StaticResource ButtonGhost}"
+                                            Click="ManageProfiles_Click"
+                                            Padding="4"
+                                            ToolTip="Gérer les profils"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="&#xE30B;" 
+                                                   FontFamily="{StaticResource FontLucide}" 
+                                                   FontSize="14"/>
+                                    </Button>
+                                </Grid>
+                                <Border Background="{StaticResource BackgroundTertiaryBrush}"
+                                        CornerRadius="8"
+                                        Padding="12,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="ActiveProfileText" 
+                                                   Text="Aucun" 
+                                                   Style="{StaticResource TextBody}"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1"
+                                                Content="Changer"
+                                                Style="{StaticResource ButtonGhost}"
+                                                Click="ChangeProfile_Click"
+                                                Padding="8,4"/>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </Border>
 
