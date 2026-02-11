@@ -1,32 +1,22 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Shell;
 using MacroEngine.Core.Models;
+using MacroEngine.Core.Profiles;
 
 namespace MacroEngine.UI
 {
-    public partial class MacroSelectionDialog : Window
+    public partial class SelectProfileDialog : Window
     {
-        public List<Macro> SelectedMacros { get; private set; }
-        private readonly List<Macro> _availableMacros;
-        private readonly List<string> _excludedMacroIds;
+        public MacroProfile? SelectedProfile { get; private set; }
 
-        public MacroSelectionDialog(List<Macro> availableMacros, List<string> excludedMacroIds)
+        public SelectProfileDialog(IEnumerable<MacroProfile> profiles)
         {
             InitializeComponent();
-            _availableMacros = availableMacros ?? new List<Macro>();
-            _excludedMacroIds = excludedMacroIds ?? new List<string>();
-            SelectedMacros = new List<Macro>();
-
-            var available = _availableMacros
-                .Where(m => !_excludedMacroIds.Contains(m.Id))
-                .ToList();
-            MacrosListBox.ItemsSource = available;
-            MacrosListBox.SelectionMode = SelectionMode.Multiple;
+            var list = profiles?.ToList() ?? new List<MacroProfile>();
+            ProfilesListBox.ItemsSource = list;
 
             var chrome = new WindowChrome
             {
@@ -56,22 +46,25 @@ namespace MacroEngine.UI
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {
-            DialogResult = false;
+            SelectedProfile = null;
             Close();
         }
 
-        private void Ok_Click(object sender, RoutedEventArgs e)
+        private void UseButton_Click(object sender, RoutedEventArgs e)
         {
-            SelectedMacros = MacrosListBox.SelectedItems.Cast<Macro>().ToList();
-            DialogResult = true;
-            Close();
+            if (ProfilesListBox.SelectedItem is MacroProfile profile)
+            {
+                SelectedProfile = profile;
+                DialogResult = true;
+                Close();
+            }
         }
 
-        private void Cancel_Click(object sender, RoutedEventArgs e)
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
         {
+            SelectedProfile = null;
             DialogResult = false;
             Close();
         }
     }
 }
-

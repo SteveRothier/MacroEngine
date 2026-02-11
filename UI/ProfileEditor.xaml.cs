@@ -12,9 +12,11 @@ namespace MacroEngine.UI
     {
         private MacroProfile? _currentProfile;
         private List<Macro>? _availableMacros;
+        private List<Macro>? _profileMacrosFull;
         private IProfileProvider? _profileProvider;
 
         public event EventHandler? ProfileSaved;
+        public event EventHandler? ProfileCancelled;
 
         public ProfileEditor()
         {
@@ -39,12 +41,40 @@ namespace MacroEngine.UI
             if (profile != null)
             {
                 ProfileNameTextBox.Text = profile.Name;
-                ProfileDescriptionTextBox.Text = profile.Description;
+                ProfileNameErrorText.Visibility = Visibility.Collapsed;
+                MacroSearchTextBox.Text = "";
 
-                // Charger les macros du profil
                 var profileMacros = availableMacros.Where(m => profile.MacroIds.Contains(m.Id)).ToList();
-                ProfileMacrosListBox.ItemsSource = profileMacros;
+                _profileMacrosFull = profileMacros;
+                ApplyMacroSearchFilter();
             }
+        }
+
+        private void MacroSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            MacroSearchPlaceholder.Visibility = string.IsNullOrWhiteSpace(MacroSearchTextBox?.Text)
+                ? Visibility.Visible : Visibility.Collapsed;
+            ApplyMacroSearchFilter();
+        }
+
+        private void ApplyMacroSearchFilter()
+        {
+            if (_profileMacrosFull == null)
+                return;
+            var query = (MacroSearchTextBox?.Text ?? "").Trim();
+            if (string.IsNullOrEmpty(query))
+            {
+                ProfileMacrosListBox.ItemsSource = null;
+                ProfileMacrosListBox.ItemsSource = _profileMacrosFull;
+                return;
+            }
+            var q = query.ToLowerInvariant();
+            var filtered = _profileMacrosFull
+                .Where(m => (m.Name?.ToLowerInvariant().Contains(q) == true) ||
+                           (m.Description?.ToLowerInvariant().Contains(q) == true))
+                .ToList();
+            ProfileMacrosListBox.ItemsSource = null;
+            ProfileMacrosListBox.ItemsSource = filtered;
         }
 
         private void AddMacro_Click(object sender, RoutedEventArgs e)
@@ -52,10 +82,10 @@ namespace MacroEngine.UI
             if (_currentProfile == null || _availableMacros == null)
                 return;
 
-            // Créer et afficher le dialogue de sélection
+            // Afficher toutes les macros (de tous les profils) ; les doublons sont ignorés à l'ajout
             var dialog = new MacroSelectionDialog(
-                _availableMacros, 
-                _currentProfile.MacroIds // Macros à exclure
+                _availableMacros,
+                new List<string>() // Ne pas exclure : montrer toutes les macros
             );
             dialog.Owner = Window.GetWindow(this);
 
@@ -95,12 +125,12 @@ namespace MacroEngine.UI
 
             if (_availableMacros != null && _currentProfile != null)
             {
-                var profileMacros = _availableMacros.Where(m => _currentProfile.MacroIds.Contains(m.Id)).ToList();
-                ProfileMacrosListBox.ItemsSource = null;
-                ProfileMacrosListBox.ItemsSource = profileMacros;
+                _profileMacrosFull = _availableMacros.Where(m => _currentProfile.MacroIds.Contains(m.Id)).ToList();
+                ApplyMacroSearchFilter();
             }
             else
             {
+                _profileMacrosFull = null;
                 ProfileMacrosListBox.ItemsSource = null;
             }
         }
@@ -110,60 +140,40 @@ namespace MacroEngine.UI
             if (_currentProfile == null)
                 return;
 
-            if (_profileProvider == null)
-            {
-                MessageBox.Show("Erreur: Provider de profils non initialisé.", 
-                               "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-                return;
-            }
+            ProfileNameErrorText.Visibility = Visibility.Collapsed;
 
-            // Valider les données
+            if (_profileProvider == null)
+                return;
+
             if (string.IsNullOrWhiteSpace(ProfileNameTextBox.Text))
             {
-                MessageBox.Show("Le nom du profil ne peut pas être vide.", 
-                               "Validation", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ProfileNameErrorText.Text = "Le nom ne peut pas être vide.";
+                ProfileNameErrorText.Visibility = Visibility.Visible;
                 ProfileNameTextBox.Focus();
                 return;
             }
 
-            // Mettre à jour le profil
             _currentProfile.Name = ProfileNameTextBox.Text.Trim();
-            _currentProfile.Description = ProfileDescriptionTextBox.Text.Trim();
             _currentProfile.ModifiedAt = DateTime.Now;
 
-            // Sauvegarder via le provider
             try
             {
                 bool success = await _profileProvider.SaveProfileAsync(_currentProfile);
-
                 if (success)
-                {
-                    MessageBox.Show("Profil sauvegardé avec succès.", 
-                                   "Succès", MessageBoxButton.OK, MessageBoxImage.Information);
-                    
-                    // Notifier que le profil a été sauvegardé
                     ProfileSaved?.Invoke(this, EventArgs.Empty);
-                }
-                else
-                {
-                    MessageBox.Show("Erreur lors de la sauvegarde du profil.", 
-                                   "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Erreur lors de la sauvegarde: {ex.Message}", 
-                               "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                ProfileNameErrorText.Text = ex.Message;
+                ProfileNameErrorText.Visibility = Visibility.Visible;
             }
         }
 
         private void Cancel_Click(object sender, RoutedEventArgs e)
         {
-            // Recharger les données
             if (_currentProfile != null && _availableMacros != null)
-            {
                 LoadProfile(_currentProfile, _availableMacros);
-            }
+            ProfileCancelled?.Invoke(this, EventArgs.Empty);
         }
     }
 }

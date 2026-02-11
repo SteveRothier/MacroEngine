@@ -30,6 +30,7 @@ namespace MacroEngine.Core.Profiles
                 if (!File.Exists(_profilesFilePath))
                 {
                     _profiles = new List<MacroProfile>();
+                    await EnsureDefaultProfileExistsAsync();
                     return _profiles;
                 }
 
@@ -52,6 +53,9 @@ namespace MacroEngine.Core.Profiles
                     CreatedAt = p.CreatedAt,
                     ModifiedAt = p.ModifiedAt
                 }).ToList() ?? new List<MacroProfile>();
+
+                if (_profiles.Count == 0)
+                    await EnsureDefaultProfileExistsAsync();
 
                 _activeProfile = _profiles.FirstOrDefault(p => p.IsActive)!;
 
@@ -160,6 +164,28 @@ namespace MacroEngine.Core.Profiles
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// Crée le profil par défaut "Par défaut" s'il n'y a aucun profil.
+        /// </summary>
+        private async Task EnsureDefaultProfileExistsAsync()
+        {
+            if (_profiles.Count > 0)
+                return;
+            var defaultProfile = new MacroProfile
+            {
+                Id = Guid.NewGuid().ToString(),
+                Name = "Par défaut",
+                Description = "Profil par défaut contenant toutes les macros.",
+                MacroIds = new List<string>(),
+                IsActive = true,
+                CreatedAt = DateTime.Now,
+                ModifiedAt = DateTime.Now
+            };
+            _profiles.Add(defaultProfile);
+            _activeProfile = defaultProfile;
+            await SaveAllProfilesAsync();
         }
 
         private async Task SaveAllProfilesAsync()

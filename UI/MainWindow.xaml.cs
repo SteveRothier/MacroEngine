@@ -148,9 +148,8 @@ namespace MacroEngine.UI
             // Charger la configuration et réinitialiser les hooks après
             _ = LoadConfigAndInitializeHooksAsync();
             
-            LoadMacros();
-            LoadProfiles();
-            
+            _ = LoadMacrosAndProfilesAsync();
+
             // Initialiser l'état des boutons
             ExecuteButton.IsEnabled = true;
             StartButton.IsEnabled = true;
@@ -808,43 +807,40 @@ namespace MacroEngine.UI
             }
         }
 
-        private async void LoadMacros()
+        /// <summary>
+        /// Charge d'abord les macros puis les profils, pour que le premier profil (par défaut) reçoive toutes les macros.
+        /// </summary>
+        private async Task LoadMacrosAndProfilesAsync()
+        {
+            await LoadMacrosAsync();
+            await LoadProfilesAsync();
+        }
+
+        private async Task LoadMacrosAsync()
         {
             try
             {
                 _macros = await _macroStorage.LoadMacrosAsync();
                 
-                // Créer une macro de test par défaut si aucune macro n'existe
                 if (_macros.Count == 0)
                 {
                     var testMacro = CreateTestMacro();
                     _macros.Add(testMacro);
-                    // Sauvegarder la macro de test
                     await _macroStorage.SaveMacrosAsync(_macros);
                 }
-                
-                MacrosListBox.ItemsSource = _macros;
-                
-                // Sélectionner automatiquement la première macro
-                if (_macros.Count > 0)
-                {
-                    // Forcer la sélection de la première macro
-                    _ = this.Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        MacrosListBox.SelectedIndex = 0;
-                        _selectedMacro = _macros[0];
-                        if (_blockEditor != null)
-                        {
-                            _blockEditor.LoadMacro(_selectedMacro);
-                        }
-                    }), System.Windows.Threading.DispatcherPriority.Loaded);
-                }
+
+                // La liste des macros est remplie par LoadProfilesAsync -> RefreshMacrosListForActiveProfileAsync (macros du profil actif)
             }
             catch (Exception ex)
             {
                 StatusText.Text = $"Erreur chargement macros: {ex.Message}";
                 StatusText.Foreground = System.Windows.Media.Brushes.Red;
             }
+        }
+
+        private async void LoadMacros()
+        {
+            await LoadMacrosAsync();
         }
 
         private Macro CreateTestMacro()
@@ -958,12 +954,72 @@ namespace MacroEngine.UI
                 var profiles = await _profileProvider.LoadProfilesAsync();
                 var activeProfile = profiles.FirstOrDefault(p => p.IsActive);
                 ActiveProfileText.Text = activeProfile?.Name ?? "Aucun";
+
+                // Par défaut, toutes les macros sont dans le premier profil (profil par défaut)
+                var defaultProfile = profiles.FirstOrDefault();
+                if (defaultProfile != null && _macros != null && _macros.Count > 0)
+                {
+                    bool changed = false;
+                    foreach (var macro in _macros)
+                    {
+                        if (!string.IsNullOrEmpty(macro.Id) && !defaultProfile.MacroIds.Contains(macro.Id))
+                        {
+                            defaultProfile.MacroIds.Add(macro.Id);
+                            changed = true;
+                        }
+                    }
+                    if (changed)
+                        await _profileProvider.SaveProfileAsync(defaultProfile);
+                }
+
+                await RefreshMacrosListForActiveProfileAsync();
             }
             catch (Exception ex)
             {
                 _logger?.Error("Erreur lors du chargement des profils", ex, "MainWindow");
                 StatusText.Text = $"Erreur chargement profils: {ex.Message}";
                 StatusText.Foreground = System.Windows.Media.Brushes.Red;
+            }
+        }
+
+        /// <summary>
+        /// Affiche dans la liste uniquement les macros du profil actif.
+        /// </summary>
+        private async Task RefreshMacrosListForActiveProfileAsync()
+        {
+            if (_macros == null) return;
+            try
+            {
+                var profiles = await _profileProvider.LoadProfilesAsync();
+                var activeProfile = profiles.FirstOrDefault(p => p.IsActive);
+                var ids = activeProfile?.MacroIds ?? new List<string>();
+                var filtered = _macros.Where(m => !string.IsNullOrEmpty(m.Id) && ids.Contains(m.Id)).ToList();
+                MacrosListBox.ItemsSource = filtered;
+
+                if (filtered.Count > 0)
+                {
+                    if (_selectedMacro != null && ids.Contains(_selectedMacro.Id))
+                        MacrosListBox.SelectedItem = _selectedMacro;
+                    else
+                    {
+                        MacrosListBox.SelectedIndex = 0;
+                        _selectedMacro = filtered[0];
+                        if (_blockEditor != null)
+                            _blockEditor.LoadMacro(_selectedMacro);
+                    }
+                }
+                else
+                {
+                    MacrosListBox.SelectedIndex = -1;
+                    _selectedMacro = null;
+                    if (_blockEditor != null)
+                        _blockEditor.LoadMacro(null!);
+                    UpdateMacroPropertiesPanel();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.Error("Erreur lors du rafraîchissement de la liste des macros", ex, "MainWindow");
             }
         }
 
@@ -2182,7 +2238,7 @@ namespace MacroEngine.UI
             public int Bottom;
         }
 
-        private void NewMacro_Click(object sender, RoutedEventArgs e)
+        private async void NewMacro_Click(object sender, RoutedEventArgs e)
         {
             var macro = new Macro
             {
@@ -2190,19 +2246,31 @@ namespace MacroEngine.UI
                 Description = "Description de la macro"
             };
             _macros.Add(macro);
-            MacrosListBox.ItemsSource = null;
-            MacrosListBox.ItemsSource = _macros;
+
+            // Ajouter la nouvelle macro au premier profil (par défaut)
+            try
+            {
+                var profiles = await _profileProvider.LoadProfilesAsync();
+                var defaultProfile = profiles.FirstOrDefault();
+                if (defaultProfile != null && !defaultProfile.MacroIds.Contains(macro.Id))
+                {
+                    defaultProfile.MacroIds.Add(macro.Id);
+                    await _profileProvider.SaveProfileAsync(defaultProfile);
+                }
+            }
+            catch { /* ignorer */ }
+
+            await RefreshMacrosListForActiveProfileAsync();
             MacrosListBox.SelectedItem = macro;
         }
 
-        private void DeleteMacro_Click(object sender, RoutedEventArgs e)
+        private async void DeleteMacro_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedMacro != null)
             {
                 _macros.Remove(_selectedMacro);
-                MacrosListBox.ItemsSource = null;
-                MacrosListBox.ItemsSource = _macros;
                 _selectedMacro = null;
+                await RefreshMacrosListForActiveProfileAsync();
             }
         }
 
@@ -2250,129 +2318,12 @@ namespace MacroEngine.UI
         {
             try
             {
-                var profilesWindow = new Window
+                var profilesWindow = new ProfilesManagementWindow(_profileProvider, _macros)
                 {
-                    Title = "Gérer les Profils",
-                    Width = 700,
-                    Height = 500,
-                    Owner = this,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                    Owner = this
                 };
-
-                var grid = new Grid();
-                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-                // ListBox pour afficher les profils
-                var profilesListBox = new ListBox();
-                var profiles = await _profileProvider.LoadProfilesAsync();
-                profilesListBox.ItemsSource = profiles;
-                profilesListBox.DisplayMemberPath = "Name";
-
-                Grid.SetRow(profilesListBox, 0);
-                grid.Children.Add(profilesListBox);
-
-                // Panel de boutons
-                var buttonPanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(10)
-                };
-
-                var editButton = new Button { Content = "Modifier", Margin = new Thickness(0, 0, 5, 0), Padding = new Thickness(10, 5, 10, 5) };
-                var deleteButton = new Button { Content = "Supprimer", Margin = new Thickness(0, 0, 5, 0), Padding = new Thickness(10, 5, 10, 5) };
-                var activateButton = new Button { Content = "Activer", Margin = new Thickness(0, 0, 5, 0), Padding = new Thickness(10, 5, 10, 5) };
-                var closeButton = new Button { Content = "Fermer", Padding = new Thickness(10, 5, 10, 5) };
-
-                editButton.Click += (s, args) =>
-                {
-                    if (profilesListBox.SelectedItem is MacroProfile profile)
-                    {
-                        // Ouvrir l'éditeur
-                        var editWindow = new Window
-                        {
-                            Title = $"Éditer: {profile.Name}",
-                            Width = 600,
-                            Height = 500,
-                            Owner = profilesWindow,
-                            WindowStartupLocation = WindowStartupLocation.CenterOwner
-                        };
-
-                        var editor = new ProfileEditor();
-                        editor.SetProfileProvider(_profileProvider);
-                        editor.LoadProfile(profile, _macros, _profileProvider);
-
-                        editor.ProfileSaved += async (sender, e) =>
-                        {
-                            await RefreshProfilesList(profilesListBox);
-                            editWindow.Close();
-                        };
-
-                        editWindow.Content = editor;
-                        editWindow.ShowDialog();
-                    }
-                    else
-                    {
-                        StatusText.Text = "Veuillez sélectionner un profil à modifier.";
-                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                    }
-                };
-
-                deleteButton.Click += async (s, args) =>
-                {
-                    if (profilesListBox.SelectedItem is MacroProfile profile)
-                    {
-                        var result = MessageBox.Show(
-                            $"Êtes-vous sûr de vouloir supprimer le profil '{profile.Name}' ?",
-                            "Confirmation",
-                            MessageBoxButton.YesNo,
-                            MessageBoxImage.Question);
-
-                        if (result == MessageBoxResult.Yes)
-                        {
-                            await _profileProvider.DeleteProfileAsync(profile.Id);
-                            await RefreshProfilesList(profilesListBox);
-                            await LoadProfilesAsync(); // Recharger dans MainWindow
-                        }
-                    }
-                    else
-                    {
-                        StatusText.Text = "Veuillez sélectionner un profil à supprimer.";
-                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                    }
-                };
-
-                activateButton.Click += async (s, args) =>
-                {
-                    if (profilesListBox.SelectedItem is MacroProfile profile)
-                    {
-                        await _profileProvider.ActivateProfileAsync(profile.Id);
-                        await RefreshProfilesList(profilesListBox);
-                        await LoadProfilesAsync(); // Recharger dans MainWindow
-                        
-                        StatusText.Text = $"Profil '{profile.Name}' activé.";
-                        StatusText.Foreground = System.Windows.Media.Brushes.Green;
-                    }
-                    else
-                    {
-                        StatusText.Text = "Veuillez sélectionner un profil à activer.";
-                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                    }
-                };
-
-                closeButton.Click += (s, args) => profilesWindow.Close();
-
-                buttonPanel.Children.Add(editButton);
-                buttonPanel.Children.Add(deleteButton);
-                buttonPanel.Children.Add(activateButton);
-                buttonPanel.Children.Add(closeButton);
-
-                Grid.SetRow(buttonPanel, 1);
-                grid.Children.Add(buttonPanel);
-
-                profilesWindow.Content = grid;
                 profilesWindow.ShowDialog();
+                await LoadProfilesAsync();
             }
             catch (Exception ex)
             {
@@ -2382,26 +2333,11 @@ namespace MacroEngine.UI
             }
         }
 
-        private async Task RefreshProfilesList(ListBox listBox)
-        {
-            try
-            {
-                var profiles = await _profileProvider.LoadProfilesAsync();
-                listBox.ItemsSource = null;
-                listBox.ItemsSource = profiles;
-            }
-            catch (Exception ex)
-            {
-                _logger?.Error("Erreur lors du rafraîchissement de la liste des profils", ex, "MainWindow");
-            }
-        }
-
         private async void ChangeProfile_Click(object sender, RoutedEventArgs e)
         {
             try
             {
                 var profiles = await _profileProvider.LoadProfilesAsync();
-                
                 if (profiles.Count == 0)
                 {
                     StatusText.Text = "Aucun profil disponible. Créez d'abord un profil.";
@@ -2409,73 +2345,17 @@ namespace MacroEngine.UI
                     return;
                 }
 
-                var selectWindow = new Window
+                var dialog = new SelectProfileDialog(profiles)
                 {
-                    Title = "Sélectionner un Profil",
-                    Width = 400,
-                    Height = 300,
-                    Owner = this,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                    Owner = this
                 };
+                if (dialog.ShowDialog() != true || dialog.SelectedProfile == null)
+                    return;
 
-                var grid = new Grid();
-                grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-                var profilesListBox = new ListBox();
-                profilesListBox.ItemsSource = profiles;
-                profilesListBox.DisplayMemberPath = "Name";
-
-                Grid.SetRow(profilesListBox, 0);
-                grid.Children.Add(profilesListBox);
-
-                var buttonPanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(10)
-                };
-
-                var activateButton = new Button 
-                { 
-                    Content = "Activer", 
-                    Margin = new Thickness(0, 0, 5, 0), 
-                    Padding = new Thickness(10, 5, 10, 5) 
-                };
-                var cancelButton = new Button 
-                { 
-                    Content = "Annuler", 
-                    Padding = new Thickness(10, 5, 10, 5) 
-                };
-
-                activateButton.Click += async (s, args) =>
-                {
-                    if (profilesListBox.SelectedItem is MacroProfile profile)
-                    {
-                        await _profileProvider.ActivateProfileAsync(profile.Id);
-                        await LoadProfilesAsync();
-                        selectWindow.Close();
-                        
-                        StatusText.Text = $"Profil '{profile.Name}' activé.";
-                        StatusText.Foreground = System.Windows.Media.Brushes.Green;
-                    }
-                    else
-                    {
-                        StatusText.Text = "Veuillez sélectionner un profil.";
-                        StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                    }
-                };
-
-                cancelButton.Click += (s, args) => selectWindow.Close();
-
-                buttonPanel.Children.Add(activateButton);
-                buttonPanel.Children.Add(cancelButton);
-
-                Grid.SetRow(buttonPanel, 1);
-                grid.Children.Add(buttonPanel);
-
-                selectWindow.Content = grid;
-                selectWindow.ShowDialog();
+                await _profileProvider.ActivateProfileAsync(dialog.SelectedProfile.Id);
+                await LoadProfilesAsync();
+                StatusText.Text = $"Profil '{dialog.SelectedProfile.Name}' activé.";
+                StatusText.Foreground = System.Windows.Media.Brushes.Green;
             }
             catch (Exception ex)
             {
@@ -2664,9 +2544,20 @@ namespace MacroEngine.UI
                     // Sauvegarder toutes les macros
                     await _macroStorage.SaveMacrosAsync(_macros);
 
-                    // Rafraîchir la liste et sélectionner la macro importée
-                    MacrosListBox.ItemsSource = null;
-                    MacrosListBox.ItemsSource = _macros;
+                    // Ajouter la macro importée au premier profil (par défaut)
+                    try
+                    {
+                        var profiles = await _profileProvider.LoadProfilesAsync();
+                        var defaultProfile = profiles.FirstOrDefault();
+                        if (defaultProfile != null && !string.IsNullOrEmpty(importedMacro.Id) && !defaultProfile.MacroIds.Contains(importedMacro.Id))
+                        {
+                            defaultProfile.MacroIds.Add(importedMacro.Id);
+                            await _profileProvider.SaveProfileAsync(defaultProfile);
+                        }
+                    }
+                    catch { /* ignorer */ }
+
+                    await RefreshMacrosListForActiveProfileAsync();
                     MacrosListBox.SelectedItem = importedMacro;
 
                     StatusText.Text = $"Macro '{importedMacro.Name}' importée avec succès";
