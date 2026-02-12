@@ -955,23 +955,6 @@ namespace MacroEngine.UI
                 var activeProfile = profiles.FirstOrDefault(p => p.IsActive);
                 ActiveProfileText.Text = activeProfile?.Name ?? "Aucun";
 
-                // Par défaut, toutes les macros sont dans le premier profil (profil par défaut)
-                var defaultProfile = profiles.FirstOrDefault();
-                if (defaultProfile != null && _macros != null && _macros.Count > 0)
-                {
-                    bool changed = false;
-                    foreach (var macro in _macros)
-                    {
-                        if (!string.IsNullOrEmpty(macro.Id) && !defaultProfile.MacroIds.Contains(macro.Id))
-                        {
-                            defaultProfile.MacroIds.Add(macro.Id);
-                            changed = true;
-                        }
-                    }
-                    if (changed)
-                        await _profileProvider.SaveProfileAsync(defaultProfile);
-                }
-
                 await RefreshMacrosListForActiveProfileAsync();
             }
             catch (Exception ex)
@@ -2247,15 +2230,15 @@ namespace MacroEngine.UI
             };
             _macros.Add(macro);
 
-            // Ajouter la nouvelle macro au premier profil (par défaut)
+            // Ajouter la nouvelle macro au profil actif
             try
             {
                 var profiles = await _profileProvider.LoadProfilesAsync();
-                var defaultProfile = profiles.FirstOrDefault();
-                if (defaultProfile != null && !defaultProfile.MacroIds.Contains(macro.Id))
+                var activeProfile = profiles.FirstOrDefault(p => p.IsActive);
+                if (activeProfile != null && !activeProfile.MacroIds.Contains(macro.Id))
                 {
-                    defaultProfile.MacroIds.Add(macro.Id);
-                    await _profileProvider.SaveProfileAsync(defaultProfile);
+                    activeProfile.MacroIds.Add(macro.Id);
+                    await _profileProvider.SaveProfileAsync(activeProfile);
                 }
             }
             catch { /* ignorer */ }
@@ -2354,6 +2337,7 @@ namespace MacroEngine.UI
 
                 await _profileProvider.ActivateProfileAsync(dialog.SelectedProfile.Id);
                 await LoadProfilesAsync();
+                await RefreshMacrosListForActiveProfileAsync();
                 StatusText.Text = $"Profil '{dialog.SelectedProfile.Name}' activé.";
                 StatusText.Foreground = System.Windows.Media.Brushes.Green;
             }
@@ -2544,15 +2528,15 @@ namespace MacroEngine.UI
                     // Sauvegarder toutes les macros
                     await _macroStorage.SaveMacrosAsync(_macros);
 
-                    // Ajouter la macro importée au premier profil (par défaut)
+                    // Ajouter la macro importée au profil actif
                     try
                     {
                         var profiles = await _profileProvider.LoadProfilesAsync();
-                        var defaultProfile = profiles.FirstOrDefault();
-                        if (defaultProfile != null && !string.IsNullOrEmpty(importedMacro.Id) && !defaultProfile.MacroIds.Contains(importedMacro.Id))
+                        var activeProfile = profiles.FirstOrDefault(p => p.IsActive);
+                        if (activeProfile != null && !string.IsNullOrEmpty(importedMacro.Id) && !activeProfile.MacroIds.Contains(importedMacro.Id))
                         {
-                            defaultProfile.MacroIds.Add(importedMacro.Id);
-                            await _profileProvider.SaveProfileAsync(defaultProfile);
+                            activeProfile.MacroIds.Add(importedMacro.Id);
+                            await _profileProvider.SaveProfileAsync(activeProfile);
                         }
                     }
                     catch { /* ignorer */ }

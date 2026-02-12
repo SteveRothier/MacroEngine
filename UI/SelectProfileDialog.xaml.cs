@@ -15,7 +15,9 @@ namespace MacroEngine.UI
         public SelectProfileDialog(IEnumerable<MacroProfile> profiles)
         {
             InitializeComponent();
-            var list = profiles?.ToList() ?? new List<MacroProfile>();
+            var list = (profiles?.ToList() ?? new List<MacroProfile>())
+                .OrderByDescending(p => p.IsActive)
+                .ToList();
             ProfilesListBox.ItemsSource = list;
 
             var chrome = new WindowChrome

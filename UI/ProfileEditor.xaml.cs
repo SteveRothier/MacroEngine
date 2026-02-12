@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Profiles;
 
@@ -44,9 +45,24 @@ namespace MacroEngine.UI
                 ProfileNameErrorText.Visibility = Visibility.Collapsed;
                 MacroSearchTextBox.Text = "";
 
-                var profileMacros = availableMacros.Where(m => profile.MacroIds.Contains(m.Id)).ToList();
+                var ids = profile.MacroIds ?? new List<string>();
+                var profileMacros = availableMacros.Where(m => ids.Contains(m.Id)).ToList();
                 _profileMacrosFull = profileMacros;
-                ApplyMacroSearchFilter();
+                ProfileMacrosListBox.ItemsSource = null;
+                ProfileMacrosListBox.ItemsSource = _profileMacrosFull;
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)(() =>
+                {
+                    if (_profileMacrosFull != null)
+                    {
+                        ProfileMacrosListBox.ItemsSource = null;
+                        ProfileMacrosListBox.ItemsSource = _profileMacrosFull;
+                    }
+                }));
+            }
+            else
+            {
+                _profileMacrosFull = null;
+                ProfileMacrosListBox.ItemsSource = null;
             }
         }
 

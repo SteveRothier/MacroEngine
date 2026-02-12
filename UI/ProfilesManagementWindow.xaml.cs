@@ -75,6 +75,7 @@ namespace MacroEngine.UI
         private void ShowEditor(MacroProfile profile)
         {
             _newProfileBeingEdited = null;
+            EditorContent.Content = null;
             var editor = new ProfileEditor();
             editor.SetProfileProvider(_profileProvider);
             editor.LoadProfile(profile, _macros, _profileProvider);
@@ -98,7 +99,7 @@ namespace MacroEngine.UI
             PlaceholderText.Visibility = Visibility.Visible;
         }
 
-        private void ProfilesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void ProfilesListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             bool hasSelection = ProfilesListBox.SelectedItem is MacroProfile;
             ActivateProfileButton.IsEnabled = hasSelection;
@@ -106,10 +107,26 @@ namespace MacroEngine.UI
 
             if (_newProfileBeingEdited != null)
                 return;
+
             if (ProfilesListBox.SelectedItem is MacroProfile profile)
-                ShowEditor(profile);
+            {
+                try
+                {
+                    var profiles = await _profileProvider.LoadProfilesAsync();
+                    var fresh = profiles.FirstOrDefault(p => p.Id == profile.Id);
+                    ShowEditor(fresh ?? profile);
+                }
+                catch (Exception ex)
+                {
+                    StatusText.Text = "Erreur : " + ex.Message;
+                    StatusText.Visibility = Visibility.Visible;
+                    ShowEditor(profile);
+                }
+            }
             else
+            {
                 HideEditor();
+            }
         }
 
         private void ProfilesListBox_MouseDoubleClick(object sender, MouseButtonEventArgs e)
