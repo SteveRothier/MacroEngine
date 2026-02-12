@@ -64,11 +64,45 @@
                     BorderBrush="{StaticResource BorderLightBrush}"
                     BorderThickness="1" CornerRadius="8" Padding="8">
                 <ListBox x:Name="ProfilesListBox" Background="Transparent" BorderThickness="0"
+                         Padding="0,0,10,0"
                          SelectionMode="Single">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="Transparent">
+                                            <ContentPresenter Content="{TemplateBinding Content}"
+                                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="Transparent"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Border Padding="10,8" Margin="0,0,0,4" CornerRadius="6"
-                                    Background="{StaticResource BackgroundTertiaryBrush}">
+                                    Background="{StaticResource BackgroundTertiaryBrush}"
+                                    BorderThickness="1">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{StaticResource SidebarAccentBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -100,16 +134,19 @@
             </Border>
 
             <!-- Boutons -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
-                        Margin="20,0,20,20">
-                <Button x:Name="UseButton" Style="{StaticResource ButtonPrimary}"
+            <Grid Grid.Row="2" Margin="20,0,20,20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="UseButton" Grid.Column="0" Style="{StaticResource ButtonPrimary}"
                         Content="Utiliser" Click="UseButton_Click"
-                        Padding="14,8" Margin="0,0,8,0"
+                        Padding="14,8" Margin="0,0,4,0"
                         ToolTip="Utiliser ce profil"/>
-                <Button x:Name="CancelButton" Style="{StaticResource ButtonSecondary}"
+                <Button x:Name="CancelButton" Grid.Column="1" Style="{StaticResource ButtonSecondary}"
                         Content="Annuler" Click="CancelButton_Click"
-                        Padding="14,8"/>
-            </StackPanel>
+                        Padding="14,8" Margin="4,0,0,0"/>
+            </Grid>
         </Grid>
     </Border>
 </Window>
