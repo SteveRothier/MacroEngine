@@ -87,6 +87,7 @@
                             MinHeight="120" MaxHeight="400" VerticalAlignment="Top"
                             HorizontalAlignment="Stretch">
                         <ListBox x:Name="ProfilesListBox" Background="Transparent" BorderThickness="0"
+                                 Padding="0,0,10,0"
                                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                                  SelectionMode="Single" SelectionChanged="ProfilesListBox_SelectionChanged"
                                  MouseDoubleClick="ProfilesListBox_MouseDoubleClick"

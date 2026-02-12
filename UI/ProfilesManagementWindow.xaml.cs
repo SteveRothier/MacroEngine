@@ -15,6 +15,7 @@ namespace MacroEngine.UI
         private readonly IProfileProvider _profileProvider;
         private readonly List<Macro> _macros;
         private MacroProfile? _newProfileBeingEdited;
+        private static bool _skipDeleteConfirmationForSession;
 
         public ProfilesManagementWindow(IProfileProvider profileProvider, List<Macro> macros)
         {
@@ -169,8 +170,19 @@ namespace MacroEngine.UI
         {
             if (ProfilesListBox.SelectedItem is not MacroProfile profile)
                 return;
-            if (MessageBox.Show($"Supprimer le profil « {profile.Name} » ?", "Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
-                return;
+
+            if (!_skipDeleteConfirmationForSession)
+            {
+                var dialog = new ConfirmDeleteProfileDialog(profile.Name)
+                {
+                    Owner = this
+                };
+                if (dialog.ShowDialog() != true)
+                    return;
+                if (dialog.SkipConfirmationForSession)
+                    _skipDeleteConfirmationForSession = true;
+            }
+
             try
             {
                 await _profileProvider.DeleteProfileAsync(profile.Id);
