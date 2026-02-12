@@ -274,13 +274,13 @@
                         <Border Grid.Row="0"
                                 Background="{StaticResource BackgroundPrimaryBrush}"
                                 BorderBrush="{StaticResource BorderLightBrush}"
-                                BorderThickness="1"
+                                BorderThickness="0.2"
                                 CornerRadius="4"
                                 Padding="8"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Top"
-                                MaxWidth="228"
-                                MaxHeight="480">
+                                Width="228"
+                                Height="480">
                         <ListBox x:Name="MacrosListBox" 
                                  SelectionChanged="MacrosListBox_SelectionChanged"
                                  Background="Transparent"

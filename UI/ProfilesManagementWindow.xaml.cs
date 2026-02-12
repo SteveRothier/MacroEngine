@@ -60,8 +60,10 @@ namespace MacroEngine.UI
             try
             {
                 var profiles = await _profileProvider.LoadProfilesAsync();
+                // Profil en cours (actif) en premier dans la liste
+                var ordered = profiles.OrderByDescending(p => p.IsActive).ToList();
                 ProfilesListBox.ItemsSource = null;
-                ProfilesListBox.ItemsSource = profiles;
+                ProfilesListBox.ItemsSource = ordered;
             }
             catch (Exception ex)
             {
