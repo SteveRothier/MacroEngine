@@ -19,6 +19,9 @@ namespace MacroEngine.UI
                 .OrderByDescending(p => p.IsActive)
                 .ToList();
             ProfilesListBox.ItemsSource = list;
+            var activeProfile = list.FirstOrDefault(p => p.IsActive);
+            if (activeProfile != null)
+                ProfilesListBox.SelectedItem = activeProfile;
 
             var chrome = new WindowChrome
             {
