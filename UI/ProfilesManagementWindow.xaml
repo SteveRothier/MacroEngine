@@ -59,7 +59,7 @@
             </Border>
 
             <!-- Contenu : liste à gauche, éditeur à droite -->
-            <Grid Grid.Row="1" Margin="20,16">
+            <Grid Grid.Row="1" Margin="20,16" VerticalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="200" MinWidth="160"/>
                     <ColumnDefinition Width="16"/>
@@ -67,7 +67,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- Colonne gauche : liste des profils (occupe toute la largeur de la colonne) -->
-                <Grid Grid.Column="0" HorizontalAlignment="Stretch">
+                <Grid Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -84,11 +84,12 @@
                     <Border Grid.Row="1" Background="{StaticResource BackgroundSecondaryBrush}"
                             BorderBrush="{StaticResource BorderLightBrush}"
                             BorderThickness="1" CornerRadius="8" Padding="8"
-                            MinHeight="120" MaxHeight="400" VerticalAlignment="Top"
+                            MinHeight="220" VerticalAlignment="Stretch"
                             HorizontalAlignment="Stretch">
                         <ListBox x:Name="ProfilesListBox" Background="Transparent" BorderThickness="0"
                                  Padding="0,0,10,0"
-                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                 HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                 HorizontalContentAlignment="Stretch"
                                  SelectionMode="Single" SelectionChanged="ProfilesListBox_SelectionChanged"
                                  MouseDoubleClick="ProfilesListBox_MouseDoubleClick"
                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
