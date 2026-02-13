@@ -18,7 +18,7 @@
     <Color x:Key="AccentSelectionColor">#2A121A</Color>
     <Color x:Key="AccentSecondaryColor">#7A1E3A</Color>
     
-    <!-- Sidebar / sélection macro -->
+    <!-- Sidebar / sélection (profils, macros) : garder un contraste lisible avec TextPrimary -->
     <Color x:Key="SidebarAccentColor">#7A1E3A</Color>
     <Color x:Key="SidebarAccentLightColor">#2A121A</Color>
     <Color x:Key="SidebarAccentHoverColor">#3A1828</Color>

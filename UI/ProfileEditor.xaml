@@ -153,13 +153,15 @@
             </Grid>
         </Border>
 
-        <!-- Boutons Sauvegarder / Annuler -->
+        <!-- Boutons Sauvegarder / Annuler (action principale à gauche) -->
         <Border Grid.Row="2" Padding="0,8,0,0" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Annuler" Style="{StaticResource ButtonGhost}"
-                        Click="Cancel_Click" Margin="0,0,8,0" Padding="12,8"/>
                 <Button Content="Sauvegarder" Style="{StaticResource ButtonPrimary}"
-                        Click="SaveProfile_Click" Padding="12,8"/>
+                        Click="SaveProfile_Click" Margin="0,0,8,0" Padding="12,8"
+                        ToolTip="Enregistrer les modifications du profil"/>
+                <Button Content="Annuler" Style="{StaticResource ButtonGhost}"
+                        Click="Cancel_Click" Padding="12,8"
+                        ToolTip="Abandonner les modifications"/>
             </StackPanel>
         </Border>
     </Grid>

@@ -142,10 +142,11 @@
                 <Button x:Name="UseButton" Grid.Column="0" Style="{StaticResource ButtonPrimary}"
                         Content="Utiliser" Click="UseButton_Click"
                         Padding="14,8" Margin="0,0,4,0"
-                        ToolTip="Utiliser ce profil"/>
+                        ToolTip="Utiliser ce profil comme profil actif"/>
                 <Button x:Name="CancelButton" Grid.Column="1" Style="{StaticResource ButtonSecondary}"
                         Content="Annuler" Click="CancelButton_Click"
-                        Padding="14,8" Margin="4,0,0,0"/>
+                        Padding="14,8" Margin="4,0,0,0"
+                        ToolTip="Annuler et fermer"/>
             </Grid>
         </Grid>
     </Border>

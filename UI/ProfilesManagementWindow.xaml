@@ -75,7 +75,8 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <Button x:Name="NewProfileButton" Grid.Row="0" Style="{StaticResource ButtonPrimary}"
-                            Click="NewProfileButton_Click" Margin="0,0,0,12" Padding="12,10">
+                            Click="NewProfileButton_Click" Margin="0,0,0,12" Padding="12,10"
+                            ToolTip="Créer un nouveau profil">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE081;" FontFamily="{StaticResource FontLucide}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                             <TextBlock Text="Nouveau profil" VerticalAlignment="Center"/>
@@ -166,14 +167,15 @@
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
                         <Button x:Name="ActivateProfileButton" Style="{StaticResource ButtonSecondary}"
                                 Click="ActivateProfileButton_Click" Margin="0,0,6,0" Padding="8,6"
-                                IsEnabled="False" ToolTip="Utiliser ce profil">
+                                IsEnabled="False" ToolTip="Utiliser ce profil comme profil actif">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE080;" FontFamily="{StaticResource FontLucide}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Utiliser" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <Button x:Name="DeleteProfileButton" Style="{StaticResource ButtonGhost}"
-                                Click="DeleteProfileButton_Click" Padding="8,6" IsEnabled="False">
+                                Click="DeleteProfileButton_Click" Padding="8,6" IsEnabled="False"
+                                ToolTip="Supprimer le profil sélectionné">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="&#xE18E;" FontFamily="{StaticResource FontLucide}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
