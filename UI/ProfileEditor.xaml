@@ -28,13 +28,24 @@
         </Grid.RowDefinitions>
 
         <!-- Nom du profil -->
-        <StackPanel Grid.Row="0" Margin="0,0,0,16">
-            <TextBlock Text="Nom du profil" Style="{StaticResource TextLabel}" Margin="0,0,0,6"/>
-            <TextBox x:Name="ProfileNameTextBox" Style="{StaticResource TextBoxModern}"/>
-            <TextBlock x:Name="ProfileNameErrorText" Text="Le nom ne peut pas être vide."
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Nom du profil" Style="{StaticResource TextLabel}"
+                       VerticalAlignment="Center" Margin="0,0,12,0"/>
+            <TextBox x:Name="ProfileNameTextBox" Grid.Column="1" Style="{StaticResource TextBoxModern}"
+                     VerticalAlignment="Center"/>
+            <TextBlock x:Name="ProfileNameErrorText" Grid.Row="1" Grid.Column="1"
+                       Text="Le nom ne peut pas être vide."
                        Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0"
                        Visibility="Collapsed"/>
-        </StackPanel>
+        </Grid>
 
         <!-- Macros du profil -->
         <Border Grid.Row="1" Background="{StaticResource BackgroundTertiaryBrush}"
