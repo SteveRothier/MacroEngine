@@ -21,6 +21,7 @@
     <!-- Sidebar / sélection (profils, macros) : garder un contraste lisible avec TextPrimary -->
     <Color x:Key="SidebarAccentColor">#7A1E3A</Color>
     <Color x:Key="SidebarAccentLightColor">#2A121A</Color>
+    <Color x:Key="SidebarAccentSelectedColor">#282530</Color>
     <Color x:Key="SidebarAccentHoverColor">#3A1828</Color>
     <Color x:Key="SidebarAccentBorderColor">#7A1E3A</Color>
     
@@ -103,6 +104,7 @@
     <!-- Sidebar -->
     <SolidColorBrush x:Key="SidebarAccentBrush" Color="{StaticResource SidebarAccentColor}"/>
     <SolidColorBrush x:Key="SidebarAccentLightBrush" Color="{StaticResource SidebarAccentLightColor}"/>
+    <SolidColorBrush x:Key="SidebarAccentSelectedBrush" Color="{StaticResource SidebarAccentSelectedColor}"/>
     <SolidColorBrush x:Key="SidebarAccentHoverBrush" Color="{StaticResource SidebarAccentHoverColor}"/>
     <SolidColorBrush x:Key="SidebarAccentBorderBrush" Color="{StaticResource SidebarAccentBorderColor}"/>
     
@@ -188,5 +190,14 @@
     <CornerRadius x:Key="RadiusTextInput">4</CornerRadius>
     <CornerRadius x:Key="RadiusWindow">8</CornerRadius>
     <CornerRadius x:Key="RadiusSmall">2</CornerRadius>
+    <CornerRadius x:Key="RadiusMacroCard">14</CornerRadius>
+
+    <!-- Colonne macros : fond uni -->
+    <Color x:Key="MacroColumnBackgroundColor">#231E26</Color>
+    <SolidColorBrush x:Key="MacroColumnBackgroundBrush" Color="{StaticResource MacroColumnBackgroundColor}"/>
+
+    <!-- Cartes macro (liste) : plus sombre que le conteneur = effet de profondeur -->
+    <Color x:Key="MacroItemBackgroundColor">#1C1920</Color>
+    <SolidColorBrush x:Key="MacroItemBackgroundBrush" Color="{StaticResource MacroItemBackgroundColor}"/>
 
 </ResourceDictionary>

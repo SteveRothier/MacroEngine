@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Interop;
 using System.Windows.Shell;
 using Microsoft.Win32;
@@ -77,6 +78,9 @@ namespace MacroEngine.UI
         // Surveillance des applications (détection d'application active)
         private ProcessMonitor? _processMonitor;
         private string _currentForegroundProcess = string.Empty;
+
+        // Liste macros : sélection uniquement au clic (pas au survol avec clic maintenu)
+        private object? _macrosListPressedItem;
 
         // Enregistrement des mouvements souris
         private DateTime _lastMouseMoveRecorded = DateTime.MinValue;
@@ -155,6 +159,10 @@ namespace MacroEngine.UI
             StartButton.IsEnabled = true;
             PauseButton.IsEnabled = false;
             StopButton.IsEnabled = false;
+
+            // Sélection de la liste macros : uniquement au clic, pas au survol avec clic maintenu
+            MacrosListBox.PreviewMouseLeftButtonDown += MacrosListBox_PreviewMouseLeftButtonDown;
+            MacrosListBox.PreviewMouseLeftButtonUp += MacrosListBox_PreviewMouseLeftButtonUp;
         }
 
         private void InitializeRecordingHooks()
@@ -1038,6 +1046,34 @@ namespace MacroEngine.UI
 
             // Mettre à jour le panneau de propriétés
             UpdateMacroPropertiesPanel();
+        }
+
+        private void MacrosListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var item = GetListBoxItemAt(MacrosListBox, e.GetPosition(MacrosListBox));
+            _macrosListPressedItem = item?.DataContext;
+            e.Handled = true;
+        }
+
+        private void MacrosListBox_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (_macrosListPressedItem != null)
+            {
+                MacrosListBox.SelectedItem = _macrosListPressedItem;
+                _macrosListPressedItem = null;
+            }
+        }
+
+        private static ListBoxItem? GetListBoxItemAt(ListBox listBox, Point position)
+        {
+            var element = listBox.InputHitTest(position) as DependencyObject;
+            while (element != null)
+            {
+                if (element is ListBoxItem item)
+                    return item;
+                element = VisualTreeHelper.GetParent(element);
+            }
+            return null;
         }
 
         private async void ExecuteMacro_Click(object sender, RoutedEventArgs e)
@@ -2229,6 +2265,9 @@ namespace MacroEngine.UI
                 Description = "Description de la macro"
             };
             _macros.Add(macro);
+
+            // Persister tout de suite pour que la macro vide survive au redémarrage
+            await _macroStorage.SaveMacrosAsync(_macros);
 
             // Ajouter la nouvelle macro au profil actif
             try

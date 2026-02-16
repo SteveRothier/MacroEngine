@@ -22,6 +22,11 @@
                 
             </ResourceDictionary.MergedDictionaries>
             
+            <!-- Retirer la bordure en pointillés par défaut au focus (focus visual) -->
+            <Style TargetType="Control">
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            </Style>
+            
             <!-- ══════════════════════════════════════════════════════════
                  Converters
                  ══════════════════════════════════════════════════════════ -->

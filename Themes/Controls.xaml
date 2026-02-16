@@ -510,45 +510,120 @@
         </Setter>
     </Style>
 
-    <!-- Style pour les items de la liste des macros (cards) -->
+    <!-- ScrollViewer sans clipping : permet au contenu (ex. cartes macro en translation) de dépasser -->
+    <Style x:Key="ScrollViewerNoClipStyle" TargetType="ScrollViewer">
+        <Setter Property="ClipToBounds" Value="False"/>
+        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="VerticalScrollBarVisibility" Value="Hidden"/>
+        <Setter Property="CanContentScroll" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollViewer">
+                    <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                            ClipToBounds="False"
+                                            CanContentScroll="{TemplateBinding CanContentScroll}"
+                                            CanHorizontallyScroll="False"
+                                            CanVerticallyScroll="False"
+                                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                                            Content="{TemplateBinding Content}"
+                                            Margin="{TemplateBinding Padding}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ListBox sans ScrollViewer interne : évite le rognage des items en translation (à utiliser dans un ScrollViewer externe) -->
+    <Style x:Key="MacrosListBoxStyle" TargetType="ListBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="ClipToBounds" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            ClipToBounds="False"
+                            Padding="{TemplateBinding Padding}">
+                        <ItemsPresenter/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Style pour les items de la liste des macros : profondeur (ombre) quand non sélectionné, plat quand sélectionné -->
     <Style x:Key="MacroListItemStyle" TargetType="ListBoxItem">
+        <Setter Property="Panel.ZIndex" Value="0"/>
         <Setter Property="Padding" Value="12,10"/>
-        <Setter Property="Margin" Value="0,0,0,4"/>
+        <Setter Property="Margin" Value="0,0.5,0,0.5"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
                     <Border x:Name="Bd"
-                            Background="{StaticResource BackgroundPrimaryBrush}"
-                            CornerRadius="{StaticResource RadiusTextInput}"
+                            Background="{StaticResource MacroItemBackgroundBrush}"
+                            CornerRadius="0"
                             Padding="{TemplateBinding Padding}"
-                            BorderThickness="1"
-                            BorderBrush="{StaticResource BorderLightBrush}"
-                            Margin="{TemplateBinding Margin}">
+                            BorderThickness="1,1,1,1"
+                            BorderBrush="#20FFFFFF"
+                            Margin="{TemplateBinding Margin}"
+                            RenderTransformOrigin="0.5,0.5"
+                            ClipToBounds="False">
+                        <Border.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform ScaleX="1" ScaleY="1"/>
+                                <TranslateTransform X="0" Y="0"/>
+                            </TransformGroup>
+                        </Border.RenderTransform>
+                        <!-- Non sélectionné : ombre marquée = effet de profondeur (carte "relevée") -->
+                        <Border.Effect>
+                            <DropShadowEffect Color="Black" Opacity="0.22" BlurRadius="8" ShadowDepth="3" Direction="270"/>
+                        </Border.Effect>
                         <ContentPresenter/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Bd" Property="Background" 
-                                    Value="{StaticResource BackgroundTertiaryBrush}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" 
-                                    Value="{StaticResource BorderMediumBrush}"/>
+                            <Setter Property="Panel.ZIndex" Value="100"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="#40FFFFFF"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <!-- Lift vertical : monte légèrement au survol (évite le rognage sur les côtés) -->
+                                        <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)" To="-1" Duration="0:0:0.2">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)" To="10" Duration="0:0:0.2"/>
+                                        <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.ShadowDepth)" To="2" Duration="0:0:0.2"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="(UIElement.RenderTransform).(TransformGroup.Children)[1].(TranslateTransform.Y)" To="0" Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                        <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)" To="8" Duration="0:0:0.18"/>
+                                        <DoubleAnimation Storyboard.TargetName="Bd" Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.ShadowDepth)" To="3" Duration="0:0:0.18"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
+                        <!-- Sélectionné : rendu plat (ShadowDepth=0, léger glow pourpre) -->
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="Background" 
-                                    Value="{StaticResource SidebarAccentLightBrush}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" 
-                                    Value="{StaticResource SidebarAccentBrush}"/>
-                            <Setter TargetName="Bd" Property="BorderThickness" 
-                                    Value="2"/>
-                            <Setter Property="Foreground" 
-                                    Value="{StaticResource TextPrimaryBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource SidebarAccentSelectedBrush}"/>
                             <Setter TargetName="Bd" Property="Effect">
                                 <Setter.Value>
                                     <DropShadowEffect Color="#7A1E3A" Opacity="0.18" BlurRadius="6" ShadowDepth="0"/>
                                 </Setter.Value>
                             </Setter>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="Bd" Property="Opacity" Value="0.5"/>
@@ -905,6 +980,10 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
+         COLONNE MACROS (panneau moteur)
+         ══════════════════════════════════════════════════════════════════════ -->
 
     <!-- ══════════════════════════════════════════════════════════════════════
          PANNEAUX ET CARTES
