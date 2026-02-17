@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Models;
@@ -73,14 +74,33 @@ namespace MacroEngine.UI
             if (e.Key == Key.Z)
             {
                 Undo();
+                PlayUndoRedoIconRotation(UndoButton, -360);
                 e.Handled = true;
             }
             // Ctrl+Y pour Redo (Y et y)
             else if (e.Key == Key.Y)
             {
                 Redo();
+                PlayUndoRedoIconRotation(RedoButton, 360);
                 e.Handled = true;
             }
+        }
+
+        private static void PlayUndoRedoIconRotation(Button? button, double angleDegrees)
+        {
+            if (button?.Template == null) return;
+            var host = button.Template.FindName("iconHost", button) as FrameworkElement;
+            if (host?.RenderTransform is not RotateTransform rt) return;
+            var sb = new Storyboard();
+            var anim = new DoubleAnimation(0, angleDegrees, TimeSpan.FromMilliseconds(800))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            };
+            Storyboard.SetTarget(anim, host);
+            Storyboard.SetTargetProperty(anim, new PropertyPath("(UIElement.RenderTransform).(RotateTransform.Angle)"));
+            sb.Children.Add(anim);
+            sb.Completed += (_, _) => rt.Angle = 0;
+            sb.Begin();
         }
 
         private void TimelineEditor_Loaded(object sender, RoutedEventArgs e)
