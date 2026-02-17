@@ -49,20 +49,22 @@ namespace MacroEngine.UI
             Loaded += BlockEditor_Loaded;
             SizeChanged += BlockEditor_SizeChanged;
             
-            // Ajouter les raccourcis clavier pour Undo/Redo
-            KeyDown += BlockEditor_KeyDown;
+            // Raccourcis Undo/Redo (PreviewKeyDown pour capter avant les contrôles enfants, majuscule et minuscule)
+            PreviewKeyDown += BlockEditor_PreviewKeyDown;
         }
 
-        private void BlockEditor_KeyDown(object sender, KeyEventArgs e)
+        private void BlockEditor_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Ctrl+Z pour Undo
-            if (e.Key == Key.Z && Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            if (Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control)
+                return;
+            // Ctrl+Z pour Undo (Z et z)
+            if (e.Key == Key.Z)
             {
                 Undo();
                 e.Handled = true;
             }
-            // Ctrl+Y pour Redo
-            else if (e.Key == Key.Y && Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control)
+            // Ctrl+Y pour Redo (Y et y)
+            else if (e.Key == Key.Y)
             {
                 Redo();
                 e.Handled = true;

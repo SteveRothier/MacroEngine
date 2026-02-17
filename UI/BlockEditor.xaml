@@ -23,105 +23,44 @@
              ══════════════════════════════════════════════════════════════════ -->
         <Border Grid.Row="0" 
                 Background="{StaticResource BackgroundTertiaryBrush}"
-                CornerRadius="10"
+                CornerRadius="0"
                 Padding="12,8"
                 Margin="0,0,0,12">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <!-- Bouton Ajouter Touche -->
-                <Button x:Name="AddKeyboardButton"
-                        Click="AddKeyboard_Click"
-                        Margin="4,0"
-                        Cursor="Hand"
-                        ToolTip="Ajouter une touche clavier">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="Bd"
-                                                Background="{StaticResource BlockKeyboardBrush}"
-                                                CornerRadius="8"
-                                                Padding="12,8">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xE284;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="+ Touche" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockKeyboardDarkBrush}"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </Button.Style>
-                </Button>
-
-                <!-- Bouton Ajouter Clic -->
-                <Button x:Name="AddMouseButton"
-                        Click="AddMouse_Click"
-                        Margin="4,0"
-                        Cursor="Hand"
-                        ToolTip="Ajouter un clic souris">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="Bd"
-                                                Background="{StaticResource BlockMouseBrush}"
-                                                CornerRadius="8"
-                                                Padding="12,8">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xE11F;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="+ Clic" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockMouseDarkBrush}"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </Button.Style>
-                </Button>
-
-                <!-- Bouton Ajouter Délai -->
-                <Button x:Name="AddDelayButton"
-                        Click="AddDelay_Click"
-                        Margin="4,0"
-                        Cursor="Hand"
-                        ToolTip="Ajouter un délai">
-                    <Button.Style>
-                        <Style TargetType="Button">
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="Bd"
-                                                Background="{StaticResource BlockDelayBrush}"
-                                                CornerRadius="8"
-                                                Padding="12,8">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="&#xE087;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                <TextBlock Text="+ Délai" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BlockDelayDarkBrush}"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </Button.Style>
-                </Button>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="180" MinWidth="180"/>
+                </Grid.ColumnDefinitions>
+                <!-- Boutons d'action alignés à gauche, scroll horizontal si fenêtre étroite -->
+                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="0" Margin="0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                        <Button x:Name="AddKeyboardButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                                Background="{StaticResource BlockKeyboardBrush}"
+                                Click="AddKeyboard_Click" Margin="4,0"
+                                ToolTip="Ajouter une touche clavier">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE284;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="+ Touche" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="AddMouseButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                                Background="{StaticResource BlockMouseBrush}"
+                                Click="AddMouse_Click" Margin="4,0"
+                                ToolTip="Ajouter un clic souris">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE11F;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="+ Clic" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="AddDelayButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                                Background="{StaticResource BlockDelayBrush}"
+                                Click="AddDelay_Click" Margin="4,0"
+                                ToolTip="Ajouter un délai">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE087;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="+ Délai" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
 
                 <!-- Séparateur vertical -->
                 <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
@@ -148,40 +87,42 @@
                              Margin="8,0,0,0"
                              Visibility="Collapsed"/>
                 </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
 
-                <!-- Séparateur vertical -->
-                <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
-
-                <!-- Boutons Undo/Redo -->
-                <Button x:Name="UndoButton"
-                        Style="{StaticResource ButtonIcon}"
-                        Click="UndoButton_Click"
-                        IsEnabled="False"
-                        Margin="0,0,4,0"
-                        ToolTip="Annuler (Ctrl+Z)">
-                    <TextBlock Text="&#xE148;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
-                </Button>
-                <Button x:Name="RedoButton"
-                        Style="{StaticResource ButtonIcon}"
-                        Click="RedoButton_Click"
-                        IsEnabled="False"
-                        Margin="0,0,12,0"
-                        ToolTip="Refaire (Ctrl+Y)">
-                    <TextBlock Text="&#xE149;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
-                </Button>
-
-                <!-- Séparateur vertical -->
-                <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="0,0,12,0"/>
-
-                <!-- Toggle Activer/Désactiver Macro -->
-                <ToggleButton x:Name="MacroEnableToggle"
-                              Style="{StaticResource ToggleSwitchStyle}"
-                              Checked="MacroEnableToggle_Checked"
-                              Unchecked="MacroEnableToggle_Unchecked"
-                              IsEnabled="False"
-                              Margin="0,0,0,0"
-                              ToolTip="Activer/Désactiver la macro"/>
-            </StackPanel>
+                <!-- Droite : largeur fixe pour que Undo/Redo ne bougent pas -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <!-- Séparateur vertical -->
+                    <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="12,0"/>
+                    <!-- Boutons Undo/Redo (raccourcis dans tooltip) -->
+                    <Button x:Name="UndoButton"
+                            Style="{StaticResource ButtonIcon}"
+                            Click="UndoButton_Click"
+                            IsEnabled="False"
+                            Margin="0,0,4,0"
+                            ToolTip="Annuler (Ctrl+Z)">
+                        <TextBlock Text="&#xE148;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
+                    </Button>
+                    <Button x:Name="RedoButton"
+                            Style="{StaticResource ButtonIcon}"
+                            Click="RedoButton_Click"
+                            IsEnabled="False"
+                            Margin="0,0,12,0"
+                            ToolTip="Refaire (Ctrl+Y)">
+                        <TextBlock Text="&#xE149;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
+                    </Button>
+                    <!-- Séparateur vertical -->
+                    <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="0,0,12,0"/>
+                    <!-- Toggle Switch : Activer/Désactiver la macro -->
+                    <ToggleButton x:Name="MacroEnableToggle"
+                                  Style="{StaticResource ToggleSwitchStyle}"
+                                  Checked="MacroEnableToggle_Checked"
+                                  Unchecked="MacroEnableToggle_Unchecked"
+                                  IsEnabled="False"
+                                  VerticalAlignment="Center"
+                                  ToolTip="Activer/Désactiver la macro"/>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <!-- ══════════════════════════════════════════════════════════════════
