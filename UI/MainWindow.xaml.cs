@@ -163,6 +163,32 @@ namespace MacroEngine.UI
             // Sélection de la liste macros : uniquement au clic, pas au survol avec clic maintenu
             MacrosListBox.PreviewMouseLeftButtonDown += MacrosListBox_PreviewMouseLeftButtonDown;
             MacrosListBox.PreviewMouseLeftButtonUp += MacrosListBox_PreviewMouseLeftButtonUp;
+
+            // Ctrl+Z / Ctrl+Y au niveau fenêtre pour fonctionner même avec le focus dans un champ (TextBox, etc.)
+            PreviewKeyDown += MainWindow_PreviewKeyDown;
+        }
+
+        private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (Keyboard.Modifiers != System.Windows.Input.ModifierKeys.Control)
+                return;
+            var content = MacroEditorContainer?.Content;
+            if (e.Key == Key.Z)
+            {
+                if (content is TimelineEditor te)
+                    te.PerformUndo();
+                else if (content is BlockEditor be)
+                    be.PerformUndo();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Y)
+            {
+                if (content is TimelineEditor te)
+                    te.PerformRedo();
+                else if (content is BlockEditor be)
+                    be.PerformRedo();
+                e.Handled = true;
+            }
         }
 
         private void InitializeRecordingHooks()

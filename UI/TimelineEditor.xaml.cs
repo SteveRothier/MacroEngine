@@ -8924,6 +8924,24 @@ namespace MacroEngine.UI
             Redo();
         }
 
+        /// <summary>
+        /// Annule la dernière modification (appelable depuis l'extérieur, ex. raccourci fenêtre).
+        /// </summary>
+        public void PerformUndo()
+        {
+            Undo();
+            PlayUndoRedoIconRotation(UndoButton, -360);
+        }
+
+        /// <summary>
+        /// Refait la dernière modification annulée (appelable depuis l'extérieur).
+        /// </summary>
+        public void PerformRedo()
+        {
+            Redo();
+            PlayUndoRedoIconRotation(RedoButton, 360);
+        }
+
         #endregion
 
         #region Presets
