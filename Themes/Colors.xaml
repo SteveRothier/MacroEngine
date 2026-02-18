@@ -194,6 +194,28 @@
         <GradientStop Color="{StaticResource AccentPressedColor}" Offset="0.5"/>
         <GradientStop Color="#4A0F1A" Offset="1"/>
     </LinearGradientBrush>
+    <!-- Enregistrer (rouge) / Arrêter (gris) - barre d'outils éditeur -->
+    <LinearGradientBrush x:Key="RecordToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource ErrorColor}" Offset="0"/>
+        <GradientStop Color="#A83A3A" Offset="0.4"/>
+        <GradientStop Color="#8F2828" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="StopToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BackgroundTertiaryColor}" Offset="0"/>
+        <GradientStop Color="#282530" Offset="0.4"/>
+        <GradientStop Color="#1E1B22" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- Exécuter (vert) / Pause (gris) - barre d'outils éditeur -->
+    <LinearGradientBrush x:Key="ExecuteToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource SuccessColor}" Offset="0"/>
+        <GradientStop Color="#3EA47B" Offset="0.4"/>
+        <GradientStop Color="#2D8A6A" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="PauseToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BackgroundTertiaryColor}" Offset="0"/>
+        <GradientStop Color="#282530" Offset="0.4"/>
+        <GradientStop Color="#1E1B22" Offset="1"/>
+    </LinearGradientBrush>
 
     <!-- ══════════════════════════════════════════════════════════════════════
          Effets d'ombre et glow

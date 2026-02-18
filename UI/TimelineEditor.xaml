@@ -116,6 +116,30 @@
                                 <TextBlock Text="Presets" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
+
+                        <!-- Séparateur à droite de Presets -->
+                        <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="8,0" VerticalAlignment="Center"/>
+
+                        <Button x:Name="RecordButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                                Background="{StaticResource RecordToolbarBrush}"
+                                Margin="4,0"
+                                ToolTip="Enregistrer une macro">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="8" Height="8" Fill="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Enregistrer" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="StopButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                                Background="{StaticResource StopToolbarBrush}"
+                                Margin="4,0"
+                                IsEnabled="False"
+                                ToolTip="Arrêter l'enregistrement">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE083;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Arrêter" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
                     </StackPanel>
                 </ScrollViewer>
 

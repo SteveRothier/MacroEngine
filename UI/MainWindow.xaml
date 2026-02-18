@@ -67,60 +67,6 @@
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Toolbar centrale - Enregistrement et exécution -->
-                <StackPanel Grid.Column="1" 
-                            Orientation="Horizontal" 
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center">
-                    
-                    <!-- Bouton Exécuter -->
-                    <Button x:Name="ExecuteButton"
-                            Style="{StaticResource ButtonSecondary}"
-                            Click="ExecuteMacro_Click"
-                            Padding="14,8"
-                            Margin="0,0,8,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE080;" FontFamily="{StaticResource FontLucide}" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Exécuter" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- Bouton Enregistrer -->
-                    <Button x:Name="StartButton"
-                            Style="{StaticResource ButtonPrimary}"
-                            Click="StartMacro_Click"
-                            Padding="14,8"
-                            Margin="0,0,8,0">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="10" Height="10" Fill="White" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Enregistrer" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-
-                    <!-- Bouton Pause -->
-                    <Button x:Name="PauseButton"
-                            Style="{StaticResource ButtonGhost}"
-                            Click="PauseMacro_Click"
-                            Padding="10,8"
-                            Margin="0,0,4,0"
-                            IsEnabled="False"
-                            ToolTip="Pause">
-                        <TextBlock Text="⏸" FontSize="14"/>
-                    </Button>
-
-                    <!-- Bouton Arrêter -->
-                    <Button x:Name="StopButton"
-                            Style="{StaticResource ButtonGhost}"
-                            Click="StopMacro_Click"
-                            Padding="10,8"
-                            Margin="0,0,12,0"
-                            IsEnabled="False"
-                            ToolTip="Arrêter">
-                        <TextBlock Text="&#xE083;" FontFamily="{StaticResource FontLucide}" FontSize="14"/>
-                    </Button>
-
-                </StackPanel>
-
                 <!-- Actions droite -->
                 <StackPanel Grid.Column="2" 
                             Orientation="Horizontal" 

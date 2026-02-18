@@ -127,7 +127,8 @@ namespace MacroEngine.UI
             _blockEditor = new TimelineEditor();
             _blockEditor.MacroChanged += BlockEditor_MacroChanged;
             MacroEditorContainer.Content = _blockEditor;
-
+            _blockEditor.RecordButton.Click += StartMacro_Click;
+            _blockEditor.StopButton.Click += StopMacro_Click;
             // Initialiser les hooks pour l'enregistrement
             _keyboardHook = new KeyboardHook();
             _mouseHook = new MouseHook();
@@ -155,10 +156,8 @@ namespace MacroEngine.UI
             _ = LoadMacrosAndProfilesAsync();
 
             // Initialiser l'état des boutons
-            ExecuteButton.IsEnabled = true;
-            StartButton.IsEnabled = true;
-            PauseButton.IsEnabled = false;
-            StopButton.IsEnabled = false;
+            _blockEditor.RecordButton.IsEnabled = true;
+            _blockEditor.StopButton.IsEnabled = false;
 
             // Sélection de la liste macros : uniquement au clic, pas au survol avec clic maintenu
             MacrosListBox.PreviewMouseLeftButtonDown += MacrosListBox_PreviewMouseLeftButtonDown;
@@ -313,18 +312,12 @@ namespace MacroEngine.UI
         
         private void UpdateExecuteButtonText()
         {
-            if (ExecuteButton != null && _appConfig != null)
-            {
-                var keyCode = _appConfig.ExecuteMacroKeyCode != 0 ? _appConfig.ExecuteMacroKeyCode : 0x79;
-                var keyName = GetKeyNameForShortcut((ushort)keyCode);
-                ExecuteButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Play, $" Exécuter ({keyName})");
-            }
             
-            if (StopButton != null && _appConfig != null)
+            if (_blockEditor?.StopButton != null && _appConfig != null)
             {
                 var keyCode = _appConfig.StopMacroKeyCode != 0 ? _appConfig.StopMacroKeyCode : 0x7A;
                 var keyName = GetKeyNameForShortcut((ushort)keyCode);
-                StopButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Stop, $" Arrêter ({keyName})");
+                _blockEditor.StopButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Stop, $" Arrêter ({keyName})");
             }
         }
         
@@ -763,12 +756,10 @@ namespace MacroEngine.UI
                 // Gérer l'état des boutons selon le mode (enregistrement vs exécution)
                 bool isExecuting = e.CurrentState != MacroEngineState.Idle;
                 
-                ExecuteButton.IsEnabled = e.CurrentState == MacroEngineState.Idle && !_isRecording;
-                StartButton.IsEnabled = !_isRecording && !isExecuting;
+                _blockEditor.RecordButton.IsEnabled = !_isRecording && !isExecuting;
                 
-                // Les boutons Pause/Stop fonctionnent pour l'exécution ET l'enregistrement
-                PauseButton.IsEnabled = isExecuting || _isRecording;
-                StopButton.IsEnabled = isExecuting || _isRecording;
+                // Le bouton Stop fonctionne pour l'exécution ET l'enregistrement
+                _blockEditor.StopButton.IsEnabled = isExecuting || _isRecording;
             });
         }
 
@@ -1414,13 +1405,10 @@ namespace MacroEngine.UI
             }
 
             // Mettre à jour l'interface
-            StartButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Record, " Enregistrement...");
+            _blockEditor.RecordButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Record, " Enregistrement...");
             StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris (max 20 touches/seconde)";
             StatusText.Foreground = System.Windows.Media.Brushes.Black;
-            ExecuteButton.IsEnabled = false; // Désactiver l'exécution pendant l'enregistrement
-            PauseButton.IsEnabled = true;
-            PauseButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Pause, " Pause");
-            StopButton.IsEnabled = true;
+            _blockEditor.StopButton.IsEnabled = true;
             _isRecordingPaused = false;
             
             _logger?.Info("Hooks d'enregistrement installés avec succès", "MainWindow");
@@ -1453,11 +1441,9 @@ namespace MacroEngine.UI
             ProcessRemainingKeys();
 
             // Mettre à jour l'interface
-            StartButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Record, " Enregistrer");
+            _blockEditor.RecordButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Record, " Enregistrer");
             StatusText.Text = $"Enregistrement terminé. {_selectedMacro?.Actions?.Count ?? 0} action(s) enregistrée(s)";
-            ExecuteButton.IsEnabled = _macroEngine.State == MacroEngineState.Idle; // Réactiver l'exécution si le moteur est inactif
-            PauseButton.IsEnabled = false;
-            StopButton.IsEnabled = false;
+            _blockEditor.StopButton.IsEnabled = false;
 
             // Rafraîchir l'éditeur
             if (_blockEditor != null && _selectedMacro != null)
@@ -2036,14 +2022,12 @@ namespace MacroEngine.UI
                 {
                     // Mettre en pause l'enregistrement
                     _isRecordingPaused = true;
-                    PauseButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Play, " Reprendre");
                     StatusText.Text = "Enregistrement en pause";
                 }
                 else
                 {
                     // Reprendre l'enregistrement
                     _isRecordingPaused = false;
-                    PauseButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Pause, " Pause");
                     StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris";
                 }
             }
@@ -2105,7 +2089,7 @@ namespace MacroEngine.UI
                 // Liste des boutons de contrôle à ignorer
                 var controlButtons = new FrameworkElement[] 
                 { 
-                    StartButton, StopButton, PauseButton, ExecuteButton
+                    _blockEditor.RecordButton, _blockEditor.StopButton
                 };
                 
                 foreach (var button in controlButtons)
