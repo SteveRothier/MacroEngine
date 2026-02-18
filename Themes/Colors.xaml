@@ -81,6 +81,15 @@
     <!-- Variable - Cyan neutre / data -->
     <Color x:Key="BlockVariableColor">#5AA3A3</Color>
     <Color x:Key="BlockVariableDarkColor">#499292</Color>
+
+    <!-- Barre d'outils : bas de dégradé plus marqué (plus sombre) -->
+    <Color x:Key="BlockKeyboardToolbarBottomColor">#2D7AA8</Color>
+    <Color x:Key="BlockMouseToolbarBottomColor">#2D8A6A</Color>
+    <Color x:Key="BlockTextToolbarBottomColor">#A67A30</Color>
+    <Color x:Key="BlockVariableToolbarBottomColor">#357272</Color>
+    <Color x:Key="BlockDelayToolbarBottomColor">#8F5218</Color>
+    <Color x:Key="BlockConditionToolbarBottomColor">#8F2828</Color>
+    <Color x:Key="BlockLoopToolbarBottomColor">#5A3D98</Color>
     
     <!-- Fond éditeur / grille -->
     <Color x:Key="EditorGridColor">#25222B</Color>
@@ -143,6 +152,48 @@
     <SolidColorBrush x:Key="BlockVariableBrush" Color="{StaticResource BlockVariableColor}"/>
     <SolidColorBrush x:Key="BlockVariableDarkBrush" Color="{StaticResource BlockVariableDarkColor}"/>
     <SolidColorBrush x:Key="EditorGridBrush" Color="{StaticResource EditorGridColor}"/>
+
+    <!-- Barre d'outils : dégradés marqués (haut clair → bas bien plus sombre) -->
+    <LinearGradientBrush x:Key="BlockKeyboardToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BlockKeyboardColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource BlockKeyboardDarkColor}" Offset="0.4"/>
+        <GradientStop Color="{StaticResource BlockKeyboardToolbarBottomColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BlockMouseToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BlockMouseColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource BlockMouseDarkColor}" Offset="0.4"/>
+        <GradientStop Color="{StaticResource BlockMouseToolbarBottomColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BlockTextToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BlockTextColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource BlockTextDarkColor}" Offset="0.4"/>
+        <GradientStop Color="{StaticResource BlockTextToolbarBottomColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BlockVariableToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BlockVariableColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource BlockVariableDarkColor}" Offset="0.4"/>
+        <GradientStop Color="{StaticResource BlockVariableToolbarBottomColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BlockDelayToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BlockDelayColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource BlockDelayDarkColor}" Offset="0.4"/>
+        <GradientStop Color="{StaticResource BlockDelayToolbarBottomColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BlockConditionToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BlockConditionColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource BlockConditionDarkColor}" Offset="0.4"/>
+        <GradientStop Color="{StaticResource BlockConditionToolbarBottomColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="BlockLoopToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource BlockLoopColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource BlockLoopDarkColor}" Offset="0.4"/>
+        <GradientStop Color="{StaticResource BlockLoopToolbarBottomColor}" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="AccentSecondaryToolbarBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="{StaticResource AccentSecondaryColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource AccentPressedColor}" Offset="0.5"/>
+        <GradientStop Color="#4A0F1A" Offset="1"/>
+    </LinearGradientBrush>
 
     <!-- ══════════════════════════════════════════════════════════════════════
          Effets d'ombre et glow

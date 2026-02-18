@@ -35,7 +35,7 @@
                 <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="0" Margin="0">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                         <Button x:Name="AddKeyboardButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockKeyboardBrush}"
+                                Background="{StaticResource BlockKeyboardToolbarBrush}"
                                 Click="AddKeyboard_Click" Margin="4,0"
                                 ToolTip="Ajouter une touche clavier">
                             <StackPanel Orientation="Horizontal">
@@ -45,7 +45,7 @@
                         </Button>
 
                         <Button x:Name="AddMouseButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockMouseBrush}"
+                                Background="{StaticResource BlockMouseToolbarBrush}"
                                 Click="AddMouse_Click" Margin="4,0"
                                 ToolTip="Ajouter un clic souris">
                             <StackPanel Orientation="Horizontal">
@@ -55,7 +55,7 @@
                         </Button>
 
                         <Button x:Name="AddTextButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockTextBrush}"
+                                Background="{StaticResource BlockTextToolbarBrush}"
                                 Click="AddText_Click" Margin="4,0"
                                 ToolTip="Ajouter une action texte">
                             <StackPanel Orientation="Horizontal">
@@ -65,7 +65,7 @@
                         </Button>
 
                         <Button x:Name="AddVariableButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockVariableBrush}"
+                                Background="{StaticResource BlockVariableToolbarBrush}"
                                 Click="AddVariable_Click" Margin="4,0"
                                 ToolTip="Ajouter une variable">
                             <StackPanel Orientation="Horizontal">
@@ -75,7 +75,7 @@
                         </Button>
 
                         <Button x:Name="AddDelayButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockDelayBrush}"
+                                Background="{StaticResource BlockDelayToolbarBrush}"
                                 Click="AddDelay_Click" Margin="4,0"
                                 ToolTip="Ajouter un délai">
                             <StackPanel Orientation="Horizontal">
@@ -85,7 +85,7 @@
                         </Button>
 
                         <Button x:Name="AddIfButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockConditionBrush}"
+                                Background="{StaticResource BlockConditionToolbarBrush}"
                                 Click="AddIf_Click" Margin="4,0"
                                 ToolTip="Ajouter une condition If/Then/Else">
                             <StackPanel Orientation="Horizontal">
@@ -95,7 +95,7 @@
                         </Button>
 
                         <Button x:Name="AddRepeatButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockLoopBrush}"
+                                Background="{StaticResource BlockLoopToolbarBrush}"
                                 Click="AddRepeat_Click" Margin="4,0"
                                 ToolTip="Ajouter un bloc Répéter">
                             <StackPanel Orientation="Horizontal">
@@ -105,7 +105,7 @@
                         </Button>
 
                         <Button x:Name="PresetsButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource AccentSecondaryBrush}"
+                                Background="{StaticResource AccentSecondaryToolbarBrush}"
                                 Click="PresetsButton_Click" Margin="4,0"
                                 ToolTip="Gérer les presets d'actions">
                             <StackPanel Orientation="Horizontal">

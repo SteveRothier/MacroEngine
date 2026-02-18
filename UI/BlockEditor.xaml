@@ -35,7 +35,7 @@
                 <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="0" Margin="0">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                         <Button x:Name="AddKeyboardButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockKeyboardBrush}"
+                                Background="{StaticResource BlockKeyboardToolbarBrush}"
                                 Click="AddKeyboard_Click" Margin="4,0"
                                 ToolTip="Ajouter une touche clavier">
                             <StackPanel Orientation="Horizontal">
@@ -44,7 +44,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="AddMouseButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockMouseBrush}"
+                                Background="{StaticResource BlockMouseToolbarBrush}"
                                 Click="AddMouse_Click" Margin="4,0"
                                 ToolTip="Ajouter un clic souris">
                             <StackPanel Orientation="Horizontal">
@@ -53,7 +53,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="AddDelayButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
-                                Background="{StaticResource BlockDelayBrush}"
+                                Background="{StaticResource BlockDelayToolbarBrush}"
                                 Click="AddDelay_Click" Margin="4,0"
                                 ToolTip="Ajouter un délai">
                             <StackPanel Orientation="Horizontal">
