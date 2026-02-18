@@ -104,6 +104,9 @@
                             </StackPanel>
                         </Button>
 
+                        <!-- Séparateur entre boutons d'action et Presets -->
+                        <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="8,0" VerticalAlignment="Center"/>
+
                         <Button x:Name="PresetsButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
                                 Background="{StaticResource AccentSecondaryToolbarBrush}"
                                 Click="PresetsButton_Click" Margin="4,0"
