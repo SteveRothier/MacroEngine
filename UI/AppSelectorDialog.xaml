@@ -136,12 +136,15 @@
                                 MinHeight="280"
                                 ClipToBounds="False"
                                 Padding="4">
-                            <ListView x:Name="ProcessListView"
+                            <Grid>
+                                <ListView x:Name="ProcessListView"
                                       SelectionMode="Multiple"
                                       Background="{StaticResource BackgroundPrimaryBrush}"
                                       BorderThickness="0"
                                       Padding="4"
-                                      Margin="0,0,0,12">
+                                      Margin="0,0,0,12"
+                                      Visibility="Collapsed"
+                                      IsEnabled="False">
                                 <ListView.ItemContainerStyle>
                                     <Style TargetType="ListViewItem">
                                         <Setter Property="MinHeight" Value="28"/>
@@ -202,6 +205,23 @@
                                     </GridView>
                                 </ListView.View>
                             </ListView>
+                                <!-- Indicateur de chargement (au-dessus, masqué quand la liste est prête) -->
+                                <Border x:Name="LoadingOverlay"
+                                        Background="{StaticResource BackgroundPrimaryBrush}"
+                                        Visibility="Visible">
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <TextBlock Text="&#xE087;"
+                                                   FontFamily="{StaticResource FontLucide}"
+                                                   FontSize="32"
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   HorizontalAlignment="Center"
+                                                   Margin="0,0,0,12"/>
+                                        <TextBlock Text="Chargement des processus..."
+                                                   Style="{StaticResource TextMuted}"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
                         </Border>
                     </Grid>
                 </Border>

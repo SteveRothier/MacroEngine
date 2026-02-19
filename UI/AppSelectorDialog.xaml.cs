@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -47,7 +48,7 @@ namespace MacroEngine.UI
             };
             WindowChrome.SetWindowChrome(this, chrome);
             ProcessListView.ItemsSource = _filteredProcesses;
-            LoadProcesses();
+            Loaded += (s, e) => _ = LoadProcessesAsync();
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -77,32 +78,44 @@ namespace MacroEngine.UI
             e.Handled = true;
         }
 
-        private void LoadProcesses()
+        private async Task LoadProcessesAsync()
         {
-            _allProcesses.Clear();
-            _filteredProcesses.Clear();
-
             var showAll = ShowAllProcessesCheckBox?.IsChecked == true;
-            var processes = showAll 
-                ? ProcessMonitor.GetAllProcesses() 
-                : ProcessMonitor.GetRunningProcesses();
 
-            foreach (var process in processes)
+            var processes = await Task.Run(() => showAll
+                ? ProcessMonitor.GetAllProcesses()
+                : ProcessMonitor.GetRunningProcesses());
+
+            await Dispatcher.InvokeAsync(() =>
             {
-                var selectableProcess = new SelectableProcessInfo
+                _allProcesses.Clear();
+                _filteredProcesses.Clear();
+                foreach (var process in processes)
                 {
-                    ProcessName = process.ProcessName,
-                    ProcessId = process.ProcessId,
-                    WindowTitle = process.WindowTitle,
-                    ExecutablePath = process.ExecutablePath,
-                    HasMainWindow = process.HasMainWindow,
-                    Icon = process.Icon,
-                    IsSelected = _selectedApps.Contains(process.ProcessName)
-                };
-                _allProcesses.Add(selectableProcess);
-            }
+                    var selectableProcess = new SelectableProcessInfo
+                    {
+                        ProcessName = process.ProcessName,
+                        ProcessId = process.ProcessId,
+                        WindowTitle = process.WindowTitle,
+                        ExecutablePath = process.ExecutablePath,
+                        HasMainWindow = process.HasMainWindow,
+                        Icon = process.Icon,
+                        IsSelected = _selectedApps.Contains(process.ProcessName)
+                    };
+                    _allProcesses.Add(selectableProcess);
+                }
+                ApplyFilter();
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+                ProcessListView.Visibility = Visibility.Visible;
+                ProcessListView.IsEnabled = true;
+            });
+        }
 
-            ApplyFilter();
+        private void ShowLoadingState()
+        {
+            LoadingOverlay.Visibility = Visibility.Visible;
+            ProcessListView.Visibility = Visibility.Collapsed;
+            ProcessListView.IsEnabled = false;
         }
 
         private void ApplyFilter()
@@ -219,14 +232,16 @@ namespace MacroEngine.UI
             ApplyFilter();
         }
 
-        private void RefreshButton_Click(object sender, RoutedEventArgs e)
+        private async void RefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            LoadProcesses();
+            ShowLoadingState();
+            await LoadProcessesAsync();
         }
 
-        private void ShowAllProcessesCheckBox_Changed(object sender, RoutedEventArgs e)
+        private async void ShowAllProcessesCheckBox_Changed(object sender, RoutedEventArgs e)
         {
-            LoadProcesses();
+            ShowLoadingState();
+            await LoadProcessesAsync();
         }
 
         private void ManualProcessTextBox_KeyDown(object sender, KeyEventArgs e)
