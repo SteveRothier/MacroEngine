@@ -211,24 +211,34 @@
                                                                    Stretch="Uniform"
                                                                    RenderOptions.BitmapScalingMode="HighQuality"/>
                                                         </Grid>
-                                                        <TextBlock Text="{Binding ProcessName}" Style="{StaticResource TextBody}" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding ProcessName}" Style="{StaticResource TextBody}" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn x:Name="FenetreColumn" Header="Fenêtre" Width="220" DisplayMemberBinding="{Binding WindowTitle}">
+                                        <GridViewColumn x:Name="FenetreColumn" Header="Fenêtre" Width="220">
                                             <GridViewColumn.HeaderTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="Fenêtre" Style="{StaticResource TextSecondary}" FontWeight="SemiBold"/>
                                                 </DataTemplate>
                                             </GridViewColumn.HeaderTemplate>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding WindowTitle}" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="PID" Width="60" DisplayMemberBinding="{Binding ProcessId}">
+                                        <GridViewColumn Header="PID" Width="60">
                                             <GridViewColumn.HeaderTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="PID" Style="{StaticResource TextSecondary}" FontWeight="SemiBold"/>
                                                 </DataTemplate>
                                             </GridViewColumn.HeaderTemplate>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding ProcessId}" Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
                                     </GridView>
                                 </ListView.View>
