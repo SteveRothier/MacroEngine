@@ -10,6 +10,33 @@
         ResizeMode="CanResizeWithGrip"
         Background="{StaticResource BackgroundPrimaryBrush}"
         PreviewKeyDown="Window_PreviewKeyDown">
+    <Window.Resources>
+        <!-- Style pour la barre d'en-têtes des colonnes (Processus, Fenêtre, PID) -->
+        <Style TargetType="GridViewColumnHeader">
+            <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="GridViewColumnHeader">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Border x:Name="RootBorder"
             Background="{StaticResource BackgroundPrimaryBrush}"
             BorderBrush="{StaticResource BorderLightBrush}"
@@ -138,6 +165,7 @@
                                 Padding="4">
                             <Grid>
                                 <ListView x:Name="ProcessListView"
+                                      SizeChanged="ProcessListView_SizeChanged"
                                       SelectionMode="Multiple"
                                       Background="{StaticResource BackgroundPrimaryBrush}"
                                       BorderThickness="0"
@@ -188,14 +216,14 @@
                                                 </DataTemplate>
                                             </GridViewColumn.CellTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="Fenêtre" Width="220" DisplayMemberBinding="{Binding WindowTitle}">
+                                        <GridViewColumn x:Name="FenetreColumn" Header="Fenêtre" Width="220" DisplayMemberBinding="{Binding WindowTitle}">
                                             <GridViewColumn.HeaderTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="Fenêtre" Style="{StaticResource TextSecondary}" FontWeight="SemiBold"/>
                                                 </DataTemplate>
                                             </GridViewColumn.HeaderTemplate>
                                         </GridViewColumn>
-                                        <GridViewColumn Header="PID" Width="50" DisplayMemberBinding="{Binding ProcessId}">
+                                        <GridViewColumn Header="PID" Width="60" DisplayMemberBinding="{Binding ProcessId}">
                                             <GridViewColumn.HeaderTemplate>
                                                 <DataTemplate>
                                                     <TextBlock Text="PID" Style="{StaticResource TextSecondary}" FontWeight="SemiBold"/>

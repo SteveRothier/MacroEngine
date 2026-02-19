@@ -48,7 +48,27 @@ namespace MacroEngine.UI
             };
             WindowChrome.SetWindowChrome(this, chrome);
             ProcessListView.ItemsSource = _filteredProcesses;
-            Loaded += (s, e) => _ = LoadProcessesAsync();
+            Loaded += (s, e) =>
+            {
+                UpdateFenetreColumnWidth();
+                _ = LoadProcessesAsync();
+            };
+        }
+
+        private void ProcessListView_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateFenetreColumnWidth();
+        }
+
+        private void UpdateFenetreColumnWidth()
+        {
+            if (FenetreColumn == null || ProcessListView == null)
+                return;
+            var scrollBarWidth = SystemParameters.VerticalScrollBarWidth;
+            var otherColumns = 32 + 180 + 60;
+            var available = ProcessListView.ActualWidth - otherColumns - scrollBarWidth - 8;
+            if (available > 80)
+                FenetreColumn.Width = available;
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -108,6 +128,7 @@ namespace MacroEngine.UI
                 LoadingOverlay.Visibility = Visibility.Collapsed;
                 ProcessListView.Visibility = Visibility.Visible;
                 ProcessListView.IsEnabled = true;
+                UpdateFenetreColumnWidth();
             });
         }
 
