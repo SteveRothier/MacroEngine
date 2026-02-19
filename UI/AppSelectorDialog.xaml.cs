@@ -6,6 +6,8 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Shell;
 using MacroEngine.Core.Processes;
 
 namespace MacroEngine.UI
@@ -36,8 +38,33 @@ namespace MacroEngine.UI
         public AppSelectorDialog()
         {
             InitializeComponent();
+            var chrome = new WindowChrome
+            {
+                CaptionHeight = 44,
+                ResizeBorderThickness = new Thickness(5),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            };
+            WindowChrome.SetWindowChrome(this, chrome);
             ProcessListView.ItemsSource = _filteredProcesses;
             LoadProcesses();
+        }
+
+        private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton == MouseButton.Left)
+                DragMove();
+        }
+
+        private void CloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            DialogResult = false;
+            Close();
+        }
+
+        private static Brush? GetThemeBrush(string key)
+        {
+            return Application.Current.TryFindResource(key) as Brush;
         }
 
         private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -106,39 +133,50 @@ namespace MacroEngine.UI
         {
             SelectedAppsPanel.Children.Clear();
 
+            if (SelectionCountText != null)
+                SelectionCountText.Text = _selectedApps.Count == 0
+                    ? " (aucune – macro disponible partout)"
+                    : $" ({_selectedApps.Count} application{(_selectedApps.Count > 1 ? "s" : "")})";
+
             if (_selectedApps.Count == 0)
             {
-                SelectedAppsPanel.Children.Add(new TextBlock
+                var noSel = new TextBlock
                 {
-                    Text = "Aucune application sélectionnée (la macro sera disponible partout)",
-                    Foreground = System.Windows.Media.Brushes.Gray,
+                    Text = "Aucune application. La macro sera active dans toutes les applications.",
                     FontStyle = FontStyles.Italic
-                });
+                };
+                if (Application.Current.TryFindResource("TextMutedBrush") is Brush muted)
+                    noSel.Foreground = muted;
+                else
+                    noSel.Foreground = Brushes.Gray;
+                SelectedAppsPanel.Children.Add(noSel);
             }
             else
             {
+                var tagBg = GetThemeBrush("AccentSecondaryBrush") ?? GetThemeBrush("BackgroundTertiaryBrush") ?? Brushes.LightGray;
+                var tagFg = GetThemeBrush("TextOnAccentBrush") ?? Brushes.White;
                 foreach (var app in _selectedApps.OrderBy(a => a))
                 {
                     var border = new Border
                     {
-                        Background = System.Windows.Media.Brushes.LightBlue,
-                        CornerRadius = new CornerRadius(3),
-                        Padding = new Thickness(5, 2, 5, 2),
-                        Margin = new Thickness(0, 0, 5, 5)
+                        Background = tagBg,
+                        CornerRadius = new CornerRadius(4),
+                        Padding = new Thickness(8, 4, 8, 4),
+                        Margin = new Thickness(0, 0, 6, 6)
                     };
 
                     var stack = new StackPanel { Orientation = Orientation.Horizontal };
-                    stack.Children.Add(new TextBlock { Text = app, VerticalAlignment = VerticalAlignment.Center });
-                    
+                    stack.Children.Add(new TextBlock { Text = app, VerticalAlignment = VerticalAlignment.Center, Foreground = tagFg });
                     var removeButton = new Button
                     {
                         Content = LucideIcons.CreateIcon(LucideIcons.Close, 10),
-                        FontSize = 10,
-                        Padding = new Thickness(3, 0, 3, 0),
-                        Margin = new Thickness(5, 0, 0, 0),
-                        Background = System.Windows.Media.Brushes.Transparent,
+                        FontFamily = (FontFamily)Application.Current.FindResource("FontLucide"),
+                        Padding = new Thickness(4, 0, 4, 0),
+                        Margin = new Thickness(6, 0, 0, 0),
+                        Background = Brushes.Transparent,
+                        Foreground = tagFg,
                         BorderThickness = new Thickness(0),
-                        Cursor = System.Windows.Input.Cursors.Hand,
+                        Cursor = Cursors.Hand,
                         Tag = app
                     };
                     removeButton.Click += RemoveApp_Click;
@@ -189,6 +227,15 @@ namespace MacroEngine.UI
         private void ShowAllProcessesCheckBox_Changed(object sender, RoutedEventArgs e)
         {
             LoadProcesses();
+        }
+
+        private void ManualProcessTextBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                AddManualProcess_Click(sender, e);
+                e.Handled = true;
+            }
         }
 
         private void AddManualProcess_Click(object sender, RoutedEventArgs e)

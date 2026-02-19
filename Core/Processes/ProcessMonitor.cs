@@ -296,19 +296,36 @@ namespace MacroEngine.Core.Processes
 
         private ImageSource? LoadIcon()
         {
+            string path = ExecutablePath;
+            if (string.IsNullOrEmpty(path))
+            {
+                try
+                {
+                    using (var process = Process.GetProcessById(ProcessId))
+                    {
+                        path = process.MainModule?.FileName ?? string.Empty;
+                    }
+                }
+                catch { }
+            }
+            if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                return null;
+
             try
             {
-                if (string.IsNullOrEmpty(ExecutablePath) || !File.Exists(ExecutablePath))
-                    return null;
-
-                using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(ExecutablePath))
+                using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(path))
                 {
-                    if (icon != null)
+                    if (icon == null)
+                        return null;
+                    // Clone pour éviter que le handle soit libéré avant la copie par WPF
+                    using (var clone = (System.Drawing.Icon)icon.Clone())
                     {
-                        return Imaging.CreateBitmapSourceFromHIcon(
-                            icon.Handle,
+                        var bitmap = Imaging.CreateBitmapSourceFromHIcon(
+                            clone.Handle,
                             Int32Rect.Empty,
-                            BitmapSizeOptions.FromEmptyOptions());
+                            BitmapSizeOptions.FromWidthAndHeight(16, 16));
+                        bitmap.Freeze();
+                        return bitmap;
                     }
                 }
             }
