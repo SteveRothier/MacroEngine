@@ -33,6 +33,70 @@ namespace MacroEngine.UI
         // Événement déclenché quand la macro est modifiée
         public event EventHandler? MacroChanged;
 
+        /// <summary>True si la barre d'outils doit afficher uniquement les icônes (pas assez de place).</summary>
+        public static readonly DependencyProperty IsToolbarCompactProperty =
+            DependencyProperty.Register(nameof(IsToolbarCompact), typeof(bool), typeof(TimelineEditor), new PropertyMetadata(false));
+        public bool IsToolbarCompact
+        {
+            get => (bool)GetValue(IsToolbarCompactProperty);
+            set => SetValue(IsToolbarCompactProperty, value);
+        }
+
+        /// <summary>True si un enregistrement est en cours (bouton Enregistrer affiche Enregistrement + animation).</summary>
+        public static readonly DependencyProperty IsRecordingProperty =
+            DependencyProperty.Register(nameof(IsRecording), typeof(bool), typeof(TimelineEditor), new PropertyMetadata(false, OnIsRecordingOrPausedChanged));
+        public bool IsRecording
+        {
+            get => (bool)GetValue(IsRecordingProperty);
+            set => SetValue(IsRecordingProperty, value);
+        }
+
+        /// <summary>True si l'enregistrement est en pause (bouton affiche icône pause).</summary>
+        public static readonly DependencyProperty IsRecordingPausedProperty =
+            DependencyProperty.Register(nameof(IsRecordingPaused), typeof(bool), typeof(TimelineEditor), new PropertyMetadata(false, OnIsRecordingOrPausedChanged));
+        public bool IsRecordingPaused
+        {
+            get => (bool)GetValue(IsRecordingPausedProperty);
+            set => SetValue(IsRecordingPausedProperty, value);
+        }
+
+        private static void OnIsRecordingOrPausedChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            ((TimelineEditor)d).UpdateRecordPulseAnimation();
+        }
+
+        private System.Windows.Media.Animation.Storyboard? _recordPulseStoryboard;
+
+        private void UpdateRecordPulseAnimation()
+        {
+            if (RecordDotAnim == null) return;
+            var shouldAnimate = IsRecording && !IsRecordingPaused;
+            if (shouldAnimate)
+            {
+                if (_recordPulseStoryboard == null)
+                {
+                    _recordPulseStoryboard = new System.Windows.Media.Animation.Storyboard
+                    {
+                        RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+                    };
+                    var anim = new System.Windows.Media.Animation.DoubleAnimation(1, 0.4, new System.Windows.Duration(TimeSpan.FromSeconds(0.5)))
+                    {
+                        AutoReverse = true
+                    };
+                    System.Windows.Media.Animation.Storyboard.SetTarget(anim, RecordDotAnim);
+                    System.Windows.Media.Animation.Storyboard.SetTargetProperty(anim, new PropertyPath(UIElement.OpacityProperty));
+                    _recordPulseStoryboard.Children.Add(anim);
+                }
+                _recordPulseStoryboard.Begin(this, true);
+            }
+            else
+            {
+                _recordPulseStoryboard?.Stop(this);
+                if (RecordDotAnim != null)
+                    RecordDotAnim.Opacity = 1;
+            }
+        }
+
         /// <summary>Récupère une couleur du thème (Colors.xaml) par clé.</summary>
         private static Color GetThemeColor(string key)
         {
@@ -61,9 +125,24 @@ namespace MacroEngine.UI
         {
             InitializeComponent();
             Loaded += TimelineEditor_Loaded;
-            
+            SizeChanged += TimelineEditor_SizeChanged;
+
             // Raccourcis Undo/Redo (PreviewKeyDown pour capter avant les contrôles enfants, majuscule et minuscule)
             PreviewKeyDown += TimelineEditor_PreviewKeyDown;
+        }
+
+        private const double ToolbarCompactThreshold = 520d;
+
+        private void TimelineEditor_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            UpdateToolbarCompactMode();
+        }
+
+        private void UpdateToolbarCompactMode()
+        {
+            if (ToolbarScrollViewer == null) return;
+            var availableWidth = ToolbarScrollViewer.ActualWidth;
+            IsToolbarCompact = availableWidth > 0 && availableWidth < ToolbarCompactThreshold;
         }
 
         private void TimelineEditor_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -105,7 +184,10 @@ namespace MacroEngine.UI
 
         private void TimelineEditor_Loaded(object sender, RoutedEventArgs e)
         {
-            // Initialisation si nécessaire
+            if (ToolbarScrollViewer != null)
+                ToolbarScrollViewer.SizeChanged += (s, args) => UpdateToolbarCompactMode();
+            Dispatcher.BeginInvoke(new Action(UpdateToolbarCompactMode), System.Windows.Threading.DispatcherPriority.Loaded);
+            UpdateRecordPulseAnimation();
         }
 
         /// <summary>

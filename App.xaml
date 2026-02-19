@@ -22,9 +22,17 @@
                 
             </ResourceDictionary.MergedDictionaries>
             
-            <!-- Retirer la bordure en pointillés par défaut au focus (focus visual) -->
+            <!-- Retirer la bordure en pointillés par défaut au focus (focus visual) partout -->
             <Style TargetType="Control">
                 <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            </Style>
+            <!-- Remplacer le style de focus système (pointillés) par un style vide -->
+            <Style x:Key="{x:Static SystemParameters.FocusVisualStyleKey}" TargetType="Control">
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Control"/>
+                    </Setter.Value>
+                </Setter>
             </Style>
             
             <!-- ══════════════════════════════════════════════════════════

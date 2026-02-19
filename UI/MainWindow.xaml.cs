@@ -312,12 +312,11 @@ namespace MacroEngine.UI
         
         private void UpdateExecuteButtonText()
         {
-            
-            if (_blockEditor?.StopButton != null && _appConfig != null)
+            if (_blockEditor?.StopButton != null && _appConfig != null && !_isRecording)
             {
                 var keyCode = _appConfig.StopMacroKeyCode != 0 ? _appConfig.StopMacroKeyCode : 0x7A;
                 var keyName = GetKeyNameForShortcut((ushort)keyCode);
-                _blockEditor.StopButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Stop, $" Arrêter ({keyName})");
+                _blockEditor.StopButton.ToolTip = $"Arrêter l'enregistrement ({keyName})";
             }
         }
         
@@ -1289,13 +1288,33 @@ namespace MacroEngine.UI
         private void StartMacro_Click(object sender, RoutedEventArgs e)
         {
             try
-        {
-            if (_selectedMacro == null)
             {
-                StatusText.Text = "Veuillez sélectionner une macro";
-                StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                return;
-            }
+                // En enregistrement : le bouton Enregistrer affiche Pause/Reprendre
+                if (_isRecording)
+                {
+                    if (!_isRecordingPaused)
+                    {
+                        _isRecordingPaused = true;
+                        _blockEditor.IsRecordingPaused = true;
+                        StatusText.Text = "Enregistrement en pause";
+                        _blockEditor.RecordButton.ToolTip = "Reprendre l'enregistrement";
+                    }
+                    else
+                    {
+                        _isRecordingPaused = false;
+                        _blockEditor.IsRecordingPaused = false;
+                        StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris";
+                        _blockEditor.RecordButton.ToolTip = "Mettre en pause l'enregistrement";
+                    }
+                    return;
+                }
+
+                if (_selectedMacro == null)
+                {
+                    StatusText.Text = "Veuillez sélectionner une macro";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    return;
+                }
 
                 if (_macroEngine.State != MacroEngineState.Idle)
                 {
@@ -1304,12 +1323,7 @@ namespace MacroEngine.UI
                     return;
                 }
 
-                if (!_isRecording)
-                {
-                    // Démarrer l'enregistrement
-                    StartRecording();
-                }
-                // Note: Pour arrêter l'enregistrement, utiliser le bouton "Arrêter"
+                StartRecording();
             }
             catch (Exception ex)
             {
@@ -1404,13 +1418,15 @@ namespace MacroEngine.UI
                 return;
             }
 
-            // Mettre à jour l'interface
-            _blockEditor.RecordButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Record, " Enregistrement...");
+            // Mettre à jour l'interface (Pause/Reprendre sur le bouton Enregistrer)
             StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris (max 20 touches/seconde)";
             StatusText.Foreground = System.Windows.Media.Brushes.Black;
             _blockEditor.StopButton.IsEnabled = true;
+            _blockEditor.IsRecording = true;
+            _blockEditor.IsRecordingPaused = false;
+            _blockEditor.RecordButton.ToolTip = "Mettre en pause l'enregistrement";
             _isRecordingPaused = false;
-            
+
             _logger?.Info("Hooks d'enregistrement installés avec succès", "MainWindow");
         }
 
@@ -1441,9 +1457,12 @@ namespace MacroEngine.UI
             ProcessRemainingKeys();
 
             // Mettre à jour l'interface
-            _blockEditor.RecordButton.Content = LucideIcons.CreateIconWithText(LucideIcons.Record, " Enregistrer");
             StatusText.Text = $"Enregistrement terminé. {_selectedMacro?.Actions?.Count ?? 0} action(s) enregistrée(s)";
             _blockEditor.StopButton.IsEnabled = false;
+            _blockEditor.IsRecording = false;
+            _blockEditor.IsRecordingPaused = false;
+            _blockEditor.RecordButton.ToolTip = "Enregistrer une macro";
+            UpdateExecuteButtonText();
 
             // Rafraîchir l'éditeur
             if (_blockEditor != null && _selectedMacro != null)
@@ -2049,7 +2068,7 @@ namespace MacroEngine.UI
 
         private void StopMacro_Click(object sender, RoutedEventArgs e)
         {
-            // Si on est en train d'enregistrer, arrêter l'enregistrement
+            // Si on est en train d'enregistrer : arrêter l'enregistrement
             if (_isRecording)
             {
                 StopRecording();

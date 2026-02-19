@@ -5,6 +5,41 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DesignHeight="500" d:DesignWidth="600">
+    <UserControl.Resources>
+        <!-- Masque le libellé des boutons toolbar quand IsToolbarCompact est true (responsive) -->
+        <Style x:Key="ToolbarButtonLabelStyle" TargetType="TextBlock">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsToolbarCompact, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- En mode compact : centrer le contenu (icône) et réduire le padding pour voir tous les boutons -->
+        <Style x:Key="ToolbarButtonContentStyle" TargetType="StackPanel" BasedOn="{x:Null}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsToolbarCompact, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="HorizontalAlignment" Value="Center"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- En mode compact : retirer la marge à droite de l'icône pour un rendu centré -->
+        <Style x:Key="ToolbarButtonIconStyle" TargetType="FrameworkElement">
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsToolbarCompact, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="Margin" Value="0"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Bouton toolbar responsive : padding réduit en mode compact -->
+        <Style x:Key="ToolbarAddActionButtonResponsiveStyle" TargetType="Button" BasedOn="{StaticResource ToolbarAddActionButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsToolbarCompact, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                    <Setter Property="Padding" Value="6,6"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
 
     <!-- ══════════════════════════════════════════════════════════════════════
          TimelineEditor - Éditeur de macros basé sur une Timeline verticale
@@ -32,111 +67,161 @@
                     <ColumnDefinition Width="180" MinWidth="180"/>
                 </Grid.ColumnDefinitions>
                 <!-- Boutons d'action alignés à gauche, scroll horizontal si fenêtre étroite -->
-                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="0" Margin="0">
+                <ScrollViewer x:Name="ToolbarScrollViewer" Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Padding="0" Margin="0">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                        <Button x:Name="AddKeyboardButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="AddKeyboardButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource BlockKeyboardToolbarBrush}"
                                 Click="AddKeyboard_Click" Margin="4,0"
                                 ToolTip="Ajouter une touche clavier">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE284;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="+ Touche" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <TextBlock Text="&#xE284;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="+ Touche" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 
-                        <Button x:Name="AddMouseButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="AddMouseButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource BlockMouseToolbarBrush}"
                                 Click="AddMouse_Click" Margin="4,0"
                                 ToolTip="Ajouter un clic souris">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE11F;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="+ Clic" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <TextBlock Text="&#xE11F;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="+ Clic" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 
-                        <Button x:Name="AddTextButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="AddTextButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource BlockTextToolbarBrush}"
                                 Click="AddText_Click" Margin="4,0"
                                 ToolTip="Ajouter une action texte">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE0CC;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="+ Texte" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <TextBlock Text="&#xE0CC;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="+ Texte" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 
-                        <Button x:Name="AddVariableButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="AddVariableButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource BlockVariableToolbarBrush}"
                                 Click="AddVariable_Click" Margin="4,0"
                                 ToolTip="Ajouter une variable">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE061;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="+ Variable" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <TextBlock Text="&#xE061;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="+ Variable" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 
-                        <Button x:Name="AddDelayButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="AddDelayButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource BlockDelayToolbarBrush}"
                                 Click="AddDelay_Click" Margin="4,0"
                                 ToolTip="Ajouter un délai">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE087;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="+ Délai" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <TextBlock Text="&#xE087;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="+ Délai" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 
-                        <Button x:Name="AddIfButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="AddIfButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource BlockConditionToolbarBrush}"
                                 Click="AddIf_Click" Margin="4,0"
                                 ToolTip="Ajouter une condition If/Then/Else">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE082;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="+ If" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <TextBlock Text="&#xE082;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="+ If" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 
-                        <Button x:Name="AddRepeatButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="AddRepeatButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource BlockLoopToolbarBrush}"
                                 Click="AddRepeat_Click" Margin="4,0"
                                 ToolTip="Ajouter un bloc Répéter">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE146;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="+ Répéter" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <TextBlock Text="&#xE146;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="+ Répéter" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 
                         <!-- Séparateur entre boutons d'action et Presets -->
                         <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="8,0" VerticalAlignment="Center"/>
 
-                        <Button x:Name="PresetsButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="PresetsButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource AccentSecondaryToolbarBrush}"
                                 Click="PresetsButton_Click" Margin="4,0"
                                 ToolTip="Gérer les presets d'actions">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE100;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Presets" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <TextBlock Text="&#xE100;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="Presets" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 
                         <!-- Séparateur à droite de Presets -->
                         <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="8,0" VerticalAlignment="Center"/>
 
-                        <Button x:Name="RecordButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="RecordButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource RecordToolbarBrush}"
                                 Margin="4,0"
                                 ToolTip="Enregistrer une macro">
-                            <StackPanel Orientation="Horizontal">
-                                <Ellipse Width="8" Height="8" Fill="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Enregistrer" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
-                            </StackPanel>
+                            <Grid>
+                                <!-- État Enregistrer : point + texte (visible quand pas en enregistrement) -->
+                                <StackPanel Orientation="Horizontal">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel" BasedOn="{StaticResource ToolbarButtonContentStyle}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsRecording, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Ellipse Width="8" Height="8" Fill="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                    <TextBlock Text="Enregistrer" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
+                                </StackPanel>
+                                <!-- État Enregistrement : point animé + "Enregistrement" (visible quand en cours, pas en pause) -->
+                                <StackPanel Orientation="Horizontal">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel" BasedOn="{StaticResource ToolbarButtonContentStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsRecording, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                        <Condition Binding="{Binding IsRecordingPaused, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <Ellipse x:Name="RecordDotAnim" Width="8" Height="8" Fill="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                    <TextBlock Text="Enregistrement" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
+                                </StackPanel>
+                                <!-- État Pause : icône pause + "Pause" (visible quand enregistrement en pause) -->
+                                <StackPanel Orientation="Horizontal">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel" BasedOn="{StaticResource ToolbarButtonContentStyle}">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding IsRecording, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                        <Condition Binding="{Binding IsRecordingPaused, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="True"/>
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Text="&#xE07F;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                    <TextBlock Text="Pause" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
+                                </StackPanel>
+                            </Grid>
                         </Button>
-                        <Button x:Name="StopButton" Style="{StaticResource ToolbarAddActionButtonStyle}"
+                        <Button x:Name="StopButton" Style="{StaticResource ToolbarAddActionButtonResponsiveStyle}"
                                 Background="{StaticResource StopToolbarBrush}"
                                 Margin="4,0"
                                 IsEnabled="False"
                                 ToolTip="Arrêter l'enregistrement">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE083;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Arrêter" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" Style="{StaticResource ToolbarButtonContentStyle}">
+                                <Rectangle Width="8" Height="8" Fill="White" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonIconStyle}"/>
+                                <TextBlock Text="Arrêter" FontSize="12" Foreground="White" FontWeight="Medium" VerticalAlignment="Center" Style="{StaticResource ToolbarButtonLabelStyle}"/>
                             </StackPanel>
                         </Button>
 

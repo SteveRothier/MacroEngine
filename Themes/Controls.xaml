@@ -11,26 +11,15 @@
          TOGGLE SWITCH
          ══════════════════════════════════════════════════════════════════════ -->
 
-    <!-- Style de focus clavier pour les boutons de la barre d'outils (défini en premier pour référence) -->
-    <Style x:Key="ToolbarButtonFocusVisual" TargetType="Control">
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Control">
-                    <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="2" Margin="-1" SnapsToDevicePixels="True"/>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <!-- Toggle mécanique type module industriel : plaque, logement encastré, levier massif, LED -->
     <Style x:Key="ToggleSwitchStyle" TargetType="ToggleButton">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="MinWidth" Value="56"/>
         <Setter Property="MinHeight" Value="28"/>
-        <Setter Property="FocusVisualStyle" Value="{StaticResource ToolbarButtonFocusVisual}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
@@ -196,6 +185,7 @@
 
     <!-- Bouton principal (accent) -->
     <Style x:Key="ButtonPrimary" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -236,6 +226,7 @@
 
     <!-- Bouton secondaire (outline) -->
     <Style x:Key="ButtonSecondary" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderMediumBrush}"/>
@@ -279,6 +270,7 @@
 
     <!-- Bouton ghost (texte uniquement) -->
     <Style x:Key="ButtonGhost" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -318,6 +310,7 @@
 
     <!-- Bouton icône (carré) -->
     <Style x:Key="ButtonIcon" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -325,7 +318,6 @@
         <Setter Property="Height" Value="36"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="FocusVisualStyle" Value="{StaticResource ToolbarButtonFocusVisual}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -457,11 +449,11 @@
 
     <!-- Bouton d'ajout d'action (barre d'outils éditeur) : couleurs par Background, hover/état cohérents -->
     <Style x:Key="ToolbarAddActionButtonStyle" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Foreground" Value="White"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="12,8"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="FocusVisualStyle" Value="{StaticResource ToolbarButtonFocusVisual}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -489,6 +481,7 @@
 
     <!-- Boutons barre de titre fenêtre (Réduire / Agrandir) -->
     <Style x:Key="WindowCaptionButtonStyle" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -525,6 +518,7 @@
 
     <!-- Boutons action Clic (icônes Sélectionner, Aperçu, Définir zone) – accent vert souris -->
     <Style x:Key="TimelineClicButton" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BlockMouseBrush}"/>
@@ -564,6 +558,7 @@
 
     <!-- Boutons action If (icônes seules : ➕, ⚙, 📦) – accent rouge condition -->
     <Style x:Key="TimelineIfButton" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BlockConditionBrush}"/>
@@ -603,6 +598,7 @@
 
     <!-- Boutons icône action If (⚙ config, ✕ supprimer) – petit format, accent rouge -->
     <Style x:Key="TimelineIfIconButton" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BlockConditionBrush}"/>
@@ -643,6 +639,7 @@
 
     <!-- Bouton "Nouvelle Macro" (CTA principal - pourpre signature) -->
     <Style x:Key="ButtonSidebarPrimary" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
@@ -686,6 +683,7 @@
 
     <!-- Boutons Importer/Exporter (actions secondaires) -->
     <Style x:Key="ButtonSidebarSecondary" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
@@ -751,6 +749,7 @@
 
     <!-- ListBox sans ScrollViewer interne : évite le rognage des items en translation (à utiliser dans un ScrollViewer externe) -->
     <Style x:Key="MacrosListBoxStyle" TargetType="ListBox">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="ClipToBounds" Value="False"/>
@@ -771,6 +770,7 @@
 
     <!-- Style pour les items de la liste des macros : profondeur (ombre) quand non sélectionné, plat quand sélectionné -->
     <Style x:Key="MacroListItemStyle" TargetType="ListBoxItem">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Panel.ZIndex" Value="0"/>
         <Setter Property="Padding" Value="12,10"/>
         <Setter Property="Margin" Value="0,0.5,0,0.5"/>
@@ -856,6 +856,7 @@
          ══════════════════════════════════════════════════════════════════════ -->
 
     <Style x:Key="TextBoxModern" TargetType="TextBox">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource BackgroundPrimaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
@@ -899,6 +900,7 @@
 
     <!-- Input action (timeline) : texte seul, barre horizontale en dessous quand sélectionné -->
     <Style x:Key="TextBoxAction" TargetType="TextBox">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="CaretBrush" Value="{StaticResource TextOnAccentBrush}"/>
@@ -942,6 +944,7 @@
          ══════════════════════════════════════════════════════════════════════ -->
 
     <Style x:Key="ComboBoxModern" TargetType="ComboBox">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource BackgroundPrimaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
@@ -999,6 +1002,7 @@
 
     <!-- Style pour les items du ComboBox -->
     <Style TargetType="ComboBoxItem">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="FontSize" Value="13"/>
@@ -1027,6 +1031,7 @@
          ══════════════════════════════════════════════════════════════════════ -->
 
     <Style x:Key="CheckBoxModern" TargetType="CheckBox">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource FontPrimary}"/>
         <Setter Property="FontSize" Value="13"/>
@@ -1100,6 +1105,7 @@
 
     <!-- RepeatButton pour les flèches / zone de la scrollbar -->
     <Style x:Key="ScrollBarRepeatButtonStyle" TargetType="RepeatButton">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
         <Setter Property="Template">
@@ -1311,6 +1317,7 @@
 
     <!-- Bouton d'ajout de bloc (+) -->
     <Style x:Key="BlockAddButton" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
         <Setter Property="Width" Value="48"/>
@@ -1354,6 +1361,7 @@
 
     <!-- Bouton de suppression sur les blocs -->
     <Style x:Key="BlockDeleteButton" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
         <Setter Property="Width" Value="24"/>
