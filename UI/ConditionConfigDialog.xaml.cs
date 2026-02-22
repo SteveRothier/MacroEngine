@@ -537,10 +537,6 @@ namespace MacroEngine.UI
                 }
             }
 
-            var selectedProcessNames = new HashSet<string>(condition.ActiveApplicationConfig.ProcessNames, StringComparer.OrdinalIgnoreCase);
-            var allProcesses = new ObservableCollection<SelectableProcessInfo>();
-            var filteredProcesses = new ObservableCollection<SelectableProcessInfo>();
-
             // Description
             var descriptionText = new TextBlock
             {
@@ -552,283 +548,44 @@ namespace MacroEngine.UI
             };
             ConfigContentPanel.Children.Add(descriptionText);
 
-            // Barre de recherche
-            var searchGrid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            searchGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var searchTextBox = new TextBox
+            // Bouton pour ouvrir le dialogue de sélection
+            var selectAppsButton = new Button
             {
-                Padding = new Thickness(5),
+                Content = "Choisir les applications...",
+                Style = (Style)FindResource("DialogContentButton"),
+                Margin = new Thickness(0, 0, 0, 10),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+
+            var selectedAppsLabel = new TextBlock
+            {
+                Text = condition.ActiveApplicationConfig.ProcessNames.Count == 0
+                    ? "Aucune application sélectionnée."
+                    : $"{condition.ActiveApplicationConfig.ProcessNames.Count} application(s) sélectionnée(s) : {string.Join(", ", condition.ActiveApplicationConfig.ProcessNames.OrderBy(a => a).Take(5))}{(condition.ActiveApplicationConfig.ProcessNames.Count > 5 ? "…" : "")}",
+                Foreground = Brushes.White,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 10),
                 FontSize = 12
             };
-            searchTextBox.TextChanged += (s, e) =>
+
+            selectAppsButton.Click += (s, e) =>
             {
-                var searchText = searchTextBox.Text?.Trim().ToLower() ?? string.Empty;
-                filteredProcesses.Clear();
-                foreach (var process in allProcesses)
+                var dialog = new AppSelectorDialog
                 {
-                    if (string.IsNullOrEmpty(searchText) ||
-                        process.ProcessName.ToLower().Contains(searchText) ||
-                        process.WindowTitle.ToLower().Contains(searchText))
-                    {
-                        filteredProcesses.Add(process);
-                    }
+                    Owner = this,
+                    SelectedApplications = condition.ActiveApplicationConfig!.ProcessNames.ToList()
+                };
+                if (dialog.ShowDialog() == true)
+                {
+                    condition.ActiveApplicationConfig.ProcessNames = dialog.SelectedApplications;
+                    selectedAppsLabel.Text = condition.ActiveApplicationConfig.ProcessNames.Count == 0
+                        ? "Aucune application sélectionnée."
+                        : $"{condition.ActiveApplicationConfig.ProcessNames.Count} application(s) sélectionnée(s) : {string.Join(", ", condition.ActiveApplicationConfig.ProcessNames.OrderBy(a => a).Take(5))}{(condition.ActiveApplicationConfig.ProcessNames.Count > 5 ? "…" : "")}";
                 }
             };
-            Grid.SetColumn(searchTextBox, 0);
-            searchGrid.Children.Add(searchTextBox);
 
-            var refreshButton = new Button
-            {
-                Content = "🔄 Actualiser",
-                Padding = new Thickness(10, 5, 10, 5),
-                Margin = new Thickness(5, 0, 0, 0),
-                FontSize = 12
-            };
-            Grid.SetColumn(refreshButton, 1);
-            searchGrid.Children.Add(refreshButton);
-            ConfigContentPanel.Children.Add(searchGrid);
-
-            // Checkbox pour afficher tous les processus
-            var showAllCheckBox = new CheckBox
-            {
-                Content = "Afficher tous les processus (y compris sans fenêtre)",
-                Margin = new Thickness(0, 0, 0, 5),
-                FontSize = 12
-            };
-            ConfigContentPanel.Children.Add(showAllCheckBox);
-
-            // Applications sélectionnées (déclarer avant les fonctions locales)
-            var selectedAppsPanel = new WrapPanel
-            {
-                MinHeight = 30,
-                Margin = new Thickness(0, 0, 0, 10)
-            };
-
-            // ListView pour les processus
-            var processListView = new ListView
-            {
-                SelectionMode = SelectionMode.Multiple,
-                MaxHeight = 200,
-                Margin = new Thickness(0, 0, 0, 10)
-            };
-
-            var gridView = new GridView();
-            var checkBoxColumn = new GridViewColumn { Width = 30 };
-            checkBoxColumn.CellTemplate = new DataTemplate();
-            var checkBoxFactory = new FrameworkElementFactory(typeof(CheckBox));
-            checkBoxFactory.SetBinding(CheckBox.IsCheckedProperty, new System.Windows.Data.Binding("IsSelected") { Mode = System.Windows.Data.BindingMode.TwoWay });
-            checkBoxFactory.AddHandler(CheckBox.ClickEvent, new RoutedEventHandler((s, e) =>
-            {
-                if (s is CheckBox cb && cb.DataContext is SelectableProcessInfo process)
-                {
-                    if (process.IsSelected)
-                        selectedProcessNames.Add(process.ProcessName);
-                    else
-                        selectedProcessNames.Remove(process.ProcessName);
-                    UpdateSelectedAppsDisplay();
-                }
-            }));
-            checkBoxColumn.CellTemplate.VisualTree = checkBoxFactory;
-
-            var processColumn = new GridViewColumn { Header = "Processus", Width = 180 };
-            processColumn.CellTemplate = new DataTemplate();
-            var stackFactory = new FrameworkElementFactory(typeof(StackPanel));
-            stackFactory.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
-
-            var imageFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.Image));
-            imageFactory.SetBinding(System.Windows.Controls.Image.SourceProperty, new System.Windows.Data.Binding("Icon"));
-            imageFactory.SetValue(System.Windows.Controls.Image.WidthProperty, 16.0);
-            imageFactory.SetValue(System.Windows.Controls.Image.HeightProperty, 16.0);
-            imageFactory.SetValue(System.Windows.Controls.Image.MarginProperty, new Thickness(0, 0, 6, 0));
-            imageFactory.SetValue(RenderOptions.BitmapScalingModeProperty, BitmapScalingMode.HighQuality);
-            stackFactory.AppendChild(imageFactory);
-
-            var textFactory = new FrameworkElementFactory(typeof(TextBlock));
-            textFactory.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("ProcessName"));
-            textFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-            stackFactory.AppendChild(textFactory);
-
-            processColumn.CellTemplate.VisualTree = stackFactory;
-
-            var windowColumn = new GridViewColumn { Header = "Fenêtre", Width = 220 };
-            windowColumn.DisplayMemberBinding = new System.Windows.Data.Binding("WindowTitle");
-
-            var pidColumn = new GridViewColumn { Header = "PID", Width = 60 };
-            pidColumn.DisplayMemberBinding = new System.Windows.Data.Binding("ProcessId");
-
-            gridView.Columns.Add(checkBoxColumn);
-            gridView.Columns.Add(processColumn);
-            gridView.Columns.Add(windowColumn);
-            gridView.Columns.Add(pidColumn);
-            processListView.View = gridView;
-            processListView.ItemsSource = filteredProcesses;
-
-            ConfigContentPanel.Children.Add(processListView);
-
-            // Applications sélectionnées
-            var selectedLabel = new TextBlock
-            {
-                Text = "Applications sélectionnées:",
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 5, 0, 5)
-            };
-            ConfigContentPanel.Children.Add(selectedLabel);
-            ConfigContentPanel.Children.Add(selectedAppsPanel);
-
-            void UpdateSelectedAppsDisplay()
-            {
-                selectedAppsPanel.Children.Clear();
-                condition.ActiveApplicationConfig!.ProcessNames = selectedProcessNames.ToList();
-
-                if (selectedProcessNames.Count == 0)
-                {
-                    selectedAppsPanel.Children.Add(new TextBlock
-                    {
-                        Text = "Aucune application sélectionnée",
-                        Foreground = Brushes.White,
-                        FontStyle = FontStyles.Italic
-                    });
-                }
-                else
-                {
-                    foreach (var app in selectedProcessNames.OrderBy(a => a))
-                    {
-                        var border = new Border
-                        {
-                            Background = DialogBrush("BackgroundTertiaryBrush"),
-                            CornerRadius = new CornerRadius(3),
-                            Padding = new Thickness(5, 2, 5, 2),
-                            Margin = new Thickness(0, 0, 5, 5)
-                        };
-
-                        var stack = new StackPanel { Orientation = Orientation.Horizontal };
-                        stack.Children.Add(new TextBlock { Text = app, VerticalAlignment = VerticalAlignment.Center });
-
-                        var removeButton = new Button
-                        {
-                            Content = LucideIcons.CreateIcon(LucideIcons.Close, 10),
-                            FontSize = 10,
-                            Padding = new Thickness(3, 0, 3, 0),
-                            Margin = new Thickness(5, 0, 0, 0),
-                            Background = Brushes.Transparent,
-                            BorderThickness = new Thickness(0),
-                            Cursor = System.Windows.Input.Cursors.Hand,
-                            Tag = app
-                        };
-                        removeButton.Click += (s, e) =>
-                        {
-                            if (s is Button btn && btn.Tag is string appName)
-                            {
-                                selectedProcessNames.Remove(appName);
-                                UpdateSelectionState();
-                                UpdateSelectedAppsDisplay();
-                            }
-                        };
-                        stack.Children.Add(removeButton);
-                        border.Child = stack;
-                        selectedAppsPanel.Children.Add(border);
-                    }
-                }
-            }
-
-            void UpdateSelectionState()
-            {
-                foreach (var process in allProcesses)
-                {
-                    process.IsSelected = selectedProcessNames.Contains(process.ProcessName);
-                }
-            }
-
-            void LoadProcesses()
-            {
-                allProcesses.Clear();
-                filteredProcesses.Clear();
-
-                var processes = (showAllCheckBox.IsChecked == true)
-                    ? ProcessMonitor.GetAllProcesses()
-                    : ProcessMonitor.GetRunningProcesses();
-
-                foreach (var process in processes)
-                {
-                    var selectableProcess = new SelectableProcessInfo
-                    {
-                        ProcessName = process.ProcessName,
-                        ProcessId = process.ProcessId,
-                        WindowTitle = process.WindowTitle,
-                        ExecutablePath = process.ExecutablePath,
-                        HasMainWindow = process.HasMainWindow,
-                        Icon = process.Icon,
-                        IsSelected = selectedProcessNames.Contains(process.ProcessName)
-                    };
-                    allProcesses.Add(selectableProcess);
-                }
-
-                var searchText = searchTextBox.Text?.Trim().ToLower() ?? string.Empty;
-                foreach (var process in allProcesses)
-                {
-                    if (string.IsNullOrEmpty(searchText) ||
-                        process.ProcessName.ToLower().Contains(searchText) ||
-                        process.WindowTitle.ToLower().Contains(searchText))
-                    {
-                        filteredProcesses.Add(process);
-                    }
-                }
-            }
-
-            // Ajout manuel de processus
-            var manualGrid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-            manualGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            manualGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            manualGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-            var manualLabel = new TextBlock
-            {
-                Text = "Ou entrez manuellement:",
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 5, 0),
-                FontSize = 12
-            };
-            Grid.SetColumn(manualLabel, 0);
-            manualGrid.Children.Add(manualLabel);
-
-            var manualTextBox = new TextBox
-            {
-                Padding = new Thickness(3),
-                FontSize = 12,
-                Margin = new Thickness(0, 0, 5, 0)
-            };
-            Grid.SetColumn(manualTextBox, 1);
-            manualGrid.Children.Add(manualTextBox);
-
-            var addButton = new Button
-            {
-                Content = "Ajouter",
-                Padding = new Thickness(10, 3, 10, 3),
-                FontSize = 12
-            };
-            addButton.Click += (s, e) =>
-            {
-                var processName = manualTextBox.Text?.Trim();
-                if (!string.IsNullOrEmpty(processName))
-                {
-                    if (processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
-                        processName = processName.Substring(0, processName.Length - 4);
-
-                    if (!selectedProcessNames.Contains(processName))
-                    {
-                        selectedProcessNames.Add(processName);
-                        UpdateSelectionState();
-                        UpdateSelectedAppsDisplay();
-                    }
-                    manualTextBox.Clear();
-                }
-            };
-            Grid.SetColumn(addButton, 2);
-            manualGrid.Children.Add(addButton);
-            ConfigContentPanel.Children.Add(manualGrid);
+            ConfigContentPanel.Children.Add(selectAppsButton);
+            ConfigContentPanel.Children.Add(selectedAppsLabel);
 
             // Titre de la fenêtre (optionnel)
             var titleLabel = new TextBlock
@@ -888,15 +645,6 @@ namespace MacroEngine.UI
             anyWindowCheckBox.Checked += (s, e) => condition.ActiveApplicationConfig!.AnyWindow = true;
             anyWindowCheckBox.Unchecked += (s, e) => condition.ActiveApplicationConfig!.AnyWindow = false;
             ConfigContentPanel.Children.Add(anyWindowCheckBox);
-
-            // Configurer les événements
-            refreshButton.Click += (s, e) => LoadProcesses();
-            showAllCheckBox.Checked += (s, e) => LoadProcesses();
-            showAllCheckBox.Unchecked += (s, e) => LoadProcesses();
-
-            // Charger les processus au démarrage
-            LoadProcesses();
-            UpdateSelectedAppsDisplay();
         }
 
         private void CreateKeyboardKeyConfig()
