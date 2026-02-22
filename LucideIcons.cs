@@ -19,6 +19,7 @@ public static class LucideIcons
     // Paramètres / Actions
     public const string Settings = "\uE30B";    // cog
     public const string Plus = "\uE081";       // circle-plus
+    public const string RefreshCcw = "\uE148";  // refresh-ccw (flèches circulaires)
     public const string Close = "\uE084";      // circle-x
     public const string Cross = "\uE1E5";      // cross
     public const string X = "\uE1B2";          // x (simple X pour fermer)
@@ -55,6 +56,11 @@ public static class LucideIcons
 
     // Texte / Type
     public const string Type = "\uE198";      // type
+
+    // Tri
+    public const string ArrowUp = "\uE19E";       // upload / arrow up
+    public const string ArrowDown = "\uE0B2";     // download / arrow down
+    public const string ArrowUpDown = "\uE376";   // arrow-up-down (tri, sort, reorder)
 
     /// <summary>Crée un TextBlock affichant une icône Lucide (pour Content de bouton, etc.).</summary>
     public static TextBlock CreateIcon(string icon, double fontSize = 14)
