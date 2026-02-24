@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shell;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Processes;
@@ -735,6 +736,7 @@ namespace MacroEngine.UI
                         chipGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                         chipGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(20) });
                         var col = 0;
+                        var iconContainer = new Grid { Width = 14, Height = 14 };
                         var img = new System.Windows.Controls.Image
                         {
                             Width = 14,
@@ -744,15 +746,50 @@ namespace MacroEngine.UI
                             HorizontalAlignment = HorizontalAlignment.Center
                         };
                         RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-                        Grid.SetRow(img, 0);
-                        Grid.SetColumn(img, col++);
-                        chipGrid.Children.Add(img);
-                        _ = Task.Run(() =>
+                        if (ProcessMonitor.TryGetCachedIcon(app, out var cachedIcon) && cachedIcon != null)
                         {
-                            var icon = ProcessMonitor.GetIconForProcessName(app);
-                            if (icon != null)
-                                Dispatcher.BeginInvoke(new Action(() => { img.Source = icon; }));
-                        });
+                            img.Source = cachedIcon;
+                            iconContainer.Children.Add(img);
+                        }
+                        else
+                        {
+                            var placeholder = new TextBlock
+                            {
+                                Text = LucideIcons.RefreshCcw,
+                                FontSize = 12,
+                                VerticalAlignment = VerticalAlignment.Center,
+                                HorizontalAlignment = HorizontalAlignment.Center,
+                                Foreground = chipFg,
+                                RenderTransformOrigin = new Point(0.5, 0.5),
+                                RenderTransform = new RotateTransform(0)
+                            };
+                            placeholder.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
+                            placeholder.Loaded += (s, _) =>
+                            {
+                                var rt = (RotateTransform)placeholder.RenderTransform;
+                                var anim = new DoubleAnimation(0, -360, new Duration(TimeSpan.FromSeconds(1)))
+                                {
+                                    RepeatBehavior = RepeatBehavior.Forever
+                                };
+                                rt.BeginAnimation(RotateTransform.AngleProperty, anim);
+                            };
+                            iconContainer.Children.Add(placeholder);
+                            iconContainer.Children.Add(img);
+                            _ = Task.Run(() =>
+                            {
+                                var icon = ProcessMonitor.GetIconForProcessName(app);
+                                if (icon != null)
+                                    Dispatcher.BeginInvoke(new Action(() =>
+                                    {
+                                        img.Source = icon;
+                                        ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
+                                        placeholder.Visibility = Visibility.Collapsed;
+                                    }));
+                            });
+                        }
+                        Grid.SetRow(iconContainer, 0);
+                        Grid.SetColumn(iconContainer, col++);
+                        chipGrid.Children.Add(iconContainer);
                         var txt = new TextBlock
                         {
                             Text = app,

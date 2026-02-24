@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
@@ -214,11 +215,33 @@ namespace MacroEngine.Core.Processes
             return string.Equals(foregroundProcessName, processName, StringComparison.OrdinalIgnoreCase);
         }
 
+        private static readonly ConcurrentDictionary<string, ImageSource?> _iconCache =
+            new ConcurrentDictionary<string, ImageSource?>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Tente de récupérer une icône déjà en cache (sans déclencher de chargement).
+        /// </summary>
+        public static bool TryGetCachedIcon(string processName, out ImageSource? icon)
+        {
+            icon = null;
+            if (string.IsNullOrEmpty(processName))
+                return false;
+            return _iconCache.TryGetValue(processName, out icon);
+        }
+
         /// <summary>
         /// Charge l'icône d'une application par son nom de processus (pour lazy-load).
+        /// Les icônes sont mises en cache pour éviter de recharger à chaque affichage.
         /// À appeler depuis un thread de fond.
         /// </summary>
         public static ImageSource? GetIconForProcessName(string processName)
+        {
+            if (string.IsNullOrEmpty(processName))
+                return null;
+            return _iconCache.GetOrAdd(processName, LoadIconForProcessNameInternal);
+        }
+
+        private static ImageSource? LoadIconForProcessNameInternal(string processName)
         {
             foreach (var process in Process.GetProcesses())
             {

@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shell;
 using System.Windows.Threading;
 using MacroEngine.Core.Processes;
@@ -335,21 +336,58 @@ namespace MacroEngine.UI
                     };
 
                     var stack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-                    var icon = _allProcesses.FirstOrDefault(p => string.Equals(p.ProcessName, app, StringComparison.OrdinalIgnoreCase))?.Icon;
-                    if (icon != null)
+                    var iconContainer = new Grid { Width = 14, Height = 14, Margin = new Thickness(0, 0, 6, 0) };
+                    var img = new Image
                     {
-                        var img = new Image
-                        {
-                            Source = icon,
-                            Width = 14,
-                            Height = 14,
-                            Stretch = Stretch.Uniform,
-                            Margin = new Thickness(0, 0, 6, 0),
-                            VerticalAlignment = VerticalAlignment.Center
-                        };
-                        RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
-                        stack.Children.Add(img);
+                        Width = 14,
+                        Height = 14,
+                        Stretch = Stretch.Uniform,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+                    RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+                    if (ProcessMonitor.TryGetCachedIcon(app, out var cachedIcon) && cachedIcon != null)
+                    {
+                        img.Source = cachedIcon;
+                        iconContainer.Children.Add(img);
                     }
+                    else
+                    {
+                        var placeholder = new TextBlock
+                        {
+                            Text = LucideIcons.RefreshCcw,
+                            FontSize = 12,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            Foreground = chipFg,
+                            RenderTransformOrigin = new Point(0.5, 0.5),
+                            RenderTransform = new RotateTransform(0)
+                        };
+                        placeholder.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
+                        placeholder.Loaded += (s, _) =>
+                        {
+                            var rt = (RotateTransform)placeholder.RenderTransform;
+                            var anim = new DoubleAnimation(0, -360, new Duration(TimeSpan.FromSeconds(1)))
+                            {
+                                RepeatBehavior = RepeatBehavior.Forever
+                            };
+                            rt.BeginAnimation(RotateTransform.AngleProperty, anim);
+                        };
+                        iconContainer.Children.Add(placeholder);
+                        iconContainer.Children.Add(img);
+                        _ = Task.Run(() =>
+                        {
+                            var loadedIcon = ProcessMonitor.GetIconForProcessName(app);
+                            if (loadedIcon != null)
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    img.Source = loadedIcon;
+                                    ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
+                                    placeholder.Visibility = Visibility.Collapsed;
+                                }));
+                        });
+                    }
+                    stack.Children.Add(iconContainer);
                     stack.Children.Add(new TextBlock
                     {
                         Text = app,
