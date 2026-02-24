@@ -214,6 +214,52 @@ namespace MacroEngine.Core.Processes
             return string.Equals(foregroundProcessName, processName, StringComparison.OrdinalIgnoreCase);
         }
 
+        /// <summary>
+        /// Charge l'icône d'une application par son nom de processus (pour lazy-load).
+        /// À appeler depuis un thread de fond.
+        /// </summary>
+        public static ImageSource? GetIconForProcessName(string processName)
+        {
+            foreach (var process in Process.GetProcesses())
+            {
+                try
+                {
+                    if (!string.Equals(process.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var path = GetProcessPath(process);
+                    if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                        continue;
+                    try
+                    {
+                        using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(path))
+                        {
+                            if (icon == null)
+                                return null;
+                            using (var clone = (System.Drawing.Icon)icon.Clone())
+                            {
+                                var bitmap = Imaging.CreateBitmapSourceFromHIcon(
+                                    clone.Handle,
+                                    Int32Rect.Empty,
+                                    BitmapSizeOptions.FromWidthAndHeight(16, 16));
+                                bitmap.Freeze();
+                                return bitmap;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+                }
+                catch { }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+            return null;
+        }
+
         private static string GetProcessPath(Process process)
         {
             try

@@ -51,6 +51,31 @@
             <Setter Property="MinWidth" Value="28"/>
             <Setter Property="MinHeight" Value="26"/>
         </Style>
+        <!-- Bouton supprimer des chips : croix rouge pourpre au hover -->
+        <Style x:Key="ChipRemoveButtonStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="3" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock x:Name="iconTb" Text="&#xE1B2;" FontFamily="{StaticResource FontLucide}" FontSize="10"
+                                       Foreground="{TemplateBinding Foreground}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="iconTb" Property="Foreground" Value="#C25B6B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <Border x:Name="RootBorder"
             Background="{StaticResource BackgroundPrimaryBrush}"
