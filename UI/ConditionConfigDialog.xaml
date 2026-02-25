@@ -51,6 +51,56 @@
             <Setter Property="MinWidth" Value="28"/>
             <Setter Property="MinHeight" Value="26"/>
         </Style>
+        <!-- Style pour le tableau "Processus ouvert" (en-têtes de colonnes, version compacte) -->
+        <Style TargetType="GridViewColumnHeader">
+            <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="MinHeight" Value="22"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+        <Style x:Key="ProcessRunningListViewItemStyle" TargetType="ListViewItem">
+            <Setter Property="MinHeight" Value="22"/>
+            <Setter Property="Padding" Value="2,1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListViewItem">
+                        <Border x:Name="RowBorder"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Margin="0">
+                            <GridViewRowPresenter Content="{TemplateBinding Content}"
+                                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RowBorder" Property="Background" Value="#15FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="RowBorder" Property="Background" Value="#15FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ProcessRunningListViewStyle" TargetType="ListView">
+            <Setter Property="Background" Value="{StaticResource BackgroundPrimaryBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="FontSize" Value="11"/>
+        </Style>
         <!-- Bouton supprimer des chips : croix rouge pourpre au hover -->
         <Style x:Key="ChipRemoveButtonStyle" TargetType="Button">
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
