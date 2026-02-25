@@ -378,13 +378,12 @@ namespace MacroEngine.UI
                         _ = Task.Run(() =>
                         {
                             var loadedIcon = ProcessMonitor.GetIconForProcessName(app);
-                            if (loadedIcon != null)
-                                Dispatcher.BeginInvoke(new Action(() =>
-                                {
-                                    img.Source = loadedIcon;
-                                    ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
-                                    placeholder.Visibility = Visibility.Collapsed;
-                                }));
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                if (loadedIcon != null) img.Source = loadedIcon;
+                                ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
+                                placeholder.Visibility = Visibility.Collapsed;
+                            }));
                         });
                     }
                     stack.Children.Add(iconContainer);

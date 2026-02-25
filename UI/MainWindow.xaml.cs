@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Interop;
 using System.Windows.Shell;
 using Microsoft.Win32;
@@ -2814,22 +2815,76 @@ namespace MacroEngine.UI
             }
             else
             {
+                var chipFg = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
+                if (chipFg == null) chipFg = System.Windows.Media.Brushes.White;
                 foreach (var app in _selectedMacro.TargetApplications)
                 {
                     var appName = System.IO.Path.GetFileNameWithoutExtension(app);
+                    if (string.IsNullOrEmpty(appName)) appName = app;
                     var tag = new Border
                     {
                         Background = (System.Windows.Media.Brush)FindResource("AccentPrimaryBrush"),
                         CornerRadius = new CornerRadius(4),
-                        Padding = new Thickness(8, 4, 8, 4),
+                        Padding = new Thickness(6, 4, 8, 4),
                         Margin = new Thickness(0, 0, 4, 4)
                     };
-                    tag.Child = new System.Windows.Controls.TextBlock
+                    var stack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                    var iconContainer = new Grid { Width = 14, Height = 14, Margin = new Thickness(0, 0, 6, 0) };
+                    var img = new System.Windows.Controls.Image
+                    {
+                        Width = 14,
+                        Height = 14,
+                        Stretch = Stretch.Uniform,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+                    RenderOptions.SetBitmapScalingMode(img, BitmapScalingMode.HighQuality);
+                    if (ProcessMonitor.TryGetCachedIcon(appName, out var cachedIcon) && cachedIcon != null)
+                    {
+                        img.Source = cachedIcon;
+                        iconContainer.Children.Add(img);
+                    }
+                    else
+                    {
+                        var placeholder = new TextBlock
+                        {
+                            Text = LucideIcons.RefreshCcw,
+                            FontSize = 10,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            Foreground = chipFg,
+                            RenderTransformOrigin = new Point(0.5, 0.5),
+                            RenderTransform = new RotateTransform(0)
+                        };
+                        placeholder.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
+                        placeholder.Loaded += (s, _) =>
+                        {
+                            var rt = (RotateTransform)placeholder.RenderTransform;
+                            var anim = new DoubleAnimation(0, -360, new Duration(TimeSpan.FromSeconds(1))) { RepeatBehavior = RepeatBehavior.Forever };
+                            rt.BeginAnimation(RotateTransform.AngleProperty, anim);
+                        };
+                        iconContainer.Children.Add(placeholder);
+                        iconContainer.Children.Add(img);
+                        _ = Task.Run(() =>
+                        {
+                            var icon = ProcessMonitor.GetIconForProcessName(appName);
+                            Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                if (icon != null) img.Source = icon;
+                                ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
+                                placeholder.Visibility = Visibility.Collapsed;
+                            }));
+                        });
+                    }
+                    stack.Children.Add(iconContainer);
+                    stack.Children.Add(new TextBlock
                     {
                         Text = appName,
                         Foreground = System.Windows.Media.Brushes.White,
-                        FontSize = 11
-                    };
+                        FontSize = 11,
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    tag.Child = stack;
                     TargetAppsPanel.Children.Add(tag);
                 }
             }

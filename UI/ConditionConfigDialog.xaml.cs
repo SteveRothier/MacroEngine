@@ -778,13 +778,12 @@ namespace MacroEngine.UI
                             _ = Task.Run(() =>
                             {
                                 var icon = ProcessMonitor.GetIconForProcessName(app);
-                                if (icon != null)
-                                    Dispatcher.BeginInvoke(new Action(() =>
-                                    {
-                                        img.Source = icon;
-                                        ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
-                                        placeholder.Visibility = Visibility.Collapsed;
-                                    }));
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    if (icon != null) img.Source = icon;
+                                    ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
+                                    placeholder.Visibility = Visibility.Collapsed;
+                                }));
                             });
                         }
                         Grid.SetRow(iconContainer, 0);
@@ -1468,13 +1467,12 @@ namespace MacroEngine.UI
                             _ = Task.Run(() =>
                             {
                                 var icon = ProcessMonitor.GetIconForProcessName(app);
-                                if (icon != null)
-                                    Dispatcher.BeginInvoke(new Action(() =>
-                                    {
-                                        img.Source = icon;
-                                        ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
-                                        placeholder.Visibility = Visibility.Collapsed;
-                                    }));
+                                Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    if (icon != null) img.Source = icon;
+                                    ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
+                                    placeholder.Visibility = Visibility.Collapsed;
+                                }));
                             });
                         }
                         Grid.SetRow(iconContainer, 0);

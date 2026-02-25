@@ -249,29 +249,36 @@ namespace MacroEngine.Core.Processes
                 {
                     if (!string.Equals(process.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
                         continue;
+                    // 1) Essayer l'icône de l'exécutable
                     var path = GetProcessPath(process);
-                    if (string.IsNullOrEmpty(path) || !File.Exists(path))
-                        continue;
-                    try
+                    if (!string.IsNullOrEmpty(path) && File.Exists(path))
                     {
-                        using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(path))
+                        try
                         {
-                            if (icon == null)
-                                return null;
-                            using (var clone = (System.Drawing.Icon)icon.Clone())
+                            using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(path))
                             {
-                                var bitmap = Imaging.CreateBitmapSourceFromHIcon(
-                                    clone.Handle,
-                                    Int32Rect.Empty,
-                                    BitmapSizeOptions.FromWidthAndHeight(16, 16));
-                                bitmap.Freeze();
-                                return bitmap;
+                                if (icon != null)
+                                {
+                                    using (var clone = (System.Drawing.Icon)icon.Clone())
+                                    {
+                                        var bitmap = Imaging.CreateBitmapSourceFromHIcon(
+                                            clone.Handle,
+                                            Int32Rect.Empty,
+                                            BitmapSizeOptions.FromWidthAndHeight(16, 16));
+                                        bitmap.Freeze();
+                                        return bitmap;
+                                    }
+                                }
                             }
                         }
+                        catch { }
                     }
-                    catch
+                    // 2) Si pas d'icône processus, essayer l'icône de la fenêtre
+                    if (process.MainWindowHandle != IntPtr.Zero)
                     {
-                        return null;
+                        var windowIcon = GetIconFromWindow(process.MainWindowHandle);
+                        if (windowIcon != null)
+                            return windowIcon;
                     }
                 }
                 catch { }
@@ -281,6 +288,38 @@ namespace MacroEngine.Core.Processes
                 }
             }
             return null;
+        }
+
+        /// <summary>
+        /// Récupère l'icône associée à une fenêtre (WM_GETICON puis GetClassLongPtr en secours).
+        /// Utilisé par ProcessInfo et par LoadIconForProcessNameInternal.
+        /// </summary>
+        public static ImageSource? GetIconFromWindow(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero) return null;
+            IntPtr hIcon = IntPtr.Zero;
+            try
+            {
+                hIcon = SendMessage(hWnd, WM_GETICON, (IntPtr)ICON_SMALL, IntPtr.Zero);
+                if (hIcon == IntPtr.Zero)
+                    hIcon = SendMessage(hWnd, WM_GETICON, (IntPtr)ICON_BIG, IntPtr.Zero);
+                if (hIcon == IntPtr.Zero)
+                    hIcon = GetClassLongPtr(hWnd, GCLP_HICONSM);
+                if (hIcon == IntPtr.Zero)
+                    hIcon = GetClassLongPtr(hWnd, GCLP_HICON);
+                if (hIcon == IntPtr.Zero)
+                    return null;
+                var bitmap = Imaging.CreateBitmapSourceFromHIcon(
+                    hIcon,
+                    Int32Rect.Empty,
+                    BitmapSizeOptions.FromWidthAndHeight(16, 16));
+                bitmap.Freeze();
+                return bitmap;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static string GetProcessPath(Process process)
@@ -318,6 +357,18 @@ namespace MacroEngine.Core.Processes
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern IntPtr GetClassLongPtr(IntPtr hWnd, int nIndex);
+
+        private const uint WM_GETICON = 0x7F;
+        private const int ICON_SMALL = 0;
+        private const int ICON_BIG = 1;
+        private const int GCLP_HICON = -14;
+        private const int GCLP_HICONSM = -34;
     }
 
     /// <summary>
@@ -377,31 +428,43 @@ namespace MacroEngine.Core.Processes
                 }
                 catch { }
             }
-            if (string.IsNullOrEmpty(path) || !File.Exists(path))
-                return null;
-
+            // 1) Essayer l'icône de l'exécutable
+            if (!string.IsNullOrEmpty(path) && File.Exists(path))
+            {
+                try
+                {
+                    using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(path))
+                    {
+                        if (icon != null)
+                        {
+                            using (var clone = (System.Drawing.Icon)icon.Clone())
+                            {
+                                var bitmap = Imaging.CreateBitmapSourceFromHIcon(
+                                    clone.Handle,
+                                    Int32Rect.Empty,
+                                    BitmapSizeOptions.FromWidthAndHeight(16, 16));
+                                bitmap.Freeze();
+                                return bitmap;
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+            // 2) Si pas d'icône processus, essayer l'icône de la fenêtre
             try
             {
-                using (var icon = System.Drawing.Icon.ExtractAssociatedIcon(path))
+                using (var process = Process.GetProcessById(ProcessId))
                 {
-                    if (icon == null)
-                        return null;
-                    // Clone pour éviter que le handle soit libéré avant la copie par WPF
-                    using (var clone = (System.Drawing.Icon)icon.Clone())
+                    if (process.MainWindowHandle != IntPtr.Zero)
                     {
-                        var bitmap = Imaging.CreateBitmapSourceFromHIcon(
-                            clone.Handle,
-                            Int32Rect.Empty,
-                            BitmapSizeOptions.FromWidthAndHeight(16, 16));
-                        bitmap.Freeze();
-                        return bitmap;
+                        var windowIcon = ProcessMonitor.GetIconFromWindow(process.MainWindowHandle);
+                        if (windowIcon != null)
+                            return windowIcon;
                     }
                 }
             }
-            catch
-            {
-                // Ignorer les erreurs d'extraction d'icône
-            }
+            catch { }
             return null;
         }
 
