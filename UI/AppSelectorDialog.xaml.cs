@@ -165,13 +165,9 @@ namespace MacroEngine.UI
             {
                 processes = await Task.Run(() =>
                 {
-                    var list = showAll
+                    return showAll
                         ? ProcessMonitor.GetAllProcesses()
                         : ProcessMonitor.GetRunningProcesses();
-                    // Pré-charger les icônes en arrière-plan pour éviter de bloquer l'UI
-                    foreach (var p in list)
-                        _ = p.Icon;
-                    return list;
                 });
             }
             catch (Exception ex)

@@ -2640,6 +2640,21 @@ namespace MacroEngine.UI
             }
         }
 
+        private void MacroDescriptionTextBox_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.TextBox tb) return;
+            var pos = e.GetPosition(tb);
+            var index = tb.GetCharacterIndexFromPoint(pos, snapToText: false);
+            // Si clic sur le texte : comportement normal (ne pas gérer). Si clic sur zone vide : mettre curseur à la fin
+            if (index < 0)
+            {
+                tb.Focus();
+                tb.SelectionStart = tb.Text?.Length ?? 0;
+                tb.SelectionLength = 0;
+                e.Handled = true;
+            }
+        }
+
         private void MacroDescriptionTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_selectedMacro != null && MacroDescriptionTextBox.Text != _selectedMacro.Description)
@@ -2918,7 +2933,6 @@ namespace MacroEngine.UI
             {
                 MacroNameTextBox.Text = "";
                 MacroDescriptionTextBox.Text = "";
-                MacroSummaryText.Text = "";
                 ShortcutDisplayText.Text = "Non défini";
                 UpdateTargetAppsDisplay();
                 ContinuousMonitoringCheckBox.IsChecked = false;
@@ -2931,7 +2945,7 @@ namespace MacroEngine.UI
         /// </summary>
         private void UpdateMacroSummary()
         {
-            MacroSummaryText.Text = GetMacroSummary(_selectedMacro);
+            // Résumé retiré de l'UI.
         }
 
         /// <summary>

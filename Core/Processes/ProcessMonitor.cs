@@ -133,7 +133,8 @@ namespace MacroEngine.Core.Processes
                         ProcessName = process.ProcessName,
                         ProcessId = process.Id,
                         WindowTitle = process.MainWindowTitle,
-                        ExecutablePath = GetProcessPath(process)
+                        ExecutablePath = GetProcessPath(process),
+                        MainWindowHandle = process.MainWindowHandle
                     };
 
                     processes.Add(info);
@@ -171,7 +172,8 @@ namespace MacroEngine.Core.Processes
                         ProcessId = process.Id,
                         WindowTitle = process.MainWindowTitle,
                         ExecutablePath = GetProcessPath(process),
-                        HasMainWindow = process.MainWindowHandle != IntPtr.Zero
+                        HasMainWindow = process.MainWindowHandle != IntPtr.Zero,
+                        MainWindowHandle = process.MainWindowHandle
                     };
 
                     processes.Add(info);
@@ -218,6 +220,70 @@ namespace MacroEngine.Core.Processes
         private static readonly ConcurrentDictionary<string, ImageSource?> _iconCache =
             new ConcurrentDictionary<string, ImageSource?>(StringComparer.OrdinalIgnoreCase);
 
+        private static string GetIconCacheFolder()
+        {
+            var folder = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MacroEngine", "IconCache");
+            try
+            {
+                if (!Directory.Exists(folder))
+                    Directory.CreateDirectory(folder);
+            }
+            catch { }
+            return folder;
+        }
+
+        private static string GetSafeCacheFileName(string processName)
+        {
+            if (string.IsNullOrEmpty(processName)) return "_";
+            var invalid = Path.GetInvalidFileNameChars();
+            var sb = new StringBuilder(processName.Length);
+            foreach (var c in processName)
+                sb.Append(Array.IndexOf(invalid, c) >= 0 ? '_' : c);
+            if (sb.Length == 0) return "_";
+            return sb.ToString() + ".png";
+        }
+
+        private static bool TryLoadIconFromDiskCache(string processName, out ImageSource? icon)
+        {
+            icon = null;
+            if (string.IsNullOrEmpty(processName)) return false;
+            try
+            {
+                var path = Path.Combine(GetIconCacheFolder(), GetSafeCacheFileName(processName));
+                if (!File.Exists(path)) return false;
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.UriSource = new Uri(path, UriKind.Absolute);
+                bitmap.EndInit();
+                bitmap.Freeze();
+                icon = bitmap;
+                return true;
+            }
+            catch { }
+            return false;
+        }
+
+        private static void SaveIconToDiskCache(string processName, ImageSource? icon)
+        {
+            if (string.IsNullOrEmpty(processName) || icon == null) return;
+            if (icon is not BitmapSource bitmap) return;
+            try
+            {
+                var folder = GetIconCacheFolder();
+                var path = Path.Combine(folder, GetSafeCacheFileName(processName));
+                using (var stream = File.Create(path))
+                {
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    encoder.Save(stream);
+                }
+            }
+            catch { }
+        }
+
         /// <summary>
         /// Tente de récupérer une icône déjà en cache (sans déclencher de chargement).
         /// </summary>
@@ -231,7 +297,7 @@ namespace MacroEngine.Core.Processes
 
         /// <summary>
         /// Charge l'icône d'une application par son nom de processus (pour lazy-load).
-        /// Les icônes sont mises en cache pour éviter de recharger à chaque affichage.
+        /// Les icônes sont mises en cache (mémoire + disque) pour réaffichage même après redémarrage.
         /// À appeler depuis un thread de fond.
         /// </summary>
         public static ImageSource? GetIconForProcessName(string processName)
@@ -243,13 +309,19 @@ namespace MacroEngine.Core.Processes
 
         private static ImageSource? LoadIconForProcessNameInternal(string processName)
         {
+            // 1) Essayer le cache disque (icône sauvegardée lors d'un affichage précédent)
+            if (TryLoadIconFromDiskCache(processName, out var diskIcon) && diskIcon != null)
+                return diskIcon;
+
+            // 2) Charger depuis un processus en cours (exe ou fenêtre)
             foreach (var process in Process.GetProcesses())
             {
                 try
                 {
                     if (!string.Equals(process.ProcessName, processName, StringComparison.OrdinalIgnoreCase))
                         continue;
-                    // 1) Essayer l'icône de l'exécutable
+                    ImageSource? result = null;
+                    // 2a) Icône de l'exécutable
                     var path = GetProcessPath(process);
                     if (!string.IsNullOrEmpty(path) && File.Exists(path))
                     {
@@ -266,19 +338,21 @@ namespace MacroEngine.Core.Processes
                                             Int32Rect.Empty,
                                             BitmapSizeOptions.FromWidthAndHeight(16, 16));
                                         bitmap.Freeze();
-                                        return bitmap;
+                                        result = bitmap;
                                     }
                                 }
                             }
                         }
                         catch { }
                     }
-                    // 2) Si pas d'icône processus, essayer l'icône de la fenêtre
-                    if (process.MainWindowHandle != IntPtr.Zero)
+                    // 2b) Sinon icône de la fenêtre
+                    if (result == null && process.MainWindowHandle != IntPtr.Zero)
+                        result = GetIconFromWindow(process.MainWindowHandle);
+
+                    if (result != null)
                     {
-                        var windowIcon = GetIconFromWindow(process.MainWindowHandle);
-                        if (windowIcon != null)
-                            return windowIcon;
+                        SaveIconToDiskCache(processName, result);
+                        return result;
                     }
                 }
                 catch { }
@@ -297,10 +371,9 @@ namespace MacroEngine.Core.Processes
         public static ImageSource? GetIconFromWindow(IntPtr hWnd)
         {
             if (hWnd == IntPtr.Zero) return null;
-            IntPtr hIcon = IntPtr.Zero;
             try
             {
-                hIcon = SendMessage(hWnd, WM_GETICON, (IntPtr)ICON_SMALL, IntPtr.Zero);
+                IntPtr hIcon = SendMessage(hWnd, WM_GETICON, (IntPtr)ICON_SMALL, IntPtr.Zero);
                 if (hIcon == IntPtr.Zero)
                     hIcon = SendMessage(hWnd, WM_GETICON, (IntPtr)ICON_BIG, IntPtr.Zero);
                 if (hIcon == IntPtr.Zero)
@@ -309,12 +382,21 @@ namespace MacroEngine.Core.Processes
                     hIcon = GetClassLongPtr(hWnd, GCLP_HICON);
                 if (hIcon == IntPtr.Zero)
                     return null;
-                var bitmap = Imaging.CreateBitmapSourceFromHIcon(
-                    hIcon,
-                    Int32Rect.Empty,
-                    BitmapSizeOptions.FromWidthAndHeight(16, 16));
-                bitmap.Freeze();
-                return bitmap;
+                // Cloner l'icône pour obtenir une copie exploitable (évite problèmes d'affichage avec le handle fenêtre)
+                using (var icon = System.Drawing.Icon.FromHandle(hIcon))
+                {
+                    if (icon == null || icon.Width <= 0 || icon.Height <= 0)
+                        return null;
+                    using (var clone = (System.Drawing.Icon)icon.Clone())
+                    {
+                        var bitmap = Imaging.CreateBitmapSourceFromHIcon(
+                            clone.Handle,
+                            Int32Rect.Empty,
+                            BitmapSizeOptions.FromWidthAndHeight(16, 16));
+                        bitmap.Freeze();
+                        return bitmap;
+                    }
+                }
             }
             catch
             {
@@ -384,6 +466,8 @@ namespace MacroEngine.Core.Processes
         public string WindowTitle { get; set; } = string.Empty;
         public string ExecutablePath { get; set; } = string.Empty;
         public bool HasMainWindow { get; set; } = false;
+        /// <summary>Handle de la fenêtre principale (capturé à la création pour l'icône fenêtre).</summary>
+        public IntPtr MainWindowHandle { get; set; } = IntPtr.Zero;
 
         /// <summary>
         /// Icône de l'application
@@ -451,20 +535,13 @@ namespace MacroEngine.Core.Processes
                 }
                 catch { }
             }
-            // 2) Si pas d'icône processus, essayer l'icône de la fenêtre
-            try
+            // 2) Si pas d'icône processus, essayer l'icône de la fenêtre (handle capturé à la création)
+            if (MainWindowHandle != IntPtr.Zero)
             {
-                using (var process = Process.GetProcessById(ProcessId))
-                {
-                    if (process.MainWindowHandle != IntPtr.Zero)
-                    {
-                        var windowIcon = ProcessMonitor.GetIconFromWindow(process.MainWindowHandle);
-                        if (windowIcon != null)
-                            return windowIcon;
-                    }
-                }
+                var windowIcon = ProcessMonitor.GetIconFromWindow(MainWindowHandle);
+                if (windowIcon != null)
+                    return windowIcon;
             }
-            catch { }
             return null;
         }
 
