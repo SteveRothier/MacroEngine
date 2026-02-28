@@ -162,14 +162,10 @@
                     Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <!-- Titre + Boutons -->
                         <RowDefinition Height="Auto"/>
-                        <!-- Boutons Importer/Exporter -->
                         <RowDefinition Height="Auto"/>
-                        <!-- Liste des macros + espace restant pour Supprimer / Profils -->
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-
                     <!-- Bouton Nouvelle Macro (pleine largeur) -->
                     <Button Grid.Row="0"
                             Style="{StaticResource ButtonSidebarPrimary}"
@@ -366,10 +362,8 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition x:Name="BottomPanelRow" Height="180"/>
                     </Grid.RowDefinitions>
-                    
                     <!-- Éditeur de macro -->
                     <ContentControl x:Name="MacroEditorContainer" Grid.Row="0" Margin="12"/>
-                    
                     <!-- Zone d'affichage des actions et zone de test -->
                     <Grid Grid.Row="1" Margin="12,0,12,12">
                         <Grid.ColumnDefinitions>
@@ -470,13 +464,10 @@
 
                         <!-- Nom de la macro -->
                         <TextBlock Text="Nom" Style="{StaticResource TextLabel}"/>
-                        <Border Background="{StaticResource BackgroundPrimaryBrush}"
-                                BorderBrush="{StaticResource BorderLightBrush}"
-                                BorderThickness="1"
-                                CornerRadius="{StaticResource RadiusTextInput}"
-                                Padding="6,4"
-                                Margin="0,0,0,6">
-                            <TextBox x:Name="MacroNameTextBox"
+                        <Border Style="{StaticResource PanelPropertiesFieldElevation}">
+                            <Border Style="{StaticResource PanelPropertiesField}"
+                                    Padding="6,4">
+                                <TextBox x:Name="MacroNameTextBox"
                                      Style="{StaticResource TextBoxPropertiesFieldCentered}"
                                      Padding="0"
                                      TextChanged="MacroNameTextBox_TextChanged"
@@ -484,17 +475,15 @@
                                      VerticalContentAlignment="Center"
                                      CaretBrush="White"
                                      Cursor="IBeam"/>
+                            </Border>
                         </Border>
 
                         <!-- Description -->
                         <TextBlock Text="Description" Style="{StaticResource TextLabel}"/>
-                        <Border Background="{StaticResource BackgroundPrimaryBrush}"
-                                BorderBrush="{StaticResource BorderLightBrush}"
-                                BorderThickness="1"
-                                CornerRadius="{StaticResource RadiusTextInput}"
-                                Padding="6,4"
-                                Margin="0,0,0,6">
-                            <TextBox x:Name="MacroDescriptionTextBox"
+                        <Border Style="{StaticResource PanelPropertiesFieldElevation}">
+                            <Border Style="{StaticResource PanelPropertiesField}"
+                                    Padding="6,4">
+                                <TextBox x:Name="MacroDescriptionTextBox"
                                      Style="{StaticResource TextBoxPropertiesField}"
                                      Padding="0"
                                      TextWrapping="Wrap"
@@ -506,64 +495,56 @@
                                      CaretBrush="White"
                                      Cursor="IBeam"
                                      PreviewMouseDown="MacroDescriptionTextBox_PreviewMouseDown"/>
+                            </Border>
                         </Border>
                         <Border Style="{StaticResource SeparatorHorizontal}" Margin="0,12,0,12"/>
 
                         <!-- Raccourci clavier -->
-                        <Grid Margin="0,0,0,12">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Raccourci clavier" Style="{StaticResource TextLabel}" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
-                            <Button Grid.Column="1"
-                                    Content="Définir"
-                                    Style="{StaticResource ButtonGhost}"
-                                    Click="SetShortcut_Click"
-                                    VerticalAlignment="Center"
-                                    HorizontalAlignment="Stretch"
-                                    Padding="12,8"
-                                    BorderBrush="{StaticResource BorderLightBrush}"
-                                    BorderThickness="1"/>
-                            <Border Grid.Row="1" Grid.ColumnSpan="2"
-                                    Background="{StaticResource BackgroundTertiaryBrush}"
-                                    CornerRadius="8"
-                                    Padding="12,10"
-                                    Margin="0,6,0,0">
+                        <StackPanel Margin="0,0,0,10">
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Raccourci clavier" Style="{StaticResource TextLabel}" VerticalAlignment="Center" Margin="0"/>
+                                <Button Grid.Column="1"
+                                        Content="Définir"
+                                        Style="{StaticResource ButtonPropertiesAction}"
+                                        Click="SetShortcut_Click"
+                                        MinWidth="72"
+                                        VerticalAlignment="Center"/>
+                            </Grid>
+                            <Border Style="{StaticResource PanelPropertiesBlock}"
+                                    Padding="10,8"
+                                    MinHeight="32">
                                 <TextBlock x:Name="ShortcutDisplayText" 
                                            Text="Non défini"
-                                           Style="{StaticResource TextMono}"/>
+                                           Style="{StaticResource TextMono}"
+                                           FontSize="12"/>
                             </Border>
-                        </Grid>
+                        </StackPanel>
 
                         <!-- Applications cibles -->
-                        <Grid Margin="0,0,0,4">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Text="Applications cibles" Style="{StaticResource TextLabel}" VerticalAlignment="Center" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
-                            <Button x:Name="SelectAppsButton"
-                                    Grid.Column="1"
-                                    Content="Sélectionner"
-                                    Style="{StaticResource ButtonGhost}"
-                                    Click="SelectApps_Click"
-                                    VerticalAlignment="Center"
-                                    HorizontalAlignment="Stretch"
-                                    BorderBrush="{StaticResource BorderLightBrush}"
-                                    BorderThickness="1"/>
-                        </Grid>
-                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                                CornerRadius="8"
-                                Padding="12,10"
-                                MinHeight="40"
-                                MaxHeight="160"
-                                Margin="0,0,0,12">
-                            <ScrollViewer Style="{StaticResource ScrollViewerNoClipStyle}"
+                        <StackPanel Margin="0,0,0,10">
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Applications cibles" Style="{StaticResource TextLabel}" VerticalAlignment="Center" Margin="0"/>
+                                <Button x:Name="SelectAppsButton"
+                                        Grid.Column="1"
+                                        Content="Sélectionner"
+                                        Style="{StaticResource ButtonPropertiesAction}"
+                                        Click="SelectApps_Click"
+                                        MinWidth="88"
+                                        VerticalAlignment="Center"/>
+                            </Grid>
+                            <Border Style="{StaticResource PanelPropertiesBlock}"
+                                    Padding="10,8"
+                                    MinHeight="36"
+                                    MaxHeight="160">
+                                <ScrollViewer Style="{StaticResource ScrollViewerNoClipStyle}"
                                           MaxHeight="140"
                                           Padding="0">
                                 <WrapPanel x:Name="TargetAppsPanel">
@@ -571,8 +552,9 @@
                                                Text="Toutes les applications" 
                                                Style="{StaticResource TextMuted}"/>
                                 </WrapPanel>
-                            </ScrollViewer>
-                        </Border>
+                                </ScrollViewer>
+                            </Border>
+                        </StackPanel>
 
                         <!-- Surveillance continue -->
                         <CheckBox x:Name="ContinuousMonitoringCheckBox"
@@ -596,8 +578,7 @@
 
                         <!-- État du moteur -->
                         <TextBlock Text="État" Style="{StaticResource TextLabel}" Margin="0,8,0,0"/>
-                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                                CornerRadius="8"
+                        <Border Style="{StaticResource PanelPropertiesBlock}"
                                 Padding="12,8"
                                 Margin="0,0,0,12">
                             <Grid>
@@ -618,15 +599,14 @@
 
                         <!-- Application active -->
                         <TextBlock Text="Application active" Style="{StaticResource TextLabel}"/>
-                        <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                                CornerRadius="8"
+                        <Border Style="{StaticResource PanelPropertiesBlock}"
                                 Padding="12,8">
                             <TextBlock x:Name="ActiveAppText" 
                                        Text="Aucune" 
                                        Style="{StaticResource TextMuted}"
                                        TextWrapping="Wrap"/>
                         </Border>
-                    </StackPanel>
+                </StackPanel>
             </Border>
             </Grid>
 

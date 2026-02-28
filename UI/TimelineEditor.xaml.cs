@@ -288,6 +288,32 @@ namespace MacroEngine.UI
             return container;
         }
 
+        private static readonly Duration ActionRightClickDuration = new Duration(TimeSpan.FromMilliseconds(80));
+
+        /// <summary>Animation clic droit : scale down (même effet que les chips).</summary>
+        private static void ActionRightClickDown(System.Windows.Controls.Border card)
+        {
+            if (card.RenderTransform is not ScaleTransform scale)
+            {
+                scale = new ScaleTransform(1, 1);
+                card.RenderTransformOrigin = new Point(0.5, 0.5);
+                card.RenderTransform = scale;
+            }
+            var anim = new DoubleAnimation(0.99, ActionRightClickDuration) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } };
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
+        }
+
+        /// <summary>Animation clic droit : scale up.</summary>
+        private static void ActionRightClickUp(System.Windows.Controls.Border card)
+        {
+            var scale = card.RenderTransform as ScaleTransform;
+            if (scale == null) return;
+            var anim = new DoubleAnimation(1.0, ActionRightClickDuration) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } };
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
+        }
+
         /// <summary>
         /// Crée une carte d'action pour la Timeline (style Timeline compact et professionnel).
         /// Si nestedRepeatInfo ou nestedIfInfo est fourni, la croix supprime l'action imbriquée uniquement, pas le bloc parent.
@@ -407,6 +433,9 @@ namespace MacroEngine.UI
                 BorderThickness = new Thickness(1, 1, 1, 1),
                 Padding = new Thickness(8, 4, 8, 4),
                 Margin = new Thickness(0, 0, 0, 2),
+                Cursor = Cursors.Hand,
+                RenderTransform = new ScaleTransform(1, 1),
+                RenderTransformOrigin = new Point(0.5, 0.5),
                 Tag = index,
                 MinHeight = 36,
                 MaxHeight = 42,
@@ -695,14 +724,18 @@ namespace MacroEngine.UI
                 textPanel.Children.Insert(0, variableControlsPanel);
             }
 
-            // Menu contextuel pour sauvegarder comme preset
+            // Menu contextuel pour sauvegarder comme preset (même style que chips)
             var contextMenu = new ContextMenu();
-            
+            if (TryFindResource("ContextMenuDefaultStyle") is Style cmStyle)
+                contextMenu.Style = cmStyle;
+
             var saveAsPresetItem = new MenuItem
             {
                 Header = "💾 Sauvegarder comme preset",
-                FontSize = 13
+                FontSize = 12
             };
+            if (TryFindResource("ContextMenuItemDefaultStyle") is Style miStyle)
+                saveAsPresetItem.Style = miStyle;
             saveAsPresetItem.Click += async (s, e) =>
             {
                 await SaveActionAsPreset(action, index);
@@ -712,8 +745,10 @@ namespace MacroEngine.UI
             var duplicateItem = new MenuItem
             {
                 Header = "📋 Dupliquer cette action",
-                FontSize = 13
+                FontSize = 12
             };
+            if (TryFindResource("ContextMenuItemDefaultStyle") is Style miStyle2)
+                duplicateItem.Style = miStyle2;
             duplicateItem.Click += (s, e) =>
             {
                 if (nestedRepeatInfo != null)
@@ -724,7 +759,10 @@ namespace MacroEngine.UI
                     DuplicateAction(index);
             };
             contextMenu.Items.Add(duplicateItem);
-            
+            contextMenu.Opened += (s, _) => ActionRightClickUp(card);
+
+            card.PreviewMouseRightButtonDown += (s, _) => ActionRightClickDown(card);
+            card.PreviewMouseRightButtonUp += (s, _) => ActionRightClickUp(card);
             card.ContextMenu = contextMenu;
 
             return card;

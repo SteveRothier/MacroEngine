@@ -83,9 +83,9 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <Ellipse x:Name="ledOn" Grid.Column="0" Width="5" Height="5" Margin="0,0,6,0"
-                                             VerticalAlignment="Center" Fill="#7A1E3A">
+                                             VerticalAlignment="Center" Fill="#6B3E26">
                                         <Ellipse.Effect>
-                                            <DropShadowEffect Color="#7A1E3A" BlurRadius="6" ShadowDepth="0" Opacity="0.6"/>
+                                            <DropShadowEffect Color="#6B3E26" BlurRadius="6" ShadowDepth="0" Opacity="0.6"/>
                                         </Ellipse.Effect>
                                     </Ellipse>
                                     <Border x:Name="levierOn"
@@ -93,16 +93,16 @@
                                             MinWidth="22" Height="18" CornerRadius="2"
                                             VerticalAlignment="Center" HorizontalAlignment="Right"
                                             Margin="0,0,2,0"
-                                            BorderThickness="1" BorderBrush="#5A1525">
+                                            BorderThickness="1" BorderBrush="#4A2819">
                                         <Border.Effect>
                                             <DropShadowEffect Color="Black" Opacity="0.5" BlurRadius="2" ShadowDepth="1" Direction="270"/>
                                         </Border.Effect>
                                         <Border.Background>
                                             <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
-                                                <GradientStop Color="#8A3A5A" Offset="0"/>
-                                                <GradientStop Color="#7A1E3A" Offset="0.4"/>
-                                                <GradientStop Color="#6A1830" Offset="0.8"/>
-                                                <GradientStop Color="#5A1528" Offset="1"/>
+                                                <GradientStop Color="#8A5A3A" Offset="0"/>
+                                                <GradientStop Color="#6B3E26" Offset="0.4"/>
+                                                <GradientStop Color="#5A3520" Offset="0.8"/>
+                                                <GradientStop Color="#4A2819" Offset="1"/>
                                             </LinearGradientBrush>
                                         </Border.Background>
                                     </Border>
@@ -308,6 +308,14 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+    <!-- Bouton compact pour panneau Propriétés (Définir, Sélectionner) -->
+    <Style x:Key="ButtonPropertiesAction" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
+        <Setter Property="Padding" Value="10,4"/>
+        <Setter Property="MinHeight" Value="26"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
     </Style>
 
     <!-- Bouton icône (carré) -->
@@ -636,10 +644,10 @@
     </Style>
 
     <!-- ══════════════════════════════════════════════════════════════════════
-         BOUTONS SIDEBAR (Palette pourpre)
+         BOUTONS SIDEBAR (Palette cuivre)
          ══════════════════════════════════════════════════════════════════════ -->
 
-    <!-- Bouton "Nouvelle Macro" (CTA principal - pourpre signature) -->
+    <!-- Bouton "Nouvelle Macro" (CTA principal - cuivre signature) -->
     <Style x:Key="ButtonSidebarPrimary" TargetType="Button">
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}"/>
@@ -834,12 +842,12 @@
                                 </BeginStoryboard>
                             </Trigger.ExitActions>
                         </Trigger>
-                        <!-- Sélectionné : rendu plat (ShadowDepth=0, léger glow pourpre) -->
+                        <!-- Sélectionné : rendu plat (ShadowDepth=0, léger glow cuivre) -->
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{StaticResource SidebarAccentSelectedBrush}"/>
                             <Setter TargetName="Bd" Property="Effect">
                                 <Setter.Value>
-                                    <DropShadowEffect Color="#7A1E3A" Opacity="0.18" BlurRadius="6" ShadowDepth="0"/>
+                                    <DropShadowEffect Color="#6B3E26" Opacity="0.18" BlurRadius="6" ShadowDepth="0"/>
                                 </Setter.Value>
                             </Setter>
                             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
@@ -1334,6 +1342,275 @@
                 <DropShadowEffect Color="Black" Opacity="0.35" BlurRadius="10" ShadowDepth="2" Direction="270"/>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Colonnes mécaniques : style technique léger (gradient discret, bordure 1px, coins 4px) -->
+    <Style x:Key="PanelColumnMetallic" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource ColumnMechanicalBackgroundBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource ColumnMechanicalBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    <!-- Ligne d'accent technique Niveau 3 : barre dégradé transparent → cuivre → transparent (left 12px, right 12px) -->
+    <Style x:Key="ColumnAccentLine" TargetType="Border">
+        <Setter Property="Height" Value="2"/>
+        <Setter Property="Background" Value="{StaticResource ColumnAccentLineGradientBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Margin" Value="12,0,12,0"/>
+    </Style>
+    <!-- Inset : highlight haut (plaque usinée) -->
+    <Style x:Key="ColumnInsetHighlight" TargetType="Border">
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Background" Value="{StaticResource ColumnInsetHighlightBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <!-- Inset : ombre bas -->
+    <Style x:Key="ColumnInsetShadow" TargetType="Border">
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Background" Value="{StaticResource ColumnInsetShadowBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <!-- Cadre fragmenté Niveau 4 : segments dans les coins (châssis CNC, 20×20px) -->
+    <Style x:Key="ColumnCornerTopLeft" TargetType="Border">
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+        <Setter Property="BorderBrush" Value="{StaticResource ColumnCornerAccentBrush}"/>
+        <Setter Property="BorderThickness" Value="2,2,0,0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+    </Style>
+    <Style x:Key="ColumnCornerTopRight" TargetType="Border">
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+        <Setter Property="BorderBrush" Value="{StaticResource ColumnCornerAccentBrush}"/>
+        <Setter Property="BorderThickness" Value="0,2,2,0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+    </Style>
+    <Style x:Key="ColumnCornerBottomLeft" TargetType="Border">
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <Setter Property="BorderBrush" Value="{StaticResource ColumnCornerAccentBrush}"/>
+        <Setter Property="BorderThickness" Value="2,0,0,2"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+    </Style>
+    <Style x:Key="ColumnCornerBottomRight" TargetType="Border">
+        <Setter Property="Width" Value="20"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <Setter Property="BorderBrush" Value="{StaticResource ColumnCornerAccentBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,2,2"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+    </Style>
+
+    <!-- Panneau Propriétés - même cadre métallique + hover animé (glow cuivre) -->
+    <Style x:Key="PanelProperties" TargetType="Border" BasedOn="{StaticResource PanelColumnMetallic}">
+        <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect Color="Black" Opacity="0.2" BlurRadius="8" ShadowDepth="1" Direction="270"/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="#406B3E26"/>
+                <Trigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.Opacity)"
+                                             To="0.45" Duration="0:0:0.15">
+                                <DoubleAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseOut"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <DoubleAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.BlurRadius)"
+                                             To="14" Duration="0:0:0.15">
+                                <DoubleAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseOut"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <ColorAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.Color)"
+                                            To="#6B3E26" Duration="0:0:0.15">
+                                <ColorAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseOut"/>
+                                </ColorAnimation.EasingFunction>
+                            </ColorAnimation>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.Opacity)"
+                                             To="0.35" Duration="0:0:0.2">
+                                <DoubleAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseIn"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <DoubleAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.BlurRadius)"
+                                             To="10" Duration="0:0:0.2">
+                                <DoubleAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseIn"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <ColorAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.Color)"
+                                            To="#FF000000" Duration="0:0:0.2">
+                                <ColorAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseIn"/>
+                                </ColorAnimation.EasingFunction>
+                            </ColorAnimation>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.ExitActions>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Wrapper élévation pour champs (marge seulement, pas d'ombre) -->
+    <Style x:Key="PanelPropertiesFieldElevation" TargetType="Border">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,6"/>
+    </Style>
+
+    <!-- Champs panneau Propriétés - input wrapper, bordure simple (sans glow ni effet) -->
+    <Style x:Key="PanelPropertiesField" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BackgroundPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="#806B3E26"/>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                <Setter Property="BorderBrush" Value="#806B3E26"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Chip processus (Applications cibles) : fond + dégradé couleur icône (hover géré en code) -->
+    <Style x:Key="ProcessChipStyle" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="6,4,4,4"/>
+        <Setter Property="Margin" Value="0,0,3,3"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+    </Style>
+
+    <!-- Template ContextMenu réutilisable (chips, actions, etc.) : fond gris anthracite, sans blanc -->
+    <ControlTemplate x:Key="ContextMenuDefaultTemplate" TargetType="ContextMenu">
+        <Border Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                Padding="{TemplateBinding Padding}">
+            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+        </Border>
+    </ControlTemplate>
+
+    <Style x:Key="ContextMenuDefaultStyle" TargetType="ContextMenu">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="2"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Template" Value="{StaticResource ContextMenuDefaultTemplate}"/>
+    </Style>
+
+    <!-- Template MenuItem réutilisable pour les menus contextuels -->
+    <ControlTemplate x:Key="ContextMenuItemDefaultTemplate" TargetType="MenuItem">
+        <Border x:Name="Bg" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter ContentSource="Header" ContentTemplate="{TemplateBinding HeaderTemplate}" Content="{TemplateBinding Header}" VerticalAlignment="Center"/>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Bg" Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style x:Key="ContextMenuItemDefaultStyle" TargetType="MenuItem">
+        <Setter Property="Padding" Value="6,4"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}"/>
+        <Setter Property="Template" Value="{StaticResource ContextMenuItemDefaultTemplate}"/>
+        <Style.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+                <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <!-- Blocs panneau Propriétés - zones de contenu avec hover animé -->
+    <Style x:Key="PanelPropertiesBlock" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Effect">
+            <Setter.Value>
+                <DropShadowEffect Color="#6B3E26" Opacity="0" BlurRadius="4" ShadowDepth="0"/>
+            </Setter.Value>
+        </Setter>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="BorderBrush" Value="#306B3E26"/>
+                <Trigger.EnterActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.Opacity)"
+                                             To="0.12" Duration="0:0:0.12">
+                                <DoubleAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseOut"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <DoubleAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.BlurRadius)"
+                                             To="6" Duration="0:0:0.12">
+                                <DoubleAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseOut"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.EnterActions>
+                <Trigger.ExitActions>
+                    <BeginStoryboard>
+                        <Storyboard>
+                            <DoubleAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.Opacity)"
+                                             To="0" Duration="0:0:0.15">
+                                <DoubleAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseIn"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                            <DoubleAnimation Storyboard.TargetProperty="Effect.(DropShadowEffect.BlurRadius)"
+                                             To="4" Duration="0:0:0.15">
+                                <DoubleAnimation.EasingFunction>
+                                    <QuadraticEase EasingMode="EaseIn"/>
+                                </DoubleAnimation.EasingFunction>
+                            </DoubleAnimation>
+                        </Storyboard>
+                    </BeginStoryboard>
+                </Trigger.ExitActions>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ══════════════════════════════════════════════════════════════════════

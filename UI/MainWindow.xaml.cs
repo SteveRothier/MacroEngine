@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Interop;
 using System.Windows.Shell;
 using Microsoft.Win32;
@@ -2813,6 +2814,163 @@ namespace MacroEngine.UI
             }
         }
 
+        /// <summary>Extrait une couleur dominante depuis une icône (BitmapSource) pour le dégradé du chip.
+        /// Favorise les pixels saturés pour une couleur plus représentative de l'app.</summary>
+        private static System.Windows.Media.Color GetDominantColorFromIcon(BitmapSource? source)
+        {
+            if (source == null || source.PixelWidth < 1 || source.PixelHeight < 1)
+                return System.Windows.Media.Color.FromRgb(0x6B, 0x3E, 0x26); // Accent cuivre par défaut
+
+            try
+            {
+                var format = source.Format;
+                if (format != PixelFormats.Bgra32 && format != PixelFormats.Bgr32)
+                {
+                    var converted = new FormatConvertedBitmap(source, PixelFormats.Bgra32, null, 0);
+                    converted.Freeze();
+                    source = converted;
+                }
+
+                int w = source.PixelWidth;
+                int h = source.PixelHeight;
+                int stride = (w * 4 + 3) & ~3;
+                var pixels = new byte[stride * h];
+                source.CopyPixels(pixels, stride, 0);
+
+                // Moyenne pondérée par saturation : les pixels saturés (couleurs vives) pèsent plus
+                double rSum = 0, gSum = 0, bSum = 0;
+                double weightSum = 0;
+                for (int y = 0; y < h; y++)
+                {
+                    for (int x = 0; x < w; x++)
+                    {
+                        int i = y * stride + x * 4;
+                        byte b_ = pixels[i], g_ = pixels[i + 1], r_ = pixels[i + 2], a = pixels[i + 3];
+                        if (a < 80) continue;
+                        int maxC = Math.Max(r_, Math.Max(g_, b_));
+                        int minC = Math.Min(r_, Math.Min(g_, b_));
+                        int lum = (r_ + g_ + b_) / 3;
+                        // Ignorer blanc/gris clair
+                        if (lum > 240 && Math.Abs(r_ - g_) < 15 && Math.Abs(g_ - b_) < 15) continue;
+                        if (lum < 20) continue; // Noir
+                        // Saturation : max-min, normalisée [0,1]. Plus saturé = plus de poids
+                        int sat = maxC - minC;
+                        double weight = 0.1 + (sat / 255.0) * 0.9; // min 0.1 pour ne pas exclure les gris colorés
+                        rSum += r_ * weight;
+                        gSum += g_ * weight;
+                        bSum += b_ * weight;
+                        weightSum += weight;
+                    }
+                }
+
+                if (weightSum < 0.01)
+                    return System.Windows.Media.Color.FromRgb(0x6B, 0x3E, 0x26);
+                return System.Windows.Media.Color.FromRgb(
+                    (byte)Math.Clamp((int)(rSum / weightSum), 0, 255),
+                    (byte)Math.Clamp((int)(gSum / weightSum), 0, 255),
+                    (byte)Math.Clamp((int)(bSum / weightSum), 0, 255));
+            }
+            catch
+            {
+                return System.Windows.Media.Color.FromRgb(0x6B, 0x3E, 0x26);
+            }
+        }
+
+        /// <summary>État du dégradé d'un chip pour animation au survol.</summary>
+        private sealed class ChipGradientState
+        {
+            public BitmapSource? Icon;
+            public required LinearGradientBrush Brush;
+            public required GradientStop FadeStop;
+            public required GradientStop BaseStop2;
+            public System.Windows.Media.Color ColorSecondary;
+            public System.Windows.Media.Color ColorTertiary;
+        }
+
+        private static readonly Duration ChipHoverDuration = new Duration(TimeSpan.FromMilliseconds(180));
+        private static readonly Duration ChipRightClickDuration = new Duration(TimeSpan.FromMilliseconds(80));
+
+        /// <param name="isHover">Si true, le dégradé s'étend plus (plus de distance vers la droite).</param>
+        private void ApplyChipGradient(Border tag, BitmapSource? icon, bool isHover = false)
+        {
+            var colorSecondary = System.Windows.Media.Colors.Transparent;
+            var colorTertiary = System.Windows.Media.Colors.Transparent;
+            if (FindResource("BackgroundSecondaryColor") is System.Windows.Media.Color c)
+                colorSecondary = c;
+            else if (FindResource("BackgroundSecondaryBrush") is SolidColorBrush brush)
+                colorSecondary = brush.Color;
+            if (FindResource("BackgroundTertiaryColor") is System.Windows.Media.Color c3)
+                colorTertiary = c3;
+            else if (FindResource("BackgroundTertiaryBrush") is SolidColorBrush brush3)
+                colorTertiary = brush3.Color;
+
+            var iconColor = GetDominantColorFromIcon(icon);
+            double fadeOffset = isHover ? 0.65 : 0.35;
+            var baseColor = isHover ? colorTertiary : colorSecondary;
+
+            var stop0 = new GradientStop(System.Windows.Media.Color.FromArgb(0x30, iconColor.R, iconColor.G, iconColor.B), 0.0);
+            var stop1 = new GradientStop(baseColor, fadeOffset);
+            var stop2 = new GradientStop(baseColor, 1.0);
+
+            // Dégradé diagonal : bas gauche → un peu moins haut, un peu plus bas à droite
+            var gradient = new LinearGradientBrush
+            {
+                StartPoint = new Point(0, 1),
+                EndPoint = new Point(1, 1),
+                GradientStops = new GradientStopCollection { stop0, stop1, stop2 }
+            };
+            // Ne pas Freeze pour permettre l'animation
+            tag.Background = gradient;
+            tag.Tag = new ChipGradientState
+            {
+                Icon = icon,
+                Brush = gradient,
+                FadeStop = stop1,
+                BaseStop2 = stop2,
+                ColorSecondary = colorSecondary,
+                ColorTertiary = colorTertiary
+            };
+        }
+
+        private void AnimateChipHover(Border tag, bool isHover)
+        {
+            if (tag?.Tag is not ChipGradientState state) return;
+
+            var fadeStop = state.FadeStop;
+            var baseStop2 = state.BaseStop2;
+            double targetOffset = isHover ? 0.65 : 0.35;
+            var targetBaseColor = isHover ? state.ColorTertiary : state.ColorSecondary;
+
+            var animOffset = new DoubleAnimation(targetOffset, ChipHoverDuration) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } };
+            fadeStop.BeginAnimation(GradientStop.OffsetProperty, animOffset);
+
+            var animColor = new ColorAnimation(targetBaseColor, ChipHoverDuration) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } };
+            fadeStop.BeginAnimation(GradientStop.ColorProperty, animColor);
+            baseStop2.BeginAnimation(GradientStop.ColorProperty, animColor);
+        }
+
+        private void Chip_RightClickDown(Border tag)
+        {
+            if (tag.RenderTransform is not ScaleTransform scale)
+            {
+                scale = new ScaleTransform(1, 1);
+                tag.RenderTransformOrigin = new Point(0.5, 0.5);
+                tag.RenderTransform = scale;
+            }
+            var anim = new DoubleAnimation(0.96, ChipRightClickDuration) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } };
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
+        }
+
+        private void Chip_RightClickUp(Border tag)
+        {
+            var scale = tag.RenderTransform as ScaleTransform;
+            if (scale == null) return;
+            var anim = new DoubleAnimation(1.0, ChipRightClickDuration) { EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut } };
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, anim);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
+        }
+
         private void UpdateTargetAppsDisplay()
         {
             if (TargetAppsPanel == null) return;
@@ -2830,19 +2988,22 @@ namespace MacroEngine.UI
             }
             else
             {
-                var chipFg = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
-                if (chipFg == null) chipFg = System.Windows.Media.Brushes.White;
+                var chipTextBrush = (System.Windows.Media.Brush?)FindResource("TextPrimaryBrush") ?? System.Windows.Media.Brushes.White;
                 foreach (var app in _selectedMacro.TargetApplications)
                 {
                     var appName = System.IO.Path.GetFileNameWithoutExtension(app);
                     if (string.IsNullOrEmpty(appName)) appName = app;
-                    var tag = new Border
+                    var tag = new Border { Cursor = Cursors.Hand };
+                    if (FindResource("ProcessChipStyle") is Style processChipStyle)
+                        tag.Style = processChipStyle;
+                    else
                     {
-                        Background = (System.Windows.Media.Brush)FindResource("AccentPrimaryBrush"),
-                        CornerRadius = new CornerRadius(4),
-                        Padding = new Thickness(6, 4, 8, 4),
-                        Margin = new Thickness(0, 0, 4, 4)
-                    };
+                        tag.BorderBrush = (System.Windows.Media.Brush)FindResource("BorderLightBrush");
+                        tag.BorderThickness = new Thickness(1);
+                        tag.CornerRadius = new CornerRadius(4);
+                        tag.Padding = new Thickness(6, 4, 4, 4);
+                        tag.Margin = new Thickness(0, 0, 3, 3);
+                    }
                     var stack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
                     var iconContainer = new Grid { Width = 14, Height = 14, Margin = new Thickness(0, 0, 6, 0) };
                     var img = new System.Windows.Controls.Image
@@ -2858,6 +3019,9 @@ namespace MacroEngine.UI
                     {
                         img.Source = cachedIcon;
                         iconContainer.Children.Add(img);
+                        var cachedBs = cachedIcon as BitmapSource;
+                        tag.Tag = cachedBs;
+                        ApplyChipGradient(tag, cachedBs, false);
                     }
                     else
                     {
@@ -2867,7 +3031,7 @@ namespace MacroEngine.UI
                             FontSize = 10,
                             VerticalAlignment = VerticalAlignment.Center,
                             HorizontalAlignment = HorizontalAlignment.Center,
-                            Foreground = chipFg,
+                            Foreground = chipTextBrush,
                             RenderTransformOrigin = new Point(0.5, 0.5),
                             RenderTransform = new RotateTransform(0)
                         };
@@ -2880,26 +3044,84 @@ namespace MacroEngine.UI
                         };
                         iconContainer.Children.Add(placeholder);
                         iconContainer.Children.Add(img);
+                        tag.Tag = null;
+                        ApplyChipGradient(tag, null, false);
                         _ = Task.Run(() =>
                         {
                             var icon = ProcessMonitor.GetIconForProcessName(appName);
                             Dispatcher.BeginInvoke(new Action(() =>
                             {
-                                if (icon != null) img.Source = icon;
+                                if (icon != null)
+                                {
+                                    img.Source = icon;
+                                    var iconBs = icon as BitmapSource;
+                                    tag.Tag = iconBs;
+                                    ApplyChipGradient(tag, iconBs, false);
+                                }
                                 ((RotateTransform)placeholder.RenderTransform).BeginAnimation(RotateTransform.AngleProperty, null);
                                 placeholder.Visibility = Visibility.Collapsed;
                             }));
                         });
                     }
+                    tag.RenderTransform = new ScaleTransform(1, 1);
+                    tag.RenderTransformOrigin = new Point(0.5, 0.5);
+                    tag.MouseEnter += (s, _) => AnimateChipHover(tag, true);
+                    tag.MouseLeave += (s, _) => AnimateChipHover(tag, false);
+                    tag.PreviewMouseRightButtonDown += (s, _) => Chip_RightClickDown(tag);
+                    tag.PreviewMouseRightButtonUp += (s, _) => Chip_RightClickUp(tag);
                     stack.Children.Add(iconContainer);
                     stack.Children.Add(new TextBlock
                     {
                         Text = appName,
-                        Foreground = System.Windows.Media.Brushes.White,
-                        FontSize = 11,
+                        Foreground = chipTextBrush,
+                        FontSize = 12,
                         VerticalAlignment = VerticalAlignment.Center
                     });
                     tag.Child = stack;
+
+                    var appToRemove = app;
+                    var contextMenu = new ContextMenu();
+                    if (FindResource("ContextMenuDefaultStyle") is Style contextMenuStyle)
+                        contextMenu.Style = contextMenuStyle;
+                    var removeItem = new MenuItem
+                    {
+                        Header = new StackPanel
+                        {
+                            Orientation = Orientation.Horizontal,
+                            Children =
+                            {
+                                new TextBlock
+                                {
+                                    Text = LucideIcons.Trash,
+                                    FontFamily = (FontFamily)FindResource("FontLucide"),
+                                    FontSize = 12,
+                                    Margin = new Thickness(0, 0, 8, 0),
+                                    VerticalAlignment = VerticalAlignment.Center
+                                },
+                                new TextBlock
+                                {
+                                    Text = "Supprimer",
+                                    FontSize = 12,
+                                    VerticalAlignment = VerticalAlignment.Center
+                                }
+                            }
+                        },
+                        Tag = appToRemove
+                    };
+                    if (FindResource("ContextMenuItemDefaultStyle") is Style deleteStyle)
+                        removeItem.Style = deleteStyle;
+                    removeItem.Click += (s, e) =>
+                    {
+                        if (_selectedMacro?.TargetApplications == null) return;
+                        _selectedMacro.TargetApplications.Remove(appToRemove);
+                        _selectedMacro.ModifiedAt = DateTime.Now;
+                        UpdateTargetAppsDisplay();
+                        _ = _macroStorage.SaveMacrosAsync(_macros);
+                    };
+                    contextMenu.Items.Add(removeItem);
+                    contextMenu.Opened += (s, _) => Chip_RightClickUp(tag);
+                    tag.ContextMenu = contextMenu;
+
                     TargetAppsPanel.Children.Add(tag);
                 }
             }

@@ -3,7 +3,7 @@
 
     <!-- ══════════════════════════════════════════════════════════════════════
          MacroEngine - Palette de Couleurs
-         Design: Thème sombre professionnel - gris anthracite violacé, accent pourpre
+         Design: Thème sombre professionnel - gris anthracite, accent cuivre (machine)
          ══════════════════════════════════════════════════════════════════════ -->
 
     <!-- Fonds principaux -->
@@ -11,19 +11,19 @@
     <Color x:Key="BackgroundSecondaryColor">#25222B</Color>
     <Color x:Key="BackgroundTertiaryColor">#2D2934</Color>
     
-    <!-- Accent principal – Rouge pourpre (signature MacroEngine) -->
-    <Color x:Key="AccentPrimaryColor">#7A1E3A</Color>
-    <Color x:Key="AccentHoverColor">#8F2A4A</Color>
-    <Color x:Key="AccentPressedColor">#5E1629</Color>
-    <Color x:Key="AccentSelectionColor">#2A121A</Color>
-    <Color x:Key="AccentSecondaryColor">#7A1E3A</Color>
+    <!-- Accent principal – Cuivre sombre (signature MacroEngine, côté machine) -->
+    <Color x:Key="AccentPrimaryColor">#6B3E26</Color>
+    <Color x:Key="AccentHoverColor">#7F4A2E</Color>
+    <Color x:Key="AccentPressedColor">#552F1E</Color>
+    <Color x:Key="AccentSelectionColor">#2A1A12</Color>
+    <Color x:Key="AccentSecondaryColor">#6B3E26</Color>
     
     <!-- Sidebar / sélection (profils, macros) : garder un contraste lisible avec TextPrimary -->
-    <Color x:Key="SidebarAccentColor">#7A1E3A</Color>
-    <Color x:Key="SidebarAccentLightColor">#2A121A</Color>
+    <Color x:Key="SidebarAccentColor">#6B3E26</Color>
+    <Color x:Key="SidebarAccentLightColor">#2A1A12</Color>
     <Color x:Key="SidebarAccentSelectedColor">#282530</Color>
-    <Color x:Key="SidebarAccentHoverColor">#3A1828</Color>
-    <Color x:Key="SidebarAccentBorderColor">#7A1E3A</Color>
+    <Color x:Key="SidebarAccentHoverColor">#3A2518</Color>
+    <Color x:Key="SidebarAccentBorderColor">#6B3E26</Color>
     
     <!-- Texte -->
     <Color x:Key="TextPrimaryColor">#E6E4EA</Color>
@@ -39,16 +39,21 @@
     
     <!-- Bordures et séparateurs -->
     <Color x:Key="BorderLightColor">#3A3642</Color>
-    <Color x:Key="BorderFocusColor">#7A1E3A</Color>
+    <Color x:Key="BorderFocusColor">#6B3E26</Color>
     <Color x:Key="BorderInternalColor">#2F2B36</Color>
     <Color x:Key="BorderMediumColor">#3A3642</Color>
     <Color x:Key="BorderDarkColor">#2F2B36</Color>
+    <!-- Biseau métallique (colonnes) : reflet haut-gauche, ombre bas-droite -->
+    <Color x:Key="BorderBevelHighlightColor">#58E6E4EA</Color>
+    <Color x:Key="BorderBevelShadowColor">#B82A2830</Color>
+    <!-- Cadre fragmenté (coins châssis) : cuivre technique -->
+    <Color x:Key="ColumnCornerAccentColor">#B87333</Color>
     
     <!-- Ombres (couleurs pour DropShadowEffect) -->
     <Color x:Key="ShadowColor">#59000000</Color>
     <Color x:Key="ShadowHoverColor">#80000000</Color>
-    <Color x:Key="GlowPurpleColor">#597A1E3A</Color>
-    <Color x:Key="GlowPurpleSubtleColor">#2E7A1E3A</Color>
+    <Color x:Key="GlowAccentColor">#596B3E26</Color>
+    <Color x:Key="GlowAccentSubtleColor">#2E6B3E26</Color>
 
     <!-- ══════════════════════════════════════════════════════════════════════
          Couleurs des blocs d'action (Timeline / cartes)
@@ -102,7 +107,25 @@
     <SolidColorBrush x:Key="BackgroundPrimaryBrush" Color="{StaticResource BackgroundPrimaryColor}"/>
     <SolidColorBrush x:Key="BackgroundSecondaryBrush" Color="{StaticResource BackgroundSecondaryColor}"/>
     <SolidColorBrush x:Key="BackgroundTertiaryBrush" Color="{StaticResource BackgroundTertiaryColor}"/>
-    
+    <!-- Colonnes mécaniques : gradient 145° métal moderne (#232326 → #1C1C1F) -->
+    <LinearGradientBrush x:Key="ColumnMechanicalBackgroundBrush" StartPoint="0.2,0" EndPoint="0.8,1">
+        <GradientStop Color="#232326" Offset="0"/>
+        <GradientStop Color="#1C1C1F" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- Bordure fine structurante (1px, faible opacité) -->
+    <SolidColorBrush x:Key="ColumnMechanicalBorderBrush" Color="#12E6E4EA"/>
+    <!-- Inset Niveau 2 : highlight 1px rgba(255,255,255,0.05) / ombre rgba(0,0,0,0.6) -->
+    <SolidColorBrush x:Key="ColumnInsetHighlightBrush" Color="#0DFFFFFF"/>
+    <SolidColorBrush x:Key="ColumnInsetShadowBrush" Color="#99000000"/>
+    <!-- Ligne d'accent technique : dégradé transparent → cuivre → transparent (barre élégante) -->
+    <LinearGradientBrush x:Key="ColumnAccentLineGradientBrush" StartPoint="0,0.5" EndPoint="1,0.5">
+        <GradientStop Color="Transparent" Offset="0"/>
+        <GradientStop Color="#B87333" Offset="0.5"/>
+        <GradientStop Color="Transparent" Offset="1"/>
+    </LinearGradientBrush>
+    <!-- Cadre fragmenté (coins châssis CNC) -->
+    <SolidColorBrush x:Key="ColumnCornerAccentBrush" Color="{StaticResource ColumnCornerAccentColor}"/>
+
     <!-- Accents -->
     <SolidColorBrush x:Key="AccentPrimaryBrush" Color="{StaticResource AccentPrimaryColor}"/>
     <SolidColorBrush x:Key="AccentSecondaryBrush" Color="{StaticResource AccentSecondaryColor}"/>
@@ -135,7 +158,13 @@
     <SolidColorBrush x:Key="BorderInternalBrush" Color="{StaticResource BorderInternalColor}"/>
     <SolidColorBrush x:Key="BorderMediumBrush" Color="{StaticResource BorderMediumColor}"/>
     <SolidColorBrush x:Key="BorderDarkBrush" Color="{StaticResource BorderDarkColor}"/>
-    
+    <!-- Cadre métallique biseauté (multi-ton, relief) -->
+    <LinearGradientBrush x:Key="BorderMetallicBevelBrush" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="{StaticResource BorderBevelHighlightColor}" Offset="0"/>
+        <GradientStop Color="{StaticResource BorderLightColor}" Offset="0.35"/>
+        <GradientStop Color="{StaticResource BorderBevelShadowColor}" Offset="1"/>
+    </LinearGradientBrush>
+
     <!-- Blocs d'action -->
     <SolidColorBrush x:Key="BlockKeyboardBrush" Color="{StaticResource BlockKeyboardColor}"/>
     <SolidColorBrush x:Key="BlockKeyboardDarkBrush" Color="{StaticResource BlockKeyboardDarkColor}"/>
@@ -192,7 +221,7 @@
     <LinearGradientBrush x:Key="AccentSecondaryToolbarBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="{StaticResource AccentSecondaryColor}" Offset="0"/>
         <GradientStop Color="{StaticResource AccentPressedColor}" Offset="0.5"/>
-        <GradientStop Color="#4A0F1A" Offset="1"/>
+        <GradientStop Color="#352010" Offset="1"/>
     </LinearGradientBrush>
     <!-- Enregistrer (rouge) / Arrêter (gris) - barre d'outils éditeur -->
     <LinearGradientBrush x:Key="RecordToolbarBrush" StartPoint="0,0" EndPoint="0,1">
@@ -237,20 +266,36 @@
                       ShadowDepth="2"
                       Direction="270"/>
     
-    <!-- Glow pourpre (hover important) - rgba(122,30,58,0.35) -->
+    <!-- Glow cuivre (hover important) -->
     <DropShadowEffect x:Key="ShadowActionBlockHover" 
-                      Color="#7A1E3A" 
+                      Color="#6B3E26" 
                       Opacity="0.35" 
                       BlurRadius="12" 
                       ShadowDepth="0"
                       Direction="270"/>
     
-    <!-- Glow pourpre subtil (sélection) - rgba(122,30,58,0.18) -->
+    <!-- Glow cuivre subtil (sélection) -->
     <DropShadowEffect x:Key="ShadowButtonHover" 
-                      Color="#7A1E3A" 
+                      Color="#6B3E26" 
                       Opacity="0.18" 
                       BlurRadius="8" 
                       ShadowDepth="0"
+                      Direction="270"/>
+
+    <!-- Panneau Propriétés - glow mécanique au survol -->
+    <DropShadowEffect x:Key="ShadowPanelPropertiesHover" 
+                      Color="#6B3E26" 
+                      Opacity="0.25" 
+                      BlurRadius="14" 
+                      ShadowDepth="0"
+                      Direction="270"/>
+
+    <!-- Élévation légère (champs TextBox panneau Propriétés) -->
+    <DropShadowEffect x:Key="ShadowTextBoxElevation" 
+                      Color="Black" 
+                      Opacity="0.22" 
+                      BlurRadius="6" 
+                      ShadowDepth="2"
                       Direction="270"/>
 
     <!-- ══════════════════════════════════════════════════════════════════════
