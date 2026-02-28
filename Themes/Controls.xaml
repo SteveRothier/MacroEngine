@@ -1559,6 +1559,22 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Conteneur des chips (Applications cibles) : fond dégradé léger, bordure discrète -->
+    <Style x:Key="PanelChipsContainer" TargetType="Border">
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="{StaticResource BackgroundSecondaryColor}" Offset="0"/>
+                    <GradientStop Color="{StaticResource BackgroundTertiaryColor}" Offset="0.5"/>
+                    <GradientStop Color="{StaticResource BackgroundSecondaryColor}" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderInternalBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
     <!-- Blocs panneau Propriétés - zones de contenu avec hover animé -->
     <Style x:Key="PanelPropertiesBlock" TargetType="Border">
         <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>

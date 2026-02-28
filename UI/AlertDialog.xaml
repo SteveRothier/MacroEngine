@@ -1,0 +1,74 @@
+<Window x:Class="MacroEngine.UI.AlertDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Alerte"
+        Width="460" SizeToContent="Height" MaxHeight="420"
+        WindowStartupLocation="CenterOwner"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        Background="{StaticResource BackgroundPrimaryBrush}">
+    <Border x:Name="RootBorder"
+            Background="{StaticResource BackgroundPrimaryBrush}"
+            BorderBrush="{StaticResource BorderLightBrush}"
+            BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto" MaxHeight="280"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Barre de titre -->
+            <Border x:Name="TitleBarBorder" Grid.Row="0"
+                    shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="16,0,0,0" Height="44"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBlock x:Name="IconText" Text="&#xE1BC;" FontFamily="{StaticResource FontLucide}" FontSize="18"
+                                   Foreground="{StaticResource WarningBrush}" Margin="0,0,10,0"/>
+                        <TextBlock x:Name="TitleText" Text="Alerte" Style="{StaticResource TextHeading}"
+                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="15"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Stretch"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="CloseButton" Style="{StaticResource WindowCaptionCloseButtonStyle}"
+                                ClickMode="Press" Focusable="False" Foreground="{StaticResource TextPrimaryBrush}"
+                                FontFamily="{StaticResource FontLucide}" Content="&#xE1B2;"
+                                ToolTip="Fermer" Click="CloseButton_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Message (hauteur selon le texte, scroll si trop long) -->
+            <Border Grid.Row="1" Margin="20,16,20,12"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="16">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              Padding="0">
+                    <TextBlock x:Name="MessageText" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextPrimaryBrush}" FontSize="14"/>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Bouton OK -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right"
+                        Margin="20,0,20,20">
+                <Button x:Name="OkButton" Style="{StaticResource ButtonPrimary}"
+                        Content="OK" Click="OkButton_Click"
+                        Padding="14,8" MinWidth="80"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

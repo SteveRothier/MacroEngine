@@ -234,12 +234,15 @@ namespace MacroEngine.UI
                     : processName;
                     
                 ActiveAppText.Text = displayText;
-                ActiveAppText.Foreground = System.Windows.Media.Brushes.DarkBlue;
+                ActiveAppText.Foreground = (System.Windows.Media.Brush)FindResource("TextPrimaryBrush");
             }
         }
 
         private void CheckAutoExecuteMacros(string processName)
         {
+            // Ne pas exécuter automatiquement si on définit un raccourci
+            if (_isCapturingShortcut)
+                return;
             // Chercher les macros qui doivent s'exécuter automatiquement pour cette application
             foreach (var macro in _macros)
             {
@@ -511,7 +514,7 @@ namespace MacroEngine.UI
                 {
                     var conflictMessage = "Conflits de raccourcis détectés:\n" + 
                         string.Join("\n", conflicts.Select(c => $"- '{c.macro.Name}' utilise {GetKeyNameForShortcut((ushort)c.keyCode)} (déjà utilisé)"));
-                    MessageBox.Show(conflictMessage, "Avertissement", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    new AlertDialog("Avertissement", conflictMessage, this).ShowDialog();
                 }), System.Windows.Threading.DispatcherPriority.Normal);
             }
             
@@ -523,8 +526,8 @@ namespace MacroEngine.UI
             // Vérifier si cette touche correspond à un raccourci de macro
             if (_macroShortcuts.TryGetValue(e.VirtualKeyCode, out var macro))
             {
-                // Ne pas exécuter si on est en train d'enregistrer
-                if (_isRecording)
+                // Ne pas exécuter si on est en train d'enregistrer ou de définir un raccourci
+                if (_isRecording || _isCapturingShortcut)
                     return;
                     
                 // Vérifier que ce n'est pas le raccourci global d'exécution ou d'arrêt
@@ -642,11 +645,9 @@ namespace MacroEngine.UI
                      _selectedMacro.ShortcutKeyCode == _appConfig.StopMacroKeyCode))
                 {
                     _logger?.Warning($"Le raccourci de la macro '{_selectedMacro.Name}' entre en conflit avec un raccourci global", "MainWindow");
-                    MessageBox.Show(
+                    new AlertDialog("Conflit de raccourci",
                         $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par un raccourci global.\nVeuillez choisir un autre raccourci.",
-                        "Conflit de raccourci",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
+                        this).ShowDialog();
                     _selectedMacro.ShortcutKeyCode = 0; // Réinitialiser le raccourci
                 }
                 else
@@ -660,11 +661,9 @@ namespace MacroEngine.UI
                     if (conflictingMacro != null)
                     {
                         _logger?.Warning($"Le raccourci de la macro '{_selectedMacro.Name}' entre en conflit avec '{conflictingMacro.Name}'", "MainWindow");
-                        MessageBox.Show(
+                        new AlertDialog("Conflit de raccourci",
                             $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par la macro '{conflictingMacro.Name}'.\nVeuillez choisir un autre raccourci.",
-                            "Conflit de raccourci",
-                            MessageBoxButton.OK,
-                            MessageBoxImage.Warning);
+                            this).ShowDialog();
                         _selectedMacro.ShortcutKeyCode = 0; // Réinitialiser le raccourci
                     }
                 }
@@ -697,10 +696,11 @@ namespace MacroEngine.UI
 
         private void GlobalExecuteHook_KeyDown(object? sender, KeyboardHookEventArgs e)
         {
-            // Vérifier que c'est le raccourci configuré pour exécuter et qu'on n'est pas en train d'enregistrer
+            // Vérifier que c'est le raccourci configuré pour exécuter et qu'on n'est pas en train d'enregistrer ou de définir un raccourci
             if (_appConfig != null && 
                 e.VirtualKeyCode == _appConfig.ExecuteMacroKeyCode && 
                 !_isRecording && 
+                !_isCapturingShortcut &&
                 _macroEngine.State == MacroEngineState.Idle)
             {
                 // Bloquer la propagation pour éviter qu'il ouvre des menus
@@ -2666,6 +2666,30 @@ namespace MacroEngine.UI
             }
         }
 
+        private void ClearShortcut_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null) return;
+            _selectedMacro.ShortcutKeyCode = 0;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            if (ShortcutDisplayText != null)
+                ShortcutDisplayText.Text = "Non défini";
+            UpdateMacroShortcuts();
+            if (_appConfig?.EnableHooks == true)
+            {
+                try
+                {
+                    _globalMacroShortcutsHook?.Uninstall();
+                    _globalMacroShortcutsHook?.Install();
+                }
+                catch { }
+            }
+            MacrosListBox.Items.Refresh();
+            _ = _macroStorage.SaveMacrosAsync(_macros);
+            UpdateExecuteButtonText();
+            StatusText.Text = "Raccourci supprimé.";
+            StatusText.Foreground = System.Windows.Media.Brushes.Gray;
+        }
+
         private void SetShortcut_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedMacro == null)
@@ -2736,11 +2760,9 @@ namespace MacroEngine.UI
                 (_selectedMacro.ShortcutKeyCode == _appConfig.ExecuteMacroKeyCode ||
                  _selectedMacro.ShortcutKeyCode == _appConfig.StopMacroKeyCode))
             {
-                MessageBox.Show(
+                new AlertDialog("Conflit de raccourci",
                     $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par un raccourci global.\nVeuillez choisir un autre raccourci.",
-                    "Conflit de raccourci",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    this).ShowDialog();
                 _selectedMacro.ShortcutKeyCode = 0;
             }
             else
@@ -2751,11 +2773,9 @@ namespace MacroEngine.UI
                     m.ShortcutKeyCode != 0);
                 if (conflictingMacro != null)
                 {
-                    MessageBox.Show(
+                    new AlertDialog("Conflit de raccourci",
                         $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par la macro '{conflictingMacro.Name}'.\nVeuillez choisir un autre raccourci.",
-                        "Conflit de raccourci",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Warning);
+                        this).ShowDialog();
                     _selectedMacro.ShortcutKeyCode = 0;
                 }
             }

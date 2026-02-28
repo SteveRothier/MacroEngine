@@ -508,19 +508,68 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Raccourci clavier" Style="{StaticResource TextLabel}" VerticalAlignment="Center" Margin="0"/>
                                 <Button Grid.Column="1"
-                                        Content="Définir"
-                                        Style="{StaticResource ButtonPropertiesAction}"
-                                        Click="SetShortcut_Click"
-                                        MinWidth="72"
-                                        VerticalAlignment="Center"/>
+                                    Content="Définir"
+                                    Style="{StaticResource ButtonPropertiesAction}"
+                                    Click="SetShortcut_Click"
+                                    MinWidth="72"/>
                             </Grid>
-                            <Border Style="{StaticResource PanelPropertiesBlock}"
+                            <Border x:Name="ShortcutDisplayBorder"
+                                    Style="{StaticResource PanelChipsContainer}"
                                     Padding="10,8"
                                     MinHeight="32">
-                                <TextBlock x:Name="ShortcutDisplayText" 
-                                           Text="Non défini"
-                                           Style="{StaticResource TextMono}"
-                                           FontSize="12"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="ShortcutDisplayText" 
+                                               Grid.Column="0"
+                                               Text="Non défini"
+                                               Style="{StaticResource TextMono}"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"/>
+                                    <Button Grid.Column="1"
+                                            Padding="4,0"
+                                            MinWidth="24"
+                                            MinHeight="24"
+                                            VerticalAlignment="Center"
+                                            Cursor="Hand"
+                                            ToolTip="Retirer le raccourci"
+                                            Click="ClearShortcut_Click">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="BorderThickness" Value="0"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <TextBlock x:Name="ClearIcon"
+                                                                       Text="&#xE1B2;"
+                                                                       FontFamily="{StaticResource FontLucide}"
+                                                                       FontSize="12"
+                                                                       Foreground="{StaticResource TextMutedBrush}"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center"/>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="ClearIcon" Property="Foreground"
+                                                                            Value="{StaticResource TextPrimaryBrush}"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                                <Setter Property="Opacity" Value="0"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
+                                                                 Value="True">
+                                                        <Setter Property="Opacity" Value="1"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                    </Button>
+                                </Grid>
                             </Border>
                         </StackPanel>
 
@@ -540,7 +589,7 @@
                                         MinWidth="88"
                                         VerticalAlignment="Center"/>
                             </Grid>
-                            <Border Style="{StaticResource PanelPropertiesBlock}"
+                            <Border Style="{StaticResource PanelChipsContainer}"
                                     Padding="10,8"
                                     MinHeight="36"
                                     MaxHeight="160">
@@ -578,32 +627,22 @@
 
                         <!-- État du moteur -->
                         <TextBlock Text="État" Style="{StaticResource TextLabel}" Margin="0,8,0,0"/>
-                        <Border Style="{StaticResource PanelPropertiesBlock}"
+                        <Border Style="{StaticResource PanelChipsContainer}"
                                 Padding="12,8"
                                 Margin="0,0,0,12">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="EngineStateText" 
+                            <TextBlock x:Name="EngineStateText" 
                                            Text="Prêt" 
                                            Foreground="{StaticResource SuccessBrush}"
                                            FontWeight="Medium"/>
-                                <TextBlock x:Name="CPSText" 
-                                           Grid.Column="1"
-                                           Text="0 CPS" 
-                                           Style="{StaticResource TextMono}"/>
-                            </Grid>
                         </Border>
 
                         <!-- Application active -->
                         <TextBlock Text="Application active" Style="{StaticResource TextLabel}"/>
-                        <Border Style="{StaticResource PanelPropertiesBlock}"
+                        <Border Style="{StaticResource PanelChipsContainer}"
                                 Padding="12,8">
                             <TextBlock x:Name="ActiveAppText" 
                                        Text="Aucune" 
-                                       Style="{StaticResource TextMuted}"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
                                        TextWrapping="Wrap"/>
                         </Border>
                 </StackPanel>
