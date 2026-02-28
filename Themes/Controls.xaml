@@ -8,6 +8,17 @@
          ══════════════════════════════════════════════════════════════════════ -->
 
     <!-- ══════════════════════════════════════════════════════════════════════
+         TOOLTIP (style global, couleurs thème)
+         ══════════════════════════════════════════════════════════════════════ -->
+    <Style TargetType="ToolTip">
+        <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="8,6"/>
+    </Style>
+
+    <!-- ══════════════════════════════════════════════════════════════════════
          TOGGLE SWITCH
          ══════════════════════════════════════════════════════════════════════ -->
 
