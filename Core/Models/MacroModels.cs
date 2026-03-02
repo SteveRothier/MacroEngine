@@ -55,14 +55,47 @@ namespace MacroEngine.Core.Models
 
         /// <summary>
         /// Surveillance continue : la macro s'exécute en boucle et réévalue les conditions (notamment If) en continu.
-        /// Utile pour réagir dès qu'une condition est remplie (ex. couleur à l'écran, application active).
+        /// Rétrocompatibilité : si true, équivalent à TriggerMode = ContinuousPolling.
         /// </summary>
-        public bool ContinuousMonitoring { get; set; } = false;
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool ContinuousMonitoring
+        {
+            get => TriggerMode == MacroTriggerMode.ContinuousPolling;
+            set => TriggerMode = value ? MacroTriggerMode.ContinuousPolling : MacroTriggerMode.SingleExecution;
+        }
+
+        /// <summary>
+        /// Mode de déclenchement : exécution unique, événementiel ou surveillance continue.
+        /// </summary>
+        public MacroTriggerMode TriggerMode { get; set; } = MacroTriggerMode.SingleExecution;
 
         /// <summary>
         /// Délai en millisecondes entre chaque cycle en mode surveillance continue (défaut 200 ms).
         /// </summary>
         public int ContinuousMonitoringIntervalMs { get; set; } = 200;
+    }
+
+    /// <summary>
+    /// Mode de déclenchement des macros avec conditions (If).
+    /// </summary>
+    public enum MacroTriggerMode
+    {
+        /// <summary>
+        /// Exécution unique : la macro s'exécute une fois quand déclenchée (raccourci, bouton).
+        /// </summary>
+        SingleExecution,
+
+        /// <summary>
+        /// Déclenchement sur événement : attend les événements système (touche, clic, app active, temps)
+        /// puis exécute. Recommandé pour conditions clavier/souris/application/temps.
+        /// </summary>
+        EventDriven,
+
+        /// <summary>
+        /// Surveillance continue : boucle de polling qui réévalue les conditions périodiquement.
+        /// Recommandé pour conditions pixel/image/texte à l'écran.
+        /// </summary>
+        ContinuousPolling
     }
 
     /// <summary>

@@ -41,6 +41,8 @@
             <converters:BoolToStatusConverter x:Key="BoolToStatusConverter"/>
             <converters:KeyCodeToNameConverter x:Key="KeyCodeToNameConverter"/>
             <converters:ShortcutVisibilityConverter x:Key="ShortcutVisibilityConverter"/>
+            <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+            <converters:RecommendedIconVisibilityConverter x:Key="RecommendedIconVisibilityConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

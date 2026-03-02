@@ -1,7 +1,9 @@
 using System;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Media;
 
 namespace MacroEngine.Converters
 {
@@ -163,6 +165,50 @@ namespace MacroEngine.Converters
                 0xDE => "^",
                 _ => $"VK{virtualKeyCode:X2}"
             };
+        }
+    }
+
+    /// <summary>
+    /// Convertit un booléen en Visibility (true → Visible, false → Collapsed).
+    /// </summary>
+    public class BoolToVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is true ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is Visibility v && v == Visibility.Visible;
+        }
+    }
+
+    /// <summary>
+    /// Affiche l'icône seulement si IsRecommended (values[0]) et que l'élément (values[1]) est dans un Popup (liste déroulante).
+    /// Utilisé pour n'afficher l'icône "recommandé" que dans les options du ComboBox, pas dans la zone de sélection.
+    /// </summary>
+    public class RecommendedIconVisibilityConverter : IMultiValueConverter
+    {
+        public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (values == null || values.Length < 2) return Visibility.Collapsed;
+            if (values[0] is not true) return Visibility.Collapsed; // IsRecommended
+            if (values[1] is not DependencyObject element) return Visibility.Collapsed;
+            return IsInPopup(element) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+
+        private static bool IsInPopup(DependencyObject element)
+        {
+            while (element != null)
+            {
+                if (element is Popup) return true;
+                element = VisualTreeHelper.GetParent(element);
+            }
+            return false;
         }
     }
 

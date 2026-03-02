@@ -692,6 +692,8 @@ namespace MacroEngine.UI
             UpdateMacroSummary();
             // Mettre à jour les raccourcis globaux (au cas où IsEnabled a changé)
             UpdateMacroShortcuts();
+            // Rafraîchir l'indication recommandée du mode de déclenchement selon les actions
+            UpdateTriggerModeRecommendedText();
         }
 
         private void GlobalExecuteHook_KeyDown(object? sender, KeyboardHookEventArgs e)
@@ -1178,7 +1180,9 @@ namespace MacroEngine.UI
                 
                 // Si la macro utilise la molette (condition) ou la surveillance continue, installer le hook souris pour capturer la molette
                 bool mouseHookInstalledForExecution = false;
-                if ((_selectedMacro.ContinuousMonitoring || MacroHasMouseWheelCondition(_selectedMacro)) && !_mouseHook.IsEnabled)
+                bool usePollingLoop = _selectedMacro.TriggerMode == MacroTriggerMode.ContinuousPolling || 
+                                     _selectedMacro.TriggerMode == MacroTriggerMode.EventDriven;
+                if ((usePollingLoop || MacroHasMouseWheelCondition(_selectedMacro)) && !_mouseHook.IsEnabled)
                 {
                     try
                     {
@@ -3167,9 +3171,10 @@ namespace MacroEngine.UI
                 UpdateTargetAppsDisplay();
 
                 // Surveillance continue
-                ContinuousMonitoringCheckBox.IsChecked = _selectedMacro.ContinuousMonitoring;
-                ContinuousMonitoringOptionsPanel.Visibility = _selectedMacro.ContinuousMonitoring ? Visibility.Visible : Visibility.Collapsed;
+                SelectTriggerModeInComboBox(_selectedMacro.TriggerMode);
+                TriggerModeOptionsPanel.Visibility = _selectedMacro.TriggerMode == MacroTriggerMode.ContinuousPolling ? Visibility.Visible : Visibility.Collapsed;
                 ContinuousMonitoringIntervalTextBox.Text = _selectedMacro.ContinuousMonitoringIntervalMs.ToString();
+                UpdateTriggerModeRecommendedText();
             }
             else
             {
@@ -3177,8 +3182,9 @@ namespace MacroEngine.UI
                 MacroDescriptionTextBox.Text = "";
                 ShortcutDisplayText.Text = "Non défini";
                 UpdateTargetAppsDisplay();
-                ContinuousMonitoringCheckBox.IsChecked = false;
-                ContinuousMonitoringOptionsPanel.Visibility = Visibility.Collapsed;
+                SelectTriggerModeInComboBox(MacroTriggerMode.SingleExecution);
+                TriggerModeOptionsPanel.Visibility = Visibility.Collapsed;
+                UpdateTriggerModeRecommendedText();
             }
         }
 
@@ -3581,12 +3587,125 @@ namespace MacroEngine.UI
             return action.Name ?? action.Type.ToString();
         }
 
-        private void ContinuousMonitoringCheckBox_Changed(object sender, RoutedEventArgs e)
+        private void TriggerModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (_selectedMacro == null) return;
-            _selectedMacro.ContinuousMonitoring = ContinuousMonitoringCheckBox.IsChecked == true;
-            ContinuousMonitoringOptionsPanel.Visibility = _selectedMacro.ContinuousMonitoring ? Visibility.Visible : Visibility.Collapsed;
+            if (_selectedMacro == null || TriggerModeComboBox?.SelectedItem is not TriggerModeOption option) return;
+            var mode = option.Mode;
+            if (_selectedMacro.TriggerMode == mode) return; // Éviter boucle lors du chargement
+            _selectedMacro.TriggerMode = mode;
+            TriggerModeOptionsPanel.Visibility = mode == MacroTriggerMode.ContinuousPolling ? Visibility.Visible : Visibility.Collapsed;
             _selectedMacro.ModifiedAt = DateTime.Now;
+            UpdateTriggerModeRecommendedText();
+            _ = _macroStorage.SaveMacrosAsync(_macros);
+        }
+
+        private void SelectTriggerModeInComboBox(MacroTriggerMode mode)
+        {
+            if (TriggerModeComboBox?.Items == null) return;
+            var option = TriggerModeComboBox.Items.OfType<TriggerModeOption>().FirstOrDefault(o => o.Mode == mode);
+            if (option != null)
+                TriggerModeComboBox.SelectedItem = option;
+        }
+
+        private static MacroTriggerMode GetRecommendedTriggerMode(Macro? macro)
+        {
+            var (mode, _) = GetRecommendedTriggerModeWithContext(macro);
+            return mode;
+        }
+
+        private static IEnumerable<IInputAction> FlattenActions(IEnumerable<IInputAction> actions)
+        {
+            foreach (var a in actions)
+            {
+                yield return a;
+                if (a is IfAction ifa)
+                {
+                    foreach (var child in FlattenActions(ifa.ThenActions ?? Enumerable.Empty<IInputAction>()))
+                        yield return child;
+                    foreach (var child in FlattenActions(ifa.ElseActions ?? Enumerable.Empty<IInputAction>()))
+                        yield return child;
+                    foreach (var branch in ifa.ElseIfBranches ?? Enumerable.Empty<ElseIfBranch>())
+                    {
+                        foreach (var g in branch.ConditionGroups ?? Enumerable.Empty<ConditionGroup>())
+                            foreach (var _ in g.Conditions ?? Enumerable.Empty<ConditionItem>()) { }
+                        foreach (var child in FlattenActions(branch.Actions ?? Enumerable.Empty<IInputAction>()))
+                            yield return child;
+                    }
+                }
+                else if (a is RepeatAction ra)
+                {
+                    foreach (var child in FlattenActions(ra.Actions ?? Enumerable.Empty<IInputAction>()))
+                        yield return child;
+                }
+            }
+        }
+
+        private static IEnumerable<ConditionType> GetConditionTypesFromIf(IfAction ifAction)
+        {
+            foreach (var g in ifAction.ConditionGroups ?? Enumerable.Empty<ConditionGroup>())
+                foreach (var c in g.Conditions ?? Enumerable.Empty<ConditionItem>())
+                    yield return c.ConditionType;
+            foreach (var c in ifAction.Conditions ?? Enumerable.Empty<ConditionItem>())
+                yield return c.ConditionType;
+            foreach (var branch in ifAction.ElseIfBranches ?? Enumerable.Empty<ElseIfBranch>())
+                foreach (var g in branch.ConditionGroups ?? Enumerable.Empty<ConditionGroup>())
+                    foreach (var c in g.Conditions ?? Enumerable.Empty<ConditionItem>())
+                        yield return c.ConditionType;
+        }
+
+        private void UpdateTriggerModeRecommendedText()
+        {
+            const string tipSingle = "Une fois au déclenchement.";
+            const string tipEvent = "Pour conditions clavier/souris/app/temps.";
+            const string tipPolling = "Pour conditions pixel/image/texte à l'écran.";
+
+            var recommended = _selectedMacro != null ? GetRecommendedTriggerModeWithContext(_selectedMacro).mode : MacroTriggerMode.SingleExecution;
+            var options = new List<TriggerModeOption>
+            {
+                new() { Label = "Exécution unique", Tooltip = tipSingle, Mode = MacroTriggerMode.SingleExecution, IsRecommended = recommended == MacroTriggerMode.SingleExecution },
+                new() { Label = "Déclenchement sur événement", Tooltip = tipEvent, Mode = MacroTriggerMode.EventDriven, IsRecommended = recommended == MacroTriggerMode.EventDriven },
+                new() { Label = "Surveillance continue", Tooltip = tipPolling, Mode = MacroTriggerMode.ContinuousPolling, IsRecommended = recommended == MacroTriggerMode.ContinuousPolling }
+            };
+
+            var currentMode = _selectedMacro?.TriggerMode ?? MacroTriggerMode.SingleExecution;
+            TriggerModeComboBox.ItemsSource = options;
+            TriggerModeComboBox.SelectedItem = options.FirstOrDefault(o => o.Mode == currentMode) ?? options[0];
+
+            TriggerModeComboBox.ToolTip = currentMode switch
+            {
+                MacroTriggerMode.SingleExecution => tipSingle,
+                MacroTriggerMode.EventDriven => tipEvent,
+                MacroTriggerMode.ContinuousPolling => tipPolling,
+                _ => tipSingle
+            };
+        }
+
+        private static (MacroTriggerMode mode, bool hasConditions) GetRecommendedTriggerModeWithContext(Macro? macro)
+        {
+            if (macro?.Actions == null || macro.Actions.Count == 0)
+                return (MacroTriggerMode.SingleExecution, false);
+            bool hasPollingCondition = false;
+            bool hasEventCondition = false;
+            bool hasAnyCondition = false;
+            foreach (var action in FlattenActions(macro.Actions))
+            {
+                if (action is IfAction ifAction)
+                {
+                    foreach (var ct in GetConditionTypesFromIf(ifAction))
+                    {
+                        hasAnyCondition = true;
+                        if (ct == ConditionType.PixelColor || ct == ConditionType.ImageOnScreen || ct == ConditionType.TextOnScreen)
+                            hasPollingCondition = true;
+                        else if (ct == ConditionType.KeyboardKey || ct == ConditionType.MouseClick || ct == ConditionType.MousePosition ||
+                                 ct == ConditionType.ActiveApplication || ct == ConditionType.TimeDate || ct == ConditionType.ProcessRunning)
+                            hasEventCondition = true;
+                    }
+                }
+            }
+            if (!hasAnyCondition) return (MacroTriggerMode.SingleExecution, false);
+            if (hasPollingCondition) return (MacroTriggerMode.ContinuousPolling, true);
+            if (hasEventCondition) return (MacroTriggerMode.EventDriven, true);
+            return (MacroTriggerMode.SingleExecution, true);
         }
 
         private void ContinuousMonitoringInterval_TextChanged(object sender, TextChangedEventArgs e)
@@ -3691,6 +3810,19 @@ namespace MacroEngine.UI
             base.OnStateChanged(e);
             UpdateMaximizeButtonContent();
         }
+    }
+
+    /// <summary>
+    /// Option pour le ComboBox du mode de déclenchement (affichage liste + sélection).
+    /// </summary>
+    public sealed class TriggerModeOption
+    {
+        public string Label { get; set; } = string.Empty;
+        public string Tooltip { get; set; } = string.Empty;
+        public MacroTriggerMode Mode { get; set; }
+        public bool IsRecommended { get; set; }
+
+        public override string ToString() => Label;
     }
 
     /// <summary>

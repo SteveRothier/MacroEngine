@@ -46,6 +46,7 @@ public static class LucideIcons
     public const string Repeat = "\uE146";     // repeat
     public const string Undo = "\uE19B";       // undo
     public const string HelpCircle = "\uE082"; // circle-question-mark
+    public const string CheckCircle = "\uE072"; // circle-check (recommandé, validé)
     public const string Library = "\uE100";    // library
 
     // Sélection / Couleur
@@ -56,6 +57,9 @@ public static class LucideIcons
 
     // Texte / Type
     public const string Type = "\uE198";      // type
+
+    // Indicateurs / Recommandation
+    public const string FlagTriangleRight = "\uE238"; // flag-triangle-right (recommandé, marqueur)
 
     // Tri
     public const string ArrowUp = "\uE19E";       // upload / arrow up

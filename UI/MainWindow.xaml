@@ -12,6 +12,58 @@
         WindowStyle="None"
         ResizeMode="CanResizeWithGrip"
         Background="{StaticResource BackgroundPrimaryBrush}">
+    <Window.Resources>
+        <!-- Style spécifique pour les items du ComboBox Mode de déclenchement -->
+        <Style x:Key="TriggerModeComboBoxItemStyle" TargetType="ComboBoxItem">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <Grid ToolTip="{Binding Tooltip}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"/>
+                                <Border Grid.Column="1" Margin="4,0,0,0" Padding="4,2,4,2"
+                                        CornerRadius="3"
+                                        BorderBrush="{StaticResource BorderLightBrush}"
+                                        BorderThickness="1"
+                                        Visibility="{Binding IsRecommended, Converter={StaticResource BoolToVisibilityConverter}}"
+                                        ToolTip="Recommandé selon les actions de la macro">
+                                    <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background">
+                                                            <Setter.Value>
+                                                                <SolidColorBrush Color="#254FB58C"/>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                        <Setter Property="Cursor" Value="Hand"/>
+                                                    </Trigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                    </Border.Style>
+                                    <TextBlock Text="&#xE238;" FontFamily="{StaticResource FontLucide}" FontSize="12"
+                                               Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <!-- Cadre de la fenêtre (bordure visible en mode restauré) -->
     <Border Background="{StaticResource BackgroundPrimaryBrush}"
             BorderBrush="{StaticResource BorderLightBrush}"
@@ -605,22 +657,26 @@
                             </Border>
                         </StackPanel>
 
-                        <!-- Surveillance continue -->
-                        <CheckBox x:Name="ContinuousMonitoringCheckBox"
-                                  Content="Surveillance continue"
-                                  Style="{StaticResource CheckBoxModern}"
-                                  Checked="ContinuousMonitoringCheckBox_Changed"
-                                  Unchecked="ContinuousMonitoringCheckBox_Changed"
-                                  Margin="0,0,0,6"
-                                  ToolTip="La macro s'exécute en boucle et réévalue les conditions (If) en continu. Utile pour réagir dès qu'une condition est remplie."/>
-                        <StackPanel x:Name="ContinuousMonitoringOptionsPanel" Visibility="Collapsed" Margin="24,0,0,12">
-                            <TextBlock Text="Intervalle (ms)" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
-                            <TextBox x:Name="ContinuousMonitoringIntervalTextBox"
-                                     Style="{StaticResource TextBoxModern}"
-                                     Width="80"
-                                     HorizontalAlignment="Left"
-                                     Text="200"
-                                     TextChanged="ContinuousMonitoringInterval_TextChanged"/>
+                        <!-- Mode de déclenchement (conditions If) -->
+                        <StackPanel Margin="0,0,0,10">
+                            <TextBlock Text="Mode de déclenchement" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="TriggerModeComboBox"
+                                      Style="{StaticResource ComboBoxModern}"
+                                      Width="220"
+                                      HorizontalAlignment="Left"
+                                      ItemContainerStyle="{StaticResource TriggerModeComboBoxItemStyle}"
+                                      SelectionChanged="TriggerModeComboBox_SelectionChanged"/>
+                            <StackPanel x:Name="TriggerModeOptionsPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                                <TextBlock Text="Intervalle (ms)" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
+                                <TextBox x:Name="ContinuousMonitoringIntervalTextBox"
+                                         Style="{StaticResource TextBoxModern}"
+                                         Width="54"
+                                         Padding="3,2"
+                                         HorizontalAlignment="Left"
+                                         Text="200"
+                                         PreviewMouseDown="MacroDescriptionTextBox_PreviewMouseDown"
+                                         TextChanged="ContinuousMonitoringInterval_TextChanged"/>
+                            </StackPanel>
                         </StackPanel>
 
                         <Border Style="{StaticResource SeparatorHorizontal}"/>

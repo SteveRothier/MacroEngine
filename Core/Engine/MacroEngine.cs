@@ -91,12 +91,15 @@ namespace MacroEngine.Core.Engine
             }
 
             _logger?.Info($"Démarrage de la macro '{macro.Name}' ({macro.Actions?.Count ?? 0} actions)" + 
-                (macro.ContinuousMonitoring ? " [Surveillance continue]" : ""), "MacroEngine");
+                (macro.TriggerMode == MacroTriggerMode.ContinuousPolling ? " [Surveillance continue]" : 
+                 macro.TriggerMode == MacroTriggerMode.EventDriven ? " [Déclenchement événementiel]" : ""), "MacroEngine");
             _timingEngine.Reset();
 
             try
             {
-                if (macro.ContinuousMonitoring)
+                bool usePollingLoop = macro.TriggerMode == MacroTriggerMode.ContinuousPolling || 
+                                     macro.TriggerMode == MacroTriggerMode.EventDriven;
+                if (usePollingLoop)
                 {
                     int intervalMs = macro.ContinuousMonitoringIntervalMs > 0 ? macro.ContinuousMonitoringIntervalMs : 200;
                     while (!_cancellationTokenSource.Token.IsCancellationRequested && State != MacroEngineState.Stopping)

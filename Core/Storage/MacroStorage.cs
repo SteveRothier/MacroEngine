@@ -63,7 +63,7 @@ namespace MacroEngine.Core.Storage
                     TargetApplications = m.TargetApplications ?? new List<string>(),
                     AppTriggerMode = m.AppTriggerMode,
                     AutoExecuteOnFocus = m.AutoExecuteOnFocus,
-                    ContinuousMonitoring = m.ContinuousMonitoring,
+                    TriggerMode = m.ContinuousMonitoring ? MacroTriggerMode.ContinuousPolling : m.TriggerMode,
                     ContinuousMonitoringIntervalMs = m.ContinuousMonitoringIntervalMs
                 }).ToList() ?? new List<Macro>();
                 
@@ -108,6 +108,7 @@ namespace MacroEngine.Core.Storage
                     AppTriggerMode = m.AppTriggerMode,
                     AutoExecuteOnFocus = m.AutoExecuteOnFocus,
                     ContinuousMonitoring = m.ContinuousMonitoring,
+                    TriggerMode = m.TriggerMode,
                     ContinuousMonitoringIntervalMs = m.ContinuousMonitoringIntervalMs
                 }).ToList();
 
@@ -172,6 +173,7 @@ namespace MacroEngine.Core.Storage
                     AppTriggerMode = macro.AppTriggerMode,
                     AutoExecuteOnFocus = macro.AutoExecuteOnFocus,
                     ContinuousMonitoring = macro.ContinuousMonitoring,
+                    TriggerMode = macro.TriggerMode,
                     ContinuousMonitoringIntervalMs = macro.ContinuousMonitoringIntervalMs
                 };
 
@@ -237,7 +239,7 @@ namespace MacroEngine.Core.Storage
                     TargetApplications = macroData.TargetApplications ?? new List<string>(),
                     AppTriggerMode = macroData.AppTriggerMode,
                     AutoExecuteOnFocus = macroData.AutoExecuteOnFocus,
-                    ContinuousMonitoring = macroData.ContinuousMonitoring,
+                    TriggerMode = macroData.ContinuousMonitoring ? MacroTriggerMode.ContinuousPolling : macroData.TriggerMode,
                     ContinuousMonitoringIntervalMs = macroData.ContinuousMonitoringIntervalMs
                 };
 
@@ -266,7 +268,8 @@ namespace MacroEngine.Core.Storage
             public List<string> TargetApplications { get; set; } = new List<string>();
             public AppTriggerMode AppTriggerMode { get; set; } = AppTriggerMode.Manual;
             public bool AutoExecuteOnFocus { get; set; } = false;
-            public bool ContinuousMonitoring { get; set; } = false;
+            public bool ContinuousMonitoring { get; set; } = false; // Rétrocompatibilité
+            public MacroTriggerMode TriggerMode { get; set; } = MacroTriggerMode.SingleExecution;
             public int ContinuousMonitoringIntervalMs { get; set; } = 200;
         }
 

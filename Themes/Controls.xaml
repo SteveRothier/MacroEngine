@@ -904,8 +904,7 @@
                         </Trigger>
                         <Trigger Property="IsFocused" Value="True">
                             <Setter TargetName="border" Property="BorderBrush" 
-                                    Value="{StaticResource AccentPrimaryBrush}"/>
-                            <Setter TargetName="border" Property="BorderThickness" Value="2"/>
+                                    Value="{StaticResource BorderMediumBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="border" Property="Opacity" Value="0.5"/>
@@ -1105,8 +1104,7 @@
                                             <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderMediumBrush}"/>
                                         </Trigger>
                                         <Trigger Property="IsChecked" Value="True">
-                                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}"/>
-                                            <Setter TargetName="border" Property="BorderThickness" Value="2"/>
+                                            <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderMediumBrush}"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -1114,11 +1112,9 @@
                         </ToggleButton>
                         <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="6,2,28,2" VerticalAlignment="Center" HorizontalAlignment="Left"/>
                         <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
-                            <Grid x:Name="DropDown" SnapsToDevicePixels="True" MinWidth="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
-                                <Border x:Name="DropDownBorder" Background="{StaticResource BackgroundSecondaryBrush}" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusTextInput}" Margin="0,2,0,0">
-                                    <ScrollViewer Margin="4,2" SnapsToDevicePixels="True" VerticalScrollBarVisibility="Auto">
-                                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
-                                    </ScrollViewer>
+                            <Grid x:Name="DropDown" SnapsToDevicePixels="True" Width="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <Border x:Name="DropDownBorder" Background="{StaticResource BackgroundSecondaryBrush}" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusTextInput}" Margin="0,2,0,0" Padding="4,2">
+                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
                                 </Border>
                             </Grid>
                         </Popup>
@@ -1145,10 +1141,10 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentSelectionBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentSelectionBrush}"/>
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
