@@ -123,27 +123,6 @@
                 <StackPanel Grid.Column="2" 
                             Orientation="Horizontal" 
                             VerticalAlignment="Center">
-                    
-                    <!-- Menu Fichier (dropdown) -->
-                    <Menu Background="Transparent" VerticalAlignment="Center">
-                        <MenuItem Header="Fichier" Padding="8,4">
-                            <MenuItem Header="Nouvelle Macro" Click="NewMacro_Click"/>
-                            <MenuItem Header="Sauvegarder" Click="SaveMacro_Click"/>
-                            <Separator/>
-                            <MenuItem Header="Exporter..." Click="ExportMacro_Click"/>
-                            <MenuItem Header="Importer..." Click="ImportMacro_Click"/>
-                            <Separator/>
-                            <MenuItem Header="Quitter" Click="Exit_Click"/>
-                        </MenuItem>
-                        <MenuItem Header="Profil" Padding="8,4">
-                            <MenuItem Header="Nouveau Profil" Click="NewProfile_Click"/>
-                            <MenuItem Header="Gérer les Profils" Click="ManageProfiles_Click"/>
-                        </MenuItem>
-                    </Menu>
-
-                    <!-- Séparateur -->
-                    <Border Style="{StaticResource SeparatorVertical}" Height="24"/>
-
                     <!-- Paramètres -->
                     <Button Style="{StaticResource ButtonIcon}"
                             Click="Settings_Click"
