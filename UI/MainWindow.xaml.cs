@@ -96,7 +96,7 @@ namespace MacroEngine.UI
             // Barre de titre personnalisée (supprime la barre blanche du cadre système)
             var chrome = new WindowChrome
             {
-                CaptionHeight = 56,
+                CaptionHeight = 36,
                 ResizeBorderThickness = new Thickness(5),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false
@@ -3802,7 +3802,7 @@ namespace MacroEngine.UI
         private void UpdateMaximizeButtonContent()
         {
             if (MaximizeButton != null)
-                MaximizeButton.Content = LucideIcons.CreateIcon(WindowState == WindowState.Maximized ? LucideIcons.Square : LucideIcons.Maximize, 14);
+                MaximizeButton.Content = LucideIcons.CreateIcon(WindowState == WindowState.Maximized ? LucideIcons.Restore : LucideIcons.Maximize, 12);
         }
 
         protected override void OnStateChanged(EventArgs e)

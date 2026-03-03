@@ -35,7 +35,8 @@ public static class LucideIcons
 
     // Barre de titre
     public const string Maximize = "\uE167";   // square (agrandir)
-    public const string Square = "\uE167";     // square (restore)
+    public const string Restore = "\uE09E";    // copy (deux carrés, restaurer)
+    public const string Square = "\uE167";     // square (définir zone, etc.)
 
     // Blocs / Actions
     public const string Keyboard = "\uE284";    // keyboard

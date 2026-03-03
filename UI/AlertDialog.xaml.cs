@@ -17,7 +17,7 @@ namespace MacroEngine.UI
 
             var chrome = new WindowChrome
             {
-                CaptionHeight = 44,
+                CaptionHeight = 40,
                 ResizeBorderThickness = new Thickness(5),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false

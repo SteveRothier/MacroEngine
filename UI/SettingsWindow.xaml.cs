@@ -30,7 +30,7 @@ namespace MacroEngine.UI
 
             var chrome = new WindowChrome
             {
-                CaptionHeight = 44,
+                CaptionHeight = 40,
                 ResizeBorderThickness = new Thickness(5),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false
@@ -108,7 +108,7 @@ namespace MacroEngine.UI
         private void UpdateMaximizeButtonContent()
         {
             if (MaximizeButton != null)
-                MaximizeButton.Content = WindowState == WindowState.Maximized ? "❐" : "□";
+                MaximizeButton.Content = LucideIcons.CreateIcon(WindowState == WindowState.Maximized ? LucideIcons.Restore : LucideIcons.Maximize, 14);
         }
 
         protected override void OnStateChanged(EventArgs e)

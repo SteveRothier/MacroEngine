@@ -65,9 +65,19 @@
         </Style>
     </Window.Resources>
     <!-- Cadre de la fenêtre (bordure visible en mode restauré) -->
-    <Border Background="{StaticResource BackgroundPrimaryBrush}"
+    <Border x:Name="RootBorder" Background="{StaticResource BackgroundPrimaryBrush}"
             BorderBrush="{StaticResource BorderLightBrush}"
             BorderThickness="1">
+        <Border.Style>
+            <Style TargetType="Border">
+                <Setter Property="Margin" Value="0"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
+                        <Setter Property="Margin" Value="7"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+        </Border.Style>
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -84,10 +94,10 @@
                 Background="{StaticResource BackgroundSecondaryBrush}"
                 BorderBrush="{StaticResource BorderLightBrush}"
                 BorderThickness="0,0,0,1"
-                Padding="16,0"
-                Height="56"
+                Padding="4,4,4,4"
+                Height="36"
                 MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-            <Grid>
+            <Grid VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <!-- Logo et titre -->
                     <ColumnDefinition Width="Auto"/>
@@ -103,19 +113,20 @@
                 <StackPanel Grid.Column="0" 
                             Orientation="Horizontal" 
                             VerticalAlignment="Center">
-                    <Border Width="32" Height="32" 
-                            CornerRadius="8" 
+                    <Border Width="24" Height="24" 
+                            CornerRadius="6" 
                             Background="{StaticResource AccentPrimaryBrush}"
-                            Margin="0,0,12,0">
+                            Margin="0,0,8,0">
                         <TextBlock Text="&#xE284;" 
                                    FontFamily="{StaticResource FontLucide}"
-                                   FontSize="18" 
+                                   FontSize="14" 
                                    Foreground="White"
                                    HorizontalAlignment="Center" 
                                    VerticalAlignment="Center"/>
                     </Border>
                     <TextBlock Text="MacroEngine" 
                                Style="{StaticResource TextHeading}"
+                               FontSize="13"
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
@@ -125,42 +136,50 @@
                             VerticalAlignment="Center">
                     <!-- Paramètres -->
                     <Button Style="{StaticResource ButtonIcon}"
+                            Width="28" Height="28"
                             Click="Settings_Click"
                             ToolTip="Paramètres">
-                        <TextBlock Text="&#xE30B;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
+                        <TextBlock Text="&#xE30B;" FontFamily="{StaticResource FontLucide}" FontSize="14"/>
                     </Button>
 
                     <!-- Logs -->
                     <Button Style="{StaticResource ButtonIcon}"
+                            Width="28" Height="28"
                             Click="ShowLogs_Click"
                             ToolTip="Journaux">
-                        <TextBlock Text="&#xE085;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
+                        <TextBlock Text="&#xE085;" FontFamily="{StaticResource FontLucide}" FontSize="14"/>
                     </Button>
                 </StackPanel>
 
                 <!-- Boutons barre de titre : Réduire / Agrandir / Fermer (icônes Lucide) -->
                 <StackPanel Grid.Column="3"
                             Orientation="Horizontal"
-                            VerticalAlignment="Stretch"
+                            VerticalAlignment="Center"
                             shell:WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button x:Name="MinimizeButton"
                             Style="{StaticResource WindowCaptionButtonStyle}"
+                            Width="40" Height="28"
                             Foreground="{StaticResource TextPrimaryBrush}"
                             FontFamily="{StaticResource FontLucide}"
+                            FontSize="12"
                             Content="&#xE11C;"
                             ToolTip="Réduire"
                             Click="MinimizeButton_Click"/>
                     <Button x:Name="MaximizeButton"
                             Style="{StaticResource WindowCaptionButtonStyle}"
+                            Width="40" Height="28"
                             Foreground="{StaticResource TextPrimaryBrush}"
                             FontFamily="{StaticResource FontLucide}"
+                            FontSize="12"
                             Content="&#xE167;"
                             ToolTip="Agrandir"
                             Click="MaximizeButton_Click"/>
                     <Button x:Name="CloseButton"
                             Style="{StaticResource WindowCaptionCloseButtonStyle}"
+                            Width="40" Height="28"
                             Foreground="{StaticResource TextPrimaryBrush}"
                             FontFamily="{StaticResource FontLucide}"
+                            FontSize="12"
                             Content="&#xE1B2;"
                             ToolTip="Fermer"
                             Click="CloseButton_Click"/>

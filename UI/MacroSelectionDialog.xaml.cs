@@ -30,12 +30,25 @@ namespace MacroEngine.UI
 
             var chrome = new WindowChrome
             {
-                CaptionHeight = 44,
+                CaptionHeight = 40,
                 ResizeBorderThickness = new Thickness(5),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false
             };
             WindowChrome.SetWindowChrome(this, chrome);
+            Loaded += (s, _) => UpdateMaximizeButtonContent();
+        }
+
+        private void UpdateMaximizeButtonContent()
+        {
+            if (MaximizeButton != null)
+                MaximizeButton.Content = LucideIcons.CreateIcon(WindowState == WindowState.Maximized ? LucideIcons.Restore : LucideIcons.Maximize, 14);
+        }
+
+        protected override void OnStateChanged(EventArgs e)
+        {
+            base.OnStateChanged(e);
+            UpdateMaximizeButtonContent();
         }
 
         private void TitleBar_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -52,7 +65,10 @@ namespace MacroEngine.UI
         private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
         private void MaximizeButton_Click(object sender, RoutedEventArgs e)
-            => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+            UpdateMaximizeButtonContent();
+        }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
         {

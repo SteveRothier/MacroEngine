@@ -84,7 +84,7 @@ namespace MacroEngine.UI
         private void UpdateMaximizeButtonContent()
         {
             if (MaximizeButton != null)
-                MaximizeButton.Content = LucideIcons.CreateIcon(WindowState == WindowState.Maximized ? LucideIcons.Square : LucideIcons.Maximize, 14);
+                MaximizeButton.Content = LucideIcons.CreateIcon(WindowState == WindowState.Maximized ? LucideIcons.Restore : LucideIcons.Maximize, 14);
         }
 
         protected override void OnStateChanged(EventArgs e)

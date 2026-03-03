@@ -25,7 +25,7 @@
                     Background="{StaticResource BackgroundSecondaryBrush}"
                     BorderBrush="{StaticResource BorderLightBrush}"
                     BorderThickness="0,0,0,1"
-                    Padding="16,0,0,0" Height="44"
+                    Padding="16,0,0,0" Height="40"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
                 <Grid>
                     <Grid.ColumnDefinitions>
