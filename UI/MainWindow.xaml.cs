@@ -567,8 +567,11 @@ namespace MacroEngine.UI
                     return; // La macro est désactivée
                 }
                 
-                // Le raccourci fonctionne depuis n'importe quelle application (global).
-                // TargetApplications ne limite que l'exécution automatique au focus, pas le raccourci clavier.
+                // Les macros avec applications cibles ne s'exécutent que lorsque l'une d'elles est active
+                if (!IsMacroShortcutActiveForCurrentApp(macro))
+                {
+                    return; // Une autre app est active, ne pas exécuter
+                }
 
                 e.Handled = true;
                 
