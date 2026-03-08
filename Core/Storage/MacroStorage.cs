@@ -64,7 +64,11 @@ namespace MacroEngine.Core.Storage
                     AppTriggerMode = m.AppTriggerMode,
                     AutoExecuteOnFocus = m.AutoExecuteOnFocus,
                     TriggerMode = m.ContinuousMonitoring ? MacroTriggerMode.ContinuousPolling : m.TriggerMode,
-                    ContinuousMonitoringIntervalMs = m.ContinuousMonitoringIntervalMs
+                    ContinuousMonitoringIntervalMs = m.ContinuousMonitoringIntervalMs,
+                    IconType = m.IconType ?? "None",
+                    LucideIconCode = m.LucideIconCode ?? "E081",
+                    IconColor = m.IconColor ?? "#B9B6C2",
+                    ProcessIconPath = m.ProcessIconPath ?? string.Empty
                 }).ToList() ?? new List<Macro>();
                 
                 _logger?.Info($"{macros.Count} macro(s) chargée(s) depuis {_macrosFilePath}", "MacroStorage");
@@ -109,7 +113,11 @@ namespace MacroEngine.Core.Storage
                     AutoExecuteOnFocus = m.AutoExecuteOnFocus,
                     ContinuousMonitoring = m.ContinuousMonitoring,
                     TriggerMode = m.TriggerMode,
-                    ContinuousMonitoringIntervalMs = m.ContinuousMonitoringIntervalMs
+                    ContinuousMonitoringIntervalMs = m.ContinuousMonitoringIntervalMs,
+                    IconType = m.IconType,
+                    LucideIconCode = m.LucideIconCode,
+                    IconColor = m.IconColor,
+                    ProcessIconPath = m.ProcessIconPath
                 }).ToList();
 
                 var options = new JsonSerializerOptions
@@ -174,7 +182,11 @@ namespace MacroEngine.Core.Storage
                     AutoExecuteOnFocus = macro.AutoExecuteOnFocus,
                     ContinuousMonitoring = macro.ContinuousMonitoring,
                     TriggerMode = macro.TriggerMode,
-                    ContinuousMonitoringIntervalMs = macro.ContinuousMonitoringIntervalMs
+                    ContinuousMonitoringIntervalMs = macro.ContinuousMonitoringIntervalMs,
+                    IconType = macro.IconType,
+                    LucideIconCode = macro.LucideIconCode,
+                    IconColor = macro.IconColor,
+                    ProcessIconPath = macro.ProcessIconPath
                 };
 
                 var options = new JsonSerializerOptions
@@ -240,7 +252,11 @@ namespace MacroEngine.Core.Storage
                     AppTriggerMode = macroData.AppTriggerMode,
                     AutoExecuteOnFocus = macroData.AutoExecuteOnFocus,
                     TriggerMode = macroData.ContinuousMonitoring ? MacroTriggerMode.ContinuousPolling : macroData.TriggerMode,
-                    ContinuousMonitoringIntervalMs = macroData.ContinuousMonitoringIntervalMs
+                    ContinuousMonitoringIntervalMs = macroData.ContinuousMonitoringIntervalMs,
+                    IconType = macroData.IconType ?? "None",
+                    LucideIconCode = macroData.LucideIconCode ?? "E081",
+                    IconColor = macroData.IconColor ?? "#B9B6C2",
+                    ProcessIconPath = macroData.ProcessIconPath ?? string.Empty
                 };
 
                 _logger?.Info($"Macro '{importedMacro.Name}' importée avec succès depuis {filePath}", "MacroStorage");
@@ -271,6 +287,10 @@ namespace MacroEngine.Core.Storage
             public bool ContinuousMonitoring { get; set; } = false; // Rétrocompatibilité
             public MacroTriggerMode TriggerMode { get; set; } = MacroTriggerMode.SingleExecution;
             public int ContinuousMonitoringIntervalMs { get; set; } = 200;
+            public string IconType { get; set; } = "None";
+            public string LucideIconCode { get; set; } = "E081";
+            public string IconColor { get; set; } = "#B9B6C2";
+            public string ProcessIconPath { get; set; } = string.Empty;
         }
 
         /// <summary>

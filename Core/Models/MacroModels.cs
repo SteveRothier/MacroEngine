@@ -38,6 +38,26 @@ namespace MacroEngine.Core.Models
         public int ShortcutKeyCode { get; set; } = 0;
 
         /// <summary>
+        /// Type d'icône affichée dans la liste des macros : None, Lucide, Process
+        /// </summary>
+        public string IconType { get; set; } = "None";
+
+        /// <summary>
+        /// Code hex de l'icône Lucide (ex: "E081" pour plus)
+        /// </summary>
+        public string LucideIconCode { get; set; } = "E081";
+
+        /// <summary>
+        /// Couleur de l'icône (hex, ex: "#B9B6C2")
+        /// </summary>
+        public string IconColor { get; set; } = "#B9B6C2";
+
+        /// <summary>
+        /// Chemin du processus pour l'icône (quand IconType = Process)
+        /// </summary>
+        public string ProcessIconPath { get; set; } = string.Empty;
+
+        /// <summary>
         /// Liste des noms de processus pour lesquels cette macro est active
         /// Si vide, la macro est disponible pour toutes les applications
         /// </summary>

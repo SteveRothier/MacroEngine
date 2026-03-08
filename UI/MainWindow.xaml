@@ -205,11 +205,21 @@
             </Grid.ColumnDefinitions>
 
             <!-- ══════════════════════════════════════════════════════════════════
-                 SIDEBAR GAUCHE - Macros + Profils
+                 SIDEBAR GAUCHE - Macros + Profils (bordures mécaniques : droite blanche 6%, inset cuivre 15%)
                  ══════════════════════════════════════════════════════════════════ -->
-            <Border Grid.Column="0" 
-                    Style="{StaticResource PanelCard}"
-                    Padding="16">
+            <Border x:Name="LeftColumnBorder"
+                    Grid.Column="0" 
+                    Opacity="0.97"
+                    Background="{StaticResource SidebarColumnGradientBrush}"
+                    BorderThickness="0,0,1,0"
+                    BorderBrush="{StaticResource BorderMechanicalEdgeBrush}"
+                    CornerRadius="{StaticResource RadiusPanel}"
+                    Padding="0"
+                    Effect="{StaticResource ShadowSidebarColumn}">
+                <Border BorderThickness="1,0,0,0"
+                        BorderBrush="{StaticResource BorderMechanicalInsetAccentBrush}"
+                        Background="Transparent"
+                        Padding="16">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -260,25 +270,18 @@
                     <Grid Grid.Row="2">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
-                        <!-- Liste des macros : panneau (gradient pourpre/bordeaux, coins 4px, ombre) -->
-                        <Grid Grid.Row="0" HorizontalAlignment="Center" VerticalAlignment="Top" Width="228" Height="480" ClipToBounds="False">
-                            <Border CornerRadius="0"
-                                    Background="{StaticResource MacroColumnBackgroundBrush}"
-                                    Margin="0">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="Black" Opacity="0.2" BlurRadius="12" ShadowDepth="2" Direction="270"/>
-                                </Border.Effect>
-                            </Border>
-                            <Border CornerRadius="0"
-                                    BorderBrush="#18FFFFFF" BorderThickness="1"
-                                    Padding="10,10,10,10" Background="Transparent"
-                                    ClipToBounds="False">
-                                <ScrollViewer Style="{StaticResource ScrollViewerNoClipStyle}"
-                                              VerticalScrollBarVisibility="Hidden"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              Padding="0,0,0,12">
+                        <!-- Barre de séparation au-dessus de la liste -->
+                        <Border Grid.Row="0" Height="1" Background="{StaticResource SeparatorSubtleBrush}" Margin="0,0,0,8"/>
+                        <!-- Liste des macros : gradient sur le ListBox -->
+                        <Border Grid.Row="1" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="480" ClipToBounds="False" Background="Transparent">
+                            <ScrollViewer Style="{StaticResource ScrollViewerNoClipStyle}"
+                                          VerticalScrollBarVisibility="Hidden"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          Padding="0,0,0,12"
+                                          Background="Transparent">
                                     <ListBox x:Name="MacrosListBox"
                                              Style="{StaticResource MacrosListBoxStyle}"
                                              SelectionChanged="MacrosListBox_SelectionChanged"
@@ -292,23 +295,34 @@
                                 <DataTemplate>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="8"/>
+                                            <ColumnDefinition Width="26"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         
-                                        <!-- Indicateur activé / désactivé (barre verticale discrète) -->
-                                        <Border Grid.Column="0" Width="2" HorizontalAlignment="Left" VerticalAlignment="Stretch" Margin="0,6,0,6" Opacity="0.9">
+                                        <!-- Icône à gauche : Lucide ou processus, grisée + tooltip si désactivée -->
+                                        <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                Visibility="{Binding IconType, Converter={StaticResource IconVisibilityConverter}}"
+                                                ToolTip="{Binding IsEnabled, Converter={StaticResource MacroDisabledTooltipConverter}}">
                                             <Border.Style>
                                                 <Style TargetType="Border">
-                                                    <Setter Property="Background" Value="#404040"/>
+                                                    <Setter Property="Opacity" Value="1"/>
                                                     <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsEnabled}" Value="True">
-                                                            <Setter Property="Background" Value="#4A7C4E"/>
+                                                        <DataTrigger Binding="{Binding IsEnabled}" Value="False">
+                                                            <Setter Property="Opacity" Value="0.4"/>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
+                                            <Grid>
+                                                <TextBlock FontFamily="{StaticResource FontLucide}" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                           Text="{Binding LucideIconCode, Converter={StaticResource LucideIconCharConverter}}"
+                                                           Foreground="{Binding IconColor, Converter={StaticResource HexToBrushConverter}}"
+                                                           Visibility="{Binding IconType, Converter={StaticResource IconTypeMatchConverter}, ConverterParameter=Lucide}"/>
+                                                <Image Width="16" Height="16" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                       Source="{Binding ProcessIconPath, Converter={StaticResource ProcessIconConverter}}"
+                                                       Visibility="{Binding IconType, Converter={StaticResource IconTypeMatchConverter}, ConverterParameter=Process}"/>
+                                            </Grid>
                                         </Border>
                                         
                                         <!-- Nom de la macro -->
@@ -320,14 +334,14 @@
                                                    TextTrimming="CharacterEllipsis"
                                                    Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                                         
-                                        <!-- Raccourci = encadrement blanc -->
+                                        <!-- Raccourci = pastille grise minimaliste (style ref) -->
                                         <Border Grid.Column="2"
                                                 VerticalAlignment="Center"
                                                 Margin="6,0,0,0"
-                                                Padding="4,0,4,2"
-                                                BorderBrush="White"
-                                                BorderThickness="1"
-                                                Background="Transparent"
+                                                Padding="5,2,5,2"
+                                                BorderThickness="0"
+                                                Background="{StaticResource BackgroundTertiaryBrush}"
+                                                CornerRadius="2"
                                                 Visibility="{Binding ShortcutKeyCode, Converter={StaticResource ShortcutVisibilityConverter}}">
                                             <TextBlock FontSize="10" FontWeight="SemiBold"
                                                        Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"
@@ -340,12 +354,11 @@
                             </ListBox.ItemTemplate>
                                     </ListBox>
                                 </ScrollViewer>
-                            </Border>
-                        </Grid>
+                        </Border>
 
                         <!-- Espace restant : Supprimer + Séparateur + Profils -->
-                        <StackPanel Grid.Row="1" VerticalAlignment="Top" Margin="0,12,0,0">
-                            <Button Style="{StaticResource ButtonGhost}"
+                        <StackPanel Grid.Row="2" VerticalAlignment="Top" Margin="0,12,0,0" HorizontalAlignment="Stretch">
+                            <Button Style="{StaticResource ButtonGhostDanger}"
                                     Click="DeleteMacro_Click"
                                     HorizontalAlignment="Stretch"
                                     Margin="0,0,0,8">
@@ -354,51 +367,66 @@
                                     <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <Border Style="{StaticResource SeparatorHorizontal}"
-                                    Margin="0,0,0,12"/>
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Profil actif" 
-                                               Style="{StaticResource TextSubheading}"
-                                               VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1"
-                                            Style="{StaticResource ButtonGhost}"
-                                            Click="ManageProfiles_Click"
-                                            Padding="4"
-                                            ToolTip="Gérer les profils"
-                                            VerticalAlignment="Center">
-                                        <TextBlock Text="&#xE30B;" 
-                                                   FontFamily="{StaticResource FontLucide}" 
-                                                   FontSize="14"/>
-                                    </Button>
-                                </Grid>
-                                <Border Background="{StaticResource BackgroundTertiaryBrush}"
-                                        CornerRadius="8"
-                                        Padding="12,10">
-                                    <Grid>
+                            <Border Height="1" Background="{StaticResource SeparatorSubtleBrush}" Margin="0,0,0,12"/>
+                            <!-- Profil actif : même largeur que Nouvelle Macro (pas de padding horizontal) -->
+                            <Border Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="0,12,0,12"
+                                    HorizontalAlignment="Stretch">
+                                <StackPanel HorizontalAlignment="Stretch">
+                                    <Grid Margin="0,0,0,8">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="ActiveProfileText" 
-                                                   Text="Aucun" 
-                                                   Style="{StaticResource TextBody}"
+                                        <TextBlock Text="Profil actif" 
+                                                   Style="{StaticResource TextSubheading}"
                                                    VerticalAlignment="Center"/>
                                         <Button Grid.Column="1"
-                                                Content="Changer"
                                                 Style="{StaticResource ButtonGhost}"
-                                                Click="ChangeProfile_Click"
-                                                Padding="8,4"/>
+                                                Click="ManageProfiles_Click"
+                                                Padding="4"
+                                                ToolTip="Gérer les profils"
+                                                VerticalAlignment="Center">
+                                            <TextBlock Text="&#xE30B;" 
+                                                       FontFamily="{StaticResource FontLucide}" 
+                                                       FontSize="14"/>
+                                        </Button>
                                     </Grid>
-                                </Border>
-                            </StackPanel>
+                                    <Border CornerRadius="4"
+                                            Padding="10,8"
+                                            HorizontalAlignment="Stretch">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                <GradientStop Color="#28252E" Offset="0"/>
+                                                <GradientStop Color="#231E26" Offset="0.4"/>
+                                                <GradientStop Color="#1F1C24" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="ActiveProfileText" 
+                                                       Text="Aucun" 
+                                                       Style="{StaticResource TextBody}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,8,0"/>
+                                            <Button Grid.Column="1"
+                                                    Content="Changer"
+                                                    Style="{StaticResource ButtonGhost}"
+                                                    Click="ChangeProfile_Click"
+                                                    Padding="8,4"
+                                                    HorizontalAlignment="Stretch"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Grid>
                 </Grid>
+                </Border>
             </Border>
 
             <!-- ══════════════════════════════════════════════════════════════════
@@ -547,6 +575,190 @@
                                      PreviewMouseDown="MacroDescriptionTextBox_PreviewMouseDown"/>
                             </Border>
                         </Border>
+
+                        <!-- Icône (processus uniquement) -->
+                        <StackPanel Margin="0,12,0,10">
+                            <ComboBox x:Name="IconTypeComboBox"
+                                      Style="{StaticResource ComboBoxModern}"
+                                      Width="220"
+                                      HorizontalAlignment="Stretch"
+                                      Margin="0,0,0,8"
+                                      Visibility="Collapsed"
+                                      SelectionChanged="IconTypeComboBox_SelectionChanged"/>
+                            <StackPanel x:Name="IconLucidePanel" Visibility="Collapsed" Margin="0,0,0,8">
+                                <TextBlock Text="Icône Lucide" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
+                                <Border Style="{StaticResource PanelChipsContainer}" Padding="8,6">
+                                    <ListBox x:Name="LucideIconsListBox"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             MaxHeight="200"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             SelectionChanged="LucideIconListBox_SelectionChanged">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="2"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border x:Name="Bd" Width="32" Height="32" CornerRadius="4"
+                                                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
+                                                                    Cursor="Hand">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="#20FFFFFF"/>
+                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsSelected" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="#25FFFFFF"/>
+                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Code, Converter={StaticResource LucideIconCharConverter}}"
+                                                           FontFamily="{StaticResource FontLucide}"
+                                                           FontSize="16"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           ToolTip="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel x:Name="IconColorPanel" Visibility="Collapsed" Margin="0,0,0,8">
+                                <TextBlock Text="Couleur" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
+                                <Border Style="{StaticResource PanelChipsContainer}" Padding="8,6">
+                                    <ListBox x:Name="IconColorListBox"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             SelectionChanged="IconColorListBox_SelectionChanged">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="4,2"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border x:Name="Bd" Width="28" Height="28" CornerRadius="14"
+                                                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
+                                                                    Cursor="Hand">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsSelected" Value="True">
+                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                                    <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Ellipse Width="20" Height="20"
+                                                         Fill="{Binding Code, Converter={StaticResource HexToBrushConverter}}"
+                                                         ToolTip="{Binding Label}"/>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel x:Name="IconProcessPanel" Visibility="Collapsed" Margin="0,0,0,0">
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Icône" Style="{StaticResource TextLabel}" VerticalAlignment="Center"/>
+                                    <Button x:Name="AddProcessIconButton" Grid.Column="1"
+                                            Content="+ Icône"
+                                            Style="{StaticResource ButtonPropertiesAction}"
+                                            Click="AddProcessIcon_Click"
+                                            Padding="8,4" MinWidth="72"/>
+                                </Grid>
+                                <Border Style="{StaticResource PanelChipsContainer}" Padding="4,4">
+                                    <ListBox x:Name="ProcessIconsListBox"
+                                            Style="{StaticResource ListBoxNoScrollBarStyle}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            MaxHeight="102"
+                                            SelectionChanged="ProcessIconsListBox_SelectionChanged">
+                                        <ListBox.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </ListBox.ItemsPanel>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="0"/>
+                                                <Setter Property="Margin" Value="1"/>
+                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                <Setter Property="Cursor" Value="Hand"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border x:Name="Bd" Width="32" Height="32" CornerRadius="4"
+                                                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
+                                                                    Cursor="Hand">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="#20FFFFFF"/>
+                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsSelected" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="#25FFFFFF"/>
+                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Image Width="20" Height="20"
+                                                       Source="{Binding Path, Converter={StaticResource ProcessIconConverter}}"
+                                                       Stretch="Uniform"
+                                                       ToolTip="{Binding DisplayName}"/>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+
                         <Border Style="{StaticResource SeparatorHorizontal}" Margin="0,12,0,12"/>
 
                         <!-- Raccourci clavier -->

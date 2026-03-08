@@ -1,9 +1,12 @@
 using System;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace MacroEngine.Converters
 {
@@ -210,6 +213,173 @@ namespace MacroEngine.Converters
             }
             return false;
         }
+    }
+
+    /// <summary>
+    /// Convertit un code hex Lucide (ex: "E081") en caractère Unicode pour la police Lucide
+    /// </summary>
+    public class LucideIconCodeConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string code && !string.IsNullOrEmpty(code))
+            {
+                try
+                {
+                    int codepoint = System.Convert.ToInt32(code.Trim(), 16);
+                    return ((char)codepoint).ToString();
+                }
+                catch { }
+            }
+            return "\uE081"; // Icône plus par défaut
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Affiche l'icône seulement si IconType != "None"
+    /// </summary>
+    public class MacroIconVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is string t && !string.IsNullOrEmpty(t) && t != "None"
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Charge l'icône d'un processus (exe) et la retourne comme ImageSource
+    /// </summary>
+    public class ProcessIconConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string path && !string.IsNullOrEmpty(path) && File.Exists(path))
+            {
+                try
+                {
+                    var icon = System.Drawing.Icon.ExtractAssociatedIcon(path);
+                    if (icon != null)
+                    {
+                        return Imaging.CreateBitmapSourceFromHIcon(
+                            icon.Handle,
+                            System.Windows.Int32Rect.Empty,
+                            BitmapSizeOptions.FromWidthAndHeight(16, 16));
+                    }
+                }
+                catch { }
+            }
+            return null!;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Convertit le code hex Lucide (ex: "E081") en caractère pour FontLucide
+    /// </summary>
+    public class LucideIconCharConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string code && !string.IsNullOrEmpty(code))
+            {
+                try
+                {
+                    int codepoint = System.Convert.ToInt32(code.Trim(), 16);
+                    return ((char)codepoint).ToString();
+                }
+                catch { }
+            }
+            return ""; // option « Aucune » : pas d'icône
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Convertit une couleur hex (ex: "#B9B6C2") en SolidColorBrush
+    /// </summary>
+    public class HexToBrushConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is string hex && !string.IsNullOrEmpty(hex))
+            {
+                try
+                {
+                    var color = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex);
+                    return new SolidColorBrush(color);
+                }
+                catch { }
+            }
+            return new SolidColorBrush(Colors.Gray);
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Affiche l'icône seulement si IconType != "None"
+    /// </summary>
+    public class IconVisibilityConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is string t && !string.IsNullOrEmpty(t) && !string.Equals(t, "None", StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    /// <summary>
+    /// Retourne "La macro est désactivée" si IsEnabled=false, sinon null (pas de tooltip)
+    /// </summary>
+    public class MacroDisabledTooltipConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value is false ? "La macro est désactivée" : null!;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// Affiche si IconType correspond au paramètre (ex: "Lucide", "Process")
+    /// </summary>
+    public class IconTypeMatchConverter : IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            var type = value as string;
+            var param = parameter as string;
+            return !string.IsNullOrEmpty(type) && !string.IsNullOrEmpty(param) && 
+                   string.Equals(type, param, StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => throw new NotImplementedException();
     }
 
     /// <summary>

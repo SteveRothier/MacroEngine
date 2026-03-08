@@ -43,6 +43,12 @@
             <converters:ShortcutVisibilityConverter x:Key="ShortcutVisibilityConverter"/>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
             <converters:RecommendedIconVisibilityConverter x:Key="RecommendedIconVisibilityConverter"/>
+            <converters:LucideIconCharConverter x:Key="LucideIconCharConverter"/>
+            <converters:IconVisibilityConverter x:Key="IconVisibilityConverter"/>
+            <converters:HexToBrushConverter x:Key="HexToBrushConverter"/>
+            <converters:ProcessIconConverter x:Key="ProcessIconConverter"/>
+            <converters:IconTypeMatchConverter x:Key="IconTypeMatchConverter"/>
+            <converters:MacroDisabledTooltipConverter x:Key="MacroDisabledTooltipConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

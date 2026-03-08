@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -83,6 +85,12 @@ namespace MacroEngine.UI
 
         // Liste macros : sélection uniquement au clic (pas au survol avec clic maintenu)
         private object? _macrosListPressedItem;
+
+        // Évite d'écraser l'icône/couleur de la macro quand on met à jour les listes depuis la macro
+        private bool _updatingIconFromMacro;
+
+        // True seulement après un clic souris sur une des listes d'icônes : on n'applique la sélection à la macro que dans ce cas
+        private bool _userClickedIconList;
 
         // Enregistrement des mouvements souris
         private DateTime _lastMouseMoveRecorded = DateTime.MinValue;
@@ -167,6 +175,21 @@ namespace MacroEngine.UI
 
             // Ctrl+Z / Ctrl+Y au niveau fenêtre pour fonctionner même avec le focus dans un champ (TextBox, etc.)
             PreviewKeyDown += MainWindow_PreviewKeyDown;
+
+            // Animation smooth au chargement (transition 0.2s ease) sur la colonne gauche
+            Loaded += MainWindow_Loaded;
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (LeftColumnBorder == null) return;
+            var anim = new System.Windows.Media.Animation.DoubleAnimation(0.97, 1,
+                new System.Windows.Duration(TimeSpan.FromMilliseconds(200)))
+            {
+                EasingFunction = new System.Windows.Media.Animation.QuadraticEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
+            };
+            LeftColumnBorder.BeginAnimation(UIElement.OpacityProperty, anim);
+            InitializeIconComboBoxes();
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -3157,6 +3180,7 @@ namespace MacroEngine.UI
             {
                 MacroNameTextBox.Text = _selectedMacro.Name;
                 MacroDescriptionTextBox.Text = _selectedMacro.Description ?? "";
+                UpdateIconComboBoxesFromMacro(_selectedMacro);
                 UpdateMacroSummary();
                 // Afficher le raccourci
                 if (_selectedMacro.ShortcutKeyCode > 0)
@@ -3181,10 +3205,566 @@ namespace MacroEngine.UI
                 MacroNameTextBox.Text = "";
                 MacroDescriptionTextBox.Text = "";
                 ShortcutDisplayText.Text = "Non défini";
+                IconLucidePanel.Visibility = Visibility.Collapsed;
+                IconColorPanel.Visibility = Visibility.Collapsed;
+                IconProcessPanel.Visibility = Visibility.Collapsed;
                 UpdateTargetAppsDisplay();
                 SelectTriggerModeInComboBox(MacroTriggerMode.SingleExecution);
                 TriggerModeOptionsPanel.Visibility = Visibility.Collapsed;
                 UpdateTriggerModeRecommendedText();
+            }
+        }
+
+        private void InitializeIconComboBoxes()
+        {
+            if (IconTypeComboBox == null) return;
+            IconTypeComboBox.ItemsSource = new[]
+            {
+                new { Label = "Icône processus", Value = "Process" }
+            };
+            IconTypeComboBox.DisplayMemberPath = "Label";
+            IconTypeComboBox.SelectedValuePath = "Value";
+
+            LucideIconsListBox.ItemsSource = new[]
+            {
+                new { Label = "Aucune", Code = "" },
+                new { Label = "Plus", Code = "E081" },
+                new { Label = "Lecture", Code = "E080" },
+                new { Label = "Pause", Code = "E07F" },
+                new { Label = "Stop", Code = "E083" },
+                new { Label = "Enregistrer", Code = "E345" },
+                new { Label = "Paramètres", Code = "E30B" },
+                new { Label = "Actualiser", Code = "E148" },
+                new { Label = "Fermer", Code = "E084" },
+                new { Label = "Croix", Code = "E1E5" },
+                new { Label = "X", Code = "E1B2" },
+                new { Label = "Moins", Code = "E11C" },
+                new { Label = "Presse-papiers", Code = "E085" },
+                new { Label = "Dossier", Code = "E0D7" },
+                new { Label = "Dossier ouvert", Code = "E247" },
+                new { Label = "Télécharger", Code = "E0B2" },
+                new { Label = "Envoyer", Code = "E19E" },
+                new { Label = "Fichier texte", Code = "E0CC" },
+                new { Label = "Carré", Code = "E167" },
+                new { Label = "Restaurer", Code = "E09E" },
+                new { Label = "Clavier", Code = "E284" },
+                new { Label = "Souris", Code = "E11F" },
+                new { Label = "Horloge", Code = "E087" },
+                new { Label = "Boîte", Code = "E061" },
+                new { Label = "Corbeille", Code = "E18E" },
+                new { Label = "Répéter", Code = "E146" },
+                new { Label = "Annuler", Code = "E19B" },
+                new { Label = "Aide", Code = "E082" },
+                new { Label = "Valider", Code = "E072" },
+                new { Label = "Bibliothèque", Code = "E100" },
+                new { Label = "Viseur", Code = "E0AC" },
+                new { Label = "Œil", Code = "E0BA" },
+                new { Label = "Goutte", Code = "E0B4" },
+                new { Label = "Copier", Code = "E09E" },
+                new { Label = "Texte", Code = "E198" },
+                new { Label = "Marqueur", Code = "E238" },
+                new { Label = "Tri", Code = "E376" },
+                new { Label = "Éclair", Code = "E0E0" },
+                new { Label = "E086", Code = "E086" },
+                new { Label = "E088", Code = "E088" },
+                new { Label = "E089", Code = "E089" },
+                new { Label = "E08A", Code = "E08A" },
+                new { Label = "E08B", Code = "E08B" },
+                new { Label = "E08C", Code = "E08C" },
+                new { Label = "E08D", Code = "E08D" },
+                new { Label = "E08E", Code = "E08E" },
+                new { Label = "E08F", Code = "E08F" },
+                new { Label = "E090", Code = "E090" },
+                new { Label = "E091", Code = "E091" },
+                new { Label = "E092", Code = "E092" },
+                new { Label = "E093", Code = "E093" },
+                new { Label = "E094", Code = "E094" },
+                new { Label = "E095", Code = "E095" },
+                new { Label = "E096", Code = "E096" },
+                new { Label = "E097", Code = "E097" },
+                new { Label = "E098", Code = "E098" },
+                new { Label = "E099", Code = "E099" },
+                new { Label = "E09A", Code = "E09A" },
+                new { Label = "E09B", Code = "E09B" },
+                new { Label = "E09C", Code = "E09C" },
+                new { Label = "E09D", Code = "E09D" },
+                new { Label = "E09F", Code = "E09F" },
+                new { Label = "E0A0", Code = "E0A0" },
+                new { Label = "E0A1", Code = "E0A1" },
+                new { Label = "E0A2", Code = "E0A2" },
+                new { Label = "E0A3", Code = "E0A3" },
+                new { Label = "E0A4", Code = "E0A4" },
+                new { Label = "E0A5", Code = "E0A5" },
+                new { Label = "E0A6", Code = "E0A6" },
+                new { Label = "E0A7", Code = "E0A7" },
+                new { Label = "E0A8", Code = "E0A8" },
+                new { Label = "E0A9", Code = "E0A9" },
+                new { Label = "E0AA", Code = "E0AA" },
+                new { Label = "E0AB", Code = "E0AB" },
+                new { Label = "E0AD", Code = "E0AD" },
+                new { Label = "E0AE", Code = "E0AE" },
+                new { Label = "E0AF", Code = "E0AF" },
+                new { Label = "E0B0", Code = "E0B0" },
+                new { Label = "E0B1", Code = "E0B1" },
+                new { Label = "E0B3", Code = "E0B3" },
+                new { Label = "E0B5", Code = "E0B5" },
+                new { Label = "E0B6", Code = "E0B6" },
+                new { Label = "E0B7", Code = "E0B7" },
+                new { Label = "E0B8", Code = "E0B8" },
+                new { Label = "E0B9", Code = "E0B9" },
+                new { Label = "E0BB", Code = "E0BB" },
+                new { Label = "E0BC", Code = "E0BC" },
+                new { Label = "E0BD", Code = "E0BD" },
+                new { Label = "E0BE", Code = "E0BE" },
+                new { Label = "E0BF", Code = "E0BF" },
+                new { Label = "E0C0", Code = "E0C0" },
+                new { Label = "E0C1", Code = "E0C1" },
+                new { Label = "E0C2", Code = "E0C2" },
+                new { Label = "E0C3", Code = "E0C3" },
+                new { Label = "E0C4", Code = "E0C4" },
+                new { Label = "E0C5", Code = "E0C5" },
+                new { Label = "E0C6", Code = "E0C6" },
+                new { Label = "E0C7", Code = "E0C7" },
+                new { Label = "E0C8", Code = "E0C8" },
+                new { Label = "E0C9", Code = "E0C9" },
+                new { Label = "E0CA", Code = "E0CA" },
+                new { Label = "E0CB", Code = "E0CB" },
+                new { Label = "E0CD", Code = "E0CD" },
+                new { Label = "E0CE", Code = "E0CE" },
+                new { Label = "E0CF", Code = "E0CF" },
+                new { Label = "E0D0", Code = "E0D0" },
+                new { Label = "E0D1", Code = "E0D1" },
+                new { Label = "E0D2", Code = "E0D2" },
+                new { Label = "E0D3", Code = "E0D3" },
+                new { Label = "E0D4", Code = "E0D4" },
+                new { Label = "E0D5", Code = "E0D5" },
+                new { Label = "E0D6", Code = "E0D6" },
+                new { Label = "E0D8", Code = "E0D8" },
+                new { Label = "E0D9", Code = "E0D9" },
+                new { Label = "E0DA", Code = "E0DA" },
+                new { Label = "E0DB", Code = "E0DB" },
+                new { Label = "E0DC", Code = "E0DC" },
+                new { Label = "E0DD", Code = "E0DD" },
+                new { Label = "E0DE", Code = "E0DE" },
+                new { Label = "E0DF", Code = "E0DF" },
+                new { Label = "E0E1", Code = "E0E1" },
+                new { Label = "E0E2", Code = "E0E2" },
+                new { Label = "E0E3", Code = "E0E3" },
+                new { Label = "E0E4", Code = "E0E4" },
+                new { Label = "E0E5", Code = "E0E5" },
+                new { Label = "E0E6", Code = "E0E6" },
+                new { Label = "E0E7", Code = "E0E7" },
+                new { Label = "E0E8", Code = "E0E8" },
+                new { Label = "E0E9", Code = "E0E9" },
+                new { Label = "E0EA", Code = "E0EA" },
+                new { Label = "E0EB", Code = "E0EB" },
+                new { Label = "E0EC", Code = "E0EC" },
+                new { Label = "E0ED", Code = "E0ED" },
+                new { Label = "E0EE", Code = "E0EE" },
+                new { Label = "E0EF", Code = "E0EF" },
+                new { Label = "E0F0", Code = "E0F0" },
+                new { Label = "E0F1", Code = "E0F1" },
+                new { Label = "E0F2", Code = "E0F2" },
+                new { Label = "E0F3", Code = "E0F3" },
+                new { Label = "E0F4", Code = "E0F4" },
+                new { Label = "E0F5", Code = "E0F5" },
+                new { Label = "E0F6", Code = "E0F6" },
+                new { Label = "E0F7", Code = "E0F7" },
+                new { Label = "E0F8", Code = "E0F8" },
+                new { Label = "E0F9", Code = "E0F9" },
+                new { Label = "E0FA", Code = "E0FA" },
+                new { Label = "E0FB", Code = "E0FB" },
+                new { Label = "E0FC", Code = "E0FC" },
+                new { Label = "E0FD", Code = "E0FD" },
+                new { Label = "E0FE", Code = "E0FE" },
+                new { Label = "E0FF", Code = "E0FF" },
+                new { Label = "E101", Code = "E101" },
+                new { Label = "E102", Code = "E102" },
+                new { Label = "E103", Code = "E103" },
+                new { Label = "E104", Code = "E104" },
+                new { Label = "E105", Code = "E105" },
+                new { Label = "E106", Code = "E106" },
+                new { Label = "E107", Code = "E107" },
+                new { Label = "E108", Code = "E108" },
+                new { Label = "E109", Code = "E109" },
+                new { Label = "E10A", Code = "E10A" },
+                new { Label = "E10B", Code = "E10B" },
+                new { Label = "E10C", Code = "E10C" },
+                new { Label = "E10D", Code = "E10D" },
+                new { Label = "E10E", Code = "E10E" },
+                new { Label = "E10F", Code = "E10F" },
+                new { Label = "E110", Code = "E110" },
+                new { Label = "E111", Code = "E111" },
+                new { Label = "E112", Code = "E112" },
+                new { Label = "E113", Code = "E113" },
+                new { Label = "E114", Code = "E114" },
+                new { Label = "E115", Code = "E115" },
+                new { Label = "E116", Code = "E116" },
+                new { Label = "E117", Code = "E117" },
+                new { Label = "E118", Code = "E118" },
+                new { Label = "E119", Code = "E119" },
+                new { Label = "E11A", Code = "E11A" },
+                new { Label = "E11B", Code = "E11B" },
+                new { Label = "E11D", Code = "E11D" },
+                new { Label = "E11E", Code = "E11E" },
+                new { Label = "E120", Code = "E120" },
+                new { Label = "E121", Code = "E121" },
+                new { Label = "E122", Code = "E122" },
+                new { Label = "E123", Code = "E123" },
+                new { Label = "E124", Code = "E124" },
+                new { Label = "E125", Code = "E125" },
+                new { Label = "E126", Code = "E126" },
+                new { Label = "E127", Code = "E127" },
+                new { Label = "E128", Code = "E128" },
+                new { Label = "E129", Code = "E129" },
+                new { Label = "E12A", Code = "E12A" },
+                new { Label = "E12B", Code = "E12B" },
+                new { Label = "E12C", Code = "E12C" },
+                new { Label = "E12D", Code = "E12D" },
+                new { Label = "E12E", Code = "E12E" },
+                new { Label = "E12F", Code = "E12F" },
+                new { Label = "E130", Code = "E130" },
+                new { Label = "E140", Code = "E140" },
+                new { Label = "E141", Code = "E141" },
+                new { Label = "E142", Code = "E142" },
+                new { Label = "E143", Code = "E143" },
+                new { Label = "E144", Code = "E144" },
+                new { Label = "E145", Code = "E145" },
+                new { Label = "E147", Code = "E147" },
+                new { Label = "E149", Code = "E149" },
+                new { Label = "E14A", Code = "E14A" },
+                new { Label = "E14B", Code = "E14B" },
+                new { Label = "E14C", Code = "E14C" },
+                new { Label = "E14D", Code = "E14D" },
+                new { Label = "E14E", Code = "E14E" },
+                new { Label = "E14F", Code = "E14F" },
+                new { Label = "E150", Code = "E150" },
+                new { Label = "E160", Code = "E160" },
+                new { Label = "E161", Code = "E161" },
+                new { Label = "E162", Code = "E162" },
+                new { Label = "E163", Code = "E163" },
+                new { Label = "E164", Code = "E164" },
+                new { Label = "E165", Code = "E165" },
+                new { Label = "E166", Code = "E166" },
+                new { Label = "E168", Code = "E168" },
+                new { Label = "E169", Code = "E169" },
+                new { Label = "E16A", Code = "E16A" },
+                new { Label = "E170", Code = "E170" },
+                new { Label = "E180", Code = "E180" },
+                new { Label = "E190", Code = "E190" },
+                new { Label = "E1A0", Code = "E1A0" },
+                new { Label = "E1B0", Code = "E1B0" },
+                new { Label = "E1C0", Code = "E1C0" },
+                new { Label = "E1D0", Code = "E1D0" },
+                new { Label = "E1F0", Code = "E1F0" },
+                new { Label = "E200", Code = "E200" },
+                new { Label = "E210", Code = "E210" },
+                new { Label = "E220", Code = "E220" },
+                new { Label = "E230", Code = "E230" },
+                new { Label = "E240", Code = "E240" },
+                new { Label = "E250", Code = "E250" },
+                new { Label = "E260", Code = "E260" },
+                new { Label = "E270", Code = "E270" },
+                new { Label = "E280", Code = "E280" },
+                new { Label = "E290", Code = "E290" },
+                new { Label = "E2A0", Code = "E2A0" },
+                new { Label = "E2B0", Code = "E2B0" },
+                new { Label = "E2C0", Code = "E2C0" },
+                new { Label = "E2D0", Code = "E2D0" },
+                new { Label = "E2E0", Code = "E2E0" },
+                new { Label = "E2F0", Code = "E2F0" },
+                new { Label = "E300", Code = "E300" },
+                new { Label = "E310", Code = "E310" },
+                new { Label = "E320", Code = "E320" },
+                new { Label = "E330", Code = "E330" },
+                new { Label = "E340", Code = "E340" },
+                new { Label = "E350", Code = "E350" },
+                new { Label = "E360", Code = "E360" },
+                new { Label = "E370", Code = "E370" },
+                new { Label = "E380", Code = "E380" },
+                new { Label = "E390", Code = "E390" },
+                new { Label = "E3A0", Code = "E3A0" },
+                new { Label = "E3B0", Code = "E3B0" },
+                new { Label = "E3C0", Code = "E3C0" },
+                new { Label = "E3D0", Code = "E3D0" },
+                new { Label = "E3E0", Code = "E3E0" },
+                new { Label = "E3F0", Code = "E3F0" }
+            };
+            LucideIconsListBox.SelectedValuePath = "Code";
+
+            IconColorListBox.ItemsSource = new[]
+            {
+                new { Label = "Blanc", Code = "#E6E4EA" },
+                new { Label = "Cuivre", Code = "#7F4A2E" },
+                new { Label = "Vert", Code = "#4FB58C" },
+                new { Label = "Bleu", Code = "#4FA3D1" },
+                new { Label = "Orange", Code = "#C97A3A" },
+                new { Label = "Rouge", Code = "#C94A4A" },
+                new { Label = "Jaune", Code = "#D4A84B" },
+                new { Label = "Violet", Code = "#9B7DD6" },
+                new { Label = "Rose", Code = "#E07A9E" },
+                new { Label = "Cyan", Code = "#3DB8C7" },
+                new { Label = "Turquoise", Code = "#5BC0BE" },
+                new { Label = "Menthe", Code = "#6BCB8A" },
+                new { Label = "Corail", Code = "#E07B6F" },
+                new { Label = "Lavande", Code = "#B8A9D4" },
+                new { Label = "Or", Code = "#C9A227" },
+                new { Label = "Bordeaux", Code = "#A63D4B" }
+            };
+            IconColorListBox.SelectedValuePath = "Code";
+
+            LucideIconsListBox.PreviewMouseLeftButtonDown += (s, _) => _userClickedIconList = true;
+            IconColorListBox.PreviewMouseLeftButtonDown += (s, _) => _userClickedIconList = true;
+            ProcessIconsListBox.PreviewMouseLeftButtonDown += ProcessIconsListBox_PreviewMouseLeftButtonDown;
+        }
+
+        private void DetachIconListHandlers()
+        {
+            LucideIconsListBox.SelectionChanged -= LucideIconListBox_SelectionChanged;
+            IconColorListBox.SelectionChanged -= IconColorListBox_SelectionChanged;
+            ProcessIconsListBox.SelectionChanged -= ProcessIconsListBox_SelectionChanged;
+        }
+
+        private void ReattachIconListHandlers()
+        {
+            LucideIconsListBox.SelectionChanged += LucideIconListBox_SelectionChanged;
+            IconColorListBox.SelectionChanged += IconColorListBox_SelectionChanged;
+            ProcessIconsListBox.SelectionChanged += ProcessIconsListBox_SelectionChanged;
+        }
+
+        private void UpdateIconComboBoxesFromMacro(Macro macro, bool clearUpdatingFlag = true, Action? onProcessListReady = null)
+        {
+            if (IconTypeComboBox == null) return;
+            _userClickedIconList = false;
+            _updatingIconFromMacro = true;
+            DetachIconListHandlers();
+            try
+            {
+                IconTypeComboBox.SelectedValue = "Process";
+                IconLucidePanel.Visibility = Visibility.Collapsed;
+                IconColorPanel.Visibility = Visibility.Collapsed;
+                IconProcessPanel.Visibility = Visibility.Visible;
+                RefreshProcessIconsList(() =>
+                {
+                    ReattachIconListHandlers();
+                    onProcessListReady?.Invoke();
+                });
+                LucideIconsListBox.SelectedIndex = -1;
+                IconColorListBox.SelectedIndex = -1;
+                // Label sous le tableau d'icônes retiré
+            }
+            finally
+            {
+                if (clearUpdatingFlag)
+                    _updatingIconFromMacro = false;
+            }
+        }
+
+        private void IconTypeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_updatingIconFromMacro || _selectedMacro == null || IconTypeComboBox?.SelectedValue is not string value) return;
+            _userClickedIconList = false;
+            _updatingIconFromMacro = true;
+            try
+            {
+                _selectedMacro.IconType = "Process";
+                IconLucidePanel.Visibility = Visibility.Collapsed;
+                IconColorPanel.Visibility = Visibility.Collapsed;
+                IconProcessPanel.Visibility = Visibility.Visible;
+                _selectedMacro.ModifiedAt = DateTime.Now;
+                MacrosListBox.Items.Refresh();
+                _ = _macroStorage.SaveMacrosAsync(_macros);
+                UpdateIconComboBoxesFromMacro(_selectedMacro, clearUpdatingFlag: false,
+                    onProcessListReady: () => _updatingIconFromMacro = false);
+            }
+            finally { }
+        }
+
+        private async void LucideIconListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_userClickedIconList || _selectedMacro == null || LucideIconsListBox?.SelectedValue is not string code) return;
+            _userClickedIconList = false;
+            var t = _selectedMacro.IconType ?? "";
+            if (!string.Equals(t, "Lucide", StringComparison.OrdinalIgnoreCase) && !string.Equals(t, "None", StringComparison.OrdinalIgnoreCase)) return;
+            var current = _selectedMacro.LucideIconCode ?? "";
+            if (string.Equals(code ?? "", current, StringComparison.OrdinalIgnoreCase)) return;
+            _selectedMacro.IconType = "Lucide";
+            _selectedMacro.LucideIconCode = code ?? "";
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            MacrosListBox.Items.Refresh();
+            try { await _macroStorage.SaveMacrosAsync(_macros); } catch { /* ignore */ }
+        }
+
+        private async void IconColorListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_userClickedIconList || _selectedMacro == null || IconColorListBox?.SelectedValue is not string color) return;
+            _userClickedIconList = false;
+            var t = _selectedMacro.IconType ?? "";
+            if (!string.Equals(t, "Lucide", StringComparison.OrdinalIgnoreCase) && !string.Equals(t, "None", StringComparison.OrdinalIgnoreCase)) return;
+            if (string.Equals(color ?? "", _selectedMacro.IconColor ?? "", StringComparison.OrdinalIgnoreCase)) return;
+            _selectedMacro.IconType = "Lucide";
+            _selectedMacro.IconColor = color ?? "";
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            MacrosListBox.Items.Refresh();
+            try { await _macroStorage.SaveMacrosAsync(_macros); } catch { /* ignore */ }
+        }
+
+        /// <summary>Élément affiché dans la liste des processus (actifs + cibles).</summary>
+        private sealed class ProcessIconItem
+        {
+            public string Path { get; set; } = string.Empty;
+            public string DisplayName { get; set; } = string.Empty;
+        }
+
+        private void RefreshProcessIconsList(Action? onComplete = null)
+        {
+            if (ProcessIconsListBox == null) return;
+            _ = Task.Run(() =>
+            {
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var list = new List<ProcessIconItem>();
+
+                // 1) Processus actifs (avec fenêtre)
+                try
+                {
+                    foreach (var p in ProcessMonitor.GetRunningProcesses())
+                    {
+                        if (string.IsNullOrEmpty(p.ExecutablePath) || !seen.Add(p.ExecutablePath)) continue;
+                        list.Add(new ProcessIconItem { Path = p.ExecutablePath, DisplayName = p.ProcessName });
+                    }
+                }
+                catch { }
+
+                // 2) ProcessIconPath de toutes les macros
+                if (_macros != null)
+                {
+                    foreach (var m in _macros)
+                    {
+                        var path = m.ProcessIconPath?.Trim();
+                        if (string.IsNullOrEmpty(path) || !File.Exists(path) || !seen.Add(path)) continue;
+                        list.Add(new ProcessIconItem { Path = path, DisplayName = System.IO.Path.GetFileNameWithoutExtension(path) });
+                    }
+                }
+
+                // 3) Applications cibles de toutes les macros (résoudre nom → chemin si possible)
+                if (_macros != null)
+                {
+                    foreach (var m in _macros)
+                    {
+                        if (m.TargetApplications == null) continue;
+                        foreach (var app in m.TargetApplications)
+                        {
+                            var name = System.IO.Path.GetFileNameWithoutExtension(app?.Trim() ?? "");
+                            if (string.IsNullOrEmpty(name)) continue;
+                            string? path = null;
+                            if ((app ?? "").Contains('\\') || (app ?? "").Contains("/"))
+                                path = File.Exists(app!) ? app : null;
+                            if (string.IsNullOrEmpty(path))
+                            {
+                                try
+                                {
+                                    foreach (var proc in Process.GetProcessesByName(name))
+                                    {
+                                        try
+                                        {
+                                            path = proc.MainModule?.FileName;
+                                            proc.Dispose();
+                                            break;
+                                        }
+                                        catch { proc.Dispose(); }
+                                    }
+                                }
+                                catch { }
+                            }
+                            if (!string.IsNullOrEmpty(path) && seen.Add(path))
+                                list.Add(new ProcessIconItem { Path = path, DisplayName = name });
+                        }
+                    }
+                }
+
+                list = list.OrderBy(x => x.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
+                var currentPath = _selectedMacro?.ProcessIconPath ?? "";
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _userClickedIconList = false;
+                    _updatingIconFromMacro = true;
+                    try
+                    {
+                        ProcessIconsListBox.SelectedValuePath = "Path";
+                        ProcessIconsListBox.ItemsSource = list;
+                        if (string.IsNullOrEmpty(currentPath))
+                            ProcessIconsListBox.SelectedIndex = -1;
+                        else
+                            ProcessIconsListBox.SelectedValue = currentPath;
+                    }
+                    finally
+                    {
+                        if (onComplete != null)
+                            onComplete();
+                        else
+                            _updatingIconFromMacro = false;
+                    }
+                }));
+            });
+        }
+
+        private async void ProcessIconsListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (_selectedMacro == null || !string.Equals(_selectedMacro.IconType, "Process", StringComparison.OrdinalIgnoreCase))
+                return;
+            // Trouver l'item cliqué (recliquer sur l'icône déjà sélectionnée = retirer l'icône)
+            var dep = e.OriginalSource as DependencyObject;
+            while (dep != null && dep is not ListBoxItem)
+                dep = VisualTreeHelper.GetParent(dep);
+            if (dep is ListBoxItem lbi && lbi.DataContext is ProcessIconItem clickedItem)
+            {
+                var currentPath = _selectedMacro.ProcessIconPath ?? "";
+                if (string.Equals(clickedItem.Path ?? "", currentPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    e.Handled = true;
+                    _selectedMacro.ProcessIconPath = "";
+                    _selectedMacro.ModifiedAt = DateTime.Now;
+                    MacrosListBox.Items.Refresh();
+                    ProcessIconsListBox.SelectedIndex = -1;
+                    try { await _macroStorage.SaveMacrosAsync(_macros); } catch { }
+                    return;
+                }
+            }
+            _userClickedIconList = true;
+        }
+
+        private async void ProcessIconsListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!_userClickedIconList || _selectedMacro == null) return;
+            _userClickedIconList = false;
+            if (!string.Equals(_selectedMacro.IconType, "Process", StringComparison.OrdinalIgnoreCase)) return;
+            if (ProcessIconsListBox?.SelectedItem is ProcessIconItem item)
+            {
+                var newPath = item.Path ?? "";
+                _selectedMacro.ProcessIconPath = newPath;
+                _selectedMacro.ModifiedAt = DateTime.Now;
+                MacrosListBox.Items.Refresh();
+                try { await _macroStorage.SaveMacrosAsync(_macros); } catch { }
+            }
+        }
+
+        private async void AddProcessIcon_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null) return;
+            var dlg = new OpenFileDialog
+            {
+                Filter = "Exécutables (*.exe)|*.exe|Tous les fichiers (*.*)|*.*",
+                Title = "Sélectionner un processus (fichier .exe)"
+            };
+            if (dlg.ShowDialog() == true && !string.IsNullOrEmpty(dlg.FileName))
+            {
+                _selectedMacro.IconType = "Process";
+                _selectedMacro.ProcessIconPath = dlg.FileName;
+                _selectedMacro.ModifiedAt = DateTime.Now;
+                UpdateIconComboBoxesFromMacro(_selectedMacro);
+                RefreshProcessIconsList();
+                MacrosListBox.Items.Refresh();
+                try { await _macroStorage.SaveMacrosAsync(_macros); } catch { }
             }
         }
 
