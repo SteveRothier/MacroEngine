@@ -254,6 +254,26 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
+        /// Ajoute uniquement le dernier bloc à la fin (évite de reconstruire toute la timeline à chaque ajout).
+        /// À utiliser après avoir ajouté une action à la fin de _currentMacro.Actions.
+        /// </summary>
+        private void AppendBlockAtEnd()
+        {
+            if (_currentMacro == null || _currentMacro.Actions.Count == 0) return;
+            var index = _currentMacro.Actions.Count - 1;
+            var action = _currentMacro.Actions[index];
+            EmptyStatePanel.Visibility = Visibility.Collapsed;
+            FrameworkElement container;
+            if (action is RepeatAction ra)
+                container = CreateRepeatActionContainer(ra, index);
+            else if (action is IfAction ifAction)
+                container = CreateIfActionContainer(ifAction, index);
+            else
+                container = CreateActionCardWithButtons(action, index);
+            TimelineStackPanel.Children.Add(container);
+        }
+
+        /// <summary>
         /// Crée un conteneur avec la carte d'action et les boutons monter/descendre séparés à droite
         /// </summary>
         private FrameworkElement CreateActionCardWithButtons(IInputAction action, int index)
@@ -1551,7 +1571,7 @@ namespace MacroEngine.UI
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
+            AppendBlockAtEnd();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1569,7 +1589,7 @@ namespace MacroEngine.UI
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
+            AppendBlockAtEnd();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1585,7 +1605,7 @@ namespace MacroEngine.UI
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
+            AppendBlockAtEnd();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1603,7 +1623,7 @@ namespace MacroEngine.UI
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
+            AppendBlockAtEnd();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1622,7 +1642,7 @@ namespace MacroEngine.UI
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
+            AppendBlockAtEnd();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1640,7 +1660,7 @@ namespace MacroEngine.UI
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
+            AppendBlockAtEnd();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -1658,7 +1678,7 @@ namespace MacroEngine.UI
             });
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
+            AppendBlockAtEnd();
             MacroChanged?.Invoke(this, EventArgs.Empty);
         }
 

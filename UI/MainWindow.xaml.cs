@@ -1079,19 +1079,32 @@ namespace MacroEngine.UI
         private void MacrosListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _selectedMacro = MacrosListBox.SelectedItem as Macro;
+            // Mise à jour immédiate des champs visibles pour éviter l'affichage de l'ancienne macro
             if (_selectedMacro != null)
             {
-                // Charger l'éditeur avec la macro sélectionnée
-                _blockEditor.LoadMacro(_selectedMacro);
+                MacroNameTextBox.Text = _selectedMacro.Name;
+                MacroDescriptionTextBox.Text = _selectedMacro.Description ?? "";
+                ShortcutDisplayText.Text = _selectedMacro.ShortcutKeyCode > 0 ? GetKeyName((ushort)_selectedMacro.ShortcutKeyCode) : "Non défini";
+                if (ClearShortcutButton != null)
+                    ClearShortcutButton.Visibility = _selectedMacro.ShortcutKeyCode != 0 ? Visibility.Visible : Visibility.Collapsed;
             }
             else
             {
-                // Vider l'éditeur si aucune macro sélectionnée
-                _blockEditor.LoadMacro(null!); // null! car LoadMacro accepte null
+                MacroNameTextBox.Text = "";
+                MacroDescriptionTextBox.Text = "";
+                ShortcutDisplayText.Text = "Non défini";
+                if (ClearShortcutButton != null)
+                    ClearShortcutButton.Visibility = Visibility.Collapsed;
             }
-
-            // Mettre à jour le panneau de propriétés
-            UpdateMacroPropertiesPanel();
+            // Différer le chargement lourd (éditeur de blocs, icônes, applications cibles) pour éviter le lag
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (_selectedMacro != null)
+                    _blockEditor.LoadMacro(_selectedMacro);
+                else
+                    _blockEditor.LoadMacro(null!);
+                UpdateMacroPropertiesPanel();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void MacrosListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
