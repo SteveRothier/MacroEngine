@@ -293,7 +293,7 @@
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid>
+                                    <Grid MaxHeight="40">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="26"/>
                                             <ColumnDefinition Width="*"/>

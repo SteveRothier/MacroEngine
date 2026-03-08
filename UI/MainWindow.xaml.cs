@@ -3721,8 +3721,9 @@ namespace MacroEngine.UI
 
         private async void ProcessIconsListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (_selectedMacro == null || !string.Equals(_selectedMacro.IconType, "Process", StringComparison.OrdinalIgnoreCase))
-                return;
+            if (_selectedMacro == null) return;
+            if (!string.Equals(_selectedMacro.IconType ?? "", "Process", StringComparison.OrdinalIgnoreCase))
+                _selectedMacro.IconType = "Process";
             // Trouver l'item cliqué (recliquer sur l'icône déjà sélectionnée = retirer l'icône)
             var dep = e.OriginalSource as DependencyObject;
             while (dep != null && dep is not ListBoxItem)
@@ -3748,7 +3749,8 @@ namespace MacroEngine.UI
         {
             if (!_userClickedIconList || _selectedMacro == null) return;
             _userClickedIconList = false;
-            if (!string.Equals(_selectedMacro.IconType, "Process", StringComparison.OrdinalIgnoreCase)) return;
+            if (!string.Equals(_selectedMacro.IconType ?? "", "Process", StringComparison.OrdinalIgnoreCase))
+                _selectedMacro.IconType = "Process";
             if (ProcessIconsListBox?.SelectedItem is ProcessIconItem item)
             {
                 var newPath = item.Path ?? "";
