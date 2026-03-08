@@ -164,7 +164,7 @@ namespace MacroEngine.UI
             _ = LoadConfigAndInitializeHooksAsync();
             
             _ = LoadMacrosAndProfilesAsync();
-
+            
             // Initialiser l'état des boutons
             _blockEditor.RecordButton.IsEnabled = true;
             _blockEditor.StopButton.IsEnabled = false;
@@ -879,7 +879,7 @@ namespace MacroEngine.UI
                     _macros.Add(testMacro);
                     await _macroStorage.SaveMacrosAsync(_macros);
                 }
-
+                
                 // La liste des macros est remplie par LoadProfilesAsync -> RefreshMacrosListForActiveProfileAsync (macros du profil actif)
             }
             catch (Exception ex)
@@ -1317,7 +1317,7 @@ namespace MacroEngine.UI
         private void StartMacro_Click(object sender, RoutedEventArgs e)
         {
             try
-            {
+        {
                 // En enregistrement : le bouton Enregistrer affiche Pause/Reprendre
                 if (_isRecording)
                 {
@@ -1338,12 +1338,12 @@ namespace MacroEngine.UI
                     return;
                 }
 
-                if (_selectedMacro == null)
-                {
-                    StatusText.Text = "Veuillez sélectionner une macro";
-                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
-                    return;
-                }
+            if (_selectedMacro == null)
+            {
+                StatusText.Text = "Veuillez sélectionner une macro";
+                StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                return;
+            }
 
                 if (_macroEngine.State != MacroEngineState.Idle)
                 {
@@ -1352,7 +1352,7 @@ namespace MacroEngine.UI
                     return;
                 }
 
-                StartRecording();
+                    StartRecording();
             }
             catch (Exception ex)
             {
@@ -1455,7 +1455,7 @@ namespace MacroEngine.UI
             _blockEditor.IsRecordingPaused = false;
             _blockEditor.RecordButton.ToolTip = "Mettre en pause l'enregistrement";
             _isRecordingPaused = false;
-
+            
             _logger?.Info("Hooks d'enregistrement installés avec succès", "MainWindow");
         }
 
@@ -2433,10 +2433,10 @@ namespace MacroEngine.UI
                     return;
 
                 await _profileProvider.ActivateProfileAsync(dialog.SelectedProfile.Id);
-                await LoadProfilesAsync();
+                        await LoadProfilesAsync();
                 await RefreshMacrosListForActiveProfileAsync();
                 StatusText.Text = $"Profil '{dialog.SelectedProfile.Name}' activé.";
-                StatusText.Foreground = System.Windows.Media.Brushes.Green;
+                        StatusText.Foreground = System.Windows.Media.Brushes.Green;
             }
             catch (Exception ex)
             {
@@ -2700,6 +2700,8 @@ namespace MacroEngine.UI
             _selectedMacro.ModifiedAt = DateTime.Now;
             if (ShortcutDisplayText != null)
                 ShortcutDisplayText.Text = "Non défini";
+            if (ClearShortcutButton != null)
+                ClearShortcutButton.Visibility = Visibility.Collapsed;
             UpdateMacroShortcuts();
             if (_appConfig?.EnableHooks == true)
             {
@@ -2820,6 +2822,8 @@ namespace MacroEngine.UI
 
             if (ShortcutDisplayText != null)
                 ShortcutDisplayText.Text = _selectedMacro.ShortcutKeyCode > 0 ? GetKeyName((ushort)_selectedMacro.ShortcutKeyCode) : "Non défini";
+            if (ClearShortcutButton != null)
+                ClearShortcutButton.Visibility = _selectedMacro.ShortcutKeyCode != 0 ? Visibility.Visible : Visibility.Collapsed;
             MacrosListBox.Items.Refresh();
             _ = _macroStorage.SaveMacrosAsync(_macros);
 
@@ -3191,6 +3195,8 @@ namespace MacroEngine.UI
                 {
                     ShortcutDisplayText.Text = "Non défini";
                 }
+                if (ClearShortcutButton != null)
+                    ClearShortcutButton.Visibility = _selectedMacro.ShortcutKeyCode != 0 ? Visibility.Visible : Visibility.Collapsed;
 
                 UpdateTargetAppsDisplay();
 
@@ -3205,6 +3211,8 @@ namespace MacroEngine.UI
                 MacroNameTextBox.Text = "";
                 MacroDescriptionTextBox.Text = "";
                 ShortcutDisplayText.Text = "Non défini";
+                if (ClearShortcutButton != null)
+                    ClearShortcutButton.Visibility = Visibility.Collapsed;
                 IconLucidePanel.Visibility = Visibility.Collapsed;
                 IconColorPanel.Visibility = Visibility.Collapsed;
                 IconProcessPanel.Visibility = Visibility.Collapsed;

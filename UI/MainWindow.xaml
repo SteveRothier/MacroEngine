@@ -533,7 +533,8 @@
                  ══════════════════════════════════════════════════════════════════ -->
             <Border Grid.Column="4" 
                     Style="{StaticResource PanelCard}"
-                    Padding="10">
+                    Padding="10"
+                    DataContext="{Binding SelectedItem, ElementName=MacrosListBox}">
                 <StackPanel HorizontalAlignment="Stretch">
                         <!-- Titre -->
                         <TextBlock Text="Propriétés" 
@@ -778,7 +779,8 @@
                             <Border x:Name="ShortcutDisplayBorder"
                                     Style="{StaticResource PanelChipsContainer}"
                                     Padding="10,8"
-                                    MinHeight="32">
+                                    MinHeight="32"
+                                    MaxHeight="32">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -789,14 +791,18 @@
                                                Text="Non défini"
                                                Style="{StaticResource TextMono}"
                                                FontSize="12"
+                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap"
                                                VerticalAlignment="Center"/>
                                     <Button Grid.Column="1"
+                                            x:Name="ClearShortcutButton"
                                             Padding="4,0"
                                             MinWidth="24"
                                             MinHeight="24"
                                             VerticalAlignment="Center"
                                             Cursor="Hand"
                                             ToolTip="Retirer le raccourci"
+                                            Visibility="{Binding ShortcutKeyCode, Converter={StaticResource ShortcutVisibilityConverter}}"
                                             Click="ClearShortcut_Click">
                                         <Button.Style>
                                             <Style TargetType="Button">
