@@ -9013,11 +9013,14 @@ namespace MacroEngine.UI
             _currentMacro.Actions.AddRange(previousState.Select(a => a.Clone()));
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
-            MacroChanged?.Invoke(this, EventArgs.Empty);
-            
             _isUndoRedo = false;
             UpdateUndoRedoButtons();
+            // Différer la reconstruction de la timeline pour éviter le lag
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void Redo()
@@ -9034,11 +9037,14 @@ namespace MacroEngine.UI
             _currentMacro.Actions.AddRange(nextState.Select(a => a.Clone()));
             _currentMacro.ModifiedAt = DateTime.Now;
             
-            RefreshBlocks();
-            MacroChanged?.Invoke(this, EventArgs.Empty);
-            
             _isUndoRedo = false;
             UpdateUndoRedoButtons();
+            // Différer la reconstruction de la timeline pour éviter le lag
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void UpdateUndoRedoButtons()

@@ -86,17 +86,21 @@
             </Grid.RowDefinitions>
 
             <!-- ══════════════════════════════════════════════════════════════════
-                 BARRE DE TITRE PERSONNALISÉE + TOPBAR (Réduire / Agrandir / Fermer)
+                 BARRE DE TITRE (même style que colonne gauche)
                  ══════════════════════════════════════════════════════════════════ -->
             <Border x:Name="TitleBarBorder"
                     Grid.Row="0"
                     shell:WindowChrome.IsHitTestVisibleInChrome="True"
-                Background="{StaticResource BackgroundSecondaryBrush}"
-                BorderBrush="{StaticResource BorderLightBrush}"
-                BorderThickness="0,0,0,1"
-                Padding="4,4,4,4"
-                Height="36"
-                MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderThickness="0,0,0,1"
+                    BorderBrush="{StaticResource BorderMechanicalEdgeBrush}"
+                    Padding="0"
+                    Height="36"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Border BorderThickness="0,0,0,1"
+                        BorderBrush="{StaticResource BorderMechanicalInsetAccentBrush}"
+                        Background="Transparent"
+                        Padding="4,4,4,4">
             <Grid VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <!-- Logo et titre -->
@@ -185,12 +189,13 @@
                             Click="CloseButton_Click"/>
                 </StackPanel>
             </Grid>
+                </Border>
             </Border>
 
             <!-- ══════════════════════════════════════════════════════════════════
                  ZONE PRINCIPALE - Layout 3 colonnes
                  ══════════════════════════════════════════════════════════════════ -->
-            <Grid Grid.Row="1" Margin="12,12">
+            <Grid Grid.Row="1" Margin="12,4,12,12">
             <Grid.ColumnDefinitions>
                 <!-- Sidebar gauche -->
                 <ColumnDefinition Width="260"/>
@@ -219,7 +224,7 @@
                 <Border BorderThickness="1,0,0,0"
                         BorderBrush="{StaticResource BorderMechanicalInsetAccentBrush}"
                         Background="Transparent"
-                        Padding="16">
+                        Padding="8">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -430,31 +435,48 @@
             </Border>
 
             <!-- ══════════════════════════════════════════════════════════════════
-                 ZONE CENTRALE - Éditeur de macros
+                 ZONE CENTRALE - Éditeur de macros (même style que colonne gauche)
                  ══════════════════════════════════════════════════════════════════ -->
             <Border Grid.Column="2" 
-                    Style="{StaticResource PanelCard}"
-                    Padding="0">
+                    Opacity="0.97"
+                    Background="{StaticResource SidebarColumnGradientBrush}"
+                    BorderThickness="1,0,1,0"
+                    BorderBrush="{StaticResource BorderMechanicalEdgeBrush}"
+                    CornerRadius="{StaticResource RadiusPanel}"
+                    Padding="0"
+                    Effect="{StaticResource ShadowSidebarColumn}">
+                <Border BorderThickness="1,0,1,0"
+                        BorderBrush="{StaticResource BorderMechanicalInsetAccentBrush}"
+                        Background="Transparent"
+                        Padding="8">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
                         <RowDefinition x:Name="BottomPanelRow" Height="180"/>
                     </Grid.RowDefinitions>
                     <!-- Éditeur de macro -->
-                    <ContentControl x:Name="MacroEditorContainer" Grid.Row="0" Margin="12"/>
+                    <ContentControl x:Name="MacroEditorContainer" Grid.Row="0" Margin="8"/>
                     <!-- Zone d'affichage des actions et zone de test -->
-                    <Grid Grid.Row="1" Margin="12,0,12,12">
+                    <Grid Grid.Row="1" Margin="8,0,8,8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="12"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         
-                        <!-- Actions exécutées -->
+                        <!-- Actions exécutées (même style que colonne gauche) -->
                         <Border x:Name="ActionsPanelBorder" Grid.Column="0" 
-                                Background="{StaticResource BackgroundTertiaryBrush}"
-                                CornerRadius="10"
-                                Padding="12">
+                                Opacity="0.97"
+                                Background="{StaticResource SidebarColumnGradientBrush}"
+                                BorderThickness="1"
+                                BorderBrush="{StaticResource BorderMechanicalEdgeBrush}"
+                                CornerRadius="{StaticResource RadiusPanel}"
+                                Padding="0"
+                                Effect="{StaticResource ShadowSidebarColumn}">
+                            <Border BorderThickness="1"
+                                    BorderBrush="{StaticResource BorderMechanicalInsetAccentBrush}"
+                                    Background="Transparent"
+                                    Padding="12">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -496,13 +518,22 @@
                                     </ListBox.ItemTemplate>
                                 </ListBox>
                             </Grid>
+                            </Border>
                         </Border>
                         
-                        <!-- Zone de test -->
+                        <!-- Zone de test (même style que colonne gauche) -->
                         <Border x:Name="TestPanelBorder" Grid.Column="2" 
-                                Background="{StaticResource BackgroundTertiaryBrush}"
-                                CornerRadius="10"
-                                Padding="8">
+                                Opacity="0.97"
+                                Background="{StaticResource SidebarColumnGradientBrush}"
+                                BorderThickness="1"
+                                BorderBrush="{StaticResource BorderMechanicalEdgeBrush}"
+                                CornerRadius="{StaticResource RadiusPanel}"
+                                Padding="0"
+                                Effect="{StaticResource ShadowSidebarColumn}">
+                            <Border BorderThickness="1"
+                                    BorderBrush="{StaticResource BorderMechanicalInsetAccentBrush}"
+                                    Background="Transparent"
+                                    Padding="12">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -523,18 +554,29 @@
                                          Text="Tapez ici pour tester vos macros..."
                                          GotFocus="TestTextBox_GotFocus"/>
                             </Grid>
+                            </Border>
                         </Border>
                     </Grid>
                 </Grid>
+                </Border>
             </Border>
 
             <!-- ══════════════════════════════════════════════════════════════════
-                 PANNEAU PROPRIÉTÉS - Droite (Macro sélectionnée)
+                 PANNEAU PROPRIÉTÉS - Droite (même style que colonne gauche)
                  ══════════════════════════════════════════════════════════════════ -->
             <Border Grid.Column="4" 
-                    Style="{StaticResource PanelCard}"
-                    Padding="10"
+                    Opacity="0.97"
+                    Background="{StaticResource SidebarColumnGradientBrush}"
+                    BorderThickness="1,0,0,0"
+                    BorderBrush="{StaticResource BorderMechanicalEdgeBrush}"
+                    CornerRadius="{StaticResource RadiusPanel}"
+                    Padding="0"
+                    Effect="{StaticResource ShadowSidebarColumn}"
                     DataContext="{Binding SelectedItem, ElementName=MacrosListBox}">
+                <Border BorderThickness="0,0,1,0"
+                        BorderBrush="{StaticResource BorderMechanicalInsetAccentBrush}"
+                        Background="Transparent"
+                        Padding="8">
                 <StackPanel HorizontalAlignment="Stretch">
                         <!-- Titre -->
                         <TextBlock Text="Propriétés" 
@@ -918,6 +960,7 @@
                                        TextWrapping="Wrap"/>
                         </Border>
                 </StackPanel>
+                </Border>
             </Border>
             </Grid>
 
