@@ -70,6 +70,8 @@ namespace MacroEngine.UI
         // Queue thread-safe pour les événements souris
         private readonly System.Collections.Concurrent.ConcurrentQueue<(int X, int Y, Core.Hooks.MouseButton Button, DateTime Time)> _mouseEventQueue = new();
         private System.Windows.Threading.DispatcherTimer? _mouseEventProcessorTimer;
+        /// <summary>Animation d’opacité du point rouge (va-et-vient) sur le bouton ENREG./STOP.</summary>
+        private Storyboard? _mainRecordBlinkStoryboard;
         private int _rapidKeyWarningCount = 0;
         private DateTime _lastRapidKeyWarning = DateTime.MinValue;
         private readonly object _recordingLock = new object();
@@ -187,6 +189,8 @@ namespace MacroEngine.UI
             // Initialiser l'état des boutons
             _blockEditor.RecordButton.IsEnabled = true;
             _blockEditor.StopButton.IsEnabled = false;
+            if (MainRecordToolbarButton != null)
+                MainRecordToolbarButton.IsEnabled = true;
 
             // Sélection de la liste macros : uniquement au clic, pas au survol avec clic maintenu
             MacrosListBox.PreviewMouseLeftButtonDown += MacrosListBox_PreviewMouseLeftButtonDown;
@@ -1088,8 +1092,11 @@ namespace MacroEngine.UI
                 bool isExecuting = e.CurrentState != MacroEngineState.Idle;
                 
                 _blockEditor.RecordButton.IsEnabled = !_isRecording && !isExecuting;
+                // Barre principale : actif hors exécution (y compris pendant l’enregistrement pour STOP.)
+                if (MainRecordToolbarButton != null)
+                    MainRecordToolbarButton.IsEnabled = !isExecuting;
                 
-                // Le bouton Stop fonctionne pour l'exécution ET l'enregistrement
+                // Le bouton Stop (timeline fantôme) : exécution ou enregistrement
                 _blockEditor.StopButton.IsEnabled = isExecuting || _isRecording;
             });
         }
@@ -1743,23 +1750,10 @@ namespace MacroEngine.UI
         {
             try
         {
-                // En enregistrement : le bouton Enregistrer affiche Pause/Reprendre
+                // Enregistrement : le même bouton arrête l’enregistrement (STOP.)
                 if (_isRecording)
                 {
-                    if (!_isRecordingPaused)
-                    {
-                        _isRecordingPaused = true;
-                        _blockEditor.IsRecordingPaused = true;
-                        StatusText.Text = "Enregistrement en pause";
-                        _blockEditor.RecordButton.ToolTip = "Reprendre l'enregistrement";
-                    }
-                    else
-                    {
-                        _isRecordingPaused = false;
-                        _blockEditor.IsRecordingPaused = false;
-                        StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris";
-                        _blockEditor.RecordButton.ToolTip = "Mettre en pause l'enregistrement";
-                    }
+                    StopRecording();
                     return;
                 }
 
@@ -1783,6 +1777,69 @@ namespace MacroEngine.UI
             {
                 StatusText.Text = $"Erreur enregistrement: {ex.Message}";
                 StatusText.Foreground = System.Windows.Media.Brushes.Red;
+            }
+        }
+
+        private void ApplyMainToolbarRecordingVisual(bool recording)
+        {
+            if (MainRecordToolbarLabel == null || MainRecordToolbarDot == null || MainRecordToolbarButton == null)
+                return;
+            StopMainRecordToolbarBlink();
+            if (recording)
+            {
+                MainRecordToolbarLabel.Text = "STOP.";
+                MainRecordToolbarDot.Fill = new SolidColorBrush(Color.FromRgb(0xE8, 0x40, 0x40));
+                MainRecordToolbarDot.Opacity = 1;
+                MainRecordToolbarButton.ToolTip = "Arrêter l'enregistrement";
+                if (_blockEditor != null)
+                    _blockEditor.RecordButton.ToolTip = "Arrêter l'enregistrement";
+                StartMainRecordToolbarBlink();
+            }
+            else
+            {
+                MainRecordToolbarLabel.Text = "ENREG.";
+                MainRecordToolbarDot.Fill = new SolidColorBrush(Color.FromRgb(0x0A, 0x08, 0x00));
+                MainRecordToolbarDot.Opacity = 1;
+                MainRecordToolbarButton.ToolTip = "Enregistrer une macro";
+                if (_blockEditor != null)
+                    _blockEditor.RecordButton.ToolTip = "Enregistrer une macro";
+            }
+        }
+
+        private void StartMainRecordToolbarBlink()
+        {
+            StopMainRecordToolbarBlink();
+            if (MainRecordToolbarDot == null) return;
+
+            var anim = new DoubleAnimation
+            {
+                From = 0.3,
+                To = 1.0,
+                Duration = new Duration(TimeSpan.FromMilliseconds(780)),
+                AutoReverse = true,
+                RepeatBehavior = RepeatBehavior.Forever,
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            };
+            Storyboard.SetTarget(anim, MainRecordToolbarDot);
+            Storyboard.SetTargetProperty(anim, new PropertyPath(UIElement.OpacityProperty));
+
+            _mainRecordBlinkStoryboard = new Storyboard();
+            _mainRecordBlinkStoryboard.Children.Add(anim);
+            _mainRecordBlinkStoryboard.Begin(MainRecordToolbarDot, isControllable: true);
+        }
+
+        private void StopMainRecordToolbarBlink()
+        {
+            if (_mainRecordBlinkStoryboard != null)
+            {
+                _mainRecordBlinkStoryboard.Stop();
+                _mainRecordBlinkStoryboard = null;
+            }
+            if (MainRecordToolbarDot != null)
+            {
+                // Stop() ne retire pas toujours l’horloge sur Opacity ; sans cela le clignotement peut continuer.
+                MainRecordToolbarDot.BeginAnimation(UIElement.OpacityProperty, null);
+                MainRecordToolbarDot.Opacity = 1;
             }
         }
 
@@ -1867,19 +1924,21 @@ namespace MacroEngine.UI
             catch (Exception ex)
             {
                 _isRecording = false;
+                ApplyMainToolbarRecordingVisual(false);
                 MessageBox.Show($"Impossible d'installer les hooks. Assurez-vous que l'application a les privilèges administrateur.\n\nErreur: {ex.Message}", 
                     "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            // Mettre à jour l'interface (Pause/Reprendre sur le bouton Enregistrer)
+            // Mettre à jour l'interface
             StatusText.Text = "Enregistrement en cours... Appuyez sur les touches ou cliquez avec la souris (max 20 touches/seconde)";
             StatusText.Foreground = System.Windows.Media.Brushes.Black;
             _blockEditor.StopButton.IsEnabled = true;
             _blockEditor.IsRecording = true;
             _blockEditor.IsRecordingPaused = false;
-            _blockEditor.RecordButton.ToolTip = "Mettre en pause l'enregistrement";
+            _blockEditor.RecordButton.ToolTip = "Arrêter l'enregistrement";
             _isRecordingPaused = false;
+            ApplyMainToolbarRecordingVisual(true);
             
             _logger?.Info("Hooks d'enregistrement installés avec succès", "MainWindow");
         }
@@ -1916,6 +1975,7 @@ namespace MacroEngine.UI
             _blockEditor.IsRecording = false;
             _blockEditor.IsRecordingPaused = false;
             _blockEditor.RecordButton.ToolTip = "Enregistrer une macro";
+            ApplyMainToolbarRecordingVisual(false);
             UpdateExecuteButtonText();
 
             // Rafraîchir l'éditeur
@@ -2590,7 +2650,7 @@ namespace MacroEngine.UI
                 // Liste des boutons de contrôle à ignorer
                 var controlButtons = new FrameworkElement[] 
                 { 
-                    _blockEditor.RecordButton, _blockEditor.StopButton
+                    _blockEditor.RecordButton, _blockEditor.StopButton, MainRecordToolbarButton
                 };
                 
                 foreach (var button in controlButtons)

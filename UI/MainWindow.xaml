@@ -494,7 +494,7 @@
                             UseLayoutRounding="True" SnapsToDevicePixels="True"
                             RenderOptions.ClearTypeHint="Enabled">
                         <DockPanel LastChildFill="False" UseLayoutRounding="True">
-                            <!-- Droite : STOP, ENREG., PROPS -->
+                            <!-- Droite : ENREG. / STOP. (même bouton), PROPS -->
                             <Border DockPanel.Dock="Right"
                                     BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1,0,0,0">
                                 <StackPanel Orientation="Horizontal">
@@ -507,22 +507,18 @@
                                                   Margin="12,0,10,0"
                                                   ToolTip="Activer / désactiver la macro"/>
                                     <Border Width="1" Height="24" Background="{StaticResource BorderLightBrush}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                    <Button Style="{StaticResource ActionCard}" Padding="14,6,14,8" Click="StopMacro_Click">
-                                        <StackPanel HorizontalAlignment="Center">
-                                            <TextBlock Text="■" FontSize="14" Foreground="#E84040" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="STOP" FontFamily="{StaticResource FontPrimary}"
-                                                       FontSize="10" FontWeight="Bold"
-                                                       Foreground="#4A5A4A" HorizontalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Padding="14,6,14,8" Cursor="Hand"
+                                    <Button x:Name="MainRecordToolbarButton" Padding="11,6,11,8" Cursor="Hand"
                                             Background="#E8A020" BorderBrush="Transparent" BorderThickness="0"
-                                            Click="StartMacro_Click">
+                                            FocusVisualStyle="{x:Null}"
+                                            Click="StartMacro_Click"
+                                            ToolTip="Enregistrer une macro">
                                         <StackPanel HorizontalAlignment="Center">
-                                            <TextBlock Text="●" FontSize="14" Foreground="#0A0800" HorizontalAlignment="Center"/>
-                                            <TextBlock Text="ENREG." FontFamily="{StaticResource FontPrimary}"
+                                            <Ellipse x:Name="MainRecordToolbarDot" Width="8" Height="8" Fill="#0A0800"
+                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="MainRecordToolbarLabel" Text="ENREG." FontFamily="{StaticResource FontPrimary}"
                                                        FontSize="10" FontWeight="Black"
-                                                       Foreground="#0A0800" HorizontalAlignment="Center"/>
+                                                       Foreground="#0A0800" HorizontalAlignment="Center" TextAlignment="Center"
+                                                       MinWidth="46" Margin="0,4,0,0"/>
                                         </StackPanel>
                                     </Button>
                                     <Button x:Name="PropsToggleButton" Style="{StaticResource ActionCard}" Padding="14,6,14,8" Click="PropsToggleButton_Click">
