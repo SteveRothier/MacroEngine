@@ -27,8 +27,10 @@ public static class LucideIcons
 
     // Fichiers / Presets
     public const string Clipboard = "\uE085"; // clipboard
+    public const string ClipboardPaste = "\uE3E8"; // clipboard-paste
     public const string Folder = "\uE0D7";     // folder
     public const string FolderOpen = "\uE247"; // folder-open
+    public const string FolderSearch = "\uE339"; // folder-search
     public const string Download = "\uE0B2";  // download
     public const string Upload = "\uE19E";     // upload
     public const string FileText = "\uE0CC";   // file-text
@@ -40,11 +42,17 @@ public static class LucideIcons
 
     // Blocs / Actions
     public const string Keyboard = "\uE284";    // keyboard
-    public const string Mouse = "\uE11F";      // mouse-pointer
-    public const string Timer = "\uE087";      // clock
+    public const string Mouse = "\uE28E";      // mouse (barre / clic)
+    public const string Timer = "\uE1E0";      // timer
     public const string Box = "\uE061";        // box
     public const string Trash = "\uE18E";      // trash-2
-    public const string Repeat = "\uE146";     // repeat
+    public const string Repeat = "\uE146";     // repeat (ancien glyphe)
+    public const string Repeat2 = "\uE411";    // repeat-2
+    public const string Braces = "\uE36A";     // braces (variable)
+    public const string Split = "\uE440";      // split (condition)
+    public const string LayoutPanelLeft = "\uE470"; // layout-panel-left (presets)
+    public const string RotateCcw = "\uE148";  // rotate-ccw / refresh-ccw (annuler)
+    public const string RotateCw = "\uE149";   // rotate-cw (refaire)
     public const string Undo = "\uE19B";       // undo
     public const string HelpCircle = "\uE082"; // circle-question-mark
     public const string CheckCircle = "\uE072"; // circle-check (recommandé, validé)
@@ -53,11 +61,14 @@ public static class LucideIcons
     // Sélection / Couleur
     public const string Crosshair = "\uE0AC"; // crosshair
     public const string Eye = "\uE0BA";        // eye
-    public const string Droplet = "\uE0B4";    // droplet (pipette)
+    public const string Images = "\uE5C4";     // images
+    public const string Droplet = "\uE0B4";    // droplet
+    public const string Pipette = "\uE13B";    // pipette (lucide-static)
     public const string Copy = "\uE09E";      // copy
 
     // Texte / Type
     public const string Type = "\uE198";      // type
+    public const string TextSearch = "\uE5AD"; // text-search
 
     // Indicateurs / Recommandation
     public const string FlagTriangleRight = "\uE238"; // flag-triangle-right (recommandé, marqueur)

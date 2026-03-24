@@ -377,6 +377,8 @@ namespace MacroEngine.UI
                     condition.ImageOnScreenConfig = null;
                     condition.TextOnScreenConfig = null;
                     condition.VariableName = null;
+                    condition.VariableOperator = null;
+                    condition.VariableValue = null;
                     condition.MouseClickConfig = null;
                     // Recharger l'UI
                     LoadConfiguration();
@@ -451,12 +453,13 @@ namespace MacroEngine.UI
             ConditionItem condition;
             if (Result!.Conditions.Count == 0)
             {
-                condition = new ConditionItem { ConditionType = ConditionType.Variable, VariableName = "" };
+                condition = new ConditionItem { ConditionType = ConditionType.Variable, VariableName = "", VariableOperator = "==", VariableValue = "" };
                 Result.Conditions.Add(condition);
             }
             else
             {
                 condition = Result.Conditions[0];
+                condition.VariableOperator ??= "==";
             }
 
             var nameLabel = new TextBlock
@@ -468,18 +471,144 @@ namespace MacroEngine.UI
             };
             ConfigContentPanel!.Children.Add(nameLabel);
 
+            static double CondVarWidth(int length, double minWidth)
+            {
+                // Equivalent JS : Math.max(minWidth, len*7 + 16)
+                var w = (length * 7.0) + 16.0;
+                return Math.Max(minWidth, w);
+            }
+
             var nameTextBox = new TextBox
             {
-                Text = condition.VariableName ?? "",
+                Text = string.IsNullOrWhiteSpace(condition.VariableName) ? "" : "$" + condition.VariableName.Trim(),
                 FontSize = 12,
                 Margin = new Thickness(0, 0, 0, 8),
-                MaxLength = 100
+                // +1 pour le "$" affiché automatiquement
+                MaxLength = 19,
+                MinWidth = 60,
+                Width = CondVarWidth((condition.VariableName ?? "").Trim().Length, 70),
+                AcceptsReturn = false,
+                TextWrapping = TextWrapping.NoWrap
             };
+            bool nameTextBoxUpdating = false;
             nameTextBox.TextChanged += (s, e) =>
             {
-                condition.VariableName = nameTextBox.Text?.Trim() ?? "";
+                if (nameTextBoxUpdating) return;
+                nameTextBoxUpdating = true;
+
+                var t = (nameTextBox.Text ?? "").Trim();
+                if (string.IsNullOrEmpty(t))
+                {
+                    condition.VariableName = "";
+                    nameTextBox.Text = "";
+                }
+                else if (t == "$")
+                {
+                    // Permet à l'utilisateur de garder le '$' en début de saisie
+                    condition.VariableName = "";
+                    nameTextBox.Text = "$";
+                    nameTextBox.CaretIndex = nameTextBox.Text.Length;
+                }
+                else
+                {
+                    if (t.StartsWith("$", StringComparison.Ordinal))
+                        t = t.Substring(1).Trim();
+                    condition.VariableName = t;
+                    nameTextBox.Text = "$" + t;
+                    nameTextBox.CaretIndex = nameTextBox.Text.Length;
+                }
+
+                var len = (condition.VariableName ?? "").Trim().Length;
+                nameTextBox.Width = CondVarWidth(len, 70);
+                nameTextBoxUpdating = false;
             };
             ConfigContentPanel.Children.Add(nameTextBox);
+
+            var opLabel = new TextBlock
+            {
+                Text = "Opérateur:",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            ConfigContentPanel.Children.Add(opLabel);
+
+            var opCombo = new ComboBox
+            {
+                FontSize = 12,
+                Foreground = Brushes.White,
+                Margin = new Thickness(0, 0, 0, 8),
+                MinWidth = 120
+            };
+            if (Application.Current.TryFindResource("ComboBoxCondVarOp") is Style condVarOpStyle)
+                opCombo.Style = condVarOpStyle;
+            opCombo.Items.Add(new ComboBoxItem { Content = "==", Tag = "==", ToolTip = "exactement égal" });
+            opCombo.Items.Add(new ComboBoxItem { Content = "!=", Tag = "!=", ToolTip = "différent" });
+            opCombo.Items.Add(new ComboBoxItem { Content = ">", Tag = ">", ToolTip = "strictement supérieur" });
+            opCombo.Items.Add(new ComboBoxItem { Content = "≥", Tag = ">=", ToolTip = "supérieur ou égal" });
+            opCombo.Items.Add(new ComboBoxItem { Content = "<", Tag = "<", ToolTip = "strictement inférieur" });
+            opCombo.Items.Add(new ComboBoxItem { Content = "≤", Tag = "<=", ToolTip = "inférieur ou égal" });
+            opCombo.Items.Add(new ComboBoxItem { Content = "∈", Tag = "contains", ToolTip = "contient" });
+            opCombo.Items.Add(new ComboBoxItem { Content = "vide", Tag = "empty", ToolTip = "variable vide" });
+            opCombo.Items.Add(new ComboBoxItem { Content = "!vide", Tag = "not_empty", ToolTip = "variable non vide" });
+            var opVal = condition.VariableOperator ?? "==";
+            for (int k = 0; k < opCombo.Items.Count; k++)
+            {
+                if (opCombo.Items[k] is ComboBoxItem cbi && (cbi.Tag as string) == opVal)
+                { opCombo.SelectedIndex = k; break; }
+            }
+            if (opCombo.SelectedIndex < 0) opCombo.SelectedIndex = 0;
+
+            var valLabel = new TextBlock
+            {
+                Text = "Valeur à comparer:",
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            ConfigContentPanel.Children.Add(valLabel);
+
+            var valTextBox = new TextBox
+            {
+                Text = (opVal == "empty" || opVal == "not_empty") ? "" : (condition.VariableValue ?? ""),
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 8),
+                MaxLength = 18,
+                IsEnabled = opVal != "empty" && opVal != "not_empty",
+                MinWidth = 50,
+                Width = CondVarWidth((condition.VariableValue ?? "").Trim().Length, 60),
+                AcceptsReturn = false,
+                TextWrapping = TextWrapping.NoWrap
+            };
+
+            void UpdateVarValueState()
+            {
+                var noVal = condition.VariableOperator == "empty" || condition.VariableOperator == "not_empty";
+                valTextBox.IsEnabled = !noVal;
+                if (noVal) valTextBox.Text = "";
+            }
+
+            opCombo.SelectionChanged += (s, e) =>
+            {
+                if (opCombo.SelectedItem is ComboBoxItem cbi && cbi.Tag is string tag)
+                {
+                    condition.VariableOperator = tag;
+                    if (tag == "empty" || tag == "not_empty")
+                        condition.VariableValue = "";
+                    UpdateVarValueState();
+                }
+            };
+
+            valTextBox.TextChanged += (s, e) =>
+            {
+                if (condition.VariableOperator != "empty" && condition.VariableOperator != "not_empty")
+                    condition.VariableValue = valTextBox.Text?.Trim() ?? "";
+                var len = (valTextBox.Text ?? "").Trim().Length;
+                valTextBox.Width = CondVarWidth(len, 60);
+            };
+            ConfigContentPanel.Children.Add(opCombo);
+            ConfigContentPanel.Children.Add(valLabel);
+            ConfigContentPanel.Children.Add(valTextBox);
         }
 
         private void CreateBooleanConfig()
@@ -1611,9 +1740,10 @@ namespace MacroEngine.UI
                 BorderBrush = DialogBrush("BorderLightBrush"),
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = System.Windows.Input.Cursors.Hand
             };
-            
+
             // Initialiser la couleur de prévisualisation
             try
             {
@@ -1660,6 +1790,41 @@ namespace MacroEngine.UI
 
             colorPanel.Children.Add(colorPreviewBorder);
             colorPanel.Children.Add(colorTextBox);
+
+            colorPreviewBorder.MouseLeftButtonDown += (s, e) =>
+            {
+                e.Handled = true;
+                try
+                {
+                    var initialHex = condition.PixelColorConfig?.ExpectedColor ?? "#000000";
+                    var screenPt = colorPreviewBorder.PointToScreen(new Point(0, 0));
+                    var contentY = screenPt.Y + colorPreviewBorder.RenderSize.Height + 6;
+                    var colorPop = new ColorPopoverWindow(initialHex, screenPt.X, contentY) { Owner = this };
+                    if (colorPop.ShowDialog() == true && !string.IsNullOrEmpty(colorPop.SelectedColorHex))
+                    {
+                        var hex = colorPop.SelectedColorHex.Trim();
+                        if (!hex.StartsWith("#")) hex = "#" + hex;
+                        condition.PixelColorConfig!.ExpectedColor = hex;
+                        colorTextBox.Text = hex;
+                        try
+                        {
+                            string h = hex.TrimStart('#');
+                            if (h.Length == 6)
+                            {
+                                int r = Convert.ToInt32(h.Substring(0, 2), 16);
+                                int g = Convert.ToInt32(h.Substring(2, 2), 16);
+                                int b = Convert.ToInt32(h.Substring(4, 2), 16);
+                                colorPreviewBorder.Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb((byte)r, (byte)g, (byte)b));
+                            }
+                        }
+                        catch { }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erreur : {ex.Message}", "Couleur", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+            };
 
             // Bouton pipette (après avoir déclaré les variables)
             var pipetteButton = new Button
@@ -1900,7 +2065,7 @@ namespace MacroEngine.UI
 
             ConfigContentPanel.Children.Add(new TextBlock
             {
-                Text = "Zone (coin supérieur gauche):",
+                Text = "Coin supérieur gauche :",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 0, 4)
@@ -1909,7 +2074,7 @@ namespace MacroEngine.UI
 
             ConfigContentPanel.Children.Add(new TextBlock
             {
-                Text = "Zone (coin inférieur droit):",
+                Text = "Coin inférieur droit :",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 8, 0, 4)
@@ -2436,11 +2601,12 @@ namespace MacroEngine.UI
 
             var browseButton = new Button
             {
-                Content = "Parcourir...",
-                Width = 100,
+                Content = LucideIcons.CreateIcon(LucideIcons.FolderSearch, 13),
+                Width = 30,
                 Height = 28,
                 Margin = new Thickness(8, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Parcourir"
             };
             browseButton.Click += (s, e) =>
             {
@@ -2457,8 +2623,8 @@ namespace MacroEngine.UI
 
             var pasteButton = new Button
             {
-                Content = "📋 Coller",
-                Width = 100,
+                Content = LucideIcons.CreateIcon(LucideIcons.ClipboardPaste, 13),
+                Width = 30,
                 Height = 28,
                 Margin = new Thickness(8, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -2818,7 +2984,7 @@ namespace MacroEngine.UI
             ConditionItem condition;
             if (Result!.Conditions.Count == 0)
             {
-                condition = new ConditionItem { ConditionType = ConditionType.MouseClick, MouseClickConfig = new MouseClickCondition() };
+                condition = new ConditionItem { ConditionType = ConditionType.MouseClick, MouseClickConfig = new MouseClickCondition { ClickType = 3 } };
                 Result.Conditions.Add(condition);
             }
             else
@@ -2827,7 +2993,7 @@ namespace MacroEngine.UI
             }
 
             if (condition.MouseClickConfig == null)
-                condition.MouseClickConfig = new MouseClickCondition();
+                condition.MouseClickConfig = new MouseClickCondition { ClickType = 3 };
 
             var clickLabel = new TextBlock
             {

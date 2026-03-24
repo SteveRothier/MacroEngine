@@ -3,12 +3,12 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Gérer les Profils"
-        Width="800"
-        Height="520"
+        Width="900"
+        Height="580"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None"
         ResizeMode="CanResizeWithGrip"
-        MinWidth="600" MinHeight="400"
+        MinWidth="720" MinHeight="460"
         Background="{StaticResource BackgroundPrimaryBrush}">
     <Border x:Name="RootBorder"
             Background="{StaticResource BackgroundPrimaryBrush}"
@@ -24,179 +24,240 @@
             <Border x:Name="TitleBarBorder" Grid.Row="0"
                     shell:WindowChrome.IsHitTestVisibleInChrome="True"
                     Background="{StaticResource BackgroundSecondaryBrush}"
-                    BorderBrush="{StaticResource BorderLightBrush}"
                     BorderThickness="0,0,0,1"
-                    Padding="16,0,0,0" Height="40"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    Padding="16,0,0,0"
+                    Height="44"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <Grid>
+                <Grid VerticalAlignment="Center">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
-                        <TextBlock Text="&#xE0D7;" FontFamily="{StaticResource FontLucide}" FontSize="18"
-                                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,10,0"/>
-                        <TextBlock Text="Gérer les Profils" Style="{StaticResource TextHeading}"
-                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="15"/>
+                        <Border Width="28" Height="28" CornerRadius="6"
+                                Background="{StaticResource AccentPrimaryBrush}"
+                                Margin="0,0,12,0" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE0D7;" FontFamily="{StaticResource FontLucide}" FontSize="14"
+                                       Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="Profils" Style="{StaticResource TextHeading}"
+                                   Foreground="{StaticResource TextPrimaryBrush}" FontSize="15" VerticalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Stretch"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True">
                         <Button x:Name="MinimizeButton" Style="{StaticResource WindowCaptionButtonStyle}"
+                                Width="44" Height="32"
                                 ClickMode="Press" Focusable="False" Foreground="{StaticResource TextPrimaryBrush}"
-                                FontFamily="{StaticResource FontLucide}" Content="&#xE11C;"
+                                FontFamily="{StaticResource FontLucide}" FontSize="12" Content="&#xE11C;"
                                 ToolTip="Réduire" Click="MinimizeButton_Click"/>
                         <Button x:Name="MaximizeButton" Style="{StaticResource WindowCaptionButtonStyle}"
+                                Width="44" Height="32"
                                 ClickMode="Press" Focusable="False" Foreground="{StaticResource TextPrimaryBrush}"
-                                FontFamily="{StaticResource FontLucide}" Content="&#xE167;"
+                                FontFamily="{StaticResource FontLucide}" FontSize="12" Content="&#xE167;"
                                 ToolTip="Agrandir" Click="MaximizeButton_Click"/>
                         <Button x:Name="CloseButton" Style="{StaticResource WindowCaptionCloseButtonStyle}"
+                                Width="44" Height="32"
                                 ClickMode="Press" Focusable="False" Foreground="{StaticResource TextPrimaryBrush}"
-                                FontFamily="{StaticResource FontLucide}" Content="&#xE1B2;"
+                                FontFamily="{StaticResource FontLucide}" FontSize="12" Content="&#xE1B2;"
                                 ToolTip="Fermer" Click="CloseButton_Click"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <!-- Contenu : liste à gauche, éditeur à droite -->
-            <Grid Grid.Row="1" Margin="20,16" VerticalAlignment="Stretch">
+            <!-- Corps : liste à gauche, détail à droite -->
+            <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200" MinWidth="160"/>
-                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="300" MinWidth="260" MaxWidth="380"/>
+                    <ColumnDefinition Width="1"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Colonne gauche : liste des profils (occupe toute la largeur de la colonne) -->
-                <Grid Grid.Column="0" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <!-- Panneau gauche : liste des profils -->
+                <Grid Grid.Column="0" Background="{StaticResource BackgroundSecondaryBrush}">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <Button x:Name="NewProfileButton" Grid.Row="0" Style="{StaticResource ButtonPrimary}"
-                            Click="NewProfileButton_Click" Margin="0,0,0,12" Padding="12,10"
+
+                    <!-- Bouton Nouveau profil -->
+                    <Button x:Name="NewProfileButton" Grid.Row="0"
+                            Style="{StaticResource ButtonPrimary}"
+                            Click="NewProfileButton_Click"
+                            HorizontalAlignment="Stretch"
+                            Margin="20,16,20,0"
+                            Padding="14,10"
                             ToolTip="Créer un nouveau profil">
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                             <TextBlock Text="&#xE081;" FontFamily="{StaticResource FontLucide}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Nouveau profil" VerticalAlignment="Center"/>
+                            <TextBlock Text="Nouveau profil" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </StackPanel>
                     </Button>
-                    <Border Grid.Row="1" Background="{StaticResource BackgroundSecondaryBrush}"
-                            BorderBrush="{StaticResource BorderLightBrush}"
-                            BorderThickness="1" CornerRadius="8" Padding="8"
-                            MinHeight="220" VerticalAlignment="Stretch"
-                            HorizontalAlignment="Stretch">
-                        <ListBox x:Name="ProfilesListBox" Background="Transparent" BorderThickness="0"
-                                 Padding="0,0,10,0"
-                                 HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                                 HorizontalContentAlignment="Stretch"
-                                 SelectionMode="Single" SelectionChanged="ProfilesListBox_SelectionChanged"
-                                 MouseDoubleClick="ProfilesListBox_MouseDoubleClick"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                 ScrollViewer.CanContentScroll="False">
-                            <ListBox.ItemContainerStyle>
-                                <Style TargetType="ListBoxItem">
-                                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                                    <Setter Property="Background" Value="Transparent"/>
-                                    <Setter Property="Template">
-                                        <Setter.Value>
-                                            <ControlTemplate TargetType="ListBoxItem">
-                                                <Border x:Name="Bd" Background="Transparent">
-                                                    <ContentPresenter Content="{TemplateBinding Content}"
-                                                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsSelected" Value="True">
-                                                        <Setter TargetName="Bd" Property="Background" Value="Transparent"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Setter.Value>
-                                    </Setter>
-                                </Style>
-                            </ListBox.ItemContainerStyle>
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Padding="10,8" Margin="0,0,0,4" CornerRadius="6"
-                                            Background="{StaticResource BackgroundTertiaryBrush}"
-                                            BorderThickness="1">
-                                        <Border.Style>
-                                            <Style TargetType="Border">
-                                                <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
-                                                        <Setter Property="BorderBrush" Value="{StaticResource SidebarAccentBrush}"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Border.Style>
-                                        <Grid>
+
+                    <!-- Barre de séparation au-dessus de la liste (comme liste des macros) -->
+                    <Border Grid.Row="1" Height="1" Background="{StaticResource SeparatorSubtleBrush}" Margin="0,0,0,8"/>
+
+                    <!-- Liste des profils : même style que liste des macros -->
+                    <Border Grid.Row="2" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                            ClipToBounds="False" Background="Transparent" Margin="0,0,0,0">
+                        <ScrollViewer Style="{StaticResource ScrollViewerNoClipStyle}"
+                                      VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      Padding="0,0,0,12"
+                                      Background="Transparent">
+                            <ListBox x:Name="ProfilesListBox"
+                                     Style="{StaticResource MacrosListBoxStyle}"
+                                     SelectionMode="Single"
+                                     SelectionChanged="ProfilesListBox_SelectionChanged"
+                                     MouseDoubleClick="ProfilesListBox_MouseDoubleClick"
+                                     ItemContainerStyle="{StaticResource MacroListItemStyle}">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel ClipToBounds="False"/>
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid MaxHeight="40">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="26"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13"
-                                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                            <!-- Icône à gauche (profil = dossier / layers) -->
+                                            <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                <TextBlock Text="&#xE0D7;" FontFamily="{StaticResource FontLucide}" FontSize="14"
+                                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                                           VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                            </Border>
+                                            <!-- Nom du profil -->
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Name}"
+                                                       FontWeight="SemiBold"
+                                                       FontSize="14"
                                                        VerticalAlignment="Center"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <Border Grid.Column="1" CornerRadius="4" Padding="6,2" VerticalAlignment="Center"
-                                                    Background="{StaticResource SuccessBrush}" Margin="8,0,0,0">
+                                                       TextTrimming="CharacterEllipsis"
+                                                       Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
+                                            <!-- Pastille "Actif" (style comme raccourci macros) -->
+                                            <Border Grid.Column="2"
+                                                    VerticalAlignment="Center"
+                                                    Margin="6,0,0,0"
+                                                    Padding="5,2,5,2"
+                                                    BorderThickness="0"
+                                                    CornerRadius="2">
                                                 <Border.Style>
                                                     <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="{StaticResource BackgroundTertiaryBrush}"/>
                                                         <Setter Property="Visibility" Value="Collapsed"/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                                <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
                                                                 <Setter Property="Visibility" Value="Visible"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
-                                                <TextBlock Text="En cours" FontSize="10" Foreground="White"/>
+                                                <TextBlock FontSize="10" FontWeight="SemiBold"
+                                                           Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"
+                                                           Text="Actif"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                         </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </ScrollViewer>
                     </Border>
-                    <TextBlock x:Name="StatusText" Grid.Row="2" Foreground="{StaticResource ErrorBrush}" FontSize="12"
-                               TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
-                    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
-                        <Button x:Name="ActivateProfileButton" Style="{StaticResource ButtonSecondary}"
-                                Click="ActivateProfileButton_Click" Margin="0,0,6,0" Padding="8,6"
-                                IsEnabled="False" ToolTip="Utiliser ce profil comme profil actif">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE080;" FontFamily="{StaticResource FontLucide}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Utiliser" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                        <Button x:Name="DeleteProfileButton" Style="{StaticResource ButtonGhost}"
-                                Click="DeleteProfileButton_Click" Padding="8,6" IsEnabled="False"
-                                ToolTip="Supprimer le profil sélectionné">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE18E;" FontFamily="{StaticResource FontLucide}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
+
+                    <!-- Message statut (erreur / succès) -->
+                    <TextBlock x:Name="StatusText" Grid.Row="3"
+                               Foreground="{StaticResource ErrorBrush}"
+                               FontSize="12" TextWrapping="Wrap"
+                               Margin="20,8,20,0" Visibility="Collapsed"/>
+
+                    <!-- Actions : Utiliser / Supprimer -->
+                    <Border Grid.Row="4" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0"
+                            Background="{StaticResource BackgroundSecondaryBrush}" Padding="20,14">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="ActivateProfileButton" Grid.Column="0"
+                                    Style="{StaticResource ButtonSecondary}"
+                                    Click="ActivateProfileButton_Click"
+                                    HorizontalAlignment="Stretch"
+                                    Padding="12,8"
+                                    IsEnabled="False"
+                                    ToolTip="Utiliser ce profil comme profil actif">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE080;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Utiliser" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="DeleteProfileButton" Grid.Column="2"
+                                    Style="{StaticResource ButtonGhostDanger}"
+                                    Click="DeleteProfileButton_Click"
+                                    HorizontalAlignment="Stretch"
+                                    Padding="12,8"
+                                    IsEnabled="False"
+                                    ToolTip="Supprimer le profil sélectionné">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE18E;" FontFamily="{StaticResource FontLucide}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Border>
                 </Grid>
 
-                <!-- Colonne droite : éditeur ou placeholder -->
-                <Border Grid.Column="2" Background="{StaticResource BackgroundSecondaryBrush}"
-                        BorderBrush="{StaticResource BorderLightBrush}"
-                        BorderThickness="1" CornerRadius="8" Padding="20">
-                    <Grid>
-                        <ContentControl x:Name="EditorContent"/>
-                        <TextBlock x:Name="PlaceholderText"
-                                  Text="Sélectionnez un profil dans la liste ou créez-en un nouveau."
-                                  Style="{StaticResource TextMuted}" FontSize="14"
-                                  VerticalAlignment="Center" HorizontalAlignment="Center"
-                                  TextWrapping="Wrap" TextAlignment="Center" MaxWidth="320"/>
-                    </Grid>
-                </Border>
+                <!-- Trait de séparation -->
+                <Border Grid.Column="1" Background="{StaticResource BorderLightBrush}"/>
+
+                <!-- Panneau droit : détail / éditeur -->
+                <Grid Grid.Column="2" Background="{StaticResource BackgroundPrimaryBrush}">
+                    <Border Background="{StaticResource BackgroundSecondaryBrush}"
+                            BorderBrush="{StaticResource BorderLightBrush}"
+                            BorderThickness="1,0,0,0"
+                            CornerRadius="0"
+                            Margin="0"
+                            Padding="0">
+                        <Grid>
+                            <ScrollViewer x:Name="EditorScrollViewer"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          Padding="24,20"
+                                          Background="Transparent">
+                                <ContentControl x:Name="EditorContent"/>
+                            </ScrollViewer>
+                            <!-- Placeholder quand aucun profil sélectionné -->
+                            <StackPanel x:Name="PlaceholderPanel"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center"
+                                        IsHitTestVisible="False">
+                                <Border Width="56" Height="56" CornerRadius="28"
+                                        Background="{StaticResource BackgroundTertiaryBrush}"
+                                        Margin="0,0,0,16">
+                                    <TextBlock Text="&#xE0D7;" FontFamily="{StaticResource FontLucide}" FontSize="24"
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock x:Name="PlaceholderText"
+                                           Text="Sélectionnez un profil ou créez-en un nouveau."
+                                           Style="{StaticResource TextMuted}"
+                                           FontSize="14"
+                                           TextAlignment="Center"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="260"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Grid>
         </Grid>
     </Border>

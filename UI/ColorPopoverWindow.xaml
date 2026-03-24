@@ -1,0 +1,348 @@
+<Window x:Class="MacroEngine.UI.ColorPopoverWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" ResizeMode="NoResize"
+        Background="Transparent" AllowsTransparency="True"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        ShowInTaskbar="False"
+        Title="Couleur">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MacroEngine;component/Themes/Colors.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/MacroEngine;component/Themes/Typography.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/MacroEngine;component/Themes/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <SolidColorBrush x:Key="PpPipetteHoverBgBrush" Color="#FFFFFF" Opacity="0.12"/>
+            <SolidColorBrush x:Key="PpModeButtonHoverBrush" Color="#808080" Opacity="0.35"/>
+            <SolidColorBrush x:Key="PpInputForegroundBrush" Color="#E0E0E0"/>
+            <!-- Champ = Border + TextBox seul (affichage + saisie) pour alignement curseur/texte parfait -->
+            <Style x:Key="PpInputBorderStyle" TargetType="Border">
+                <Setter Property="Background" Value="{StaticResource BackgroundPrimaryBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Height" Value="28"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+            </Style>
+            <!-- Style de base pour les inputs du popover -->
+            <Style x:Key="PpInputBoxBaseStyle" TargetType="TextBox" BasedOn="{StaticResource TextBoxNoCornerRadius}">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{StaticResource PpInputForegroundBrush}"/>
+                <Setter Property="CaretBrush" Value="{StaticResource PpInputForegroundBrush}"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="4,0"/>
+                <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+            </Style>
+            <!-- Un seul input (Hex) : padding standard + texte centré -->
+            <Style x:Key="PpInputBoxSingleStyle" TargetType="TextBox" BasedOn="{StaticResource PpInputBoxBaseStyle}">
+                <Setter Property="TextAlignment" Value="Center"/>
+            </Style>
+            <!-- Trois inputs (R/G/B ou H/S/L) : toute la largeur utilisée, padding gauche pour décaler le texte, rien rogné -->
+            <Style x:Key="PpInputBoxTripleStyle" TargetType="TextBox" BasedOn="{StaticResource PpInputBoxBaseStyle}">
+                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                <Setter Property="Padding" Value="6,0,6,0"/>
+                <Setter Property="TextAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="TextBox">
+                            <Border x:Name="border"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                <Border x:Name="PART_ContentHost"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              Background="Transparent"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="PpPipetteBtnStyle" TargetType="Border">
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="0"/>
+                <Setter Property="Padding" Value="0,7"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{StaticResource PpPipetteHoverBgBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style x:Key="PpModeButtonStyle" TargetType="Button">
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Foreground" Value="White"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+                <Setter Property="Padding" Value="10,4"/>
+                <Setter Property="Cursor" Value="Hand"/>
+                <Setter Property="FontSize" Value="10"/>
+                <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{StaticResource PpModeButtonHoverBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+    <Canvas x:Name="OverlayGrid" Background="#01000000"
+            PreviewMouseDown="OverlayGrid_PreviewMouseDown">
+        <Border x:Name="ContentContainer">
+            <!-- .pixel-pop style -->
+            <Border x:Name="RootBorder" Width="220"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="0,1,0,1">
+                <Border.Effect>
+                    <DropShadowEffect Color="Black" Opacity="0.8" BlurRadius="40" ShadowDepth="16"/>
+                </Border.Effect>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <!-- spectrum S/V : toute la largeur du popover, collé en haut et sur les côtés -->
+                    <Border x:Name="CpSv" Grid.Row="0" Height="120" Margin="0,0,0,8" Cursor="Cross"
+                            HorizontalAlignment="Stretch" ClipToBounds="True"
+                            MouseLeftButtonDown="CpSv_MouseLeftButtonDown"
+                            MouseMove="CpSv_MouseMove"
+                            MouseLeftButtonUp="CpSv_MouseLeftButtonUp"
+                            LostMouseCapture="CpSv_LostMouseCapture">
+                        <Grid>
+                            <Image x:Name="SvImage" Stretch="Fill"/>
+                            <Canvas x:Name="SvCursorCanvas" IsHitTestVisible="False">
+                                <Ellipse x:Name="SvCursor" Width="10" Height="10"
+                                         Stroke="White" StrokeThickness="2"
+                                         RenderTransformOrigin="0.5,0.5">
+                                    <Ellipse.RenderTransform>
+                                        <TranslateTransform x:Name="SvCursorTransform"/>
+                                    </Ellipse.RenderTransform>
+                                    <Ellipse.Effect>
+                                        <DropShadowEffect Color="Black" Opacity="0.5" BlurRadius="1" ShadowDepth="0"/>
+                                    </Ellipse.Effect>
+                                </Ellipse>
+                            </Canvas>
+                        </Grid>
+                    </Border>
+                    <!-- pp-body : le reste avec marges latérales -->
+                    <StackPanel x:Name="CpBody" Grid.Row="1" Margin="8,0,8,10">
+                        <!-- cp-hue : curseur rond centré comme le spectrum S/V -->
+                        <Border x:Name="CpHue" Height="12" Margin="0,0,0,10" Cursor="Hand"
+                                CornerRadius="4" ClipToBounds="True"
+                                MouseLeftButtonDown="CpHue_MouseLeftButtonDown"
+                                MouseMove="CpHue_MouseMove"
+                                MouseLeftButtonUp="CpHue_MouseLeftButtonUp"
+                                LostMouseCapture="CpHue_LostMouseCapture">
+                            <Border.Clip>
+                                <RectangleGeometry RadiusX="4" RadiusY="4" Rect="0,0,204,12"/>
+                            </Border.Clip>
+                            <Grid>
+                                <Image x:Name="HueImage" Stretch="Fill"/>
+                                <Canvas x:Name="HueCursorCanvas" IsHitTestVisible="False">
+                                    <Ellipse x:Name="HueCursor" Width="12" Height="12"
+                                             Stroke="White" StrokeThickness="2"
+                                             RenderTransformOrigin="0.5,0.5">
+                                        <Ellipse.RenderTransform>
+                                            <TranslateTransform x:Name="HueCursorTransform"/>
+                                        </Ellipse.RenderTransform>
+                                        <Ellipse.Effect>
+                                            <DropShadowEffect Color="Black" Opacity="0.5" BlurRadius="1" ShadowDepth="0"/>
+                                        </Ellipse.Effect>
+                                    </Ellipse>
+                                </Canvas>
+                            </Grid>
+                        </Border>
+                        <!-- pp-row: pipette icon + preview + (Hex | RGB | HSL selon mode) -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="60"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" VerticalAlignment="Top" Margin="0,12,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border x:Name="PipetteIconBtn" Width="28" Height="28"
+                                            Style="{StaticResource PpPipetteBtnStyle}"
+                                            MouseLeftButtonDown="PipetteBtn_MouseLeftButtonDown"/>
+                                    <Border Width="4"/>
+                                    <Border x:Name="CpPreview" Width="28" Height="28"
+                                            CornerRadius="14"
+                                            BorderThickness="0"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <Grid Grid.Column="2" VerticalAlignment="Top">
+                                <!-- HEX -->
+                                <StackPanel x:Name="HexPanel" Visibility="Visible">
+                                    <TextBlock Text="Hex" FontSize="8" FontWeight="Bold"
+                                               FontFamily="{StaticResource FontMono}"
+                                               Foreground="White" Margin="0,0,0,4"/>
+                                    <Border Style="{StaticResource PpInputBorderStyle}">
+                                        <Grid>
+                                            <TextBlock x:Name="CpHexDisplay" Text="" Visibility="Collapsed"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                       Foreground="{StaticResource PpInputForegroundBrush}"/>
+                                            <TextBox x:Name="CpHex" MaxLength="7" Style="{StaticResource PpInputBoxSingleStyle}"
+                                                     Text="" LostFocus="CpHex_LostFocus" TextChanged="CpHex_TextChanged"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                                <!-- RGB -->
+                                <Grid x:Name="RgbPanel" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="R" FontSize="8" FontWeight="Bold"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   Foreground="White" Margin="0,0,0,4"/>
+                                        <Border Style="{StaticResource PpInputBorderStyle}">
+                                            <Grid>
+                                                <TextBlock x:Name="CpRDisplay" Text="" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                           Foreground="{StaticResource PpInputForegroundBrush}"/>
+                                                <TextBox x:Name="CpR" Style="{StaticResource PpInputBoxTripleStyle}"
+                                                         MaxLength="3" Text="" TextChanged="CpRgb_TextChanged"/>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="G" FontSize="8" FontWeight="Bold"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   Foreground="White" Margin="0,0,0,4"/>
+                                        <Border Style="{StaticResource PpInputBorderStyle}">
+                                            <Grid>
+                                                <TextBlock x:Name="CpGDisplay" Text="" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                           Foreground="{StaticResource PpInputForegroundBrush}"/>
+                                                <TextBox x:Name="CpG" Style="{StaticResource PpInputBoxTripleStyle}"
+                                                         MaxLength="3" Text="" TextChanged="CpRgb_TextChanged"/>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="B" FontSize="8" FontWeight="Bold"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   Foreground="White" Margin="0,0,0,4"/>
+                                        <Border Style="{StaticResource PpInputBorderStyle}">
+                                            <Grid>
+                                                <TextBlock x:Name="CpBDisplay" Text="" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                           Foreground="{StaticResource PpInputForegroundBrush}"/>
+                                                <TextBox x:Name="CpB" Style="{StaticResource PpInputBoxTripleStyle}"
+                                                         MaxLength="3" Text="" TextChanged="CpRgb_TextChanged"/>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                                <!-- HSL -->
+                                <Grid x:Name="HslPanel" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="6"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="H" FontSize="8" FontWeight="Bold"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   Foreground="White" Margin="0,0,0,4"/>
+                                        <Border Style="{StaticResource PpInputBorderStyle}">
+                                            <Grid>
+                                                <TextBlock x:Name="CpHDisplay" Text="" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                           Foreground="{StaticResource PpInputForegroundBrush}"/>
+                                                <TextBox x:Name="CpH" Style="{StaticResource PpInputBoxTripleStyle}"
+                                                         Text="" TextChanged="CpHsl_TextChanged"/>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="S %" FontSize="8" FontWeight="Bold"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   Foreground="White" Margin="0,0,0,4"/>
+                                        <Border Style="{StaticResource PpInputBorderStyle}">
+                                            <Grid>
+                                                <TextBlock x:Name="CpSDisplay" Text="" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                           Foreground="{StaticResource PpInputForegroundBrush}"/>
+                                                <TextBox x:Name="CpS" Style="{StaticResource PpInputBoxTripleStyle}"
+                                                         Text="" TextChanged="CpHsl_TextChanged"/>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="L %" FontSize="8" FontWeight="Bold"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   Foreground="White" Margin="0,0,0,4"/>
+                                        <Border Style="{StaticResource PpInputBorderStyle}">
+                                            <Grid>
+                                                <TextBlock x:Name="CpLDisplay" Text="" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           FontFamily="{StaticResource FontMono}" FontSize="11"
+                                                           Foreground="{StaticResource PpInputForegroundBrush}"/>
+                                                <TextBox x:Name="CpL" Style="{StaticResource PpInputBoxTripleStyle}"
+                                                         Text="" TextChanged="CpHsl_TextChanged"/>
+                                            </Grid>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Grid>
+                        <!-- Tolérance % : même disposition et largeur qu'un input R/G/B -->
+                        <StackPanel Margin="0,0,0,10">
+                            <TextBlock Text="Tolérance %" FontSize="8" FontWeight="Bold"
+                                       FontFamily="{StaticResource FontMono}"
+                                       Foreground="White" Margin="0,0,0,4"/>
+                            <Border Style="{StaticResource PpInputBorderStyle}" Width="48" HorizontalAlignment="Left">
+                                <Grid>
+                                    <TextBox x:Name="CpTolerance" MaxLength="3" Style="{StaticResource PpInputBoxTripleStyle}"
+                                             Text="10" LostFocus="CpTolerance_LostFocus" TextChanged="CpTolerance_TextChanged"/>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                        <!-- Boutons bascule RGB / HSL / HEX -->
+                        <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0" Padding="0,8,0,0" Margin="0,4,0,0">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                <Button x:Name="BtnModeRgb" Content="RGB" Style="{StaticResource PpModeButtonStyle}"
+                                        Margin="0,0,4,0" Click="ModeButton_Click"/>
+                                <Button x:Name="BtnModeHsl" Content="HSL" Style="{StaticResource PpModeButtonStyle}"
+                                        Margin="0,0,4,0" Click="ModeButton_Click"/>
+                                <Button x:Name="BtnModeHex" Content="HEX" Style="{StaticResource PpModeButtonStyle}"
+                                        Click="ModeButton_Click"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Border>
+    </Canvas>
+</Window>

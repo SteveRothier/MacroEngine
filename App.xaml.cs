@@ -14,6 +14,10 @@ namespace MacroEngine
 
         protected override void OnStartup(StartupEventArgs e)
         {
+            // Capturer les exceptions non gérées pour diagnostiquer si la fenêtre ne s'ouvre pas
+            AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+            this.DispatcherUnhandledException += OnDispatcherUnhandledException;
+
             base.OnStartup(e);
             
             // Initialiser les dossiers nécessaires
@@ -38,8 +42,37 @@ namespace MacroEngine
             });
         }
 
+        private void OnUnhandledException(object sender, UnhandledExceptionEventArgs args)
+        {
+            var ex = args.ExceptionObject as Exception;
+            LogAndShowStartupError(ex, "UnhandledException");
+        }
+
+        private void OnDispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
+        {
+            LogAndShowStartupError(e.Exception, "DispatcherUnhandledException");
+            e.Handled = true; // Éviter le crash immédiat pour que le message s'affiche
+        }
+
+        private void LogAndShowStartupError(Exception? ex, string source)
+        {
+            string message = ex?.ToString() ?? "Erreur inconnue";
+            _appLogger?.Error($"Démarrage / fenêtre : {source}", ex ?? new Exception(message), "App");
+            try
+            {
+                System.Windows.MessageBox.Show(
+                    $"L'application n'a pas pu démarrer correctement.\n\n{ex?.Message}\n\nDétails : {message}",
+                    "MacroEngine - Erreur",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Error);
+            }
+            catch { /* en dernier recours, au moins le log est fait */ }
+        }
+
         protected override void OnExit(ExitEventArgs e)
         {
+            AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
+            this.DispatcherUnhandledException -= OnDispatcherUnhandledException;
             _appLogger?.Info("Arrêt de l'application en cours...", "App");
             
             // Nettoyer les hooks et services via MainWindow si elle existe

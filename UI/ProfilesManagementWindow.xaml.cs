@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shell;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Profiles;
 
@@ -20,6 +21,15 @@ namespace MacroEngine.UI
         public ProfilesManagementWindow(IProfileProvider profileProvider, List<Macro> macros)
         {
             InitializeComponent();
+            // Barre de titre personnalisée (même comportement que MainWindow)
+            var chrome = new WindowChrome
+            {
+                CaptionHeight = 44,
+                ResizeBorderThickness = new Thickness(5),
+                GlassFrameThickness = new Thickness(0),
+                UseAeroCaptionButtons = false
+            };
+            WindowChrome.SetWindowChrome(this, chrome);
             _profileProvider = profileProvider ?? throw new ArgumentNullException(nameof(profileProvider));
             _macros = macros ?? new List<Macro>();
             Loaded += ProfilesManagementWindow_Loaded;
@@ -111,15 +121,15 @@ namespace MacroEngine.UI
             {
                 await RefreshProfilesAsync();
                 EditorContent.Content = null;
-                PlaceholderText.Visibility = Visibility.Visible;
+                PlaceholderPanel.Visibility = Visibility.Visible;
             };
             editor.ProfileCancelled += (s, args) =>
             {
                 EditorContent.Content = null;
-                PlaceholderText.Visibility = Visibility.Visible;
+                PlaceholderPanel.Visibility = Visibility.Visible;
             };
             EditorContent.Content = editor;
-            PlaceholderText.Visibility = Visibility.Collapsed;
+            PlaceholderPanel.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Collapsed;
         }
 
@@ -130,7 +140,7 @@ namespace MacroEngine.UI
             if (selected == null)
             {
                 EditorContent.Content = null;
-                PlaceholderText.Visibility = Visibility.Visible;
+                PlaceholderPanel.Visibility = Visibility.Visible;
                 return;
             }
             var editor = new ProfileEditor();
@@ -141,7 +151,7 @@ namespace MacroEngine.UI
                 await RefreshProfilesAsync();
             };
             EditorContent.Content = editor;
-            PlaceholderText.Visibility = Visibility.Collapsed;
+            PlaceholderPanel.Visibility = Visibility.Collapsed;
             StatusText.Visibility = Visibility.Collapsed;
         }
 
@@ -186,7 +196,7 @@ namespace MacroEngine.UI
                 await _profileProvider.DeleteProfileAsync(selected.Id);
                 await RefreshProfilesAsync();
                 EditorContent.Content = null;
-                PlaceholderText.Visibility = Visibility.Visible;
+                PlaceholderPanel.Visibility = Visibility.Visible;
             }
             catch (Exception ex)
             {

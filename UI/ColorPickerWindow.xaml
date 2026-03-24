@@ -4,57 +4,44 @@
         Title="Pipette Couleur"
         WindowStyle="None"
         AllowsTransparency="True"
-        Background="Transparent"
+        Background="#01000000"
         Topmost="True"
         ShowInTaskbar="False"
         ResizeMode="NoResize"
-        Width="220" Height="160"
+        Cursor="None"
         IsHitTestVisible="False">
-    <Border Background="#E0FFFFFF"
-            BorderBrush="#FF0078D4"
-            BorderThickness="2"
-            CornerRadius="8"
-            Padding="12">
-        <StackPanel>
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                <TextBlock Text="&#xE0B4;" FontFamily="{StaticResource FontLucide}" FontSize="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                <TextBlock Text="Pipette Couleur" FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+    <Canvas x:Name="OverlayCanvas">
+        <!-- Loupe circulaire, position mise à jour en code -->
+        <Border x:Name="LoupeBorder" Width="99" Height="99"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="0"
+                CornerRadius="49.5"
+                ClipToBounds="True">
+            <Grid>
+                <!-- Pixels zoomés (rempli par WriteableBitmap en code) -->
+                <Image x:Name="LoupeImage" Stretch="Fill" RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                <!-- Grille (dessinée en code) -->
+                <Canvas x:Name="GridLines" IsHitTestVisible="False"/>
+                <!-- Pixel central surligné : cadre à l'extérieur pour ne pas cacher le centre -->
+                <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                        BorderBrush="#E6FFFFFF" BorderThickness="2.5"
+                        IsHitTestVisible="False" Width="14" Height="14">
+                    <Border x:Name="CenterPixelBorder" Width="9" Height="9"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                </Grid>
+        </Border>
+        <!-- Tooltip couleur sous la loupe -->
+        <Border x:Name="TooltipBorder" Padding="6,4" Background="#E01E1E1E"
+                BorderBrush="#4DFFFFFF" BorderThickness="1"
+                IsHitTestVisible="False">
+            <StackPanel Orientation="Horizontal">
+                <Border x:Name="TooltipSwatch" Width="12" Height="12" Margin="0,0,6,0"
+                        BorderBrush="#26FFFFFF" BorderThickness="1" Background="Black"/>
+                <TextBlock x:Name="TooltipHex" Text="#000000" FontFamily="Consolas" FontSize="11"
+                           FontWeight="Bold" Foreground="White" VerticalAlignment="Center"/>
             </StackPanel>
-            
-            <Grid Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                
-                <Border x:Name="ColorPreviewBorder"
-                        Grid.Column="0"
-                        Width="40" Height="40"
-                        BorderBrush="#FF666666"
-                        BorderThickness="1"
-                        Margin="0,0,8,0"
-                        Background="Black"/>
-                
-                <StackPanel Grid.Column="1">
-                    <TextBlock x:Name="XTextBlock">
-                        <Run Text="X: "/>
-                        <Run x:Name="XValue" Text="0" FontWeight="Bold"/>
-                    </TextBlock>
-                    <TextBlock x:Name="YTextBlock">
-                        <Run Text="Y: "/>
-                        <Run x:Name="YValue" Text="0" FontWeight="Bold"/>
-                    </TextBlock>
-                    <TextBlock x:Name="ColorTextBlock">
-                        <Run Text="Couleur: "/>
-                        <Run x:Name="ColorValue" Text="#000000" FontWeight="Bold"/>
-                    </TextBlock>
-                </StackPanel>
-            </Grid>
-            
-            <TextBlock Text="Cliquez pour sélectionner • ESC pour annuler" 
-                       FontSize="10"
-                       FontStyle="Italic"
-                       Foreground="#FF666666"/>
-        </StackPanel>
-    </Border>
+        </Border>
+    </Canvas>
 </Window>

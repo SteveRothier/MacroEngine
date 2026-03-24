@@ -27,74 +27,64 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Nom du profil -->
-        <Grid Grid.Row="0" Margin="0,0,0,16">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-            <TextBlock Text="Nom du profil" Style="{StaticResource TextLabel}"
-                       VerticalAlignment="Center" Margin="0,0,12,0"/>
-            <TextBox x:Name="ProfileNameTextBox" Grid.Column="1" Style="{StaticResource TextBoxModern}"
-                     VerticalAlignment="Center"/>
-            <TextBlock x:Name="ProfileNameErrorText" Grid.Row="1" Grid.Column="1"
+        <!-- Nom du profil : label au-dessus, champ pleine largeur -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="Nom du profil" Style="{StaticResource TextLabel}" Margin="0,0,0,6"/>
+            <TextBox x:Name="ProfileNameTextBox" Style="{StaticResource TextBoxModern}" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ProfileNameErrorText"
                        Text="Le nom ne peut pas être vide."
                        Foreground="{StaticResource ErrorBrush}" FontSize="12" Margin="0,4,0,0"
                        Visibility="Collapsed"/>
-        </Grid>
+        </StackPanel>
 
         <!-- Macros du profil -->
         <Border Grid.Row="1" Background="{StaticResource BackgroundTertiaryBrush}"
                 BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1"
-                CornerRadius="8" Padding="12" Margin="0,0,0,16">
+                CornerRadius="6" Padding="16" Margin="0,0,0,20">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*" MinHeight="200" MaxHeight="380"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*" MinHeight="180" MaxHeight="360"/>
                 </Grid.RowDefinitions>
-                <!-- Ligne : Macros inclus | icône Ajouter | icône Retirer | (espace) | Recherche -->
-                <Grid Grid.Row="0" Margin="0,0,0,8">
+                <TextBlock Grid.Row="0" Text="Macros inclus" Style="{StaticResource TextSubheading}"
+                           Margin="0,0,0,12"/>
+                <!-- Barre d'outils : Ajouter, Retirer, Recherche -->
+                <Grid Grid.Row="1" Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Macros inclus" Style="{StaticResource TextSubheading}"
-                               VerticalAlignment="Center" Margin="0,0,8,0"/>
-                    <Button Grid.Column="1" Style="{StaticResource ButtonGhost}" Click="AddMacro_Click"
-                            Padding="8,6" MinWidth="36" Width="36" ToolTip="Ajouter une macro">
+                    <Button Grid.Column="0" Style="{StaticResource ButtonGhost}" Click="AddMacro_Click"
+                            Padding="8,6" MinWidth="32" Width="32" ToolTip="Ajouter une macro">
                         <TextBlock Text="&#xE081;" FontFamily="{StaticResource FontLucide}" FontSize="14"
                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                     </Button>
-                    <Button Grid.Column="2" Style="{StaticResource ButtonGhost}" Click="RemoveMacro_Click"
-                            Padding="8,6" MinWidth="36" Width="36" ToolTip="Retirer la sélection">
+                    <Button Grid.Column="1" Style="{StaticResource ButtonGhost}" Click="RemoveMacro_Click"
+                            Padding="8,6" MinWidth="32" Width="32" Margin="4,0,0,0" ToolTip="Retirer la sélection">
                         <TextBlock Text="&#xE18E;" FontFamily="{StaticResource FontLucide}" FontSize="14"
                                    Foreground="{StaticResource TextPrimaryBrush}"/>
                     </Button>
-                    <!-- Recherche à droite, sans décalage : cadre gris, pas de pourpre -->
-                    <Border Grid.Column="4" HorizontalAlignment="Right" VerticalAlignment="Center"
-                            Background="#1E1B22" BorderBrush="#2D2934" BorderThickness="1"
-                            CornerRadius="4" Padding="8,6" MinWidth="160" Width="160">
+                    <Border Grid.Column="3" VerticalAlignment="Center"
+                            Background="{StaticResource BackgroundPrimaryBrush}"
+                            BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1"
+                            CornerRadius="4" Padding="8,6" MinWidth="140">
                         <Grid>
                             <TextBlock x:Name="MacroSearchPlaceholder" Text="Rechercher..."
-                                       Foreground="#9CA3AF" FontSize="12"
+                                       Foreground="{StaticResource TextMutedBrush}" FontSize="12"
                                        IsHitTestVisible="False" VerticalAlignment="Center"/>
                             <TextBox x:Name="MacroSearchTextBox" Background="Transparent" BorderThickness="0"
-                                     Foreground="White" CaretBrush="White" Padding="0"
-                                     VerticalContentAlignment="Center"
+                                     Foreground="{StaticResource TextPrimaryBrush}" CaretBrush="{StaticResource TextPrimaryBrush}"
+                                     Padding="0" VerticalContentAlignment="Center"
                                      TextChanged="MacroSearchTextBox_TextChanged"
                                      Style="{StaticResource MacroSearchTextBoxStyle}"/>
                         </Grid>
                     </Border>
                 </Grid>
-                <ListBox x:Name="ProfileMacrosListBox" Grid.Row="1" Background="Transparent" BorderThickness="0"
-                         SelectionMode="Multiple" Margin="0,0,0,0" Padding="0"
+                <ListBox x:Name="ProfileMacrosListBox" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                         SelectionMode="Multiple" Padding="0"
                          ScrollViewer.VerticalScrollBarVisibility="Auto"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.CanContentScroll="False"
@@ -103,9 +93,8 @@
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel Orientation="Horizontal"
-                                       ItemWidth="212" ItemHeight="42"
-                                       Margin="17,0,0,0"
-                                       HorizontalAlignment="Center"/>
+                                       ItemWidth="200" ItemHeight="40"
+                                       Margin="0,0,8,8"/>
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                     <ListBox.ItemContainerStyle>
@@ -129,9 +118,8 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Border Padding="4,1" Margin="0,0,12,7" Background="{StaticResource BackgroundPrimaryBrush}"
-                                    CornerRadius="3" BorderThickness="1"
-                                    HorizontalAlignment="Stretch" Height="35">
+                            <Border Padding="10,8" Margin="0,0,8,8" Background="{StaticResource BackgroundPrimaryBrush}"
+                                    CornerRadius="4" BorderThickness="1">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
@@ -142,10 +130,10 @@
                                         </Style.Triggers>
                                     </Style>
                                 </Border.Style>
-                                <TextBlock Text="{Binding Name}" FontSize="12"
+                                <TextBlock Text="{Binding Name}" FontSize="13"
                                            Foreground="{StaticResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                           VerticalAlignment="Center"/>
                             </Border>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -153,16 +141,14 @@
             </Grid>
         </Border>
 
-        <!-- Boutons Sauvegarder / Annuler (action principale à gauche) -->
-        <Border Grid.Row="2" Padding="0,8,0,0" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Content="Sauvegarder" Style="{StaticResource ButtonPrimary}"
-                        Click="SaveProfile_Click" Margin="0,0,8,0" Padding="12,8"
-                        ToolTip="Enregistrer les modifications du profil"/>
-                <Button Content="Annuler" Style="{StaticResource ButtonGhost}"
-                        Click="Cancel_Click" Padding="12,8"
-                        ToolTip="Abandonner les modifications"/>
-            </StackPanel>
-        </Border>
+        <!-- Boutons Annuler / Sauvegarder -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Annuler" Style="{StaticResource ButtonGhost}"
+                    Click="Cancel_Click" Padding="12,8" Margin="0,0,8,0"
+                    ToolTip="Abandonner les modifications"/>
+            <Button Content="Sauvegarder" Style="{StaticResource ButtonPrimary}"
+                    Click="SaveProfile_Click" Padding="12,8"
+                    ToolTip="Enregistrer les modifications du profil"/>
+        </StackPanel>
     </Grid>
 </UserControl>

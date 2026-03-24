@@ -1,0 +1,319 @@
+<Window x:Class="MacroEngine.UI.ImageOnScreenPopoverWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" ResizeMode="NoResize"
+        Background="Transparent" AllowsTransparency="True"
+        ShowInTaskbar="False"
+        Title="Image à l'écran">
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/MacroEngine;component/Themes/Colors.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/MacroEngine;component/Themes/Typography.xaml"/>
+                <ResourceDictionary Source="pack://application:,,,/MacroEngine;component/Themes/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Slider "Sensibilité" : ligne 3px + pouce rouge (comme demandé) -->
+            <Style x:Key="ImageSensSliderStyle" TargetType="Slider">
+                <Setter Property="Height" Value="12"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="IsTabStop" Value="False"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Slider">
+                            <Grid>
+                                <Track x:Name="PART_Track"
+                                       Value="{TemplateBinding Value}"
+                                       Minimum="{TemplateBinding Minimum}"
+                                       Maximum="{TemplateBinding Maximum}">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Background="{StaticResource BorderMediumBrush}"
+                                                       BorderThickness="0"
+                                                       Height="3"/>
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Background="{StaticResource BorderMediumBrush}"
+                                                       BorderThickness="0"
+                                                       Height="3"/>
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Width="12" Height="12" Cursor="Hand">
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb">
+                                                    <Grid Width="12" Height="12">
+                                                        <Ellipse Fill="{StaticResource ErrorBrush}"
+                                                                 Stroke="#66000000"
+                                                                 StrokeThickness="1"/>
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Canvas x:Name="OverlayGrid" Background="#01000000" PreviewMouseDown="OverlayGrid_PreviewMouseDown">
+        <Border x:Name="ContentContainer">
+            <!-- .img-pop -->
+            <Border x:Name="RootBorder" Width="280" Height="340"
+                    Background="{StaticResource BackgroundSecondaryBrush}"
+                    BorderBrush="{StaticResource BorderLightBrush}"
+                    BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect Color="Black" Opacity="0.8" BlurRadius="40" ShadowDepth="16"/>
+                </Border.Effect>
+
+                <StackPanel>
+                    <StackPanel Margin="12,0" VerticalAlignment="Top">
+                        <!-- Preview -->
+                        <Border x:Name="PreviewBorder"
+                                Height="210"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource BorderLightBrush}"
+                                BorderThickness="0,0,0,1"
+                                Margin="0,0,0,6">
+                            <Grid>
+                                <Image x:Name="PreviewImage"
+                                       Stretch="Uniform"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Visibility="Collapsed"
+                                       SnapsToDevicePixels="True"
+                                       RenderOptions.BitmapScalingMode="HighQuality"/>
+                                <Button x:Name="ClearImageButton"
+                                        Width="22" Height="22"
+                                        Cursor="Hand"
+                                        Visibility="Collapsed"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Padding="0"
+                                        ToolTip="Supprimer l'image"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Margin="0,2,-12,0"
+                                        Panel.ZIndex="3"
+                                        MouseEnter="ClearImageButton_MouseEnter"
+                                        MouseLeave="ClearImageButton_MouseLeave"
+                                        Click="ClearImageButton_Click">
+                                    <Button.Style>
+                                        <Style TargetType="Button">
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="BorderBrush" Value="Transparent"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </Button.Style>
+                                    <TextBlock x:Name="ClearImageIcon"
+                                               Text="✕"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextSecondaryBrush}"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Button>
+                                <StackPanel x:Name="PreviewHint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            Visibility="Visible">
+                                    <TextBlock Text="&#xE0F6;" FontFamily="{StaticResource FontLucide}" FontSize="18"
+                                               Foreground="{StaticResource TextPrimaryBrush}" Opacity="0.9"
+                                               HorizontalAlignment="Center" Margin="0,-1,0,0"/>
+                                    <TextBlock Text="Aucune image" Foreground="{StaticResource TextMutedBrush}"
+                                               FontSize="9" HorizontalAlignment="Center" Margin="0,0,0,0"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- Chemin -->
+                        <TextBlock Text="Fichier image" FontSize="9" FontWeight="Bold"
+                                   FontFamily="{StaticResource FontMono}"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   Margin="0,0,0,2"/>
+                        <Grid Margin="0,0,0,10" >
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="PathTextBox"
+                                     Grid.Column="0"
+                                     Style="{StaticResource TextBoxNoCornerRadiusKeepBorder}"
+                                     Background="{StaticResource BackgroundPrimaryBrush}"
+                                     Foreground="{StaticResource TextSecondaryBrush}"
+                                     BorderBrush="{StaticResource BorderLightBrush}"
+                                     FontFamily="{StaticResource FontMono}"
+                                     Padding="4,3,0,3"
+                                     Margin="0"
+                                     MinHeight="22"
+                                     FontSize="11"
+                                     GotKeyboardFocus="PathTextBox_GotKeyboardFocus"
+                                     TextChanged="PathTextBox_TextChanged"
+                                     />
+                            <Button x:Name="BrowseButton" Grid.Column="1"
+                                    Content=""
+                                    Margin="0"
+                                    Width="30" Height="26"
+                                    Cursor="Hand"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="0"
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    ToolTip="Parcourir"
+                                    Click="BrowseButton_Click">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <Button x:Name="PasteButton" Grid.Column="2"
+                                    Content=""
+                                    Margin="-4,0,0,0"
+                                    Width="30" Height="26"
+                                    Cursor="Hand"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="0"
+                                    Foreground="{StaticResource TextSecondaryBrush}"
+                                    HorizontalContentAlignment="Center"
+                                    VerticalContentAlignment="Center"
+                                    ToolTip="Coller"
+                                    Click="PasteButton_Click">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderBrush" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                        </Grid>
+
+                        <!-- Sensibilité -->
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Sensibilité" FontSize="10" FontWeight="Bold"
+                                       FontFamily="{StaticResource FontMono}"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="SensitivityValueTextRight"
+                                       Grid.Column="2"
+                                       Foreground="{StaticResource BlockSiRedBrush}"
+                                       FontSize="11"
+                                       FontWeight="ExtraBold"
+                                       FontFamily="{StaticResource FontMono}"
+                                       VerticalAlignment="Center"
+                                       MinWidth="32"
+                                       TextAlignment="Right"/>
+                            <!-- Slider -->
+                            <Slider x:Name="SensitivitySlider"
+                                    Grid.Column="1"
+                                    Minimum="0" Maximum="100"
+                                    ValueChanged="SensitivitySlider_ValueChanged"
+                                    Style="{StaticResource ImageSensSliderStyle}"
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,8,0"
+                                    />
+                        </Grid>
+
+                        <!-- Zone -->
+                        <TextBlock Margin="0" FontSize="10" FontWeight="Bold"
+                                   FontFamily="{StaticResource FontMono}"
+                                   Foreground="{StaticResource TextMutedBrush}"
+                                   >
+                            Zone de recherche (optionnel)
+                        </TextBlock>
+
+                        <Grid Margin="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="ZoneInfoText" Grid.Column="0"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       FontSize="9"
+                                       FontFamily="{StaticResource FontMono}"
+                                       FontStyle="Italic"
+                                       Text="Tout l'écran"
+                                       VerticalAlignment="Center"
+                                       Cursor="Hand"
+                                       ToolTip="Cliquer pour visualiser / définir la zone"
+                                       MouseEnter="ZoneInfoText_MouseEnter"
+                                       MouseLeave="ZoneInfoText_MouseLeave"
+                                       MouseLeftButtonDown="ZoneInfoText_MouseLeftButtonDown"/>
+                            <Button x:Name="ZonePickButton" Grid.Column="1"
+                                    Width="34" Height="26"
+                                    Margin="10,0,0,0"
+                                    Cursor="Hand"
+                                    Click="ZonePickButton_Click"
+                                    ToolTip="Sélectionner la zone"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="0"
+                                    MouseEnter="ZonePickButton_MouseEnter"
+                                    MouseLeave="ZonePickButton_MouseLeave">
+                                <Button.Style>
+                                    <Style TargetType="Button">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="Button">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </Button.Style>
+                                <TextBlock x:Name="ZonePickIcon"
+                                           Text="&#xE509;"
+                                           FontSize="14"
+                                           FontFamily="{StaticResource FontLucide}"
+                                           Foreground="{StaticResource TextSecondaryBrush}"
+                                           Margin="0,-1,0,0"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Button>
+                        </Grid>
+
+                        <!-- Zone clear (croix) supprimé : on garde juste l'information/zone -->
+                    </StackPanel>
+
+                    <!-- Footer supprimé : fermeture = appliquer (x / clic extérieur) -->
+                </StackPanel>
+            </Border>
+        </Border>
+    </Canvas>
+</Window>
+

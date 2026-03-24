@@ -1,16 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using MacroEngine.Core.Inputs;
 using MacroEngine.Core.Models;
 using MacroEngine.Core.Hooks;
+using MacroEngine.Core.Processes;
 using MacroEngine.Core.Storage;
 
 namespace MacroEngine.UI
@@ -171,7 +176,7 @@ namespace MacroEngine.UI
             var host = button.Template.FindName("iconHost", button) as FrameworkElement;
             if (host?.RenderTransform is not RotateTransform rt) return;
             var sb = new Storyboard();
-            var anim = new DoubleAnimation(0, angleDegrees, TimeSpan.FromMilliseconds(800))
+            var anim = new DoubleAnimation(0, angleDegrees, TimeSpan.FromMilliseconds(280))
             {
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             };
@@ -196,61 +201,174 @@ namespace MacroEngine.UI
         public void LoadMacro(Macro? macro)
         {
             _currentMacro = macro;
-            RefreshBlocks();
-            UpdateMacroEnableToggle();
-            
-            // Réinitialiser l'historique
             _undoStack.Clear();
             _redoStack.Clear();
-            SaveState();
             UpdateUndoRedoButtons();
+
+            // RefreshBlocks d’abord ; cloner les actions pour undo seulement une fois l’UI construite
+            // (évite un pic CPU UI sur le thread de rendu au moment du clic sur une autre macro).
+            RefreshBlocks(() =>
+            {
+                if (_currentMacro == null || _isUndoRedo)
+                    return;
+                var state = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+                _undoStack.Push(state);
+                TrimUndoStackIfNeeded();
+                _redoStack.Clear();
+                UpdateUndoRedoButtons();
+            });
         }
 
-        /// <summary>
-        /// Rafraîchit l'affichage des actions dans la Timeline
-        /// </summary>
-        public void RefreshBlocks()
+        /// <summary>Génération incrémentée à chaque RefreshBlocks pour annuler un rebuild par lots en cours.</summary>
+        private int _timelineRefreshGeneration;
+
+        /// <summary>Au-delà : reconstruction par petits lots sur plusieurs trames (UI réactive pendant undo/chargement).</summary>
+        private const int TimelineRebuildChunkThreshold = 14;
+
+        private const int TimelineRebuildChunkSize = 5;
+
+        private void ClearTimelineActionBlocks()
         {
-            // Retirer toutes les cartes existantes (sauf EmptyStatePanel)
             var childrenToRemove = TimelineStackPanel.Children.Cast<UIElement>()
                 .Where(c => c != EmptyStatePanel)
                 .ToList();
             
             foreach (var child in childrenToRemove)
-            {
                 TimelineStackPanel.Children.Remove(child);
             }
+
+        /// <summary>Crée le conteneur timeline pour l’action à l’index donné (racine macro).</summary>
+        private FrameworkElement CreateTimelineBlockForActionIndex(int index)
+        {
+            var action = _currentMacro!.Actions[index];
+            if (action is RepeatAction ra)
+                return CreateRepeatActionContainer(ra, index);
+            if (action is IfAction ifAction)
+                return CreateIfActionContainer(ifAction, index);
+            return CreateActionCardWithButtons(action, index);
+        }
+
+        /// <summary>
+        /// Rafraîchit l'affichage des actions dans la Timeline.
+        /// </summary>
+        /// <param name="layoutComplete">Appelé quand tout est affiché (y compris rebuild par lots). Utile pour enchaîner MacroChanged.</param>
+        public void RefreshBlocks(Action? layoutComplete = null)
+        {
+            _timelineRefreshGeneration++;
+            int gen = _timelineRefreshGeneration;
+
+            void CompleteIfCurrent()
+            {
+                if (gen == _timelineRefreshGeneration)
+                    layoutComplete?.Invoke();
+            }
+
+            ClearTimelineActionBlocks();
 
             if (_currentMacro == null || _currentMacro.Actions.Count == 0)
             {
                 EmptyStatePanel.Visibility = Visibility.Visible;
+                CompleteIfCurrent();
                 return;
             }
 
             EmptyStatePanel.Visibility = Visibility.Collapsed;
 
-            // Créer une carte pour chaque action avec les boutons séparés à droite
-            for (int i = 0; i < _currentMacro.Actions.Count; i++)
+            int count = _currentMacro.Actions.Count;
+            if (count <= TimelineRebuildChunkThreshold)
             {
-                var action = _currentMacro.Actions[i];
-                if (action is RepeatAction ra)
+                TimelineStackPanel.BeginInit();
+                try
                 {
-                    // Pour RepeatAction, créer un conteneur avec les actions imbriquées
-                    var repeatContainer = CreateRepeatActionContainer(ra, i);
-                    TimelineStackPanel.Children.Add(repeatContainer);
+                    for (int i = 0; i < count; i++)
+                        TimelineStackPanel.Children.Add(CreateTimelineBlockForActionIndex(i));
                 }
-                else if (action is IfAction ifAction)
+                finally
                 {
-                    // Pour IfAction, créer un conteneur avec les actions imbriquées (Then et Else)
-                    var ifContainer = CreateIfActionContainer(ifAction, i);
-                    TimelineStackPanel.Children.Add(ifContainer);
+                    TimelineStackPanel.EndInit();
                 }
-                else
-                {
-                    var actionContainer = CreateActionCardWithButtons(action, i);
-                    TimelineStackPanel.Children.Add(actionContainer);
-                }
+
+                CompleteIfCurrent();
+                return;
             }
+
+            // Macros longues : plusieurs trames pour garder la fenêtre interactive (undo/redo, premier chargement).
+            int idx = 0;
+            void Step()
+            {
+                if (gen != _timelineRefreshGeneration)
+                    return;
+
+                int end = Math.Min(idx + TimelineRebuildChunkSize, count);
+                TimelineStackPanel.BeginInit();
+                try
+                {
+                    for (; idx < end; idx++)
+                        TimelineStackPanel.Children.Add(CreateTimelineBlockForActionIndex(idx));
+                }
+                finally
+                {
+                    TimelineStackPanel.EndInit();
+                }
+
+                if (idx >= count)
+                    CompleteIfCurrent();
+                else
+                    Dispatcher.BeginInvoke((Action)Step, System.Windows.Threading.DispatcherPriority.Background);
+            }
+
+            Step();
+        }
+
+        /// <summary>Nombre de conteneurs d’actions affichés (hors panneau vide).</summary>
+        private int CountDisplayedTimelineBlocks()
+        {
+            return TimelineStackPanel.Children.Cast<UIElement>().Count(c => c != EmptyStatePanel);
+        }
+
+        /// <summary>
+        /// Après modification de <see cref="Macro.Actions"/> depuis l’extérieur (barre du haut, etc.) :
+        /// append O(1) si une seule action a été ajoutée en fin, sinon reconstruction complète.
+        /// Met à jour l’historique annuler/refaire.
+        /// </summary>
+        public void RefreshAfterExternalMutation()
+        {
+            if (_currentMacro == null)
+            {
+                RefreshBlocks();
+                return;
+            }
+
+            int n = _currentMacro.Actions.Count;
+            int uiBlocks = CountDisplayedTimelineBlocks();
+
+            if (n == 0)
+            {
+                RefreshBlocks();
+                return;
+            }
+
+            // Exactement une action de plus que l’affichage actuel → ajout en fin (cas barre du haut)
+            if (n == uiBlocks + 1)
+            {
+                AppendBlockAtEnd();
+                return;
+            }
+
+            // Déjà aligné (ex. double planification)
+            if (n == uiBlocks)
+                return;
+
+            RefreshBlocks();
+        }
+
+        /// <summary>
+        /// À appeler <b>avant</b> de modifier <see cref="Macro.Actions"/> depuis l’extérieur (barre du haut, presets),
+        /// pour que Annuler restaure l’état d’avant la modification (même logique que SaveState avant Add dans la timeline).
+        /// </summary>
+        public void PrepareUndoForExternalMutation()
+        {
+            SaveState();
         }
 
         /// <summary>
@@ -261,49 +379,44 @@ namespace MacroEngine.UI
         {
             if (_currentMacro == null || _currentMacro.Actions.Count == 0) return;
             var index = _currentMacro.Actions.Count - 1;
-            var action = _currentMacro.Actions[index];
             EmptyStatePanel.Visibility = Visibility.Collapsed;
-            FrameworkElement container;
-            if (action is RepeatAction ra)
-                container = CreateRepeatActionContainer(ra, index);
-            else if (action is IfAction ifAction)
-                container = CreateIfActionContainer(ifAction, index);
-            else
-                container = CreateActionCardWithButtons(action, index);
-            TimelineStackPanel.Children.Add(container);
+            TimelineStackPanel.Children.Add(CreateTimelineBlockForActionIndex(index));
         }
 
         /// <summary>
-        /// Crée un conteneur avec la carte d'action et les boutons monter/descendre séparés à droite
+        /// Crée un conteneur avec le numéro d'étape, la carte d'action et les boutons monter/descendre (style step card).
         /// </summary>
         private FrameworkElement CreateActionCardWithButtons(IInputAction action, int index)
         {
-            // Conteneur horizontal pour la carte et les boutons - largeur fixe pour toutes les actions
-            // Utiliser un Grid pour un meilleur contrôle de la largeur
             var container = new Grid
             {
                 VerticalAlignment = VerticalAlignment.Stretch,
-                HorizontalAlignment = HorizontalAlignment.Stretch, // S'étend pour prendre toute la largeur
-                Margin = new Thickness(0, 0, 0, 2),
-                MinWidth = 400 // Largeur minimale pour toutes les actions
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 4),
+                MinWidth = 400
             };
-            
-            // Définir les colonnes : carte prend tout l'espace disponible, boutons ont une largeur fixe
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Carte - prend tout l'espace disponible
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Boutons monter/descendre - largeur automatique
-            
-            // Créer la carte d'action (sans les boutons monter/descendre)
+
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });   // Numéro étape (01, 02…)
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var stepNumberText = new TextBlock
+            {
+                Text = (index + 1).ToString("D2"),
+                FontSize = 10,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xA0, 0x20)),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 12, 0)
+            };
+            stepNumberText.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+            Grid.SetColumn(stepNumberText, 0);
+            container.Children.Add(stepNumberText);
+
             var card = CreateActionCard(action, index);
-            card.HorizontalAlignment = HorizontalAlignment.Stretch; // S'étend pour prendre toute la largeur de sa colonne
-            
-            // Créer le conteneur des boutons monter/descendre séparé à droite
-            var buttonsContainer = CreateMoveButtonsContainer(action, index);
-            
-            Grid.SetColumn(card, 0);
-            Grid.SetColumn(buttonsContainer, 1);
-            
+            card.HorizontalAlignment = HorizontalAlignment.Stretch;
+            Grid.SetColumn(card, 1);
             container.Children.Add(card);
-            container.Children.Add(buttonsContainer);
             
             return container;
         }
@@ -334,21 +447,85 @@ namespace MacroEngine.UI
             scale.BeginAnimation(ScaleTransform.ScaleYProperty, anim);
         }
 
+        /// <summary>Retourne le libellé court du type d'action pour la zone type (style step card).</summary>
+        private static string GetActionTypeLabel(IInputAction action)
+        {
+            return action switch
+            {
+                KeyboardAction => "TOUCHE",
+                Core.Inputs.MouseAction => "CLIC",
+                DelayAction => "DÉLAI",
+                TextAction => "TEXTE",
+                VariableAction => "VAR",
+                IfAction => "SI",
+                RepeatAction => "RÉPÉTER",
+                _ => "ACTION"
+            };
+        }
+
+        /// <summary>Segments (label, value) pour l'affichage type maquette (ACTION, X, Y, DURÉE, etc.).</summary>
+        private List<(string Label, string Value)> GetActionDisplaySegments(IInputAction action, string title, string details)
+        {
+            var list = new List<(string, string)>();
+            switch (action)
+            {
+                case Core.Inputs.MouseAction ma:
+                    list.Add(("ACTION", title));
+                    if (ma.X >= 0 && ma.Y >= 0) { list.Add(("X", ma.X.ToString())); list.Add(("Y", ma.Y.ToString())); }
+                    list.Add(("", details));
+                    break;
+                case DelayAction da:
+                    list.Add(("DURÉE", da.GetDurationInUnit(da.Unit).ToString("0")));
+                    list.Add(("UNITÉ", da.Unit == Core.Inputs.TimeUnit.Milliseconds ? "ms" : da.Unit == Core.Inputs.TimeUnit.Seconds ? "s" : "min"));
+                    if (da.IsRandom && da.MinDuration != da.MaxDuration)
+                        list.Add(("ALÉATOIRE", $"+{Math.Abs(da.MaxDuration - da.MinDuration)}ms"));
+                    list.Add(("", details));
+                    break;
+                case KeyboardAction ka:
+                    list.Add(("TOUCHE", title));
+                    list.Add(("", details));
+                    break;
+                case VariableAction va:
+                    list.Add(("VARIABLE", va.VariableName ?? "?"));
+                    var opText = va.Operation switch
+                    {
+                        Core.Inputs.VariableOperation.Set => "=",
+                        Core.Inputs.VariableOperation.Increment => "+= 1",
+                        Core.Inputs.VariableOperation.Decrement => "-= 1",
+                        Core.Inputs.VariableOperation.Toggle => "toggle",
+                        Core.Inputs.VariableOperation.EvaluateExpression => "expr",
+                        _ => "="
+                    };
+                    list.Add(("OPÉRATION", opText));
+                    list.Add(("", details));
+                    break;
+                case TextAction ta:
+                    list.Add(("TEXTE", string.IsNullOrEmpty(ta.Text) ? "" : (ta.Text.Length > 20 ? ta.Text.Substring(0, 20) + "…" : ta.Text)));
+                    list.Add(("", details));
+                    break;
+                default:
+                    list.Add(("", title));
+                    if (!string.IsNullOrEmpty(details)) list.Add(("", details));
+                    break;
+            }
+            return list;
+        }
+
         /// <summary>
-        /// Crée une carte d'action pour la Timeline (style Timeline compact et professionnel).
+        /// Crée une carte d'action pour la Timeline (style step card : fond #0D0F0D, zone type 72px, bordure #262D26).
         /// Si nestedRepeatInfo ou nestedIfInfo est fourni, la croix supprime l'action imbriquée uniquement, pas le bloc parent.
         /// </summary>
         private FrameworkElement CreateActionCard(IInputAction action, int index, NestedActionInfo? nestedRepeatInfo = null, NestedIfActionInfo? nestedIfInfo = null)
         {
-            // Couleurs de la palette sombre
-            Color bgBase = GetThemeColor("BackgroundTertiaryColor");       // #2D2934 Fond tertiaire
-            Color bgSecondary = GetThemeColor("BackgroundSecondaryColor"); // #25222B Fond secondaire
-            Color textMuted = GetThemeColor("TextMutedColor");             // #8A8794 Texte muted
+            // Palette step card v2 (--bg1, --bg2, --line2, --text3)
+            var bgCard = Color.FromRgb(0x0D, 0x0F, 0x0D);   // --bg1
+            var bgTypeZone = Color.FromRgb(0x11, 0x13, 0x11);   // --bg2
+            var borderCard = Color.FromRgb(0x5A, 0x5D, 0x5A);   // #5A5D5A (actions clic/délai/touche/variable/texte)
+            var textMuted = Color.FromRgb(0x4A, 0x5A, 0x4A);   // --text3
             
             // Couleur principale de l'action (accent)
             Color primaryColor;
             Color hoverColor;
-            string icon;
             string title;
             string details;
             
@@ -356,283 +533,575 @@ namespace MacroEngine.UI
             switch (action)
             {
                 case KeyboardAction ka:
-                    primaryColor = Color.FromRgb(79, 163, 209);   // #4FA3D1 Bleu froid
-                    hoverColor = Color.FromRgb(99, 183, 229);     // Plus clair au hover
-                    icon = LucideIcons.Keyboard;
+                    primaryColor = Color.FromRgb(52, 200, 184);   // #34C8B8
+                    hoverColor = Color.FromRgb(82, 220, 204);
                     title = GetKeyboardActionTitle(ka);
                     details = GetKeyboardActionDetails(ka);
                     break;
                 case Core.Inputs.MouseAction ma:
-                    primaryColor = Color.FromRgb(79, 181, 140);   // #4FB58C Vert technique
-                    hoverColor = Color.FromRgb(99, 201, 160);
-                    icon = LucideIcons.Mouse;
+                    primaryColor = Color.FromRgb(52, 200, 184);   // #34C8B8
+                    hoverColor = Color.FromRgb(82, 220, 204);
                     title = GetMouseActionTitle(ma);
                     details = GetMouseActionDetails(ma);
                     break;
                 case DelayAction da:
-                    primaryColor = Color.FromRgb(201, 122, 58);   // #C97A3A Orange timing
-                    hoverColor = Color.FromRgb(221, 142, 78);
-                    icon = LucideIcons.Timer;
+                    primaryColor = Color.FromRgb(232, 160, 32);   // #E8A020
+                    hoverColor = Color.FromRgb(240, 184, 64);
                     title = GetDelayActionTitle(da);
                     details = "Pause";
                     break;
                 case RepeatAction ra:
-                    primaryColor = Color.FromRgb(138, 108, 209);   // #8A6CD1 Violet logique
-                    hoverColor = Color.FromRgb(158, 128, 229);
-                    icon = LucideIcons.Repeat;
+                    primaryColor = Color.FromRgb(57, 217, 122);   // #39D97A
+                    hoverColor = Color.FromRgb(77, 237, 142);
                     var actionsCount = ra.Actions?.Count ?? 0;
                     title = GetRepeatActionTitle(ra);
                     details = $"{actionsCount} action{(actionsCount > 1 ? "s" : "")}";
                     break;
                 case IfAction ifAction:
-                    primaryColor = Color.FromRgb(201, 74, 74);     // #C94A4A Rouge décisionnel
-                    hoverColor = Color.FromRgb(221, 94, 94);
-                    icon = LucideIcons.HelpCircle;
-                    var thenCount = ifAction.ThenActions?.Count ?? 0;
-                    var elseCount = ifAction.ElseActions?.Count ?? 0;
+                    primaryColor = Color.FromRgb(232, 64, 64);    // #E84040
+                    hoverColor = Color.FromRgb(252, 84, 84);
                     title = GetIfActionTitle(ifAction);
-                    details = $"Then: {thenCount}, Else: {elseCount}";
+                    details = "";
                     break;
                 case TextAction ta:
-                    primaryColor = Color.FromRgb(224, 177, 90);     // #E0B15A Jaune chaud
-                    hoverColor = Color.FromRgb(244, 197, 110);
-                    icon = LucideIcons.FileText;
+                    primaryColor = Color.FromRgb(0x4A, 0x5A, 0x4A);
+                    hoverColor = Color.FromRgb(0x6A, 0x7A, 0x6A);
                     title = GetTextActionTitle(ta);
                     details = GetTextActionDetails(ta);
                     break;
                 case VariableAction va:
-                    primaryColor = Color.FromRgb(90, 163, 163);    // #5AA3A3 Cyan data
-                    hoverColor = Color.FromRgb(110, 183, 183);
-                    icon = LucideIcons.Box;
+                    primaryColor = Color.FromRgb(167, 139, 250);   // #A78BFA
+                    hoverColor = Color.FromRgb(187, 159, 255);
                     title = GetVariableActionTitle(va);
                     details = GetVariableActionDetails(va);
                     break;
                 default:
-                    primaryColor = Color.FromRgb(122, 30, 58);    // #7A1E3A Pourpre signature
-                    hoverColor = Color.FromRgb(142, 50, 78);
-                    icon = LucideIcons.HelpCircle;
+                    primaryColor = Color.FromRgb(0x7A, 0x92, 0x7A);
+                    hoverColor = Color.FromRgb(0x9A, 0xB2, 0x9A);
                     title = action.Type.ToString();
                     details = "";
                     break;
             }
 
-            // Le texte et l'icône sont en blanc pour une meilleure lisibilité
-            Color textColor = Color.FromRgb(230, 228, 234); // #E6E4EA Texte principal clair
-            Color iconColor = Color.FromRgb(255, 255, 255); // Blanc pur
-
-            // Fond gris violacé avec gradient depuis le bas-gauche vers haut-droite
-            var gradientBrush = new LinearGradientBrush
+            string typeLabel = GetActionTypeLabel(action);
+            var brushCard = new SolidColorBrush(bgCard);
+            var brushCardHover = new SolidColorBrush(Color.FromRgb(0x11, 0x13, 0x11));   // --bg2 au hover
+            var brushBorder = new SolidColorBrush(borderCard);
+            var brushBorderHover = new SolidColorBrush(primaryColor);
+            if (action is RepeatAction)
             {
-                StartPoint = new Point(0, 1),    // Bas-gauche
-                EndPoint = new Point(1, 0),       // Haut-droite
-                GradientStops = new GradientStopCollection
-                {
-                    new GradientStop(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B), 0.0),
-                    new GradientStop(bgBase, 0.35),
-                    new GradientStop(bgBase, 1.0)
-                }
-            };
-            
-            var gradientBrushHover = new LinearGradientBrush
+                brushCard = new SolidColorBrush(Color.FromArgb(13, 57, 217, 122));   // vert transparent ~5%
+                brushBorder = new SolidColorBrush(Color.FromArgb(0x59, 57, 217, 122)); // bordure vert ~35%
+                brushCardHover = brushCard; // pas de changement de background au hover pour Répéter
+            }
+            if (action is IfAction)
             {
-                StartPoint = new Point(0, 1),    // Bas-gauche
-                EndPoint = new Point(1, 0),       // Haut-droite
-                GradientStops = new GradientStopCollection
-                {
-                    new GradientStop(Color.FromArgb(120, hoverColor.R, hoverColor.G, hoverColor.B), 0.0),
-                    new GradientStop(bgSecondary, 0.4),
-                    new GradientStop(bgSecondary, 1.0)
-                }
-            };
+                brushCard = new SolidColorBrush(Color.FromArgb(13, 232, 64, 64));   // rouge #e84040 transparent ~5%
+                brushBorder = new SolidColorBrush(Color.FromArgb(0x59, 232, 64, 64)); // bordure rouge ~35%
+                brushCardHover = brushCard; // pas de changement au hover pour Si
+            }
 
-            // Carte Timeline avec fond gradient - compacte et professionnelle
             var card = new Border
             {
-                Background = gradientBrush,
-                BorderBrush = new SolidColorBrush(Color.FromArgb(50, primaryColor.R, primaryColor.G, primaryColor.B)),
-                BorderThickness = new Thickness(1, 1, 1, 1),
-                Padding = new Thickness(8, 4, 8, 4),
-                Margin = new Thickness(0, 0, 0, 2),
+                Background = brushCard,
+                BorderBrush = brushBorder,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(0),
+                Margin = new Thickness(0, 0, 0, 4),
                 Cursor = Cursors.Hand,
                 RenderTransform = new ScaleTransform(1, 1),
                 RenderTransformOrigin = new Point(0.5, 0.5),
                 Tag = index,
-                MinHeight = 36,
-                MaxHeight = 42,
+                MinHeight = 48,
+                MaxHeight = 48,
                 MinWidth = 400,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
-                CornerRadius = new CornerRadius(2),
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    Color = Colors.Black,
-                    Opacity = 0.25,
-                    BlurRadius = 6,
-                    ShadowDepth = 2,
-                    Direction = 270
-                }
+                CornerRadius = new CornerRadius(0)
             };
 
-            // Contenu horizontal avec style enrichi
             var contentGrid = new Grid();
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(5) }); // Barre colorée gauche
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge icône
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); // Texte
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Badge info optionnel
-            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) }); // Croix supprimer à droite
+            contentGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(48) });
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength((action is RepeatAction || action is IfAction) ? 0 : 72) });
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            contentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // Barre colorée à gauche (timeline) - accent vif
-            var timelineBar = new Border
+            // .step-type v2 : width 72, bg2, border-right même couleur que carte (#5A5D5A)
+            var typeZone = new Border
             {
-                Background = new SolidColorBrush(primaryColor),
-                Width = 3,
-                Margin = new Thickness(0, 1, 8, 1),
-                VerticalAlignment = VerticalAlignment.Stretch,
-                CornerRadius = new CornerRadius(0),
-                Effect = new System.Windows.Media.Effects.DropShadowEffect
-                {
-                    Color = primaryColor,
-                    Opacity = 0.6,
-                    BlurRadius = 6,
-                    ShadowDepth = 0,
-                    Direction = 0
-                }
-            };
-            Grid.SetColumn(timelineBar, 0);
-            contentGrid.Children.Add(timelineBar);
-
-            // Badge icône avec fond sombre et bordure colorée
-            var iconBadge = new Border
-            {
-                Background = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B)),
-                CornerRadius = new CornerRadius(2),
-                Padding = new Thickness(5, 3, 5, 3),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B)),
-                MinWidth = 26,
-                MinHeight = 26
-            };
-            
-            var iconBlock = new TextBlock
-            {
-                Text = icon,
-                FontSize = 12,
-                Foreground = new SolidColorBrush(iconColor),
-                VerticalAlignment = VerticalAlignment.Center,
+                Width = (action is RepeatAction || action is IfAction) ? 0 : 72,
+                Background = new SolidColorBrush(Color.FromRgb(0x11, 0x13, 0x11)),   // --bg2
+                BorderBrush = brushBorder,
+                BorderThickness = new Thickness(0, 0, 1, 0),
+                Padding = new Thickness(10, 10, 10, 10),
                 HorizontalAlignment = HorizontalAlignment.Center,
-                FontWeight = FontWeights.Medium
+                VerticalAlignment = VerticalAlignment.Center
             };
-            iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
-            iconBadge.Child = iconBlock;
-            Grid.SetColumn(iconBadge, 1);
-            contentGrid.Children.Add(iconBadge);
-
-            // Texte (titre + détails sur une seule ligne)
-            var textPanel = new StackPanel
+            var typeBadge = new Border
             {
-                Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
+                Background = new SolidColorBrush(Color.FromArgb(0x0A, primaryColor.R, primaryColor.G, primaryColor.B)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(0x52, primaryColor.R, primaryColor.G, primaryColor.B)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(7, 6, 7, 6),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
             };
+            var typeLabelBlock = new TextBlock
+            {
+                Text = typeLabel,
+                FontSize = 11,
+                FontWeight = FontWeights.ExtraBold,   // 800 = ExtraBold
+                Foreground = new SolidColorBrush(primaryColor),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            typeLabelBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+            if (action is RepeatAction || action is IfAction)
+            {
+                typeLabelBlock.Text = "";
+                typeZone.Visibility = Visibility.Collapsed;
+            }
+            typeBadge.Child = typeLabelBlock;
+            typeZone.Child = typeBadge;
+            Grid.SetColumn(typeZone, 0);
+            contentGrid.Children.Add(typeZone);
 
-            // Titre principal avec la couleur de l'action
+            // Contenu en segments : centré verticalement dans la ligne 48px
+            var segments = GetActionDisplaySegments(action, title, details);
+            var contentPanel = new Grid
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            contentPanel.UseLayoutRounding = true;
+            contentPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            for (int c = 0; c < segments.Count; c++)
+                contentPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             var titleBlock = new TextBlock
             {
                 Text = title,
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(textColor),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                FontFamily = new FontFamily("Segoe UI Semibold")
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(primaryColor),
+                VerticalAlignment = VerticalAlignment.Center
             };
-            textPanel.Children.Add(titleBlock);
-
-            // Détails avec badge optionnel
-            TextBlock? detailsBlock = null;
-            Border? detailsBadge = null;
-            
-            if (!string.IsNullOrEmpty(details))
+            titleBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontPrimary");
+            var firstSegmentContent = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch };
+            firstSegmentContent.Children.Add(titleBlock);
+            var lineBrush = new SolidColorBrush(borderCard);
+            TextBox? delayDurationTextBox = null;
+            for (int si = 0; si < segments.Count; si++)
             {
-                // Badge pour les détails avec fond sombre
-                detailsBadge = new Border
+                var (segLabel, segValue) = segments[si];
+                var segBorder = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B)),
-                    CornerRadius = new CornerRadius(1),
-                    Padding = new Thickness(5, 1, 5, 1),
+                    BorderBrush = si < segments.Count - 1 ? lineBrush : Brushes.Transparent,
+                    BorderThickness = new Thickness(0, 0, si < segments.Count - 1 ? 1 : 0, 0),
+                    Padding = (si == 1 && action is DelayAction) ? new Thickness(0, 0, 0, 0) : new Thickness(10, 10, 14, 10),
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 0, 0),
-                    BorderThickness = new Thickness(1),
-                    BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B))
+                    Effect = null
                 };
-                
-                detailsBlock = new TextBlock
+                if (si == 0 && (action is RepeatAction || action is IfAction))
                 {
-                    Text = details,
-                    FontSize = 11,
+                    segBorder.BorderThickness = new Thickness(3, 0, 0, 0);
+                    segBorder.BorderBrush = new SolidColorBrush(primaryColor);
+                    segBorder.Padding = new Thickness(10, 12, 14, 12);
+                }
+                RenderOptions.SetEdgeMode(segBorder, EdgeMode.Aliased);
+                var segStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                bool isDelayFirstSegment = si == 0 && action is DelayAction;
+                bool isDelayUnitSegment = si == 1 && action is DelayAction;
+                if (!string.IsNullOrEmpty(segLabel) && !isDelayFirstSegment && !isDelayUnitSegment)
+                {
+                    var lbl = new TextBlock
+                    {
+                        Text = segLabel,
+                        FontSize = 8,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = new SolidColorBrush(textMuted)
+                    };
+                    lbl.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                    segStack.Children.Add(lbl);
+                }
+                if (si == 0)
+                {
+                    if (action is DelayAction da)
+                    {
+                        // DURÉE comme X/Y : label au-dessus, TextBox en dessous (même structure que coordonnées)
+                        segStack.Orientation = Orientation.Vertical;
+                        segStack.HorizontalAlignment = HorizontalAlignment.Left;
+                        segStack.VerticalAlignment = VerticalAlignment.Center;
+                        var delayLbl = new TextBlock
+                        {
+                            Text = "DURÉE",
+                            FontSize = 8,
+                            FontWeight = FontWeights.Bold,
                     Foreground = new SolidColorBrush(textMuted),
+                            Margin = new Thickness(0, 0, 0, 1)
+                        };
+                        delayLbl.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                        segStack.Children.Add(delayLbl);
+                        var delayAccent = Color.FromRgb(201, 122, 58);
+                        var durationTextBox = new TextBox
+                        {
+                            Text = da.GetDurationInUnit(da.Unit).ToString("0.##"),
+                            Width = 72,
+                            MinWidth = 56,
+                            FontSize = 16,
+                            FontWeight = FontWeights.Bold,
+                            Foreground = new SolidColorBrush(delayAccent),
+                            Background = Brushes.Transparent,
+                            BorderBrush = Brushes.Transparent,
+                            BorderThickness = new Thickness(0),
+                            Padding = new Thickness(0),
+                            TextAlignment = TextAlignment.Left,
                     VerticalAlignment = VerticalAlignment.Center,
-                    FontWeight = FontWeights.Regular,
-                    FontFamily = new FontFamily("Segoe UI")
-                };
-                detailsBadge.Child = detailsBlock;
-                
-                textPanel.Children.Add(detailsBadge);
-            }
-
-            Grid.SetColumn(textPanel, 2);
-            contentGrid.Children.Add(textPanel);
-
-            // Badge numéro
-            var infoBadge = new Border
-            {
-                Background = new SolidColorBrush(Color.FromArgb(20, primaryColor.R, primaryColor.G, primaryColor.B)),
-                CornerRadius = new CornerRadius(2),
-                Padding = new Thickness(4, 1, 4, 1),
+                            VerticalContentAlignment = VerticalAlignment.Center,
+                            CaretBrush = new SolidColorBrush(delayAccent),
+                            Margin = new Thickness(-4, 0, 0, 0),
+                            Visibility = (da.IsRandom || da.UseVariableDelay) ? Visibility.Collapsed : Visibility.Visible
+                        };
+                        durationTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontDisplay");
+                        durationTextBox.TextChanged += (s, e) =>
+                        {
+                            if (TryParseDouble(durationTextBox.Text, out double value) && value >= 0)
+                            {
+                                SaveState();
+                                da.SetDurationFromUnit(value, da.Unit);
+                                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                            }
+                        };
+                        durationTextBox.LostFocus += (s, e) =>
+                        {
+                            if (!TryParseDouble(durationTextBox.Text, out double value) || value < 0)
+                                durationTextBox.Text = da.GetDurationInUnit(da.Unit).ToString("0.##");
+                            else RefreshBlocks();
+                        };
+                        durationTextBox.PreviewKeyDown += (s, e) => { if (e.Key == Key.Enter) { (s as TextBox)?.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)); e.Handled = true; } };
+                        segStack.Children.Add(durationTextBox);
+                        delayDurationTextBox = durationTextBox;
+                        segBorder.Cursor = Cursors.IBeam;
+                        segBorder.PreviewMouseLeftButtonDown += (s, e) =>
+                        {
+                            var current = e.OriginalSource as DependencyObject;
+                            var isClickOnTextBox = false;
+                            while (current != null)
+                            {
+                                if (current == durationTextBox) { isClickOnTextBox = true; break; }
+                                current = VisualTreeHelper.GetParent(current);
+                            }
+                            if (!isClickOnTextBox)
+                            {
+                                durationTextBox.Focus();
+                                durationTextBox.SelectionStart = durationTextBox.Text.Length;
+                                durationTextBox.SelectionLength = 0;
+                                e.Handled = true;
+                            }
+                        };
+                    }
+                    else
+                    {
+                        segStack.Children.Add(firstSegmentContent);
+                    }
+                }
+                else if (si == 1 && action is DelayAction da && delayDurationTextBox != null)
+                {
+                    var delayAccent = Color.FromRgb(201, 122, 58);
+                    // Ligne pleine hauteur comme les autres : segBorder sans padding, Grid [contenu avec padding | ligne Stretch]
+                    var unitCellStack = new StackPanel
+                    {
+                        Orientation = Orientation.Vertical,
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    var unitLbl = new TextBlock
+                    {
+                        Text = "UNITÉ",
+                        FontSize = 8,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = new SolidColorBrush(textMuted),
+                        Margin = new Thickness(0, 0, 0, 1)
+                    };
+                    unitLbl.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                    unitCellStack.Children.Add(unitLbl);
+                    var unitComboBox = new ComboBox
+                    {
+                        MinWidth = 56,
+                        Width = 72,
+                        FontSize = 16,
+                        FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 8, 0),
-                BorderThickness = new Thickness(1),
-                BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B)),
-                Visibility = Visibility.Collapsed,
-                MinWidth = 24,
+                        VerticalContentAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        HorizontalContentAlignment = HorizontalAlignment.Left,
+                        Margin = new Thickness(0, 0, 0, 0),
+                        Padding = new Thickness(0, 0, 0, 0)
+                    };
+                    unitComboBox.Items.Add("ms");
+                    unitComboBox.Items.Add("s");
+                    unitComboBox.Items.Add("min");
+                    unitComboBox.SelectedIndex = da.Unit switch
+                    {
+                        Core.Inputs.TimeUnit.Milliseconds => 0,
+                        Core.Inputs.TimeUnit.Seconds => 1,
+                        Core.Inputs.TimeUnit.Minutes => 2,
+                        _ => 0
+                    };
+                    unitComboBox.SetResourceReference(ComboBox.FontFamilyProperty, "FontDisplay");
+                    if (Application.Current.TryFindResource("ComboBoxDelayUnit") is Style unitCbStyle)
+                        unitComboBox.Style = unitCbStyle;
+                    else
+                        unitComboBox.Foreground = new SolidColorBrush(delayAccent);
+                    if (Application.Current.TryFindResource("ComboBoxItemDelayUnit") is Style unitItemStyle)
+                        unitComboBox.ItemContainerStyle = unitItemStyle;
+                    unitComboBox.SelectionChanged += (s, e) =>
+                    {
+                        if (unitComboBox.SelectedIndex < 0 || _currentMacro == null) return;
+                        SaveState();
+                        double currentValue = TryParseDouble(delayDurationTextBox.Text, out double val) ? val : da.GetDurationInUnit(da.Unit);
+                        var newUnit = unitComboBox.SelectedIndex switch
+                        {
+                            0 => Core.Inputs.TimeUnit.Milliseconds,
+                            1 => Core.Inputs.TimeUnit.Seconds,
+                            2 => Core.Inputs.TimeUnit.Minutes,
+                            _ => Core.Inputs.TimeUnit.Milliseconds
+                        };
+                        da.Unit = newUnit;
+                        da.SetDurationFromUnit(currentValue, newUnit);
+                        delayDurationTextBox.Text = currentValue.ToString("0.##");
+                        _currentMacro.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                    };
+                    unitCellStack.Children.Add(unitComboBox);
+                    var delayRestPanel = CreateDelayActionRestControls(da, index, delayDurationTextBox, unitSelectorInSegment: true);
+                    delayRestPanel.VerticalAlignment = VerticalAlignment.Center;
+                    var unitLineBorder = new Border
+                    {
+                        Width = 1,
+                        Background = lineBrush,
+                        VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
-            
-            var infoText = new TextBlock
-            {
-                Text = "#" + (index + 1).ToString(),
-                FontSize = 10,
-                Foreground = new SolidColorBrush(primaryColor),
+                    RenderOptions.SetEdgeMode(unitLineBorder, EdgeMode.Aliased);
+                    var unitPartWithPadding = new Border
+                    {
+                        Child = unitCellStack,
+                        Padding = new Thickness(10, 10, 14, 10),
+                        VerticalAlignment = VerticalAlignment.Stretch
+                    };
+                    var restPartWithPadding = new Border
+                    {
+                        Child = delayRestPanel,
+                        Padding = new Thickness(8, 10, 10, 10),
+                        VerticalAlignment = VerticalAlignment.Stretch
+                    };
+                    var unitSegmentOuterGrid = new Grid { VerticalAlignment = VerticalAlignment.Stretch };
+                    unitSegmentOuterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    unitSegmentOuterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1) });
+                    unitSegmentOuterGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    unitSegmentOuterGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                    Grid.SetColumn(unitPartWithPadding, 0);
+                    Grid.SetRow(unitPartWithPadding, 0);
+                    unitSegmentOuterGrid.Children.Add(unitPartWithPadding);
+                    Grid.SetColumn(unitLineBorder, 1);
+                    Grid.SetRow(unitLineBorder, 0);
+                    unitSegmentOuterGrid.Children.Add(unitLineBorder);
+                    Grid.SetColumn(restPartWithPadding, 2);
+                    Grid.SetRow(restPartWithPadding, 0);
+                    unitSegmentOuterGrid.Children.Add(restPartWithPadding);
+                    segStack.Children.Add(unitSegmentOuterGrid);
+                    segStack.Orientation = Orientation.Horizontal;
+                    segStack.VerticalAlignment = VerticalAlignment.Stretch;
+                }
+                else if (action is Core.Inputs.MouseAction mouseAction && (segLabel == "X" || segLabel == "Y"))
+                {
+                    // Segments X/Y : label au-dessus, valeur en dessous, premier chiffre sous X/Y, texte aligné à gauche pour ne pas bouger
+                    segStack.Orientation = Orientation.Vertical;
+                    segStack.HorizontalAlignment = HorizontalAlignment.Left;
+                    segStack.VerticalAlignment = VerticalAlignment.Center;
+                    // Segments X/Y éditables pour l'action Clic (max 5 chiffres, chiffres uniquement)
+                    var coordTextBox = new TextBox
+                    {
+                        Text = segValue,
+                        MaxLength = 5,
+                        Width = 72,
+                        MinWidth = 56,
+                        FontSize = 16,
                 FontWeight = FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Center,
+                        Foreground = new SolidColorBrush(primaryColor),
+                        Background = Brushes.Transparent,
+                        BorderBrush = Brushes.Transparent,
+                        BorderThickness = new Thickness(0),
+                        Padding = new Thickness(0, 0, 0, 0),
+                        Margin = new Thickness(-4, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                FontFamily = new FontFamily("Segoe UI Semibold")
-            };
-            infoBadge.Child = infoText;
-            Grid.SetColumn(infoBadge, 3);
-            contentGrid.Children.Add(infoBadge);
+                        VerticalContentAlignment = VerticalAlignment.Center,
+                        TextAlignment = TextAlignment.Left,
+                        CaretBrush = new SolidColorBrush(primaryColor)
+                    };
+                    coordTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontDisplay");
+                    coordTextBox.PreviewTextInput += (s, e) =>
+                    {
+                        foreach (char c in e.Text ?? "")
+                            if (!char.IsDigit(c)) { e.Handled = true; return; }
+                    };
+                    coordTextBox.TextChanged += (s, e) =>
+                    {
+                        var t = (s as TextBox)?.Text ?? "";
+                        var digitsOnly = new string(t.Where(char.IsDigit).ToArray());
+                        if (digitsOnly.Length > 5) digitsOnly = digitsOnly.Substring(0, 5);
+                        if (t != digitsOnly)
+                        {
+                            var box = (TextBox)s;
+                            var pos = box.SelectionStart;
+                            box.Text = digitsOnly;
+                            box.SelectionStart = Math.Min(pos, digitsOnly.Length);
+                        }
+                    };
+                    if (segLabel == "X")
+                    {
+                        coordTextBox.LostFocus += (s, e) =>
+                        {
+                            if (int.TryParse(coordTextBox.Text, out int x) && x >= 0)
+                            {
+                                SaveState();
+                                mouseAction.X = x;
+                                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                            }
+                            else
+                                coordTextBox.Text = mouseAction.X >= 0 ? mouseAction.X.ToString() : "0";
+                        };
+                        coordTextBox.PreviewKeyDown += (s, e) => { if (e.Key == Key.Enter) { (s as TextBox)?.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)); e.Handled = true; } };
+                    }
+                    else
+                    {
+                        coordTextBox.LostFocus += (s, e) =>
+                        {
+                            if (int.TryParse(coordTextBox.Text, out int y) && y >= 0)
+                            {
+                                SaveState();
+                                mouseAction.Y = y;
+                                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                            }
+                            else
+                                coordTextBox.Text = mouseAction.Y >= 0 ? mouseAction.Y.ToString() : "0";
+                        };
+                        coordTextBox.PreviewKeyDown += (s, e) => { if (e.Key == Key.Enter) { (s as TextBox)?.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)); e.Handled = true; } };
+                    }
+                    segStack.Children.Add(coordTextBox);
+                    // Clic n'importe où dans le segment : focus le champ et curseur à droite du texte
+                    segBorder.Cursor = Cursors.IBeam;
+                    segBorder.PreviewMouseLeftButtonDown += (s, e) =>
+                    {
+                        // Clic sur le label ou le padding : focus + curseur à la fin ; clic dans le texte : laisser le TextBox placer le curseur
+                        var current = e.OriginalSource as DependencyObject;
+                        var isClickOnTextBox = false;
+                        while (current != null)
+                        {
+                            if (current == coordTextBox) { isClickOnTextBox = true; break; }
+                            current = VisualTreeHelper.GetParent(current);
+                        }
+                        if (!isClickOnTextBox)
+                        {
+                            coordTextBox.Focus();
+                            coordTextBox.SelectionStart = coordTextBox.Text.Length;
+                            coordTextBox.SelectionLength = 0;
+                            e.Handled = true;
+                        }
+                    };
+                }
+                else if (!(si == 1 && action is DelayAction))
+                {
+                    segStack.HorizontalAlignment = HorizontalAlignment.Left;
+                    var val = new TextBlock
+                    {
+                        Text = segValue,
+                        FontSize = (si > 0 && string.IsNullOrEmpty(segLabel)) ? 11 : 16,
+                        FontWeight = (si > 0 && string.IsNullOrEmpty(segLabel)) ? FontWeights.Normal : FontWeights.Bold,
+                        Foreground = (si > 0 && string.IsNullOrEmpty(segLabel)) ? new SolidColorBrush(textMuted) : new SolidColorBrush(primaryColor),
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    val.SetResourceReference(TextBlock.FontFamilyProperty, string.IsNullOrEmpty(segLabel) ? "FontEditorMono" : "FontDisplay");
+                    segStack.Children.Add(val);
+                }
+                segBorder.Child = segStack;
+                Grid.SetRow(segBorder, 0);
+                Grid.SetColumn(segBorder, si);
+                contentPanel.Children.Add(segBorder);
+            }
+            Grid.SetRow(contentPanel, 0);
+            Grid.SetColumn(contentPanel, 1);
+            contentGrid.Children.Add(contentPanel);
 
-            // Croix supprimer à droite
+            // Barre de boutons (style maquette : ⚙ | ▲ | ▼ | ✕)
+            var buttonStrip = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var settingsBtn = new Border
+            {
+                Background = Brushes.Transparent,
+                Padding = new Thickness(8, 8, 8, 8),
+                Cursor = Cursors.Hand,
+                Child = new TextBlock { Text = "⚙", FontSize = 12, Foreground = new SolidColorBrush(textMuted), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center }
+            };
+            buttonStrip.Children.Add(settingsBtn);
+            buttonStrip.Children.Add(new Rectangle { Width = 1, Height = 24, Fill = lineBrush, Margin = new Thickness(0), VerticalAlignment = VerticalAlignment.Center });
+            bool canMoveUp = false, canMoveDown = false;
+            if (nestedRepeatInfo != null && _currentMacro != null && nestedRepeatInfo.ParentIndex >= 0 && nestedRepeatInfo.ParentIndex < _currentMacro.Actions.Count && _currentMacro.Actions[nestedRepeatInfo.ParentIndex] is RepeatAction raN)
+            {
+                canMoveUp = nestedRepeatInfo.NestedIndex > 0;
+                canMoveDown = raN.Actions != null && nestedRepeatInfo.NestedIndex < raN.Actions.Count - 1;
+            }
+            else if (nestedIfInfo != null && _currentMacro != null && nestedIfInfo.ParentIndex >= 0 && nestedIfInfo.ParentIndex < _currentMacro.Actions.Count && _currentMacro.Actions[nestedIfInfo.ParentIndex] is IfAction ifN)
+            {
+                var list = nestedIfInfo.IsThen ? ifN.ThenActions : (nestedIfInfo.ElseIfBranchIndex >= 0 ? ifN.ElseIfBranches?[nestedIfInfo.ElseIfBranchIndex].Actions : ifN.ElseActions);
+                canMoveUp = list != null && nestedIfInfo.NestedIndex > 0;
+                canMoveDown = list != null && nestedIfInfo.NestedIndex < list.Count - 1;
+            }
+            else if (nestedRepeatInfo == null && nestedIfInfo == null && _currentMacro != null)
+            {
+                canMoveUp = index > 0;
+                canMoveDown = index < _currentMacro.Actions.Count - 1;
+            }
+            var upBtn = new Border { Width = 26, Height = 26, Background = Brushes.Transparent, Cursor = canMoveUp ? Cursors.Hand : Cursors.Arrow, Padding = new Thickness(0), Tag = index, Child = new TextBlock { Text = "▲", FontSize = 10, Foreground = new SolidColorBrush(textMuted), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+            var downBtn = new Border { Width = 26, Height = 26, Background = Brushes.Transparent, Cursor = canMoveDown ? Cursors.Hand : Cursors.Arrow, Padding = new Thickness(0), Tag = index, Child = new TextBlock { Text = "▼", FontSize = 10, Foreground = new SolidColorBrush(textMuted), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } };
+            if (nestedRepeatInfo != null)
+            {
+                upBtn.MouseLeftButtonDown += (s, e) => { if (canMoveUp) { MoveNestedActionUp(nestedRepeatInfo); e.Handled = true; } };
+                downBtn.MouseLeftButtonDown += (s, e) => { if (canMoveDown) { MoveNestedActionDown(nestedRepeatInfo); e.Handled = true; } };
+            }
+            else if (nestedIfInfo != null)
+            {
+                upBtn.MouseLeftButtonDown += (s, e) => { if (canMoveUp) { MoveNestedIfActionUp(nestedIfInfo.ParentIndex, nestedIfInfo.NestedIndex, nestedIfInfo.IsThen); e.Handled = true; } };
+                downBtn.MouseLeftButtonDown += (s, e) => { if (canMoveDown) { MoveNestedIfActionDown(nestedIfInfo.ParentIndex, nestedIfInfo.NestedIndex, nestedIfInfo.IsThen); e.Handled = true; } };
+            }
+            else
+            {
+                upBtn.MouseLeftButtonDown += (s, e) => { if (canMoveUp) { MoveActionUp(index); e.Handled = true; } };
+                downBtn.MouseLeftButtonDown += (s, e) => { if (canMoveDown) { MoveActionDown(index); e.Handled = true; } };
+            }
+            buttonStrip.Children.Add(upBtn);
+            buttonStrip.Children.Add(downBtn);
+            buttonStrip.Children.Add(new Rectangle { Width = 1, Height = 24, Fill = new SolidColorBrush(borderCard), Margin = new Thickness(0), VerticalAlignment = VerticalAlignment.Center });
             var deleteBtnContainer = new Border
             {
                 Background = Brushes.Transparent,
-                CornerRadius = new CornerRadius(1),
-                Padding = new Thickness(2, 2, 2, 2),
-                Margin = new Thickness(2, 0, 0, 0),
+                Padding = new Thickness(8, 8, 8, 8),
+                Margin = new Thickness(0, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Cursor = Cursors.Hand,
                 Tag = nestedRepeatInfo != null ? (object)nestedRepeatInfo : (nestedIfInfo != null ? (object)nestedIfInfo : (object)index),
-                Opacity = 0
+                Opacity = 0.6
             };
             var deleteCrossText = new TextBlock
             {
-                Text = "×",
-                FontSize = 14,
-                FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush(Color.FromRgb(200, 80, 80)), // Rouge pour la suppression
+                Text = "✕",
+                FontSize = 11,
+                Foreground = new SolidColorBrush(textMuted),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center
             };
@@ -650,98 +1119,78 @@ namespace MacroEngine.UI
                     e.Handled = true;
                 };
             }
-            Grid.SetColumn(deleteBtnContainer, 4);
-            contentGrid.Children.Add(deleteBtnContainer);
+            deleteBtnContainer.MouseEnter += (s, e) => deleteCrossText.Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0x40, 0x40));
+            deleteBtnContainer.MouseLeave += (s, e) => deleteCrossText.Foreground = new SolidColorBrush(textMuted);
+            buttonStrip.Children.Add(deleteBtnContainer);
+            Grid.SetColumn(buttonStrip, 2);
+            contentGrid.Children.Add(buttonStrip);
 
             card.Child = contentGrid;
 
-            // Effets hover : gradient plus intense, glow sur la barre (texte reste blanc)
             card.MouseEnter += (s, e) =>
             {
-                infoBadge.Visibility = Visibility.Visible;
                 deleteBtnContainer.Opacity = 1;
-                card.Background = gradientBrushHover;
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(120, hoverColor.R, hoverColor.G, hoverColor.B));
-                timelineBar.Background = new SolidColorBrush(hoverColor);
-                iconBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(140, hoverColor.R, hoverColor.G, hoverColor.B));
-                iconBadge.Background = new SolidColorBrush(Color.FromArgb(50, hoverColor.R, hoverColor.G, hoverColor.B));
-                if (detailsBlock != null && detailsBadge != null)
-                {
-                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(40, hoverColor.R, hoverColor.G, hoverColor.B));
-                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(70, hoverColor.R, hoverColor.G, hoverColor.B));
-                }
+                card.Background = brushCardHover;
+                card.BorderBrush = brushBorderHover;
+                typeBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x80, hoverColor.R, hoverColor.G, hoverColor.B));
+                typeBadge.Background = new SolidColorBrush(Color.FromArgb(0x1A, hoverColor.R, hoverColor.G, hoverColor.B));
             };
 
             card.MouseLeave += (s, e) =>
             {
-                infoBadge.Visibility = Visibility.Collapsed;
-                deleteBtnContainer.Opacity = 0;
-                card.Background = gradientBrush;
-                card.BorderBrush = new SolidColorBrush(Color.FromArgb(50, primaryColor.R, primaryColor.G, primaryColor.B));
-                timelineBar.Background = new SolidColorBrush(primaryColor);
-                iconBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(80, primaryColor.R, primaryColor.G, primaryColor.B));
-                iconBadge.Background = new SolidColorBrush(Color.FromArgb(30, primaryColor.R, primaryColor.G, primaryColor.B));
-                if (detailsBlock != null && detailsBadge != null)
-                {
-                    detailsBadge.Background = new SolidColorBrush(Color.FromArgb(25, primaryColor.R, primaryColor.G, primaryColor.B));
-                    detailsBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(40, primaryColor.R, primaryColor.G, primaryColor.B));
-                }
+                deleteBtnContainer.Opacity = 0.6;
+                card.Background = brushCard;
+                card.BorderBrush = brushBorder;
+                typeBadge.BorderBrush = new SolidColorBrush(Color.FromArgb(0x52, primaryColor.R, primaryColor.G, primaryColor.B));
+                typeBadge.Background = new SolidColorBrush(Color.FromArgb(0x0A, primaryColor.R, primaryColor.G, primaryColor.B));
             };
 
-            // Édition inline
+            // Édition inline (remplace le contenu du premier segment)
             if (action is KeyboardAction ka2)
             {
-                // Pour KeyboardAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
-                textPanel.Children.Remove(titleBlock);
-                
-                var keyboardControlsPanel = CreateKeyboardActionControls(ka2, index, textPanel);
-                textPanel.Children.Insert(0, keyboardControlsPanel);
+                firstSegmentContent.Children.Clear();
+                firstSegmentContent.Children.Add(CreateKeyboardActionControls(ka2, index, firstSegmentContent));
             }
-            else if (action is DelayAction da)
+            else if (action is DelayAction)
             {
-                // Pour DelayAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
-                textPanel.Children.Remove(titleBlock);
-                
-                var delayControlsPanel = CreateDelayActionControls(da, index, textPanel);
-                textPanel.Children.Insert(0, delayControlsPanel);
+                // Contenu Délai construit dans la boucle des segments (segment DURÉE comme X/Y + reste en segment 1)
             }
             else if (action is Core.Inputs.MouseAction ma)
             {
-                // Pour MouseAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
-                textPanel.Children.Remove(titleBlock);
-                
-                var mouseControlsPanel = CreateMouseActionControls(ma, index, textPanel);
-                textPanel.Children.Insert(0, mouseControlsPanel);
+                firstSegmentContent.Children.Clear();
+                firstSegmentContent.Children.Add(CreateMouseActionControls(ma, index, firstSegmentContent));
             }
             else if (action is RepeatAction ra)
             {
-                // Pour RepeatAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
-                textPanel.Children.Remove(titleBlock);
-                
-                var repeatControlsPanel = CreateRepeatActionControls(ra, index, textPanel);
-                textPanel.Children.Insert(0, repeatControlsPanel);
+                firstSegmentContent.Children.Clear();
+                titleBlock.Text = "Répéter";
+                titleBlock.Margin = new Thickness(0, -2, 0, 0);
+                titleBlock.HorizontalAlignment = HorizontalAlignment.Left;
+                titleBlock.VerticalAlignment = VerticalAlignment.Center;
+                var titleWrap = new Grid
+                {
+                    MinHeight = 24,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 10, 0)
+                };
+                titleWrap.Children.Add(titleBlock);
+                firstSegmentContent.Children.Add(titleWrap);
+                firstSegmentContent.Children.Add(CreateRepeatActionControls(ra, index, firstSegmentContent));
             }
             else if (action is IfAction ifAction)
             {
-                // Pour IfAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
-                textPanel.Children.Remove(titleBlock);
-                
-                var ifControlsPanel = CreateIfActionControls(ifAction, index, textPanel);
-                textPanel.Children.Insert(0, ifControlsPanel);
+                firstSegmentContent.Children.Clear();
+                firstSegmentContent.Children.Add(CreateIfActionControls(ifAction, index, firstSegmentContent));
             }
             else if (action is TextAction ta)
             {
-                // Pour TextAction, afficher directement les contrôles inline au lieu du titre (toujours visibles)
-                textPanel.Children.Remove(titleBlock);
-                
-                var textControlsPanel = CreateTextActionControls(ta, index, textPanel);
-                textPanel.Children.Insert(0, textControlsPanel);
+                firstSegmentContent.Children.Clear();
+                firstSegmentContent.Children.Add(CreateTextActionControls(ta, index, firstSegmentContent));
             }
             else if (action is VariableAction va)
             {
-                textPanel.Children.Remove(titleBlock);
-                var variableControlsPanel = CreateVariableActionControls(va, index, textPanel);
-                textPanel.Children.Insert(0, variableControlsPanel);
+                firstSegmentContent.Children.Clear();
+                firstSegmentContent.Children.Add(CreateVariableActionControls(va, index, firstSegmentContent));
             }
 
             // Menu contextuel pour sauvegarder comme preset (même style que chips)
@@ -784,6 +1233,11 @@ namespace MacroEngine.UI
             card.PreviewMouseRightButtonDown += (s, _) => ActionRightClickDown(card);
             card.PreviewMouseRightButtonUp += (s, _) => ActionRightClickUp(card);
             card.ContextMenu = contextMenu;
+            settingsBtn.MouseLeftButtonDown += (s, e) =>
+            {
+                if (card.ContextMenu != null) { card.ContextMenu.PlacementTarget = card; card.ContextMenu.IsOpen = true; }
+                e.Handled = true;
+            };
 
             return card;
         }
@@ -812,13 +1266,13 @@ namespace MacroEngine.UI
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(1),
                 BorderBrush = GetThemeBrush("BorderLightBrush"),
-                CornerRadius = new CornerRadius(2),
+                CornerRadius = new CornerRadius(0),
                 Padding = new Thickness(2, 2, 2, 2),
                 Margin = new Thickness(8, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                MinHeight = 40,
-                MaxHeight = 40,
+                MinHeight = 48,
+                MaxHeight = 48,
                 Visibility = Visibility.Visible
             };
             
@@ -1414,7 +1868,7 @@ namespace MacroEngine.UI
                     ? $"Si pixel ({ifAction.PixelColorConfig.X},{ifAction.PixelColorConfig.Y}) = {ifAction.PixelColorConfig.ExpectedColor}"
                     : "Si Pixel couleur",
                 ConditionType.MousePosition => ifAction.MousePositionConfig != null
-                    ? $"Si souris dans zone ({ifAction.MousePositionConfig.X1},{ifAction.MousePositionConfig.Y1})-({ifAction.MousePositionConfig.X2},{ifAction.MousePositionConfig.Y2})"
+                    ? $"Si souris dans {ifAction.MousePositionConfig.X1},{ifAction.MousePositionConfig.Y1} → {ifAction.MousePositionConfig.X2},{ifAction.MousePositionConfig.Y2}"
                     : "Si Position souris",
                 ConditionType.TimeDate => ifAction.TimeDateConfig != null
                     ? $"Si {ifAction.TimeDateConfig.ComparisonType} {GetTimeOperatorSymbol(ifAction.TimeDateConfig.Operator)} {ifAction.TimeDateConfig.Value}"
@@ -1456,7 +1910,7 @@ namespace MacroEngine.UI
                     ? $"Si pixel ({condition.PixelColorConfig.X},{condition.PixelColorConfig.Y}) = {condition.PixelColorConfig.ExpectedColor}"
                     : "Si Pixel couleur",
                 ConditionType.MousePosition => condition.MousePositionConfig != null
-                    ? $"Si souris dans zone ({condition.MousePositionConfig.X1},{condition.MousePositionConfig.Y1})-({condition.MousePositionConfig.X2},{condition.MousePositionConfig.Y2})"
+                    ? $"Si souris dans {condition.MousePositionConfig.X1},{condition.MousePositionConfig.Y1} → {condition.MousePositionConfig.X2},{condition.MousePositionConfig.Y2}"
                     : "Si Position souris",
                 ConditionType.TimeDate => condition.TimeDateConfig != null
                     ? $"Si {condition.TimeDateConfig.ComparisonType} {GetTimeOperatorSymbol(condition.TimeDateConfig.Operator)} {condition.TimeDateConfig.Value}"
@@ -2221,6 +2675,7 @@ namespace MacroEngine.UI
         private Panel CreateDelayActionControls(DelayAction da, int index, Panel parentPanel)
         {
             var originalMargin = new Thickness(0, 0, 0, 0);
+            var delayAccent = Color.FromRgb(201, 122, 58); // #C97A3A (même style que coordonnées X/Y)
             
             var editPanel = new StackPanel
             {
@@ -2229,31 +2684,27 @@ namespace MacroEngine.UI
                 Margin = originalMargin
             };
 
-            // Label "Délai:" (texte blanc clair)
-            var delayLabel = new TextBlock
-            {
-                Text = "Délai:",
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromRgb(230, 228, 234)), // #E6E4EA
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0)
-            };
-            editPanel.Children.Add(delayLabel);
-
-            // TextBox pour la durée normale (cachée si Aléatoire ou UseVariableDelay)
+            // TextBox durée (juste l'input, comme X) : texte à gauche pour commencer juste sous "DURÉE"
             var durationTextBox = new TextBox
             {
-                Style = GetActionTextBoxStyle(),
                 Text = da.GetDurationInUnit(da.Unit).ToString("0.##"),
                 Width = 80,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                TextAlignment = TextAlignment.Center,
+                MinWidth = 56,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(delayAccent),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                TextAlignment = TextAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
+                VerticalContentAlignment = VerticalAlignment.Center,
+                CaretBrush = new SolidColorBrush(delayAccent),
+                Margin = new Thickness(0),
                 Visibility = (da.IsRandom || da.UseVariableDelay) ? Visibility.Collapsed : Visibility.Visible
             };
+            durationTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontDisplay");
             durationTextBox.TextChanged += (s, e) =>
             {
                 if (TryParseDouble(durationTextBox.Text, out double value) && value >= 0)
@@ -2278,21 +2729,72 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(durationTextBox);
 
-            // Délais aléatoire (Min et Max) – à la place du délai normal quand Aléatoire est coché
+            // Colonne « durée » : même structure que les segments X/Y (Border + Stack vertical label + champ)
+            var delaySegBrush = GetThemeBrush("BorderLightBrush") ?? new SolidColorBrush(Color.FromRgb(0x1F, 0x24, 0x1F));
+            var delaySegLabel = new TextBlock
+            {
+                Text = "DURÉE",
+                FontSize = 8,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x4A, 0x5A, 0x4A)),
+                Margin = new Thickness(0, 0, 0, 2)
+            };
+            delaySegLabel.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+            var durationSegStack = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            durationSegStack.Children.Add(delaySegLabel);
+            durationSegStack.Children.Add(durationTextBox);
+            var durationSegBorder = new Border
+            {
+                Child = durationSegStack,
+                Padding = new Thickness(0, 0, 14, 0),
+                BorderBrush = delaySegBrush,
+                BorderThickness = new Thickness(0, 0, 1, 0),
+                VerticalAlignment = VerticalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            editPanel.Children.Add(durationSegBorder);
+
+            editPanel.Children.Add(CreateDelayActionRestControls(da, index, durationTextBox));
+            return editPanel;
+        }
+
+        private Panel CreateDelayActionRestControls(DelayAction da, int index, TextBox durationTextBox, bool unitSelectorInSegment = false)
+        {
+            var delayAccent = Color.FromRgb(201, 122, 58);
+            var restPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+
+            // Délais aléatoire (Min et Max) – même style que durée normale
             var minDurationTextBox = new TextBox
             {
-                Style = GetActionTextBoxStyle(),
                 Text = da.GetMinDurationInUnit(da.Unit).ToString("0.##"),
                 Width = 70,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
+                MinWidth = 56,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(delayAccent),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                CaretBrush = new SolidColorBrush(delayAccent),
                 Margin = new Thickness(0, 0, 4, 0),
                 Visibility = da.IsRandom ? Visibility.Visible : Visibility.Collapsed
             };
+            minDurationTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontDisplay");
             minDurationTextBox.TextChanged += (s, e) =>
             {
                 if (TryParseDouble(minDurationTextBox.Text, out double value) && value >= 0)
@@ -2317,7 +2819,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(minDurationTextBox);
+            restPanel.Children.Add(minDurationTextBox);
 
             var andLabel = new TextBlock
             {
@@ -2329,20 +2831,28 @@ namespace MacroEngine.UI
                 Margin = new Thickness(4, 0, 4, 0),
                 Visibility = da.IsRandom ? Visibility.Visible : Visibility.Collapsed
             };
-            editPanel.Children.Add(andLabel);
+            restPanel.Children.Add(andLabel);
 
             var maxDurationTextBox = new TextBox
             {
-                Style = GetActionTextBoxStyle(),
                 Text = da.GetMaxDurationInUnit(da.Unit).ToString("0.##"),
                 Width = 70,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
+                MinWidth = 56,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(delayAccent),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                CaretBrush = new SolidColorBrush(delayAccent),
                 Margin = new Thickness(0, 0, 8, 0),
                 Visibility = da.IsRandom ? Visibility.Visible : Visibility.Collapsed
             };
+            maxDurationTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontDisplay");
             maxDurationTextBox.TextChanged += (s, e) =>
             {
                 if (TryParseDouble(maxDurationTextBox.Text, out double value) && value >= 0)
@@ -2367,7 +2877,7 @@ namespace MacroEngine.UI
                     RefreshBlocks();
                 }
             };
-            editPanel.Children.Add(maxDurationTextBox);
+            restPanel.Children.Add(maxDurationTextBox);
 
             // Panneau avancé : Variable, Jitter
             var delayAdvancedPanel = new StackPanel
@@ -2409,20 +2919,28 @@ namespace MacroEngine.UI
                 ToolTip = "Utiliser une variable pour définir le délai (ex: baseDelay * 1.5)"
             };
 
-            // TextBox pour le nom de variable (visible si UseVariableDelay)
+            // TextBox pour le nom de variable (même style que durée)
             var variableNameTextBox = new TextBox
             {
-                Style = GetActionTextBoxStyle(),
                 Text = da.VariableName ?? "",
                 Width = 100,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
+                MinWidth = 56,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(delayAccent),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                CaretBrush = new SolidColorBrush(delayAccent),
                 Margin = new Thickness(0, 0, 4, 0),
                 Visibility = da.UseVariableDelay ? Visibility.Visible : Visibility.Collapsed,
                 ToolTip = "Nom de la variable à utiliser pour le délai"
             };
+            variableNameTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontDisplay");
             variableNameTextBox.TextChanged += (s, e) =>
             {
                 SaveState();
@@ -2454,17 +2972,25 @@ namespace MacroEngine.UI
 
             var multiplierTextBox = new TextBox
             {
-                Style = GetActionTextBoxStyle(),
                 Text = da.VariableMultiplier.ToString("0.##"),
                 Width = 60,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
+                MinWidth = 56,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(delayAccent),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                CaretBrush = new SolidColorBrush(delayAccent),
                 Margin = new Thickness(0, 0, 8, 0),
                 Visibility = da.UseVariableDelay ? Visibility.Visible : Visibility.Collapsed,
                 ToolTip = "Multiplicateur (ex: 1.5 pour baseDelay * 1.5)"
             };
+            multiplierTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontDisplay");
             multiplierTextBox.TextChanged += (s, e) =>
             {
                 if (TryParseDouble(multiplierTextBox.Text, out double value))
@@ -2573,10 +3099,10 @@ namespace MacroEngine.UI
                 }
                 RefreshBlocks();
             };
-            editPanel.Children.Add(randomCheckBox);
+            restPanel.Children.Add(randomCheckBox);
 
-            editPanel.Children.Add(delayAdvancedButton);
-            editPanel.Children.Add(delayAdvancedPanel);
+            restPanel.Children.Add(delayAdvancedButton);
+            restPanel.Children.Add(delayAdvancedPanel);
 
             // Label et TextBox pour Jitter (%) — dans panneau avancé
             var jitterLabel = new TextBlock
@@ -2592,16 +3118,24 @@ namespace MacroEngine.UI
 
             var jitterTextBox = new TextBox
             {
-                Style = GetActionTextBoxStyle(),
                 Text = da.JitterPercent.ToString("0.##"),
                 Width = 50,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
+                MinWidth = 56,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = new SolidColorBrush(delayAccent),
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                CaretBrush = new SolidColorBrush(delayAccent),
                 Margin = new Thickness(0, 0, 8, 0),
                 ToolTip = "Ex: 10 pour ±10% de variation"
             };
+            jitterTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontDisplay");
             jitterTextBox.TextChanged += (s, e) =>
             {
                 if (TryParseDouble(jitterTextBox.Text, out double value) && value >= 0)
@@ -2628,7 +3162,9 @@ namespace MacroEngine.UI
             };
             delayAdvancedPanel.Children.Add(jitterTextBox);
 
-            // ComboBox pour l'unité de temps
+            // ComboBox pour l'unité de temps (omis si déjà dans le segment UNITÉ de la carte)
+            if (!unitSelectorInSegment)
+            {
             var unitComboBox = new ComboBox
             {
                 MinWidth = 100,
@@ -2640,8 +3176,6 @@ namespace MacroEngine.UI
             unitComboBox.Items.Add("ms");
             unitComboBox.Items.Add("s");
             unitComboBox.Items.Add("min");
-            
-            // Mapper l'unité actuelle vers l'index
             unitComboBox.SelectedIndex = da.Unit switch
             {
                 TimeUnit.Milliseconds => 0,
@@ -2649,13 +3183,11 @@ namespace MacroEngine.UI
                 TimeUnit.Minutes => 2,
                 _ => 0
             };
-            
             unitComboBox.SelectionChanged += (s, e) =>
             {
                 if (unitComboBox.SelectedIndex >= 0 && _currentMacro != null)
                 {
                     SaveState();
-                    // Garder la valeur numérique actuelle (pas de conversion)
                     double currentValue = TryParseDouble(durationTextBox.Text, out double val) ? val : da.GetDurationInUnit(da.Unit);
                     var newUnit = unitComboBox.SelectedIndex switch
                     {
@@ -2665,10 +3197,8 @@ namespace MacroEngine.UI
                         _ => TimeUnit.Milliseconds
                     };
                     da.Unit = newUnit;
-                    // Appliquer la valeur dans la nouvelle unité (sans conversion)
                     da.SetDurationFromUnit(currentValue, newUnit);
                     durationTextBox.Text = currentValue.ToString("0.##");
-                    // Mettre à jour aussi min/max si aléatoire
                     if (da.IsRandom)
                     {
                         double minValue = TryParseDouble(minDurationTextBox.Text, out double minVal) ? minVal : da.GetMinDurationInUnit(da.Unit);
@@ -2683,9 +3213,10 @@ namespace MacroEngine.UI
                     MacroChanged?.Invoke(this, EventArgs.Empty);
                 }
             };
-            editPanel.Children.Add(unitComboBox);
+                restPanel.Children.Add(unitComboBox);
+            }
 
-            return editPanel;
+            return restPanel;
         }
 
         private Panel CreateTextActionControls(TextAction ta, int index, Panel parentPanel)
@@ -3642,52 +4173,104 @@ namespace MacroEngine.UI
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            // ComboBox pour le type d'action
+            // ComboBox 1 : Gauche / Droit / Milieu / Molette haut / Molette bas
+            var clicAccent = Color.FromRgb(52, 200, 184);   // #34C8B8
             var actionTypeComboBox = new ComboBox
             {
-                MinWidth = 140,
+                MinWidth = 110,
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(clicAccent),
                 VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            actionTypeComboBox.SetResourceReference(ComboBox.StyleProperty, "ComboBoxNoBackground");
+            actionTypeComboBox.SetResourceReference(ComboBox.FontFamilyProperty, "FontDisplay");
+            actionTypeComboBox.Items.Add("Gauche");        // 0
+            actionTypeComboBox.Items.Add("Droit");        // 1
+            actionTypeComboBox.Items.Add("Milieu");       // 2
+            actionTypeComboBox.Items.Add("Molette haut"); // 3
+            actionTypeComboBox.Items.Add("Molette bas");  // 4
+
+            // ComboBox 2 : état — Maintenant / Pressé (pour clics) ou "Activée" (pour molettes)
+            var stateComboBox = new ComboBox
+            {
+                MinWidth = 88,
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)),
+                VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
             };
+            stateComboBox.SetResourceReference(ComboBox.StyleProperty, "ComboBoxNoBackground");
+            stateComboBox.SetResourceReference(ComboBox.FontFamilyProperty, "FontDisplay");
+            stateComboBox.Items.Add("Maintenant");  // 0 = clic instantané
+            stateComboBox.Items.Add("Pressé");      // 1 = maintenir (down)
 
-            // Ordre des items dans le ComboBox (sans les "Relâcher")
-            actionTypeComboBox.Items.Add("Clic gauche");      // index 0
-            actionTypeComboBox.Items.Add("Clic droit");       // index 1
-            actionTypeComboBox.Items.Add("Clic milieu");      // index 2
-            actionTypeComboBox.Items.Add("Double-clic gauche");  // index 3
-            actionTypeComboBox.Items.Add("Double-clic droit");   // index 4
-            actionTypeComboBox.Items.Add("Maintenir gauche");  // index 5
-            actionTypeComboBox.Items.Add("Maintenir droit");   // index 6
-            actionTypeComboBox.Items.Add("Maintenir milieu");  // index 7
-            actionTypeComboBox.Items.Add("Déplacer");         // index 8
-            actionTypeComboBox.Items.Add("Molette haut");      // index 9
-            actionTypeComboBox.Items.Add("Molette bas");       // index 10
-            actionTypeComboBox.Items.Add("Molette");          // index 11
-            actionTypeComboBox.Items.Add("Scroll continu");   // index 12
-
-            // Mapper l'ActionType actuel vers l'index du ComboBox
-            int currentIndex = ma.ActionType switch
+            // Mapper ActionType → (typeIndex, stateIndex). Pour molette on n'utilise pas stateComboBox (affiché "Activée").
+            int TypeIndexFromAction(Core.Inputs.MouseActionType t)
             {
-                Core.Inputs.MouseActionType.LeftClick => 0,
-                Core.Inputs.MouseActionType.RightClick => 1,
-                Core.Inputs.MouseActionType.MiddleClick => 2,
-                Core.Inputs.MouseActionType.DoubleLeftClick => 3,
-                Core.Inputs.MouseActionType.DoubleRightClick => 4,
-                Core.Inputs.MouseActionType.LeftDown => 5,
-                Core.Inputs.MouseActionType.RightDown => 6,
-                Core.Inputs.MouseActionType.MiddleDown => 7,
-                Core.Inputs.MouseActionType.Move => 8,
-                Core.Inputs.MouseActionType.WheelUp => 9,
-                Core.Inputs.MouseActionType.WheelDown => 10,
-                Core.Inputs.MouseActionType.Wheel => 11,
-                Core.Inputs.MouseActionType.WheelContinuous => 12,
-                _ => 0 // Par défaut, LeftClick si c'est un type "Relâcher" non supporté
+                return t switch
+                {
+                    Core.Inputs.MouseActionType.LeftClick or Core.Inputs.MouseActionType.LeftDown or Core.Inputs.MouseActionType.DoubleLeftClick => 0,
+                    Core.Inputs.MouseActionType.RightClick or Core.Inputs.MouseActionType.RightDown or Core.Inputs.MouseActionType.DoubleRightClick => 1,
+                    Core.Inputs.MouseActionType.MiddleClick or Core.Inputs.MouseActionType.MiddleDown => 2,
+                    Core.Inputs.MouseActionType.WheelUp => 3,
+                    Core.Inputs.MouseActionType.WheelDown => 4,
+                    _ => 0
+                };
+            }
+            int StateIndexFromAction(Core.Inputs.MouseActionType t)
+            {
+                return (t == Core.Inputs.MouseActionType.LeftDown || t == Core.Inputs.MouseActionType.RightDown || t == Core.Inputs.MouseActionType.MiddleDown) ? 1 : 0;
+            }
+
+            int typeIdx = TypeIndexFromAction(ma.ActionType);
+            int stateIdx = StateIndexFromAction(ma.ActionType);
+            actionTypeComboBox.SelectedIndex = typeIdx;
+            stateComboBox.SelectedIndex = stateIdx;
+
+            bool isWheel = (typeIdx == 3 || typeIdx == 4);
+            stateComboBox.Visibility = isWheel ? Visibility.Collapsed : Visibility.Visible;
+
+            // Label "Activée" pour les molettes (à la place du combo état)
+            var stateLabelWheel = new TextBlock
+            {
+                Text = "Activée",
+                FontSize = 12,
+                FontWeight = FontWeights.Medium,
+                Foreground = new SolidColorBrush(Color.FromRgb(185, 182, 194)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Visibility = isWheel ? Visibility.Visible : Visibility.Collapsed
             };
-            actionTypeComboBox.SelectedIndex = currentIndex;
+            stateLabelWheel.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+
+            void ApplyMouseType()
+            {
+                int t = actionTypeComboBox.SelectedIndex;
+                int s = stateComboBox.SelectedIndex;
+                ma.ActionType = (t, s) switch
+                {
+                    (0, 0) => Core.Inputs.MouseActionType.LeftClick,
+                    (0, 1) => Core.Inputs.MouseActionType.LeftDown,
+                    (1, 0) => Core.Inputs.MouseActionType.RightClick,
+                    (1, 1) => Core.Inputs.MouseActionType.RightDown,
+                    (2, 0) => Core.Inputs.MouseActionType.MiddleClick,
+                    (2, 1) => Core.Inputs.MouseActionType.MiddleDown,
+                    (3, _) => Core.Inputs.MouseActionType.WheelUp,
+                    (4, _) => Core.Inputs.MouseActionType.WheelDown,
+                    _ => ma.ActionType
+                };
+                SaveState();
+                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+            }
 
             editPanel.Children.Add(actionTypeComboBox);
+            editPanel.Children.Add(stateComboBox);
+            editPanel.Children.Add(stateLabelWheel);
 
             // Fonction pour déterminer si les coordonnées doivent être affichées
             bool ShouldShowCoordinates(Core.Inputs.MouseActionType actionType)
@@ -3927,13 +4510,24 @@ namespace MacroEngine.UI
             if (Application.Current.TryFindResource("TimelineClicButton") is Style clicBtnStyle3)
                 zoneButton.Style = clicBtnStyle3;
 
-            var zoneLabel = new TextBlock
+            var zoneLabelText = new TextBlock
             {
                 Text = ma.ConditionalZoneEnabled && (ma.ConditionalZoneX2 > ma.ConditionalZoneX1 || ma.ConditionalZoneY2 > ma.ConditionalZoneY1)
-                    ? $"({ma.ConditionalZoneX1},{ma.ConditionalZoneY1}) → ({ma.ConditionalZoneX2},{ma.ConditionalZoneY2})"
+                    ? $"{ma.ConditionalZoneX1},{ma.ConditionalZoneY1} \u2192 {ma.ConditionalZoneX2},{ma.ConditionalZoneY2}"
                     : "",
                 FontSize = 10,
-                Foreground = GetThemeBrush("TextMutedBrush"),
+                Foreground = GetThemeBrush("ErrorBrush"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var zoneLabel = new Border
+            {
+                Child = zoneLabelText,
+                Padding = new Thickness(4, 1, 4, 1),
+                Margin = new Thickness(4, 0, 0, 0),
+                BorderThickness = new Thickness(1),
+                BorderBrush = GetThemeBrush("ErrorBrush"),
+                CornerRadius = new CornerRadius(2),
                 VerticalAlignment = VerticalAlignment.Center,
                 Visibility = (showConditionalZone && ma.ConditionalZoneEnabled) ? Visibility.Visible : Visibility.Collapsed
             };
@@ -3965,7 +4559,7 @@ namespace MacroEngine.UI
                     ma.ConditionalZoneY1 = zoneSelectorWindow.Y1;
                     ma.ConditionalZoneX2 = zoneSelectorWindow.X2;
                     ma.ConditionalZoneY2 = zoneSelectorWindow.Y2;
-                    zoneLabel.Text = $"({ma.ConditionalZoneX1},{ma.ConditionalZoneY1}) → ({ma.ConditionalZoneX2},{ma.ConditionalZoneY2})";
+                    zoneLabelText.Text = $"{ma.ConditionalZoneX1},{ma.ConditionalZoneY1} \u2192 {ma.ConditionalZoneX2},{ma.ConditionalZoneY2}";
                     if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
                 }
             };
@@ -3995,6 +4589,33 @@ namespace MacroEngine.UI
                            ma.ActionType == Core.Inputs.MouseActionType.Move;
                 previewPositionButton.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             }
+
+            actionTypeComboBox.SelectionChanged += (s, e) =>
+            {
+                if (actionTypeComboBox.SelectedIndex < 0) return;
+                int typeIdxNew = actionTypeComboBox.SelectedIndex;
+                bool wheel = (typeIdxNew == 3 || typeIdxNew == 4);
+                stateComboBox.Visibility = wheel ? Visibility.Collapsed : Visibility.Visible;
+                stateLabelWheel.Visibility = wheel ? Visibility.Visible : Visibility.Collapsed;
+                if (wheel)
+                    stateComboBox.SelectedIndex = 0;
+                ApplyMouseType();
+                bool showCoordsNew = !wheel;
+                xLabel.Visibility = showCoordsNew ? Visibility.Visible : Visibility.Collapsed;
+                xTextBox.Visibility = showCoordsNew ? Visibility.Visible : Visibility.Collapsed;
+                yLabel.Visibility = showCoordsNew ? Visibility.Visible : Visibility.Collapsed;
+                yTextBox.Visibility = showCoordsNew ? Visibility.Visible : Visibility.Collapsed;
+                selectPointButton.Visibility = showCoordsNew ? Visibility.Visible : Visibility.Collapsed;
+                UpdateConditionalZoneVisibility();
+                UpdatePreviewButtonVisibility();
+            };
+
+            stateComboBox.SelectionChanged += (s, e) =>
+            {
+                if (stateComboBox.SelectedIndex < 0) return;
+                ApplyMouseType();
+                UpdateConditionalZoneVisibility();
+            };
 
             // Durée de maintien (ms) pour "Maintenir" — optionnel, vide ou 0 = illimité
             bool IsMaintenirType(Core.Inputs.MouseActionType t) =>
@@ -5470,34 +6091,42 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée les contrôles inline pour une action RepeatAction (toujours visibles dans la carte)
+        /// Crée les contrôles inline pour une action RepeatAction (style mockup : mode trigger, chip × N, key/click)
         /// </summary>
         private StackPanel CreateRepeatActionControls(RepeatAction ra, int index, Panel parentPanel)
         {
-            // Créer un panel horizontal pour le mode et les inputs
+            // Vert mockup (block-repeat) : #39D97A = 57, 217, 122
+            var green = Color.FromRgb(57, 217, 122);
+            var loopBrush = new SolidColorBrush(green);
+            var loopBorder = new SolidColorBrush(Color.FromArgb(0x66, 57, 217, 122));
+            var loopBg = new SolidColorBrush(Color.FromArgb(0x1A, 57, 217, 122));
+            var gap = new Thickness(10, 0, 0, 0);
+
             var editPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center
             };
 
-            // ComboBox pour le mode de répétition
+            // Mode selector : chip style + flèche et option sélectionnée en vert (ComboBoxRepeatGreen)
             var modeComboBox = new ComboBox
             {
-                FontSize = 13,
+                FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
-                MinWidth = 140,
-                Margin = new Thickness(0, 0, 8, 0),
+                MinWidth = 130,
+                Margin = new Thickness(0),
                 VerticalAlignment = VerticalAlignment.Center
             };
-            
+            if (Application.Current.TryFindResource("ComboBoxRepeatGreen") is Style repeatCbStyle)
+                modeComboBox.Style = repeatCbStyle;
+            if (Application.Current.TryFindResource("ComboBoxItemRepeatGreen") is Style repeatItemStyle)
+                modeComboBox.ItemContainerStyle = repeatItemStyle;
+            modeComboBox.SetResourceReference(ComboBox.FontFamilyProperty, "FontMono");
             modeComboBox.Items.Add(new ComboBoxItem { Content = "1 fois", Tag = RepeatMode.Once });
-            modeComboBox.Items.Add(new ComboBoxItem { Content = "X fois", Tag = RepeatMode.RepeatCount });
-            modeComboBox.Items.Add(new ComboBoxItem { Content = "Jusqu'à arrêt", Tag = RepeatMode.UntilStopped });
-            modeComboBox.Items.Add(new ComboBoxItem { Content = "Tant que touche", Tag = RepeatMode.WhileKeyPressed });
-            modeComboBox.Items.Add(new ComboBoxItem { Content = "Tant que clic", Tag = RepeatMode.WhileClickPressed });
-
-            // Sélectionner le mode actuel
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "× N fois", Tag = RepeatMode.RepeatCount });
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "jusqu'à arrêt", Tag = RepeatMode.UntilStopped });
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "tant que touche", Tag = RepeatMode.WhileKeyPressed });
+            modeComboBox.Items.Add(new ComboBoxItem { Content = "tant que clic", Tag = RepeatMode.WhileClickPressed });
             for (int i = 0; i < modeComboBox.Items.Count; i++)
             {
                 if (modeComboBox.Items[i] is ComboBoxItem item && item.Tag is RepeatMode mode && mode == ra.RepeatMode)
@@ -5506,69 +6135,149 @@ namespace MacroEngine.UI
                     break;
                 }
             }
+            var modeChipWrap = new Border
+            {
+                Child = modeComboBox,
+                Background = loopBg,
+                BorderBrush = loopBorder,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(3, 2, 7, 2),
+                Margin = gap,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            editPanel.Children.Add(modeChipWrap);
 
-            editPanel.Children.Add(modeComboBox);
-
-            // Input pour le nombre de répétitions (X fois) - inline
+            // Chip × N (affichage) + panneau édition inline (× [input]) — visible uniquement en mode "× N fois"
+            var chipPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Margin = gap };
+            var chipText = new TextBlock
+            {
+                Text = "× " + ra.RepeatCount,
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = loopBrush,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            chipText.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+            var repeatChip = new Border
+            {
+                Child = chipText,
+                Background = loopBg,
+                BorderBrush = loopBorder,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(3, 2, 6, 2),
+                Cursor = Cursors.IBeam,
+                Visibility = ra.RepeatMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed
+            };
+            var repeatChipInput = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
+            };
+            var chipTimes = new TextBlock { Text = "×", FontSize = 11, Foreground = GetThemeBrush("TextMutedBrush"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0) };
+            chipTimes.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
             var repeatCountTextBox = new TextBox
             {
-                Style = GetActionTextBoxStyle(),
                 Text = ra.RepeatCount.ToString(),
-                MinWidth = 50,
-                MaxWidth = 80,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
+                Width = 36,
+                MinWidth = 28,
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Foreground = loopBrush,
+                CaretBrush = loopBrush,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(2, 0, 2, 0),
                 TextAlignment = TextAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                Visibility = ra.RepeatMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed,
-                Background = GetThemeBrush("BackgroundTertiaryBrush"),
-                BorderBrush = GetThemeBrush("BorderLightBrush"),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(4),
-                Cursor = Cursors.IBeam
+                VerticalContentAlignment = VerticalAlignment.Center
             };
-            // Validation : n'accepter que les nombres entiers (ne PAS bloquer le clic pour permettre l'édition)
+            repeatCountTextBox.SetResourceReference(TextBox.FontFamilyProperty, "FontMono");
             repeatCountTextBox.PreviewTextInput += (s, e) => e.Handled = !char.IsDigit(e.Text, 0);
-            editPanel.Children.Add(repeatCountTextBox);
-
-            // Input pour la touche à surveiller (Tant qu'une touche est pressée) - inline
-            var keyCodeTextBox = new TextBox
+            void ConfirmRepeatCount()
             {
-                Style = GetActionTextBoxStyle(),
-                Text = ra.KeyCodeToMonitor == 0 ? "Cliquez pour capturer" : GetKeyName(ra.KeyCodeToMonitor),
-                MinWidth = 120,
-                MaxWidth = 150,
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                TextAlignment = TextAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                Visibility = ra.RepeatMode == RepeatMode.WhileKeyPressed ? Visibility.Visible : Visibility.Collapsed,
-                IsReadOnly = true,
-                Cursor = Cursors.Hand,
-                Background = GetThemeBrush("BackgroundTertiaryBrush"),
-                BorderBrush = GetThemeBrush("BorderLightBrush"),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(4)
+                if (int.TryParse(repeatCountTextBox.Text, out int count) && count > 0 && count <= 9999)
+                {
+                    SaveState();
+                    ra.RepeatCount = count;
+                    chipText.Text = "× " + count;
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                }
+                else
+                    repeatCountTextBox.Text = ra.RepeatCount.ToString();
+                repeatChipInput.Visibility = Visibility.Collapsed;
+                repeatChip.Visibility = ra.RepeatMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed;
+            }
+            repeatCountTextBox.LostFocus += (s, e) => ConfirmRepeatCount();
+            repeatCountTextBox.PreviewKeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter) { ConfirmRepeatCount(); Keyboard.ClearFocus(); e.Handled = true; }
+                else if (e.Key == Key.Escape) { repeatCountTextBox.Text = ra.RepeatCount.ToString(); repeatChipInput.Visibility = Visibility.Collapsed; repeatChip.Visibility = ra.RepeatMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed; Keyboard.ClearFocus(); e.Handled = true; }
             };
+            repeatChipInput.Children.Add(chipTimes);
+            repeatChipInput.Children.Add(repeatCountTextBox);
+            repeatChip.MouseLeftButtonDown += (s, e) =>
+            {
+                e.Handled = true;
+                repeatChip.Visibility = Visibility.Collapsed;
+                repeatChipInput.Visibility = Visibility.Visible;
+                repeatCountTextBox.Focus();
+                repeatCountTextBox.SelectAll();
+            };
+            chipPanel.Children.Add(repeatChip);
+            chipPanel.Children.Add(repeatChipInput);
+            editPanel.Children.Add(chipPanel);
+
+            // Touche à surveiller (hint "cliquer + appuyer" comme mockup)
+            var keyWrap = new Border
+            {
+                Background = loopBg,
+                BorderBrush = loopBorder,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(3, 2, 8, 2),
+                MinWidth = 110,
+                Margin = gap,
+                Visibility = ra.RepeatMode == RepeatMode.WhileKeyPressed ? Visibility.Visible : Visibility.Collapsed,
+                Cursor = Cursors.Hand
+            };
+            var keyHint = new TextBlock { FontSize = 10, FontStyle = FontStyles.Italic, VerticalAlignment = VerticalAlignment.Center };
+            keyHint.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+            var keyVal = new TextBlock { FontSize = 12, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center };
+            keyVal.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+            keyHint.Foreground = new SolidColorBrush(Color.FromArgb(0x66, 57, 217, 122));
+            keyVal.Foreground = loopBrush;
+            keyHint.Text = "cliquer + appuyer";
+            keyVal.Text = ra.KeyCodeToMonitor == 0 ? "" : GetKeyName(ra.KeyCodeToMonitor);
+            keyVal.Visibility = ra.KeyCodeToMonitor == 0 ? Visibility.Collapsed : Visibility.Visible;
+            keyHint.Visibility = ra.KeyCodeToMonitor == 0 ? Visibility.Visible : Visibility.Collapsed;
+            var keyStack = new StackPanel { Orientation = Orientation.Horizontal };
+            keyStack.Children.Add(keyHint);
+            keyStack.Children.Add(keyVal);
+            keyWrap.Child = keyStack;
             bool keyCaptureMode = false;
             KeyboardHook? tempKeyHook = null;
-            keyCodeTextBox.MouseLeftButtonDown += (s, e) =>
+            keyWrap.MouseLeftButtonDown += (s, e) =>
             {
                 if (!keyCaptureMode)
                 {
                     e.Handled = true;
                     keyCaptureMode = true;
-                    keyCodeTextBox.Text = "Appuyez sur une touche...";
-                    keyCodeTextBox.Background = GetThemeBrush("AccentSelectionBrush");
+                    keyHint.Text = "appuyer sur une touche...";
+                    keyWrap.BorderBrush = loopBrush;
+                    keyWrap.Background = new SolidColorBrush(Color.FromArgb(0x24, 57, 217, 122));
                     tempKeyHook = new KeyboardHook();
                     tempKeyHook.KeyDown += (sender, args) =>
                     {
                         SaveState();
                         ra.KeyCodeToMonitor = (ushort)args.VirtualKeyCode;
-                        keyCodeTextBox.Text = GetKeyName(ra.KeyCodeToMonitor);
-                        keyCodeTextBox.Background = GetThemeBrush("BackgroundTertiaryBrush");
+                        keyVal.Text = GetKeyName(ra.KeyCodeToMonitor);
+                        keyVal.Visibility = Visibility.Visible;
+                        keyHint.Visibility = Visibility.Collapsed;
+                        keyHint.Text = "cliquer + appuyer";
+                        keyWrap.BorderBrush = loopBorder;
+                        keyWrap.Background = loopBg;
                         keyCaptureMode = false;
                         tempKeyHook?.Uninstall();
                         tempKeyHook = null;
@@ -5579,75 +6288,69 @@ namespace MacroEngine.UI
                     tempKeyHook.Install();
                 }
             };
-            editPanel.Children.Add(keyCodeTextBox);
+            editPanel.Children.Add(keyWrap);
 
-            // ComboBox pour le type de clic (Tant qu'un clic est pressé) - inline
+            // Sélecteur type de clic : même chip + flèche et option sélectionnée en vert
             var clickTypeComboBox = new ComboBox
             {
                 MinWidth = 100,
-                FontSize = 13,
+                FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-                Visibility = ra.RepeatMode == RepeatMode.WhileClickPressed ? Visibility.Visible : Visibility.Collapsed,
+                Margin = new Thickness(0),
                 SelectedIndex = ra.ClickTypeToMonitor
             };
-            clickTypeComboBox.Items.Add("Gauche");
-            clickTypeComboBox.Items.Add("Droit");
-            clickTypeComboBox.Items.Add("Milieu");
-            editPanel.Children.Add(clickTypeComboBox);
+            if (Application.Current.TryFindResource("ComboBoxRepeatGreen") is Style repeatClickCbStyle)
+                clickTypeComboBox.Style = repeatClickCbStyle;
+            if (Application.Current.TryFindResource("ComboBoxItemRepeatGreen") is Style repeatClickItemStyle)
+                clickTypeComboBox.ItemContainerStyle = repeatClickItemStyle;
+            clickTypeComboBox.SetResourceReference(ComboBox.FontFamilyProperty, "FontMono");
+            clickTypeComboBox.Items.Add("Clic gauche");
+            clickTypeComboBox.Items.Add("Clic droit");
+            clickTypeComboBox.Items.Add("Clic milieu");
+            var clickChipWrap = new Border
+            {
+                Child = clickTypeComboBox,
+                Background = loopBg,
+                BorderBrush = loopBorder,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(3, 2, 7, 2),
+                Margin = gap,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = ra.RepeatMode == RepeatMode.WhileClickPressed ? Visibility.Visible : Visibility.Collapsed
+            };
+            editPanel.Children.Add(clickChipWrap);
 
-            // Mise à jour de la visibilité des inputs selon le mode sélectionné
+            // Mise à jour de la visibilité selon le mode sélectionné
             modeComboBox.SelectionChanged += (s, e) =>
             {
                 if (modeComboBox.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag is RepeatMode selectedMode)
                 {
-                    // Mettre à jour la visibilité des inputs sans recréer tous les blocs
-                    repeatCountTextBox.Visibility = selectedMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed;
-                    keyCodeTextBox.Visibility = selectedMode == RepeatMode.WhileKeyPressed ? Visibility.Visible : Visibility.Collapsed;
-                    clickTypeComboBox.Visibility = selectedMode == RepeatMode.WhileClickPressed ? Visibility.Visible : Visibility.Collapsed;
-                    
-                    // Sauvegarder le changement de mode
+                    chipPanel.Visibility = selectedMode == RepeatMode.RepeatCount ? Visibility.Visible : Visibility.Collapsed;
+                    if (selectedMode != RepeatMode.RepeatCount)
+                    {
+                        repeatChipInput.Visibility = Visibility.Collapsed;
+                        repeatChip.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        repeatChip.Visibility = Visibility.Visible;
+                        chipText.Text = "× " + ra.RepeatCount;
+                    }
+                    keyWrap.Visibility = selectedMode == RepeatMode.WhileKeyPressed ? Visibility.Visible : Visibility.Collapsed;
+                    clickChipWrap.Visibility = selectedMode == RepeatMode.WhileClickPressed ? Visibility.Visible : Visibility.Collapsed;
+
                     SaveState();
                     ra.RepeatMode = selectedMode;
-                    
-                    if (selectedMode == RepeatMode.Once)
-                    {
-                        ra.RepeatCount = 1;
-                    }
-                    else if (selectedMode == RepeatMode.UntilStopped)
-                    {
-                        ra.RepeatCount = 0;
-                    }
-                    
+                    if (selectedMode == RepeatMode.Once) ra.RepeatCount = 1;
+                    else if (selectedMode == RepeatMode.UntilStopped) ra.RepeatCount = 0;
+
                     _currentMacro!.ModifiedAt = DateTime.Now;
                     MacroChanged?.Invoke(this, EventArgs.Empty);
                 }
-            };
-            
-            // Rafraîchir les blocs après la fermeture du ComboBox
-            modeComboBox.DropDownClosed += (s, e) =>
-            {
-                RefreshBlocks();
             };
 
-            // Sauvegarder automatiquement le nombre de répétitions lors de la perte de focus (clic ailleurs)
-            repeatCountTextBox.LostFocus += (s, e) =>
-            {
-                if (int.TryParse(repeatCountTextBox.Text, out int count) && count > 0)
-                {
-                    SaveState();
-                    ra.RepeatCount = count;
-                    _currentMacro!.ModifiedAt = DateTime.Now;
-                    RefreshBlocks();
-                    MacroChanged?.Invoke(this, EventArgs.Empty);
-                }
-                else
-                {
-                    // Valeur invalide : restaurer la valeur originale
-                    repeatCountTextBox.Text = ra.RepeatCount.ToString();
-                }
-            };
+            modeComboBox.DropDownClosed += (s, e) => RefreshBlocks();
 
             // Sauvegarder automatiquement le type de clic lors du changement
             clickTypeComboBox.SelectionChanged += (s, e) =>
@@ -5661,37 +6364,7 @@ namespace MacroEngine.UI
                 }
             };
             
-            // Rafraîchir les blocs seulement après la fermeture du ComboBox de type de clic
-            clickTypeComboBox.DropDownClosed += (s, e) =>
-            {
-                RefreshBlocks();
-            };
-
-            // Empêcher les TextBox de déclencher le drag & drop (les ComboBox peuvent être cliqués normalement)
-
-            // Gestion des touches : Enter pour confirmer le nombre de répétitions, Escape pour annuler
-            repeatCountTextBox.PreviewKeyDown += (s, e) =>
-            {
-                if (e.Key == Key.Enter)
-                {
-                    e.Handled = true;
-                    if (int.TryParse(repeatCountTextBox.Text, out int count) && count > 0)
-                    {
-                        SaveState();
-                        ra.RepeatCount = count;
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    }
-                    Keyboard.ClearFocus();
-                }
-                else if (e.Key == Key.Escape)
-                {
-                    e.Handled = true;
-                    repeatCountTextBox.Text = ra.RepeatCount.ToString();
-                    Keyboard.ClearFocus();
-                }
-            };
+            clickTypeComboBox.DropDownClosed += (s, e) => RefreshBlocks();
 
             return editPanel;
         }
@@ -5703,24 +6376,72 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée les contrôles inline pour une action IfAction (toujours visibles dans la carte)
+        /// Ordre et libellés des types de condition (mockup Si)
+        /// </summary>
+        private static (ConditionType type, string label)[] GetConditionTypeDisplayList()
+        {
+            return new[]
+            {
+                (ConditionType.Boolean, "Boolean"),
+                (ConditionType.ActiveApplication, "Application active"),
+                (ConditionType.KeyboardKey, "Touche clavier"),
+                (ConditionType.ProcessRunning, "Processus ouvert"),
+                (ConditionType.PixelColor, "Couleur pixel"),
+                (ConditionType.MousePosition, "Position souris"),
+                (ConditionType.MouseClick, "Clic souris"),
+                (ConditionType.ImageOnScreen, "Image à l'écran"),
+                (ConditionType.TextOnScreen, "Texte à l'écran"),
+                (ConditionType.Variable, "Variable"),
+                (ConditionType.TimeDate, "Temps / Date")
+            };
+        }
+
+        private static string GetConditionTypeLabel(ConditionType type)
+        {
+            foreach (var (t, label) in GetConditionTypeDisplayList())
+                if (t == type) return label;
+            return type.ToString();
+        }
+
+        /// <summary>Processus en cours avec fenêtre visible pour le picker Application active / Processus ouvert (avec icônes).</summary>
+        private static List<ProcessInfo> GetRunningProcessesWithIcons()
+        {
+            try
+            {
+                return ProcessMonitor.GetRunningProcesses();
+            }
+            catch { return new List<ProcessInfo>(); }
+        }
+
+        /// <summary>
+        /// Crée les contrôles inline pour une action IfAction (style mockup: block-if, cond-select, cond-config, ET/OU, ＋ ET/OU)
         /// </summary>
         private StackPanel CreateIfActionControls(IfAction ifAction, int index, Panel parentPanel)
         {
-            // Vérifier si on utilise le mode groupes ou le mode plat
+            var red = Color.FromRgb(0xE8, 0x40, 0x40);
+            var redBrush = new SolidColorBrush(red);
+            var redBorder = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0x40, 0x40));
+            var redBg = new SolidColorBrush(Color.FromArgb(0x1A, 0xE8, 0x40, 0x40));
+            var amber = Color.FromRgb(0xE8, 0xA0, 0x20);
+            var amberBrush = new SolidColorBrush(amber);
+            var amberBorder = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0xA0, 0x20));
+            var amberBg = new SolidColorBrush(Color.FromArgb(0x12, 0xE8, 0xA0, 0x20));
+            var purple = Color.FromRgb(0xA7, 0x8B, 0xFA);
+            var purpleBrush = new SolidColorBrush(purple);
+            var purpleBorder = new SolidColorBrush(Color.FromArgb(0x66, 0xA7, 0x8B, 0xFA));
+            var purpleBg = new SolidColorBrush(Color.FromArgb(0x12, 0xA7, 0x8B, 0xFA));
+            var textMuted = GetThemeBrush("TextMutedBrush") ?? new SolidColorBrush(Color.FromRgb(0x4A, 0x5A, 0x4A));
+            var line2 = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26));
+            const double conditionBorderThickness = 1;
+
             bool useGroups = ifAction.ConditionGroups != null && ifAction.ConditionGroups.Count > 0;
-
-            // Initialiser selon le mode
             if (useGroups)
-            {
-                return CreateConditionGroupsUI(ifAction, index, parentPanel);
-            }
+                return CreateConditionGroupsUI(ifAction, index, parentPanel, redBrush, redBorder, redBg);
 
-            // Mode plat: Initialiser Conditions si vide (compatibilité avec l'ancien format)
             if (ifAction.Conditions == null || ifAction.Conditions.Count == 0)
             {
                 ifAction.Conditions = new List<ConditionItem>();
-                var conditionItem = new ConditionItem
+                ifAction.Conditions.Add(new ConditionItem
                 {
                     ConditionType = ifAction.ConditionType,
                     Condition = ifAction.Condition,
@@ -5732,87 +6453,118 @@ namespace MacroEngine.UI
                     TimeDateConfig = ifAction.TimeDateConfig,
                     ImageOnScreenConfig = ifAction.ImageOnScreenConfig,
                     TextOnScreenConfig = ifAction.TextOnScreenConfig
-                };
-                ifAction.Conditions.Add(conditionItem);
+                });
             }
-
             if (ifAction.Operators == null)
-            {
                 ifAction.Operators = new List<LogicalOperator>();
-            }
+            while (ifAction.Operators.Count < ifAction.Conditions.Count - 1)
+                ifAction.Operators.Add(LogicalOperator.AND);
 
-            // Créer un panel horizontal pour afficher toutes les conditions
             var mainPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
-            // Label "Si"
-            var ifLabel = new TextBlock
+            // block-title Si (centré verticalement)
+            var blockTitle = new TextBlock
             {
                 Text = "Si",
-                FontSize = 13,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 8, 0),
+                FontSize = 14,
+                FontWeight = FontWeights.Bold,
+                Foreground = redBrush,
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = GetThemeBrush("TextPrimaryBrush")
+                Margin = new Thickness(0, -2, 10, 0)
             };
-            mainPanel.Children.Add(ifLabel);
+            blockTitle.SetResourceReference(TextBlock.FontFamilyProperty, "FontPrimary");
+            mainPanel.Children.Add(blockTitle);
 
-            // Afficher toutes les conditions existantes
+            // Liste des types pour le ComboBox (ordre mockup)
+            var typeList = GetConditionTypeDisplayList();
+
             for (int i = 0; i < ifAction.Conditions.Count; i++)
             {
                 var condition = ifAction.Conditions[i];
-                var conditionIndex = i; // Capture pour la closure
+                var conditionIndex = i;
 
-                // Panel pour une condition
-                var conditionPanel = new StackPanel
+                // cond-logical ET/OU (entre conditions, avant la 2e, 3e...)
+                if (i > 0)
                 {
-                    Orientation = Orientation.Horizontal,
+                    var opIndex = i - 1;
+                    var isAnd = opIndex < ifAction.Operators.Count && ifAction.Operators[opIndex] == LogicalOperator.AND;
+                    var condLogical = new Border
+                    {
+                        Child = new TextBlock
+                        {
+                            Text = isAnd ? "ET" : "OU",
+                            FontSize = 9,
+                            FontWeight = FontWeights.ExtraBold,
+                            Foreground = isAnd ? amberBrush : purpleBrush,
+                            VerticalAlignment = VerticalAlignment.Center
+                        },
+                        Background = isAnd ? amberBg : purpleBg,
+                        BorderBrush = isAnd ? amberBorder : purpleBorder,
+                        BorderThickness = new Thickness(1),
+                        Padding = new Thickness(3, 3, 6, 3),
+                        MinHeight = 23,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 8, 0)
-                };
-
-                // Label pour afficher le numéro de condition
-                var conditionLabel = new TextBlock
-                {
-                    Text = $"[Condition{i + 1}]",
-                    FontSize = 12,
-                    FontWeight = FontWeights.SemiBold,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 4, 0),
-                    Foreground = GetThemeBrush("TextPrimaryBrush")
-                };
-                conditionPanel.Children.Add(conditionLabel);
-
-                // ComboBox pour le type de condition
-                var conditionTypeComboBox = new ComboBox
-                {
-                    Width = 150,
-                    FontSize = 11,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                conditionTypeComboBox.Items.Add("Booléen");
-                conditionTypeComboBox.Items.Add("Application active");
-                conditionTypeComboBox.Items.Add("Touche clavier");
-                conditionTypeComboBox.Items.Add("Processus ouvert");
-                conditionTypeComboBox.Items.Add("Pixel couleur");
-                conditionTypeComboBox.Items.Add("Position souris");
-                conditionTypeComboBox.Items.Add("Temps/Date");
-                conditionTypeComboBox.Items.Add("Image à l'écran");
-                conditionTypeComboBox.Items.Add("Texte à l'écran");
-                conditionTypeComboBox.Items.Add("Variable");
-                conditionTypeComboBox.Items.Add("Clic");
-                conditionTypeComboBox.SelectedIndex = (int)condition.ConditionType;
-
-                conditionTypeComboBox.SelectionChanged += (s, e) =>
-                {
-                    if (conditionTypeComboBox.SelectedIndex >= 0)
+                        Cursor = Cursors.Hand,
+                        Margin = new Thickness(6, 0, 0, 0),
+                        ToolTip = "Basculer ET / OU"
+                    };
+                    condLogical.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                    condLogical.MouseLeftButtonDown += (s, e) =>
                     {
                         SaveState();
-                        condition.ConditionType = (ConditionType)conditionTypeComboBox.SelectedIndex;
-                        // Réinitialiser les configurations
+                        if (opIndex < ifAction.Operators.Count)
+                            ifAction.Operators[opIndex] = ifAction.Operators[opIndex] == LogicalOperator.AND ? LogicalOperator.OR : LogicalOperator.AND;
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                        e.Handled = true;
+                    };
+                    mainPanel.Children.Add(condLogical);
+                }
+
+                // cond-select-trigger : ComboBox type de condition (sélection et flèche en rouge)
+                var condCombo = new ComboBox
+                {
+                    MinWidth = 110,
+                    FontSize = 11,
+                    FontWeight = FontWeights.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
+                    BorderThickness = new Thickness(0),
+                    Background = Brushes.Transparent,
+                    Padding = new Thickness(0, 0, 0, 0)
+                };
+                if (Application.Current.TryFindResource("ComboBoxSiRed") is Style siRedStyle)
+                    condCombo.Style = siRedStyle;
+                if (Application.Current.TryFindResource("ComboBoxItemSiRed") is Style siRedItemStyle)
+                    condCombo.ItemContainerStyle = siRedItemStyle;
+                condCombo.SetResourceReference(ComboBox.FontFamilyProperty, "FontMono");
+                foreach (var (t, label) in typeList)
+                    condCombo.Items.Add(new ComboBoxItem { Content = label, Tag = t });
+                var typeIdx = Array.FindIndex(typeList, x => x.type == condition.ConditionType);
+                condCombo.SelectedIndex = typeIdx >= 0 ? typeIdx : 0;
+                var condSelectWrap = new Border
+                {
+                    Background = redBg,
+                    BorderBrush = redBorder,
+                    BorderThickness = new Thickness(conditionBorderThickness),
+                    Padding = new Thickness(3, 2, 6, 2),
+                    Margin = new Thickness(0, 0, 4, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    CornerRadius = new CornerRadius(0),
+                    Child = condCombo
+                };
+                condCombo.SelectionChanged += (s, e) =>
+                {
+                    if (condCombo.SelectedItem is ComboBoxItem item && item.Tag is ConditionType t)
+                    {
+                        SaveState();
+                        condition.ConditionType = t;
                         condition.ActiveApplicationConfig = null;
                         condition.KeyboardKeyConfig = null;
                         condition.ProcessRunningConfig = null;
@@ -5822,331 +6574,1875 @@ namespace MacroEngine.UI
                         condition.ImageOnScreenConfig = null;
                         condition.TextOnScreenConfig = null;
                         condition.VariableName = null;
-                        condition.MouseClickConfig = condition.ConditionType == ConditionType.MouseClick ? new MouseClickCondition() : null;
+                        condition.VariableOperator = null;
+                        condition.VariableValue = null;
+                        condition.MouseClickConfig = t == ConditionType.MouseClick ? new MouseClickCondition { ClickType = 3 } : null;
                         _currentMacro!.ModifiedAt = DateTime.Now;
                         RefreshBlocks();
                         MacroChanged?.Invoke(this, EventArgs.Empty);
                     }
                 };
-                conditionPanel.Children.Add(conditionTypeComboBox);
+                mainPanel.Children.Add(condSelectWrap);
 
-                // Sous-combo pour le type de clic (visible uniquement si type = Clic)
-                var clickTypeComboBox = new ComboBox
+                // cond-config : pour Boolean = bascule Vrai/Faux ; sinon aperçu + gear
+                var condConfig = new StackPanel
                 {
-                    Width = 120,
-                    FontSize = 11,
+                    Orientation = Orientation.Horizontal,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(4, 0, 0, 0),
-                    Visibility = condition.ConditionType == ConditionType.MouseClick ? Visibility.Visible : Visibility.Collapsed
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(0, 0, 4, 0)
                 };
-                clickTypeComboBox.Items.Add("Clic gauche");
-                clickTypeComboBox.Items.Add("Clic droit");
-                clickTypeComboBox.Items.Add("Clic milieu");
-                clickTypeComboBox.Items.Add("Maintenir gauche");
-                clickTypeComboBox.Items.Add("Maintenir droit");
-                clickTypeComboBox.Items.Add("Maintenir milieu");
-                clickTypeComboBox.Items.Add("Molette haut");
-                clickTypeComboBox.Items.Add("Molette bas");
-                if (condition.MouseClickConfig != null)
-                    clickTypeComboBox.SelectedIndex = Math.Max(0, Math.Min(condition.MouseClickConfig.ClickType, 7));
-                else
-                    clickTypeComboBox.SelectedIndex = 0;
-                clickTypeComboBox.SelectionChanged += (s, e) =>
+                TextBlock? previewText = null;
+                Action<FrameworkElement>? openPixelPop = null;
+                Action<FrameworkElement>? openColorPop = null;
+                Action<FrameworkElement>? openImagePop = null;
+                Action<FrameworkElement>? openTextPop = null;
+                if (condition.ConditionType == ConditionType.Boolean)
                 {
-                    if (clickTypeComboBox.SelectedIndex >= 0 && condition.MouseClickConfig != null)
+                    // Un seul bouton bascule Vrai/Faux (même style que ET/OU, même hauteur que ComboBox)
+                    var boolLabel = new TextBlock
                     {
-                        SaveState();
-                        condition.MouseClickConfig.ClickType = clickTypeComboBox.SelectedIndex;
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    }
-                };
-                conditionPanel.Children.Add(clickTypeComboBox);
-
-                // Bouton pour configurer cette condition
-                var configButton = new Button
-                {
-                    Content = LucideIcons.CreateIcon(LucideIcons.Settings, 12),
-                    Width = 28,
-                    Height = 28,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(4, 0, 0, 0),
-                    Cursor = Cursors.Hand
-                };
-                if (Application.Current.TryFindResource("TimelineIfIconButton") is Style ifIconStyle)
-                    configButton.Style = ifIconStyle;
-                configButton.Click += (s, e) =>
-                {
-                    // Créer un IfAction temporaire avec seulement cette condition pour le dialogue
-                    var tempIfAction = new IfAction
-                    {
-                        Conditions = new List<ConditionItem> { condition },
-                        Operators = new List<LogicalOperator>()
-                    };
-                    var dialog = new ConditionConfigDialog(tempIfAction);
-                    dialog.Owner = Window.GetWindow(this);
-                    if (dialog.ShowDialog() == true && dialog.Result != null && dialog.Result.Conditions.Count > 0)
-                    {
-                        SaveState();
-                        // Copier la configuration de la condition
-                        var resultCondition = dialog.Result.Conditions[0];
-                        condition.ConditionType = resultCondition.ConditionType;
-                        condition.Condition = resultCondition.Condition;
-                        condition.ActiveApplicationConfig = resultCondition.ActiveApplicationConfig;
-                        condition.KeyboardKeyConfig = resultCondition.KeyboardKeyConfig;
-                        condition.ProcessRunningConfig = resultCondition.ProcessRunningConfig;
-                        condition.PixelColorConfig = resultCondition.PixelColorConfig;
-                        condition.MousePositionConfig = resultCondition.MousePositionConfig;
-                        condition.TimeDateConfig = resultCondition.TimeDateConfig;
-                        condition.ImageOnScreenConfig = resultCondition.ImageOnScreenConfig;
-                        condition.TextOnScreenConfig = resultCondition.TextOnScreenConfig;
-                        condition.MouseClickConfig = resultCondition.MouseClickConfig != null ? new MouseClickCondition { ClickType = resultCondition.MouseClickConfig.ClickType } : null;
-                        condition.VariableName = resultCondition.VariableName;
-                        _currentMacro!.ModifiedAt = DateTime.Now;
-                        RefreshBlocks();
-                        MacroChanged?.Invoke(this, EventArgs.Empty);
-                    }
-                };
-                conditionPanel.Children.Add(configButton);
-
-                // Bouton pour supprimer cette condition (toujours visible, mais désactivé si seule condition)
-                var removeButton = new Button
-                {
-                    Content = LucideIcons.CreateIcon(LucideIcons.Close, 10),
-                    Width = 24,
-                    Height = 24,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(4, 0, 0, 0),
-                    Cursor = Cursors.Hand,
-                    ToolTip = "Supprimer cette condition",
-                    IsEnabled = ifAction.Conditions.Count > 1
-                };
-                if (Application.Current.TryFindResource("TimelineIfIconButton") is Style ifIconStyle2)
-                    removeButton.Style = ifIconStyle2;
-                removeButton.Click += (s, e) =>
-                {
-                    if (ifAction.Conditions.Count <= 1)
-                        return; // Ne pas supprimer la dernière condition
-                    
-                    SaveState();
-                    if (conditionIndex >= 0 && conditionIndex < ifAction.Conditions.Count)
-                    {
-                        ifAction.Conditions.RemoveAt(conditionIndex);
-                        
-                        // Supprimer l'opérateur correspondant
-                        if (ifAction.Operators.Count > 0)
-                        {
-                            if (conditionIndex == 0)
-                            {
-                                ifAction.Operators.RemoveAt(0);
-                            }
-                            else if (conditionIndex >= ifAction.Operators.Count)
-                            {
-                                ifAction.Operators.RemoveAt(ifAction.Operators.Count - 1);
-                            }
-                            else
-                            {
-                                ifAction.Operators.RemoveAt(conditionIndex);
-                            }
-                        }
-                    }
-                    _currentMacro!.ModifiedAt = DateTime.Now;
-                    RefreshBlocks();
-                    MacroChanged?.Invoke(this, EventArgs.Empty);
-                };
-                conditionPanel.Children.Add(removeButton);
-
-                mainPanel.Children.Add(conditionPanel);
-
-                // Opérateur logique (sauf pour la dernière condition)
-                if (i < ifAction.Conditions.Count - 1)
-                {
-                    var operatorComboBox = new ComboBox
-                    {
-                        Width = 70,
-                        FontSize = 12,
+                        Text = condition.Condition ? "Vrai" : "Faux",
+                        FontSize = 11,
                         FontWeight = FontWeights.SemiBold,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Margin = new Thickness(8, 0, 8, 0)
+                        Foreground = redBrush,
+                        VerticalAlignment = VerticalAlignment.Center
                     };
-                    operatorComboBox.Items.Add("ET");
-                    operatorComboBox.Items.Add("OU");
+                    boolLabel.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                    var boolToggle = new Border
+                    {
+                        Child = boolLabel,
+                        Background = redBg,
+                        BorderBrush = redBorder,
+                        BorderThickness = new Thickness(1),
+                        Padding = new Thickness(3, 3, 6, 3),
+                        MinHeight = 23,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Cursor = Cursors.Hand,
+                        Margin = new Thickness(0, 0, 0, 0),
+                        ToolTip = "Basculer Vrai / Faux"
+                    };
+                    boolToggle.MouseLeftButtonDown += (s, e) =>
+                    {
+                        SaveState();
+                        condition.Condition = !condition.Condition;
+                        boolLabel.Text = condition.Condition ? "Vrai" : "Faux";
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        RefreshBlocks();
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                        e.Handled = true;
+                    };
+                    condConfig.Children.Add(boolToggle);
+                }
+                else if (condition.ConditionType == ConditionType.ActiveApplication || condition.ConditionType == ConditionType.ProcessRunning)
+                {
+                    // Chips inline (style mockup) + bouton ＋ ouvrant le picker
+                    var processNamesList = condition.ConditionType == ConditionType.ActiveApplication
+                        ? (condition.ActiveApplicationConfig ??= new ActiveApplicationCondition { ProcessNames = new List<string>() }).ProcessNames
+                        : (condition.ProcessRunningConfig ??= new ProcessRunningCondition { ProcessNames = new List<string>() }).ProcessNames;
+                    if (processNamesList == null) processNamesList = new List<string>();
 
-                    // Initialiser la valeur
-                    if (i < ifAction.Operators.Count)
+                    var chipsPanel = new WrapPanel
                     {
-                        operatorComboBox.SelectedIndex = ifAction.Operators[i] == LogicalOperator.AND ? 0 : 1;
+                        Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 2, 0)
+                    };
+
+                    const int maxVisibleChips = 3;
+
+                    Border? moreChipSingleton = null;
+                    Popup? morePopupSingleton = null;
+                    bool IsDescendantOf(DependencyObject ancestor, DependencyObject node)
+                    {
+                        while (node != null) { if (node == ancestor) return true; node = VisualTreeHelper.GetParent(node); }
+                        return false;
                     }
-                    else
+
+                    void RefreshChipsPanel()
                     {
-                        operatorComboBox.SelectedIndex = 0; // AND par défaut
-                        if (ifAction.Operators.Count <= i)
+                        chipsPanel.Children.Clear();
+                        var list = processNamesList.ToList();
+                        var visibleCount = Math.Min(maxVisibleChips, list.Count);
+                        for (int i = 0; i < visibleCount; i++)
                         {
-                            while (ifAction.Operators.Count <= i)
+                            var name = list[i];
+                            var chipStack = new StackPanel { Orientation = Orientation.Horizontal };
+                            var iconSource = ProcessMonitor.GetIconForProcessName(name);
+                            if (iconSource != null)
                             {
-                                ifAction.Operators.Add(LogicalOperator.AND);
+                                chipStack.Children.Add(new Border
+                                {
+                                    Width = 14,
+                                    Height = 14,
+                                    Margin = new Thickness(0, 0, 4, 0),
+                                    Child = new Image { Source = iconSource, Width = 14, Height = 14, Stretch = Stretch.Uniform }
+                                });
                             }
+                            chipStack.Children.Add(new TextBlock { Text = name, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = redBrush, VerticalAlignment = VerticalAlignment.Center });
+                            var closeTb = new TextBlock { Text = "✕", FontSize = 9, Foreground = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0x40, 0x40)), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+                            var closeBtn = new Border
+                            {
+                                Child = closeTb,
+                                Background = Brushes.Transparent,
+                                Cursor = Cursors.Hand,
+                    Margin = new Thickness(4, 0, 0, 0),
+                                Padding = new Thickness(2, 0, 0, 0)
+                            };
+                            closeBtn.MouseEnter += (s, e) => closeTb.Foreground = redBrush;
+                            closeBtn.MouseLeave += (s, e) => closeTb.Foreground = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0x40, 0x40));
+                            chipStack.Children.Add(closeBtn);
+                            var chip = new Border
+                            {
+                                Background = redBg,
+                                BorderBrush = redBorder,
+                                BorderThickness = new Thickness(1),
+                                Padding = new Thickness(2, 2, 2, 2),
+                                Margin = new Thickness(0, 0, 3, 0),
+                                VerticalAlignment = VerticalAlignment.Center,
+                                Child = chipStack
+                            };
+                            chip.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                            var nameCapture = name;
+                            chipStack.Children[chipStack.Children.Count - 1].MouseLeftButtonDown += (s, e) =>
+                            {
+                                processNamesList.RemoveAll(n => string.Equals(n, nameCapture, StringComparison.OrdinalIgnoreCase));
+                                RefreshChipsPanel();
+                                SaveState();
+                                _currentMacro!.ModifiedAt = DateTime.Now;
+                                MacroChanged?.Invoke(this, EventArgs.Empty);
+                                e.Handled = true;
+                            };
+                            chipsPanel.Children.Add(chip);
+                        }
+                        if (list.Count > maxVisibleChips)
+                        {
+                            if (moreChipSingleton == null)
+                            {
+                                var moreChip = new Border
+                                {
+                                    Background = redBg,
+                                    BorderBrush = redBorder,
+                                    BorderThickness = new Thickness(1),
+                                    Padding = new Thickness(2, 2, 2, 2),
+                                    Margin = new Thickness(0, 0, 3, 0),
+                                    VerticalAlignment = VerticalAlignment.Center,
+                                    MinHeight = 20,
+                                    Child = new TextBlock { Text = "...", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = redBrush, VerticalAlignment = VerticalAlignment.Center }
+                                };
+                                moreChip.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                                var morePopup = new Popup { PlacementTarget = moreChip, Placement = PlacementMode.Bottom, StaysOpen = true };
+                                void CloseMorePopup()
+                                {
+                                    morePopup.IsOpen = false;
+                                    if (Application.Current.MainWindow != null)
+                                        Application.Current.MainWindow.PreviewMouseDown -= OnMorePopupPreviewMouseDown;
+                                }
+                                void OnMorePopupPreviewMouseDown(object s, MouseButtonEventArgs ev)
+                                {
+                                    var clicked = ev.OriginalSource as DependencyObject;
+                                    if (clicked == null) return;
+                                    if (IsDescendantOf(morePopup.Child as DependencyObject, clicked) || IsDescendantOf(moreChip, clicked)) return;
+                                    CloseMorePopup();
+                                }
+                                void OpenMorePopup()
+                                {
+                                    var restList = processNamesList.Skip(maxVisibleChips).ToList();
+                                    if (restList.Count == 0) { CloseMorePopup(); return; }
+                                    var panel = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 2, 0, 0) };
+                                    foreach (var name in restList)
+                                    {
+                                        var chipStack = new StackPanel { Orientation = Orientation.Horizontal };
+                                        var iconSource = ProcessMonitor.GetIconForProcessName(name);
+                                        if (iconSource != null)
+                                            chipStack.Children.Add(new Border { Width = 14, Height = 14, Margin = new Thickness(0, 0, 4, 0), Child = new Image { Source = iconSource, Width = 14, Height = 14, Stretch = Stretch.Uniform } });
+                                        chipStack.Children.Add(new TextBlock { Text = name, FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = redBrush, VerticalAlignment = VerticalAlignment.Center });
+                                        var popupCloseTb = new TextBlock { Text = "✕", FontSize = 9, Foreground = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0x40, 0x40)), VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center };
+                                        var popupCloseBtn = new Border
+                                        {
+                                            Child = popupCloseTb,
+                                            Background = Brushes.Transparent,
+                                            Cursor = Cursors.Hand,
+                                            Margin = new Thickness(4, 0, 0, 0),
+                                            Padding = new Thickness(2, 0, 0, 0)
+                                        };
+                                        popupCloseBtn.MouseEnter += (s, e) => popupCloseTb.Foreground = redBrush;
+                                        popupCloseBtn.MouseLeave += (s, e) => popupCloseTb.Foreground = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0x40, 0x40));
+                                        chipStack.Children.Add(popupCloseBtn);
+                                        var popupChip = new Border { Background = Brushes.Transparent, Padding = new Thickness(2, 2, 2, 2), Margin = new Thickness(0, 0, 0, 2), Child = chipStack };
+                                        popupChip.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                                        var nameCapture = name;
+                                        chipStack.Children[chipStack.Children.Count - 1].MouseLeftButtonDown += (s, e) =>
+                                        {
+                                            processNamesList.RemoveAll(n => string.Equals(n, nameCapture, StringComparison.OrdinalIgnoreCase));
+                                            RefreshChipsPanel();
+                        SaveState();
+                        _currentMacro!.ModifiedAt = DateTime.Now;
+                        MacroChanged?.Invoke(this, EventArgs.Empty);
+                                            OpenMorePopup();
+                                            e.Handled = true;
+                                        };
+                                        panel.Children.Add(popupChip);
+                                    }
+                                    var popupBorder = new Border { Child = panel, Background = redBg, BorderBrush = redBorder, BorderThickness = new Thickness(1), Padding = new Thickness(4) };
+                                    popupBorder.MouseLeave += (s, e) => CloseMorePopup();
+                                    morePopup.Child = popupBorder;
+                                    morePopup.IsOpen = true;
+                                }
+                                moreChip.MouseEnter += (s, e) =>
+                                {
+                                    OpenMorePopup();
+                                    if (morePopup.IsOpen)
+                                        Application.Current.MainWindow?.AddHandler(UIElement.PreviewMouseDownEvent, (MouseButtonEventHandler)OnMorePopupPreviewMouseDown, true);
+                                };
+                                moreChipSingleton = moreChip;
+                                morePopupSingleton = morePopup;
+                            }
+                            chipsPanel.Children.Add(moreChipSingleton);
                         }
                     }
 
-                    var operatorIndex = i; // Capture pour la closure
-                    operatorComboBox.SelectionChanged += (s, e) =>
+                    void AddChip(string name)
                     {
-                        if (operatorComboBox.SelectedIndex >= 0)
+                        if (string.IsNullOrWhiteSpace(name) || processNamesList!.Any(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase))) return;
+                        processNamesList.Add(name);
+                        RefreshChipsPanel();
+                    }
+
+                    RefreshChipsPanel();
+
+                    var chipAddBtn = new Grid
+                    {
+                        Width = 23,
+                        MinHeight = 23,
+                        Height = 23,
+                        Background = Brushes.Transparent,
+                    Cursor = Cursors.Hand,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        ToolTip = "Ajouter une application / un processus"
+                    };
+                    chipAddBtn.Children.Add(new Rectangle
+                    {
+                        Stroke = redBorder,
+                        StrokeThickness = conditionBorderThickness,
+                        StrokeDashArray = new DoubleCollection(new[] { 6.0, 3.0 }),
+                        Fill = Brushes.Transparent,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        VerticalAlignment = VerticalAlignment.Stretch,
+                        RadiusX = 0,
+                        RadiusY = 0
+                    });
+                    chipAddBtn.Children.Add(new TextBlock
+                    {
+                        Text = "＋",
+                        FontSize = 11,
+                        Foreground = redBrush,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                    chipAddBtn.MouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        var processes = GetRunningProcessesWithIcons();
+                        var borderLight = TryFindResource("BorderLightBrush") as Brush ?? new SolidColorBrush(Color.FromRgb(0x33, 0x33, 0x33));
+                        var textMutedPicker = new SolidColorBrush(Color.FromArgb(0x99, 0x99, 0x99, 0x99));
+
+                        const int searchCursorLeft = 2;
+                        const int searchPlaceholderLeft = 6;
+                        var searchBox = new TextBox
                         {
-                            SaveState();
-                            if (operatorIndex < ifAction.Operators.Count)
+                            FontSize = 11,
+                            Padding = new Thickness(searchCursorLeft, 4, 6, 4),
+                            BorderThickness = new Thickness(0, 0, 0, 0),
+                            Background = Brushes.Transparent,
+                            CaretBrush = redBrush
+                        };
+                        searchBox.SetResourceReference(TextBox.ForegroundProperty, "TextPrimaryBrush");
+                        searchBox.SetResourceReference(TextBox.FontFamilyProperty, "FontMono");
+                        var searchPlaceholder = new TextBlock { Text = "Rechercher…", FontSize = 11, Foreground = textMutedPicker, IsHitTestVisible = false, Margin = new Thickness(searchPlaceholderLeft, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                        searchPlaceholder.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                        var searchWrap = new Grid();
+                        searchWrap.Children.Add(searchBox);
+                        searchWrap.Children.Add(searchPlaceholder);
+                        searchBox.TextChanged += (_, __) => searchPlaceholder.Visibility = string.IsNullOrEmpty(searchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+                        var searchRow = new Border { BorderBrush = borderLight, BorderThickness = new Thickness(0, 0, 1, 1), Child = searchWrap };
+
+                        var listBox = new ListBox
+                        {
+                            MaxHeight = 180,
+                            BorderThickness = new Thickness(0, 0, 0, 0),
+                            Background = Brushes.Transparent,
+                            HorizontalContentAlignment = HorizontalAlignment.Stretch
+                        };
+                        if (TryFindResource("ListBoxPickerBorderScrollStyle") is Style pickerListStyle)
+                            listBox.Style = pickerListStyle;
+                        if (TryFindResource("ListBoxItemPickerStyle") is Style pickerItemStyle)
+                            listBox.ItemContainerStyle = pickerItemStyle;
+                        listBox.SetResourceReference(ListBox.ForegroundProperty, "TextSecondaryBrush");
+                        listBox.SetResourceReference(ListBox.FontFamilyProperty, "FontMono");
+                        const int manualCursorLeft = 2;
+                        const int manualPlaceholderLeft = 6;
+                        var manualBox = new TextBox
+                        {
+                            FontSize = 10,
+                            Padding = new Thickness(manualCursorLeft, 4, 8, 4),
+                            BorderThickness = new Thickness(1),
+                            BorderBrush = borderLight,
+                            CaretBrush = redBrush
+                        };
+                        manualBox.SetResourceReference(TextBox.ForegroundProperty, "TextPrimaryBrush");
+                        manualBox.SetResourceReference(TextBox.FontFamilyProperty, "FontMono");
+                        var manualPlaceholder = new TextBlock { Text = "Nom du processus…", FontSize = 10, Foreground = textMutedPicker, IsHitTestVisible = false, Margin = new Thickness(manualPlaceholderLeft, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                        manualPlaceholder.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                        var manualWrap = new Grid();
+                        manualWrap.Children.Add(manualBox);
+                        manualWrap.Children.Add(manualPlaceholder);
+                        manualBox.TextChanged += (_, __) => manualPlaceholder.Visibility = string.IsNullOrEmpty(manualBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+
+                        var footerGrid = new Grid();
+                        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                        footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                        footerGrid.Children.Add(manualWrap);
+                        Grid.SetColumn(manualWrap, 0);
+                        var addManualBtn = new Button { Content = "⊕", FontSize = 13, Padding = new Thickness(8, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center, BorderBrush = borderLight, BorderThickness = new Thickness(1, 1, 1, 1), Background = Brushes.Transparent };
+                        footerGrid.Children.Add(addManualBtn);
+                        Grid.SetColumn(addManualBtn, 1);
+                        addManualBtn.SetResourceReference(Button.ForegroundProperty, "TextSecondaryBrush");
+                        addManualBtn.MouseEnter += (_, __) => { addManualBtn.BorderBrush = redBrush; addManualBtn.Foreground = redBrush; };
+                        addManualBtn.MouseLeave += (_, __) => { addManualBtn.BorderBrush = borderLight; addManualBtn.SetValue(Button.ForegroundProperty, TryFindResource("TextSecondaryBrush")); };
+                        var footer = new Border { BorderBrush = borderLight, BorderThickness = new Thickness(0, 1, 1, 0), Padding = new Thickness(10, 6, 10, 6), Child = footerGrid };
+
+                        var popupContent = new StackPanel
+                        {
+                            Width = 240,
+                            Background = TryFindResource("BackgroundSecondaryBrush") as Brush ?? new SolidColorBrush(Color.FromRgb(0x0D, 0x0F, 0x0D))
+                        };
+                        popupContent.Children.Add(searchRow);
+                        popupContent.Children.Add(listBox);
+                        popupContent.Children.Add(footer);
+
+                        var selectedSet = new HashSet<string>(processNamesList, StringComparer.OrdinalIgnoreCase);
+                        var listItems = new List<(string name, Border row)>();
+
+                        void RefreshList()
+                        {
+                            var q = searchBox.Text.Trim().ToLowerInvariant();
+                            listBox.Items.Clear();
+                            listItems.Clear();
+                            foreach (var process in processes.Where(p => string.IsNullOrEmpty(q) || p.ProcessName.ToLowerInvariant().Contains(q)))
                             {
-                                ifAction.Operators[operatorIndex] = operatorComboBox.SelectedIndex == 0 
-                                    ? LogicalOperator.AND 
-                                    : LogicalOperator.OR;
+                                var name = process.ProcessName;
+                                var pid = process.ProcessId;
+                                var iconSource = process.Icon;
+                                var rowGrid = new Grid();
+                                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                                rowGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                                var iconBlock = new Border
+                                {
+                                    Width = 16,
+                                    Height = 16,
+                                    Margin = new Thickness(0, 0, 8, 0),
+                                    Child = iconSource != null
+                                        ? new Image { Source = iconSource, Width = 16, Height = 16, Stretch = Stretch.Uniform }
+                                        : null
+                                };
+                                Grid.SetColumn(iconBlock, 0);
+                                rowGrid.Children.Add(iconBlock);
+                                var nameTb = new TextBlock { Text = name, FontSize = 10, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+                                nameTb.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                                var nameWrap = new Border { Child = nameTb, Margin = new Thickness(0, 0, 8, 0), HorizontalAlignment = HorizontalAlignment.Stretch };
+                                Grid.SetColumn(nameWrap, 1);
+                                rowGrid.Children.Add(nameWrap);
+                                var pidTb = new TextBlock { Text = pid.ToString(), FontSize = 9, Foreground = textMutedPicker, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+                                pidTb.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                                Grid.SetColumn(pidTb, 2);
+                                rowGrid.Children.Add(pidTb);
+                                var checkTb = new TextBlock { Text = "✓", FontSize = 9, Foreground = redBrush, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 0) };
+                                checkTb.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                                Grid.SetColumn(checkTb, 3);
+                                rowGrid.Children.Add(checkTb);
+                                var isSelected = selectedSet.Contains(name);
+                                checkTb.Visibility = isSelected ? Visibility.Visible : Visibility.Collapsed;
+                                var row = new Border
+                                {
+                                    Padding = new Thickness(10, 6, 10, 6),
+                                    Child = rowGrid,
+                                    Background = isSelected ? redBg : Brushes.Transparent,
+                                    Cursor = Cursors.Hand,
+                                    HorizontalAlignment = HorizontalAlignment.Stretch
+                                };
+                                row.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                                row.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
+                                if (isSelected) nameTb.Foreground = redBrush;
+                                row.MouseLeftButtonDown += (s2, e2) =>
+                                {
+                                    if (selectedSet.Contains(name))
+                                    {
+                                        selectedSet.Remove(name);
+                                        processNamesList.RemoveAll(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+                                        RefreshChipsPanel();
+                                        row.Background = Brushes.Transparent;
+                                        nameTb.SetValue(TextBlock.ForegroundProperty, TryFindResource("TextSecondaryBrush"));
+                                        checkTb.Visibility = Visibility.Collapsed;
                             }
                             else
                             {
-                                while (ifAction.Operators.Count <= operatorIndex)
-                                {
-                                    ifAction.Operators.Add(LogicalOperator.AND);
-                                }
-                                ifAction.Operators[operatorIndex] = operatorComboBox.SelectedIndex == 0 
-                                    ? LogicalOperator.AND 
-                                    : LogicalOperator.OR;
+                                        selectedSet.Add(name);
+                                        AddChip(name);
+                                        row.Background = redBg;
+                                        nameTb.Foreground = redBrush;
+                                        checkTb.Visibility = Visibility.Visible;
+                                    }
+                                    SaveState();
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                                    e2.Handled = true;
+                                };
+                                listBox.Items.Add(row);
+                                listItems.Add((name, row));
                             }
+                        }
+
+                        searchBox.TextChanged += (s2, e2) => RefreshList();
+                        RefreshList();
+
+                        addManualBtn.Click += (s2, e2) =>
+                        {
+                            var val = manualBox.Text.Trim();
+                            if (string.IsNullOrEmpty(val)) return;
+                            if (!processNamesList.Any(n => string.Equals(n, val, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                processNamesList.Add(val);
+                                AddChip(val);
+                                selectedSet.Add(val);
+                                manualBox.Clear();
+                                SaveState();
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                            }
+                        };
+                        manualBox.KeyDown += (s2, e2) => { if (e2.Key == Key.Enter) { addManualBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); e2.Handled = true; } };
+
+                        var popup = new Popup
+                        {
+                            PlacementTarget = chipAddBtn,
+                            Placement = PlacementMode.Bottom,
+                            StaysOpen = true,
+                            Child = new Border
+                            {
+                                Child = popupContent,
+                                BorderBrush = TryFindResource("BorderLightBrush") as Brush,
+                                BorderThickness = new Thickness(1, 1, 0, 1)
+                            }
+                        };
+                        void ClosePicker()
+                        {
+                            popup.IsOpen = false;
+                            if (Application.Current.MainWindow != null)
+                                Application.Current.MainWindow.PreviewMouseDown -= OnPreviewMouseDown;
+                        }
+                        void OnPreviewMouseDown(object s, MouseButtonEventArgs e)
+                        {
+                            var clicked = e.OriginalSource as DependencyObject;
+                            if (clicked == null) return;
+                            if (IsDescendantOf(popup.Child as DependencyObject, clicked) || IsDescendantOf(chipAddBtn, clicked))
+                                return;
+                            ClosePicker();
+                        }
+                        bool IsDescendantOf(DependencyObject ancestor, DependencyObject node)
+                        {
+                            while (node != null) { if (node == ancestor) return true; node = VisualTreeHelper.GetParent(node); }
+                            return false;
+                        }
+                        Application.Current.MainWindow?.AddHandler(UIElement.PreviewMouseDownEvent, (MouseButtonEventHandler)OnPreviewMouseDown, true);
+                        Dispatcher.BeginInvoke((Action)(() => popup.IsOpen = true), System.Windows.Threading.DispatcherPriority.Loaded);
+                    };
+                    condConfig.Children.Add(chipsPanel);
+                    condConfig.Children.Add(chipAddBtn);
+                }
+                else if (condition.ConditionType == ConditionType.KeyboardKey)
+                {
+                    condition.KeyboardKeyConfig ??= new KeyboardKeyCondition();
+                    string GetKeyConditionDisplay(KeyboardKeyCondition c)
+                    {
+                        if (c == null || c.VirtualKeyCode == 0) return "Touche…";
+                        var parts = new List<string>();
+                        if (c.RequireCtrl) parts.Add("Ctrl");
+                        if (c.RequireAlt) parts.Add("Alt");
+                        if (c.RequireShift) parts.Add("Shift");
+                        parts.Add(GetKeyName(c.VirtualKeyCode));
+                        return string.Join(" + ", parts);
+                    }
+                    var keyVal = new TextBlock
+                    {
+                        Text = GetKeyConditionDisplay(condition.KeyboardKeyConfig),
+                        FontSize = 11,
+                        FontWeight = FontWeights.Bold,
+                        Foreground = redBrush,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Left
+                    };
+                    keyVal.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                    var keyCapture = new TextBox
+                    {
+                        Background = Brushes.Transparent,
+                        BorderThickness = new Thickness(0),
+                        Padding = new Thickness(0),
+                        MinHeight = 0,
+                        VerticalAlignment = VerticalAlignment.Stretch,
+                        HorizontalAlignment = HorizontalAlignment.Stretch,
+                        VerticalContentAlignment = VerticalAlignment.Center,
+                        IsReadOnly = true,
+                        Focusable = true,
+                        Cursor = Cursors.IBeam
+                    };
+                    keyCapture.SetResourceReference(TextBox.FontFamilyProperty, "FontMono");
+                    var fieldBorderBrush = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0x40, 0x40));
+                    var fieldBgBrush = new SolidColorBrush(Color.FromArgb(0x14, 0xE8, 0x40, 0x40));
+                    var fieldPulseBorderBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xE8, 0x40, 0x40));
+                    var pulseBorderBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xE8, 0x40, 0x40));
+                    var pulseBgBrush = new SolidColorBrush(Color.FromArgb(0x14, 0xE8, 0x40, 0x40));
+                    var keyField = new Border
+                    {
+                        BorderThickness = new Thickness(1),
+                        BorderBrush = fieldBorderBrush,
+                        Background = fieldBgBrush,
+                        Padding = new Thickness(3, 2, 6, 4),
+                        MinWidth = 120,
+                        CornerRadius = new CornerRadius(0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Cursor = Cursors.Hand,
+                        ToolTip = "Cliquer puis appuyer sur une touche"
+                    };
+                    var keyFieldGrid = new Grid();
+                    keyFieldGrid.Children.Add(keyVal);
+                    keyFieldGrid.Children.Add(keyCapture);
+                    keyField.Child = keyFieldGrid;
+                    var pulseEase = new QuadraticEase { EasingMode = EasingMode.EaseInOut };
+                    void StopPulse()
+                    {
+                        pulseBorderBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+                        pulseBgBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+                        keyField.BorderBrush = condition.KeyboardKeyConfig!.VirtualKeyCode != 0 ? fieldPulseBorderBrush : fieldBorderBrush;
+                        keyField.Background = fieldBgBrush;
+                    }
+                    void StartPulse()
+                    {
+                        keyVal.Visibility = Visibility.Collapsed;
+                        pulseBorderBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+                        pulseBgBrush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+                        keyField.BorderBrush = pulseBorderBrush;
+                        keyField.Background = pulseBgBrush;
+                        pulseBorderBrush.Color = Color.FromArgb(0x80, 0xE8, 0x40, 0x40);
+                        pulseBgBrush.Color = Color.FromArgb(0x14, 0xE8, 0x40, 0x40);
+                        var borderAnim = new ColorAnimation(
+                            Color.FromRgb(0xE8, 0x40, 0x40),
+                            new Duration(TimeSpan.FromSeconds(0.45)))
+                        {
+                            AutoReverse = true,
+                            RepeatBehavior = RepeatBehavior.Forever,
+                            EasingFunction = pulseEase
+                        };
+                        var bgAnim = new ColorAnimation(
+                            Color.FromArgb(0x2E, 0xE8, 0x40, 0x40),
+                            new Duration(TimeSpan.FromSeconds(0.45)))
+                        {
+                            AutoReverse = true,
+                            RepeatBehavior = RepeatBehavior.Forever,
+                            EasingFunction = pulseEase
+                        };
+                        pulseBorderBrush.BeginAnimation(SolidColorBrush.ColorProperty, borderAnim);
+                        pulseBgBrush.BeginAnimation(SolidColorBrush.ColorProperty, bgAnim);
+                    }
+                    keyCapture.MouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        keyCapture.Focus();
+                        StartPulse();
+                    };
+                    keyCapture.GotFocus += (s, e) => StartPulse();
+                    keyCapture.LostFocus += (s, e) =>
+                    {
+                        StopPulse();
+                        keyVal.Visibility = Visibility.Visible;
+                        keyVal.Text = GetKeyConditionDisplay(condition.KeyboardKeyConfig!);
+                    };
+                    keyCapture.PreviewKeyDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        if (e.Key == Key.LeftCtrl || e.Key == Key.RightCtrl || e.Key == Key.LeftShift || e.Key == Key.RightShift ||
+                            e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.Key == Key.LWin || e.Key == Key.RWin ||
+                            e.Key == Key.Tab || e.Key == Key.CapsLock)
+                            return;
+                        try
+                        {
+                            int vk = KeyInterop.VirtualKeyFromKey(e.Key);
+                            if (vk <= 0) return;
+                            condition.KeyboardKeyConfig!.VirtualKeyCode = (ushort)vk;
+                            condition.KeyboardKeyConfig.RequireCtrl = (e.KeyboardDevice.Modifiers & System.Windows.Input.ModifierKeys.Control) != 0;
+                            condition.KeyboardKeyConfig.RequireAlt = (e.KeyboardDevice.Modifiers & System.Windows.Input.ModifierKeys.Alt) != 0;
+                            condition.KeyboardKeyConfig.RequireShift = (e.KeyboardDevice.Modifiers & System.Windows.Input.ModifierKeys.Shift) != 0;
+                            keyVal.Text = GetKeyConditionDisplay(condition.KeyboardKeyConfig);
+                            keyVal.Visibility = Visibility.Visible;
+                            StopPulse();
+                            SaveState();
                             _currentMacro!.ModifiedAt = DateTime.Now;
-                            RefreshBlocks();
+                            MacroChanged?.Invoke(this, EventArgs.Empty);
+                            Keyboard.ClearFocus();
+                        }
+                        catch { }
+                    };
+                    var keyWrap = new Border
+                    {
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Child = keyField
+                    };
+                    condConfig.Children.Add(keyWrap);
+                }
+                else if (condition.ConditionType == ConditionType.PixelColor)
+                {
+                    condition.PixelColorConfig ??= new PixelColorCondition { X = 0, Y = 0, ExpectedColor = "#e84040" };
+                    var pc = condition.PixelColorConfig;
+                    static System.Windows.Media.Color ParseHexColor(string hex)
+                    {
+                        hex = (hex ?? "").TrimStart('#');
+                        if (hex.Length != 6) return System.Windows.Media.Color.FromRgb(0xE8, 0x40, 0x40);
+                        int r = int.Parse(hex.Substring(0, 2), NumberStyles.HexNumber);
+                        int g = int.Parse(hex.Substring(2, 2), NumberStyles.HexNumber);
+                        int b = int.Parse(hex.Substring(4, 2), NumberStyles.HexNumber);
+                        return System.Windows.Media.Color.FromRgb((byte)r, (byte)g, (byte)b);
+                    }
+                    var pixelRedBorder = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x4D, 0xE8, 0x40, 0x40));
+                    var pixelRedBg = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x0F, 0xE8, 0x40, 0x40));
+                    const int conditionRowHeight = 23; // même hauteur que le ComboBox Si (condSelectWrap + bool toggle MinHeight)
+                    var swatchBrush = new SolidColorBrush(ParseHexColor(pc.ExpectedColor));
+                    var swatch = new Border
+                    {
+                        Width = conditionRowHeight,
+                        Height = conditionRowHeight,
+                        Background = swatchBrush,
+                        Cursor = Cursors.Hand,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 5, 0)
+                    };
+                    condConfig.Children.Add(swatch);
+                    var xBox = new TextBox
+                    {
+                        Text = pc.X.ToString(),
+                        Width = 44,
+                        MaxLength = 5,
+                        MinHeight = conditionRowHeight,
+                        Height = conditionRowHeight,
+                        FontSize = 11,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = redBrush,
+                        CaretBrush = redBrush,
+                        Background = pixelRedBg,
+                        BorderBrush = pixelRedBorder,
+                        BorderThickness = new Thickness(1),
+                        Padding = new Thickness(4, 2, 4, 2),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        VerticalContentAlignment = VerticalAlignment.Center,
+                        HorizontalContentAlignment = HorizontalAlignment.Left,
+                        TextAlignment = TextAlignment.Left,
+                        Margin = new Thickness(0, 0, 5, 0)
+                    };
+                    xBox.SetResourceReference(TextBox.FontFamilyProperty, "FontMono");
+                    xBox.SetResourceReference(FrameworkElement.StyleProperty, "TextBoxConditionCoord");
+                    xBox.PreviewTextInput += (s, e) => { foreach (char c in e.Text ?? "") { if (!char.IsDigit(c)) { e.Handled = true; return; } } };
+                    xBox.TextChanged += (s, e) =>
+                    {
+                        var digits = new string((xBox.Text ?? "").Where(char.IsDigit).ToArray());
+                        if (digits.Length > 5) digits = digits.Substring(0, 5);
+                        if (xBox.Text != digits) xBox.Text = digits;
+                    };
+                    xBox.LostFocus += (s, e) =>
+                    {
+                        if (int.TryParse(xBox.Text, out var x) && x >= 0) { pc.X = x; SaveState(); _currentMacro!.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                        else xBox.Text = pc.X.ToString();
+                    };
+                    condConfig.Children.Add(xBox);
+                    var yBox = new TextBox
+                    {
+                        Text = pc.Y.ToString(),
+                        Width = 44,
+                        MaxLength = 5,
+                        MinHeight = conditionRowHeight,
+                        Height = conditionRowHeight,
+                        FontSize = 11,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = redBrush,
+                        CaretBrush = redBrush,
+                        Background = pixelRedBg,
+                        BorderBrush = pixelRedBorder,
+                        BorderThickness = new Thickness(1),
+                        Padding = new Thickness(4, 2, 4, 2),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        VerticalContentAlignment = VerticalAlignment.Center,
+                        HorizontalContentAlignment = HorizontalAlignment.Left,
+                        TextAlignment = TextAlignment.Left,
+                        Margin = new Thickness(0, 0, 5, 0)
+                    };
+                    yBox.SetResourceReference(TextBox.FontFamilyProperty, "FontMono");
+                    yBox.SetResourceReference(FrameworkElement.StyleProperty, "TextBoxConditionCoord");
+                    yBox.PreviewTextInput += (s, e) => { foreach (char c in e.Text ?? "") { if (!char.IsDigit(c)) { e.Handled = true; return; } } };
+                    yBox.TextChanged += (s, e) =>
+                    {
+                        var digits = new string((yBox.Text ?? "").Where(char.IsDigit).ToArray());
+                        if (digits.Length > 5) digits = digits.Substring(0, 5);
+                        if (yBox.Text != digits) yBox.Text = digits;
+                    };
+                    yBox.LostFocus += (s, e) =>
+                    {
+                        if (int.TryParse(yBox.Text, out var y) && y >= 0) { pc.Y = y; SaveState(); _currentMacro!.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                        else yBox.Text = pc.Y.ToString();
+                    };
+                    condConfig.Children.Add(yBox);
+                    var pointPickerIcon = LucideIcons.CreateIcon(LucideIcons.Mouse, 12);
+                    pointPickerIcon.Foreground = redBrush;
+                    var pointPickerBtn = new Border
+                    {
+                        Padding = new Thickness(5, 2, 5, 2),
+                        Cursor = Cursors.Hand,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Background = Brushes.Transparent,
+                        Child = pointPickerIcon,
+                        ToolTip = "Sélectionner un point à l'écran"
+                    };
+                    pointPickerBtn.MouseLeftButtonDown += (s, e) =>
+                    {
+                        e.Handled = true;
+                        try
+                        {
+                            var win = Window.GetWindow(this);
+                            var pointSelector = new PointPickerOverlayWindow { Owner = win };
+                            if (pointSelector.ShowDialog() == true)
+                            {
+                                pc.X = pointSelector.SelectedX;
+                                pc.Y = pointSelector.SelectedY;
+                                xBox.Text = pc.X.ToString();
+                                yBox.Text = pc.Y.ToString();
+                SaveState();
+                                _currentMacro!.ModifiedAt = DateTime.Now;
+                                MacroChanged?.Invoke(this, EventArgs.Empty);
+                            }
+                        }
+                        catch { }
+                    };
+                    condConfig.Children.Add(pointPickerBtn);
+
+                    openPixelPop = (placementTarget) =>
+                    {
+                        var screenPt = placementTarget.PointToScreen(new Point(0, 0));
+                        var contentY = screenPt.Y + placementTarget.RenderSize.Height + 6;
+                        var pop = new PixelColorPopoverWindow(pc, screenPt.X, contentY, () =>
+                        {
+                            swatchBrush.Color = ParseHexColor(pc.ExpectedColor);
+                        });
+                        try { pop.Owner = Window.GetWindow(this); } catch { }
+                        if (pop.ShowDialog() == true)
+                        {
+                            xBox.Text = pc.X.ToString();
+                            yBox.Text = pc.Y.ToString();
+                            swatchBrush.Color = ParseHexColor(pc.ExpectedColor);
+                            SaveState();
+                            _currentMacro!.ModifiedAt = DateTime.Now;
                             MacroChanged?.Invoke(this, EventArgs.Empty);
                         }
                     };
-                    mainPanel.Children.Add(operatorComboBox);
-                }
-            }
-
-            // Bouton pour ajouter une nouvelle condition
-            var addButton = new Button
-            {
-                Content = LucideIcons.CreateIcon(LucideIcons.Plus, 12),
-                MinWidth = 32,
-                Width = 32,
-                Height = 28,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 0, 0),
-                Cursor = Cursors.Hand,
-                Padding = new Thickness(4, 0, 4, 0)
-            };
-            if (Application.Current.TryFindResource("TimelineIfButton") is Style ifBtnStyle)
-                addButton.Style = ifBtnStyle;
-            addButton.Click += (s, e) =>
-            {
-                SaveState();
-                var newCondition = new ConditionItem
-                {
-                    ConditionType = ConditionType.Boolean,
-                    Condition = true
-                };
-                ifAction.Conditions.Add(newCondition);
-                
-                // Ajouter un opérateur si nécessaire
-                if (ifAction.Conditions.Count > 1 && ifAction.Operators.Count < ifAction.Conditions.Count - 1)
-                {
-                    ifAction.Operators.Add(LogicalOperator.AND);
-                }
-                
+                    openColorPop = (placementTarget) =>
+                    {
+                        var screenPt = placementTarget.PointToScreen(new Point(0, 0));
+                        var contentY = screenPt.Y + placementTarget.RenderSize.Height + 6;
+                        var colorPop = new ColorPopoverWindow(pc.ExpectedColor, screenPt.X, contentY, (hex) =>
+                        {
+                            var h = (hex ?? "").Trim();
+                            if (!h.StartsWith("#")) h = "#" + h;
+                            pc.ExpectedColor = h;
+                            swatchBrush.Color = ParseHexColor(h);
+                        });
+                        try { colorPop.Owner = Window.GetWindow(this); } catch { }
+                        if (colorPop.ShowDialog() == true && !string.IsNullOrEmpty(colorPop.SelectedColorHex))
+                        {
+                            var hex = colorPop.SelectedColorHex.Trim();
+                            if (!hex.StartsWith("#")) hex = "#" + hex;
+                            pc.ExpectedColor = hex;
+                            swatchBrush.Color = ParseHexColor(hex);
+                            SaveState();
                 _currentMacro!.ModifiedAt = DateTime.Now;
-                RefreshBlocks();
                 MacroChanged?.Invoke(this, EventArgs.Empty);
-            };
-            mainPanel.Children.Add(addButton);
+                        }
+                    };
+                    swatch.MouseLeftButtonDown += (s, e) => { e.Handled = true; openColorPop?.Invoke(swatch); };
+                    }
+                    else
+                    {
+                    // Condition Clic souris : deux ComboBox inline (type + état) à droite, pas dans le dialogue
+                    if (condition.ConditionType == ConditionType.MouseClick)
+                    {
+                        condition.MouseClickConfig ??= new MouseClickCondition();
+                        var clickTypeCombo = new ComboBox
+                        {
+                            MinWidth = 88,
+                            FontSize = 11,
+                            FontWeight = FontWeights.SemiBold,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            VerticalContentAlignment = VerticalAlignment.Center,
+                            BorderThickness = new Thickness(0),
+                            Background = Brushes.Transparent,
+                            Padding = new Thickness(0),
+                            Margin = new Thickness(0)
+                        };
+                        if (Application.Current.TryFindResource("ComboBoxSiRed") is Style siRedStyleClick)
+                            clickTypeCombo.Style = siRedStyleClick;
+                        if (Application.Current.TryFindResource("ComboBoxItemSiRed") is Style siRedItemStyleClick)
+                            clickTypeCombo.ItemContainerStyle = siRedItemStyleClick;
+                        clickTypeCombo.SetResourceReference(ComboBox.FontFamilyProperty, "FontMono");
+                        clickTypeCombo.Foreground = redBrush;
+                        clickTypeCombo.Items.Add("Gauche");
+                        clickTypeCombo.Items.Add("Droit");
+                        clickTypeCombo.Items.Add("Milieu");
+                        clickTypeCombo.Items.Add("Molette haut");
+                        clickTypeCombo.Items.Add("Molette bas");
 
-            // Bouton "Configurer..." pour ouvrir le dialogue complet
-            var fullConfigButton = new Button
-            {
-                Content = LucideIcons.CreateIcon(LucideIcons.Settings, 12),
-                MinWidth = 32,
-                Width = 32,
-                Height = 28,
+                        // Bordure rouge autour du ComboBox (comme les autres champs de condition)
+                        var clickTypeWrap = new Border
+                        {
+                            CornerRadius = new CornerRadius(0),
+                            BorderBrush = redBorder,
+                            BorderThickness = new Thickness(1),
+                            Background = redBg,
+                            Padding = new Thickness(3, 2, 6, 2),
+                            Margin = new Thickness(0, 0, 4, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 0, 0),
-                Cursor = Cursors.Hand
-            };
-            if (Application.Current.TryFindResource("TimelineIfButton") is Style ifBtnStyle2)
-                fullConfigButton.Style = ifBtnStyle2;
-            fullConfigButton.Click += (s, e) =>
-            {
-                var dialog = new ConditionConfigDialog(ifAction);
-                dialog.Owner = Window.GetWindow(this);
-                if (dialog.ShowDialog() == true && dialog.Result != null)
+                            Child = clickTypeCombo
+                        };
+
+                        int ct = Math.Max(0, Math.Min(condition.MouseClickConfig.ClickType, 7));
+                        int clickTypeIdx = ct switch { 0 => 0, 1 => 1, 2 => 2, 3 => 0, 4 => 1, 5 => 2, 6 => 3, 7 => 4, _ => 0 };
+                        int clickStateIdx = (ct >= 3 && ct <= 5) ? 1 : 0;
+                        bool wheel = (clickTypeIdx == 3 || clickTypeIdx == 4);
+                        clickTypeCombo.SelectedIndex = clickTypeIdx;
+
+                        // Bascule Maintenu / Pressé (orange / violet comme ET/OU). Masquée pour les molettes.
+                        var clickStateText = new TextBlock
+                        {
+                            Text = clickStateIdx == 0 ? "MNTN" : "PRS",
+                            FontSize = 9,
+                            FontWeight = FontWeights.ExtraBold,
+                            Foreground = clickStateIdx == 0 ? amberBrush : purpleBrush,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            TextAlignment = TextAlignment.Center
+                        };
+                        clickStateText.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                        var clickStateToggle = new Border
+                        {
+                            Child = clickStateText,
+                            Background = clickStateIdx == 0 ? amberBg : purpleBg,
+                            BorderBrush = clickStateIdx == 0 ? amberBorder : purpleBorder,
+                            BorderThickness = new Thickness(1),
+                            Padding = new Thickness(4, 3, 6, 3),
+                            MinHeight = 23,
+                            VerticalAlignment = VerticalAlignment.Center,
+                Cursor = Cursors.Hand,
+                            Margin = new Thickness(0, 0, 4, 0),
+                            Visibility = wheel ? Visibility.Collapsed : Visibility.Visible,
+                            ToolTip = "Basculer Maintenu / Pressé"
+                        };
+
+                        void ApplyClickTypeFromUi()
+                        {
+                            int t = clickTypeCombo.SelectedIndex;
+                            bool w = (t == 3 || t == 4);
+                            clickStateToggle.Visibility = w ? Visibility.Collapsed : Visibility.Visible;
+                            int st = clickStateIdx;
+                            condition.MouseClickConfig!.ClickType = (t, st) switch
+                            {
+                                (0, 0) => 0, (0, 1) => 3,
+                                (1, 0) => 1, (1, 1) => 4,
+                                (2, 0) => 2, (2, 1) => 5,
+                                (3, _) => 6,
+                                (4, _) => 7,
+                                _ => 0
+                            };
+                        }
+
+                        clickTypeCombo.SelectionChanged += (s, e) =>
+                        {
+                            if (clickTypeCombo.SelectedIndex < 0) return;
+                            // sur molette, repasser à Maintenant (par cohérence si on revient sur clic)
+                            if (clickTypeCombo.SelectedIndex == 3 || clickTypeCombo.SelectedIndex == 4)
+                                clickStateIdx = 0;
+                            ApplyClickTypeFromUi();
+                            SaveState(); if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                        };
+
+                        clickStateToggle.MouseLeftButtonDown += (s, e) =>
+                        {
+                            e.Handled = true;
+                            clickStateIdx = clickStateIdx == 0 ? 1 : 0;
+                            clickStateText.Text = clickStateIdx == 0 ? "MNTN" : "PRS";
+                            clickStateText.Foreground = clickStateIdx == 0 ? amberBrush : purpleBrush;
+                            clickStateToggle.Background = clickStateIdx == 0 ? amberBg : purpleBg;
+                            clickStateToggle.BorderBrush = clickStateIdx == 0 ? amberBorder : purpleBorder;
+                            ApplyClickTypeFromUi();
+                            SaveState(); if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                        };
+                        condConfig.Children.Add(clickTypeWrap);
+                        condConfig.Children.Add(clickStateToggle);
+                    }
+                    else if (condition.ConditionType == ConditionType.Variable)
+                    {
+                        condition.VariableOperator ??= "==";
+                        var noVal = condition.VariableOperator == "empty" || condition.VariableOperator == "not_empty";
+                        var grayBorder = GetThemeBrush("BorderLightBrush") ?? new SolidColorBrush(Color.FromRgb(0x5A, 0x5D, 0x5A));
+                        const int condVarRowHeight = 20; // hauteur des 3 éléments (un peu moins que le ComboBox conditions)
+
+                        static double CondVarWidth(int length, double minWidth, double fontSize, FontWeight weight)
+                        {
+                            // Équivalent JS, mais basé sur la largeur réelle (monospace WPF)
+                            var monoObj = Application.Current.TryFindResource("FontMono");
+                            var fontFamily = monoObj is FontFamily ff ? ff : new FontFamily("Consolas");
+                            var typeface = new Typeface(fontFamily, FontStyles.Normal, weight, FontStretches.Normal);
+                            var text = length <= 0 ? "" : new string('M', length); // monospace => même largeur par caractère
+                            var ft = new FormattedText(
+                                text,
+                                System.Globalization.CultureInfo.CurrentCulture,
+                                FlowDirection.LeftToRight,
+                                typeface,
+                                fontSize,
+                                Brushes.Transparent,
+                                1.0);
+                            var w = ft.Width + 16.0; // padding/offset comme le mockup JS
+                            return Math.Max(minWidth, w);
+                        }
+
+                        var condVarNameInitial = (condition.VariableName ?? "").Trim();
+                        var condVarName = new TextBox
+                        {
+                            Text = string.IsNullOrEmpty(condVarNameInitial) ? "" : "$" + condVarNameInitial,
+                            FontSize = 11,
+                            FontWeight = FontWeights.Bold,
+                            Foreground = purpleBrush,
+                            CaretBrush = purpleBrush,
+                            Padding = new Thickness(2, 2, 10, 2),
+                            Cursor = Cursors.IBeam,
+                            Width = CondVarWidth(condVarNameInitial.Length, 70, 11, FontWeights.Bold),
+                            MinWidth = 60,
+                            MaxWidth = 220,
+                            // +1 pour le "$" affiché automatiquement
+                            MaxLength = 19,
+                            MinHeight = condVarRowHeight,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            VerticalContentAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            BorderThickness = new Thickness(0),
+                            Background = Brushes.Transparent,
+                            Margin = new Thickness(0),
+                            ToolTip = "Nom de la variable"
+                        };
+                        condVarName.SetResourceReference(TextBox.FontFamilyProperty, "FontMono");
+                        if (Application.Current.TryFindResource("TextBoxCondVarNoScroll") is Style condVarNameStyle)
+                            condVarName.Style = condVarNameStyle;
+                        // Même "méthode TextBox" que les coordonnées pixel : pas de scrolling interne
+                        condVarName.SetResourceReference(FrameworkElement.StyleProperty, "TextBoxConditionCoordNoGap");
+                        condVarName.BorderThickness = new Thickness(0);
+                        condVarName.BorderBrush = Brushes.Transparent;
+                        condVarName.Background = Brushes.Transparent;
+                        condVarName.TextAlignment = TextAlignment.Left;
+                        var namePlaceholder = new TextBlock
+                        {
+                            Text = "$variable",
+                            FontSize = 11,
+                            FontWeight = FontWeights.Bold,
+                            FontStyle = FontStyles.Italic,
+                            Foreground = new SolidColorBrush(Color.FromArgb(0x59, 0xA7, 0x8B, 0xFA)),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Margin = new Thickness(5, 0, 7, 0),
+                            IsHitTestVisible = false
+                        };
+                        namePlaceholder.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                        namePlaceholder.Visibility = string.IsNullOrEmpty(condition.VariableName) ? Visibility.Visible : Visibility.Collapsed;
+                        bool condVarNameUpdating = false;
+                        condVarName.TextChanged += (s, e) =>
+                        {
+                            if (condVarNameUpdating) return;
+                            condVarNameUpdating = true;
+
+                            var t = (condVarName.Text ?? "").Trim();
+                            if (string.IsNullOrEmpty(t))
+                            {
+                                condition.VariableName = "";
+                                condVarName.Text = "";
+                            }
+                            else if (t == "$")
+                            {
+                                // Permet à l'utilisateur de garder le '$' pour démarrer la saisie
+                                condition.VariableName = "";
+                                condVarName.Text = "$";
+                                condVarName.CaretIndex = condVarName.Text.Length;
+                            }
+                            else
+                            {
+                                if (t.StartsWith("$", StringComparison.Ordinal))
+                                    t = t.Substring(1).Trim();
+                                condition.VariableName = t;
+                                condVarName.Text = "$" + t;
+                                condVarName.CaretIndex = condVarName.Text.Length;
+                            }
+
+                            // Ne pas masquer le '$' tapé par l'utilisateur avec le placeholder.
+                            namePlaceholder.Visibility = string.IsNullOrEmpty(t) ? Visibility.Visible : Visibility.Collapsed;
+                            SaveState(); if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                            condVarNameUpdating = false;
+                        };
+                        var nameGrid = new Grid();
+                        nameGrid.Children.Add(condVarName);
+                        nameGrid.Children.Add(namePlaceholder);
+                        var nameWrap = new Border
+                        {
+                            CornerRadius = new CornerRadius(0),
+                            BorderThickness = new Thickness(1),
+                            BorderBrush = new SolidColorBrush(Color.FromArgb(0x66, 0xA7, 0x8B, 0xFA)),
+                            Background = new SolidColorBrush(Color.FromArgb(0x14, 0xA7, 0x8B, 0xFA)),
+                            Padding = new Thickness(0),
+                            Margin = new Thickness(0, 0, 4, 0),
+                            MinHeight = condVarRowHeight,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Width = CondVarWidth(condVarNameInitial.Length, 70, 11, FontWeights.Bold),
+                            Cursor = Cursors.IBeam,
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            Child = nameGrid
+                        };
+                        condVarName.AcceptsReturn = false;
+                        condVarName.TextWrapping = TextWrapping.NoWrap;
+                        // Redimensionnement dynamique (équivalent oninput JS)
+                        condVarName.TextChanged += (_, __) =>
+                        {
+                            var len = (condition.VariableName ?? "").Trim().Length;
+                            var w = CondVarWidth(len, 70, 11, FontWeights.Bold);
+                            condVarName.Width = w;
+                            nameWrap.Width = w;
+                        };
+
+                        var condVarOp = new ComboBox
+                        {
+                            FontSize = 12,
+                            FontWeight = FontWeights.ExtraBold,
+                            MinWidth = 40,
+                            MinHeight = condVarRowHeight,
+                VerticalAlignment = VerticalAlignment.Center,
+                            VerticalContentAlignment = VerticalAlignment.Center,
+                            HorizontalContentAlignment = HorizontalAlignment.Center,
+                            Padding = new Thickness(4, 2, 4, 2),
+                            BorderThickness = new Thickness(0),
+                            Background = GetThemeBrush("BackgroundTertiaryBrush") ?? new SolidColorBrush(Color.FromRgb(0x11, 0x13, 0x11)),
+                            Foreground = GetThemeBrush("TextPrimaryBrush") ?? new SolidColorBrush(Colors.White),
+                            Margin = new Thickness(0)
+                        };
+                        if (Application.Current.TryFindResource("ComboBoxCondVarOp") is Style condVarOpStyle)
+                            condVarOp.Style = condVarOpStyle;
+                        condVarOp.SetResourceReference(ComboBox.FontFamilyProperty, "FontMono");
+                        condVarOp.Items.Add(new ComboBoxItem { Content = "==", Tag = "==", ToolTip = "exactement égal" });
+                        condVarOp.Items.Add(new ComboBoxItem { Content = "!=", Tag = "!=", ToolTip = "différent" });
+                        condVarOp.Items.Add(new ComboBoxItem { Content = ">", Tag = ">", ToolTip = "strictement supérieur" });
+                        condVarOp.Items.Add(new ComboBoxItem { Content = "≥", Tag = ">=", ToolTip = "supérieur ou égal" });
+                        condVarOp.Items.Add(new ComboBoxItem { Content = "<", Tag = "<", ToolTip = "strictement inférieur" });
+                        condVarOp.Items.Add(new ComboBoxItem { Content = "≤", Tag = "<=", ToolTip = "inférieur ou égal" });
+                        condVarOp.Items.Add(new ComboBoxItem { Content = "∈", Tag = "contains", ToolTip = "contient" });
+                        condVarOp.Items.Add(new ComboBoxItem { Content = "vide", Tag = "empty", ToolTip = "variable vide" });
+                        condVarOp.Items.Add(new ComboBoxItem { Content = "!vide", Tag = "not_empty", ToolTip = "variable non vide" });
+                        string SelectVarOpByValue(string? val)
+                        {
+                            if (string.IsNullOrEmpty(val)) val = "==";
+                            for (int k = 0; k < condVarOp.Items.Count; k++)
+                            {
+                                if (condVarOp.Items[k] is ComboBoxItem cbi && (cbi.Tag as string) == val)
+                                    return val;
+                            }
+                            return "==";
+                        }
+                        condition.VariableOperator = SelectVarOpByValue(condition.VariableOperator);
+                        for (int k = 0; k < condVarOp.Items.Count; k++)
+                        {
+                            if (condVarOp.Items[k] is ComboBoxItem cbi && (cbi.Tag as string) == condition.VariableOperator)
+                            { condVarOp.SelectedIndex = k; break; }
+                        }
+                        if (condVarOp.SelectedIndex < 0) condVarOp.SelectedIndex = 0;
+                        var opWrap = new Border
+                        {
+                            CornerRadius = new CornerRadius(0),
+                            BorderThickness = new Thickness(1),
+                            BorderBrush = grayBorder,
+                            Background = condVarOp.Background,
+                            Padding = new Thickness(0),
+                            Margin = new Thickness(0, 0, 4, 0),
+                            MinHeight = condVarRowHeight,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Child = condVarOp
+                        };
+                        condVarOp.Background = Brushes.Transparent;
+
+                        var condVarVal = new TextBox
+                        {
+                            Text = noVal ? "" : (condition.VariableValue ?? ""),
+                            FontSize = 11,
+                            FontWeight = FontWeights.SemiBold,
+                            Foreground = redBrush,
+                            CaretBrush = redBrush,
+                            Padding = new Thickness(2, 2, 10, 2),
+                            Cursor = Cursors.IBeam,
+                            Width = double.NaN,
+                            MinWidth = CondVarWidth((condition.VariableValue ?? "").Trim().Length, 60, 11, FontWeights.SemiBold),
+                            MaxWidth = double.PositiveInfinity,
+                            MaxLength = 18,
+                            MinHeight = condVarRowHeight,
+                            HorizontalAlignment = HorizontalAlignment.Stretch,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            VerticalContentAlignment = VerticalAlignment.Center,
+                            BorderThickness = new Thickness(0),
+                            Background = Brushes.Transparent,
+                            Margin = new Thickness(0),
+                            IsEnabled = !noVal,
+                            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                            ToolTip = noVal ? "—" : "Valeur à comparer"
+                        };
+                        condVarVal.AcceptsReturn = false;
+                        condVarVal.TextWrapping = TextWrapping.NoWrap;
+                        condVarVal.SetResourceReference(TextBox.FontFamilyProperty, "FontMono");
+                        if (Application.Current.TryFindResource("TextBoxCondVarNoScroll") is Style condVarValStyle)
+                            condVarVal.Style = condVarValStyle;
+                        // Même "méthode TextBox" que les coordonnées pixel : pas de scrolling interne
+                        condVarVal.SetResourceReference(FrameworkElement.StyleProperty, "TextBoxConditionCoordNoGap");
+                        condVarVal.BorderThickness = new Thickness(0);
+                        condVarVal.BorderBrush = Brushes.Transparent;
+                        condVarVal.Background = Brushes.Transparent;
+                        condVarVal.TextAlignment = TextAlignment.Left;
+                        var valPlaceholder = new TextBlock
+                        {
+                            Text = "valeur",
+                            FontSize = 11,
+                            FontWeight = FontWeights.SemiBold,
+                            FontStyle = FontStyles.Italic,
+                            Foreground = new SolidColorBrush(Color.FromArgb(0x4D, 0xE8, 0x40, 0x40)),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Margin = new Thickness(5, 0, 7, 0),
+                            IsHitTestVisible = false
+                        };
+                        valPlaceholder.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                        valPlaceholder.Visibility = (noVal || string.IsNullOrEmpty(condVarVal.Text)) ? Visibility.Visible : Visibility.Collapsed;
+                        var valGrid = new Grid();
+                        valGrid.Children.Add(condVarVal);
+                        valGrid.Children.Add(valPlaceholder);
+                        var valWrap = new Border
+                        {
+                            CornerRadius = new CornerRadius(0),
+                            BorderThickness = new Thickness(1),
+                            BorderBrush = new SolidColorBrush(Color.FromArgb(0x4D, 0xE8, 0x40, 0x40)),
+                            Background = new SolidColorBrush(Color.FromArgb(0x0F, 0xE8, 0x40, 0x40)),
+                            Padding = new Thickness(0),
+                            Margin = new Thickness(0),
+                            MinHeight = condVarRowHeight,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Stretch,
+                            Width = double.NaN,
+                            MinWidth = CondVarWidth((condition.VariableValue ?? "").Trim().Length, 60, 11, FontWeights.SemiBold),
+                            Cursor = Cursors.IBeam,
+                            Child = valGrid
+                        };
+
+                        void UpdateVarConfigUi()
+                        {
+                            noVal = condition.VariableOperator == "empty" || condition.VariableOperator == "not_empty";
+                            condVarVal.IsEnabled = !noVal;
+                            condVarVal.Text = noVal ? "" : (condition.VariableValue ?? "");
+                            condVarVal.ToolTip = noVal ? "—" : "Valeur à comparer";
+                            valPlaceholder.Visibility = (noVal || string.IsNullOrEmpty(condVarVal.Text)) ? Visibility.Visible : Visibility.Collapsed;
+                        }
+
+                        condVarOp.SelectionChanged += (s, e) =>
+                        {
+                            if (condVarOp.SelectedItem is ComboBoxItem cbi && cbi.Tag is string tag)
+                            {
+                                condition.VariableOperator = tag;
+                                if (tag == "empty" || tag == "not_empty")
+                                    condition.VariableValue = "";
+                                UpdateVarConfigUi();
+                                SaveState(); if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                            }
+                        };
+
+                        condVarVal.TextChanged += (s, e) =>
+                        {
+                            if (!noVal)
+                                condition.VariableValue = condVarVal.Text?.Trim() ?? "";
+                            valPlaceholder.Visibility = string.IsNullOrEmpty(condVarVal.Text) ? Visibility.Visible : Visibility.Collapsed;
+                            var len = condVarVal.Text?.Trim().Length ?? 0;
+                            var newW = CondVarWidth(len, 60, 11, FontWeights.SemiBold);
+                            condVarVal.MinWidth = newW;
+                            valWrap.MinWidth = newW;
+                            SaveState(); if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                        };
+
+                        var varRow = new Grid
+                        {
+                VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Stretch
+                        };
+                        varRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                        varRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                        varRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                        Grid.SetColumn(nameWrap, 0);
+                        Grid.SetColumn(opWrap, 1);
+                        Grid.SetColumn(valWrap, 2);
+                        varRow.Children.Add(nameWrap);
+                        varRow.Children.Add(opWrap);
+                        varRow.Children.Add(valWrap);
+
+                        condConfig.Children.Add(varRow);
+                    }
+                    else if (condition.ConditionType == ConditionType.ImageOnScreen)
+                    {
+                        condition.ImageOnScreenConfig ??= new ImageOnScreenCondition { ImagePath = "", Sensitivity = 80 };
+                        var io = condition.ImageOnScreenConfig;
+
+                        var iconBrush = GetThemeBrush("TextPrimaryBrush") ?? new SolidColorBrush(Colors.White);
+
+                        // Icons (font lucide) : Zone = \ue509, Image = \ue0f6
+                        var thumbIcon = new TextBlock
+                        {
+                            Text = "\ue0f6",
+                            FontSize = 18,
+                            FontFamily = (FontFamily)FindResource("FontLucide"),
+                            Foreground = new SolidColorBrush((iconBrush as SolidColorBrush)?.Color ?? Colors.White) { Opacity = 0.9 },
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Center
+                        };
+
+                        var thumbImage = new System.Windows.Controls.Image
+                        {
+                            Stretch = System.Windows.Media.Stretch.UniformToFill,
+                            Visibility = Visibility.Collapsed,
+                            SnapsToDevicePixels = true
+                        };
+                        RenderOptions.SetBitmapScalingMode(thumbImage, BitmapScalingMode.HighQuality);
+                        Popup? imagePreviewPopup = null;
+
+                        var thumbBorder = new Border
+                        {
+                            Width = 28,
+                            Height = 28,
+                            BorderBrush = Brushes.Transparent,
+                            BorderThickness = new Thickness(0),
+                            Background = Brushes.Transparent,
+                Cursor = Cursors.Hand,
+                            ToolTip = "Cliquer pour agrandir l'image",
+                            Child = new Grid
+                            {
+                                Children =
+                                {
+                                    thumbImage,
+                                    thumbIcon
+                                }
+                            }
+                        };
+
+                        thumbBorder.MouseLeftButtonDown += (s, e) =>
+                        {
+                            e.Handled = true;
+                            if (imagePreviewPopup != null && imagePreviewPopup.IsOpen)
+                            {
+                                imagePreviewPopup.IsOpen = false;
+                                imagePreviewPopup = null;
+                                return;
+                            }
+                            var path = (io.ImagePath ?? "").Trim();
+                            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return;
+                            try
+                            {
+                                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                                bitmap.BeginInit();
+                                bitmap.UriSource = new Uri(path, UriKind.Absolute);
+                                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                                bitmap.EndInit();
+                                var screenPt = thumbBorder.PointToScreen(new Point(0, 0));
+                                double thumbBottom = screenPt.Y + thumbBorder.ActualHeight;
+                                double screenH = SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight;
+                                double spaceBelow = screenH - thumbBottom;
+                                double spaceAbove = screenPt.Y - SystemParameters.VirtualScreenTop;
+                                var popup = new Popup
+                                {
+                                    PlacementTarget = thumbBorder,
+                                    Placement = spaceBelow >= 280 || spaceBelow >= spaceAbove ? PlacementMode.Bottom : PlacementMode.Top,
+                                    VerticalOffset = 4,
+                                    StaysOpen = true,
+                                    Child = new Border
+                                    {
+                                        Background = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)),
+                                        BorderBrush = GetThemeBrush("BorderLightBrush") ?? new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                                        BorderThickness = new Thickness(1),
+                                        Padding = new Thickness(0),
+                                        Child = new System.Windows.Controls.Image
+                                        {
+                                            Source = bitmap,
+                                            Stretch = System.Windows.Media.Stretch.Uniform,
+                                            MaxWidth = 520,
+                                            MaxHeight = 380,
+                                            SnapsToDevicePixels = true
+                                        }
+                                    }
+                                };
+                                if (popup.Child is Border border && border.Child is System.Windows.Controls.Image previewImg)
+                                    RenderOptions.SetBitmapScalingMode(previewImg, BitmapScalingMode.HighQuality);
+                                bool IsDescendantOfImage(DependencyObject? ancestor, DependencyObject? node)
+                                {
+                                    while (node != null) { if (node == ancestor) return true; node = VisualTreeHelper.GetParent(node); }
+                                    return false;
+                                }
+                                void CloseImagePreviewPopup()
+                                {
+                                    popup.IsOpen = false;
+                                    imagePreviewPopup = null;
+                                    if (Application.Current.MainWindow != null)
+                                        Application.Current.MainWindow.PreviewMouseDown -= OnImagePreviewPreviewMouseDown;
+                                }
+                                void OnImagePreviewPreviewMouseDown(object _s, MouseButtonEventArgs ev)
+                                {
+                                    var clicked = ev.OriginalSource as DependencyObject;
+                                    if (clicked == null) return;
+                                    if (IsDescendantOfImage(popup.Child as DependencyObject, clicked) || IsDescendantOfImage(thumbBorder, clicked)) return;
+                                    CloseImagePreviewPopup();
+                                }
+                                popup.Closed += (_, _) =>
+                                {
+                                    if (ReferenceEquals(imagePreviewPopup, popup))
+                                        imagePreviewPopup = null;
+                                    if (Application.Current.MainWindow != null)
+                                        Application.Current.MainWindow.PreviewMouseDown -= OnImagePreviewPreviewMouseDown;
+                                };
+                                imagePreviewPopup = popup;
+                                popup.IsOpen = true;
+                                Application.Current.MainWindow?.AddHandler(UIElement.PreviewMouseDownEvent, (MouseButtonEventHandler)OnImagePreviewPreviewMouseDown, true);
+                            }
+                            catch { }
+                        };
+
+                        void RefreshThumb()
+                        {
+                            var path = (io.ImagePath ?? "").Trim();
+                            if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+                            {
+                                try
+                                {
+                                    var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                                    bitmap.BeginInit();
+                                    bitmap.UriSource = new Uri(path, UriKind.Absolute);
+                                    bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                                    bitmap.EndInit();
+                                    thumbImage.Source = bitmap;
+                                    thumbImage.Visibility = Visibility.Visible;
+                                    thumbIcon.Visibility = Visibility.Collapsed;
+                                }
+                                catch
+                                {
+                                    thumbImage.Source = null;
+                                    thumbImage.Visibility = Visibility.Collapsed;
+                                    thumbIcon.Visibility = Visibility.Visible;
+                                }
+                            }
+                            else
+                            {
+                                thumbImage.Source = null;
+                                thumbImage.Visibility = Visibility.Collapsed;
+                                thumbIcon.Visibility = Visibility.Visible;
+                            }
+                        }
+
+                        RefreshThumb();
+
+                        openImagePop = (placementTarget) =>
+                        {
+                            var screenPt = placementTarget.PointToScreen(new Point(0, 0));
+                            var contentX = screenPt.X;
+                            var contentY = screenPt.Y + placementTarget.RenderSize.Height + 6;
+
+                            var vsl = SystemParameters.VirtualScreenLeft;
+                            var vsw = SystemParameters.VirtualScreenWidth;
+                            // Popover width ~= 260, keep small margin to avoid clipping
+                            if (contentX + 260 > vsl + vsw - 8)
+                                contentX = (vsl + vsw - 268);
+
+                            var pop = new ImageOnScreenPopoverWindow(io, contentX, contentY);
+                            try { pop.Owner = Window.GetWindow(this); } catch { }
+
+                            if (pop.ShowDialog() == true)
+                            {
+                                RefreshThumb();
+                                SaveState();
+                                if (_currentMacro != null)
+                                {
+                                    _currentMacro.ModifiedAt = DateTime.Now;
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+                                }
+                            }
+                        };
+
+                        condConfig.Children.Add(thumbBorder);
+                    }
+                    else if (condition.ConditionType == ConditionType.TextOnScreen)
+                    {
+                        condition.TextOnScreenConfig ??= new TextOnScreenCondition { Text = "" };
+                        var tos = condition.TextOnScreenConfig;
+
+                        // Couleurs proches du snippet web
+                        var unsetColor = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0x40, 0x40)); // rgba(...,0.4)
+                        var unsetBorder = new SolidColorBrush(Color.FromArgb(0x33, 0xE8, 0x40, 0x40)); // rgba(...,0.2)
+                        var setBg = new SolidColorBrush(Color.FromArgb(0x0F, 0xE8, 0x40, 0x40)); // rgba(...,0.06)
+                        var setBorder = new SolidColorBrush(Color.FromArgb(0x59, 0xE8, 0x40, 0x40)); // rgba(...,0.35)
+
+                        var thumbText = new TextBlock
+                        {
+                            Text = "non configuré",
+                            FontSize = 10,
+                            FontWeight = FontWeights.SemiBold,
+                            FontFamily = (FontFamily)FindResource("FontMono"),
+                            Foreground = unsetColor,
+                            FontStyle = FontStyles.Italic,
+                            TextTrimming = TextTrimming.CharacterEllipsis,
+                            TextWrapping = TextWrapping.NoWrap,
+                            MaxWidth = 120,
+                            Margin = new Thickness(4, 0, 4, 0),
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            VerticalAlignment = VerticalAlignment.Center
+                        };
+
+                        var dashRect = new Rectangle
+                        {
+                            Stroke = unsetBorder,
+                            StrokeThickness = 1,
+                            StrokeDashArray = new DoubleCollection(new[] { 6.0, 3.0 }),
+                            Fill = Brushes.Transparent,
+                            RadiusX = 0,
+                            RadiusY = 0,
+                            HorizontalAlignment = HorizontalAlignment.Stretch,
+                            VerticalAlignment = VerticalAlignment.Stretch
+                        };
+
+                        var thumbGrid = new Grid();
+                        thumbGrid.Children.Add(dashRect);
+                        thumbGrid.Children.Add(thumbText);
+
+                        var thumbBorder = new Border
+                        {
+                            Padding = new Thickness(2, 0, 2, 0),
+                            MinHeight = 23, // même hauteur visuelle que les contrôles type ComboBox
+                            BorderThickness = new Thickness(0),
+                            Background = Brushes.Transparent,
+                            Cursor = Cursors.Arrow,
+                            Child = thumbGrid,
+                VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            ToolTip = "Configurer la condition (Texte à l'écran)"
+                        };
+
+                        void RefreshThumb()
+                        {
+                            var t = (tos.Text ?? "").Trim();
+                            var isSet = !string.IsNullOrEmpty(t);
+                            const int inlineTextMaxChars = 16;
+                            var oneLine = (t ?? string.Empty).Replace("\r", " ").Replace("\n", " ").Trim();
+
+                            thumbText.Text = isSet
+                                ? (oneLine.Length > inlineTextMaxChars ? oneLine.Substring(0, inlineTextMaxChars) + "…" : oneLine)
+                                : "non configuré";
+                            thumbText.FontStyle = isSet ? FontStyles.Normal : FontStyles.Italic;
+                            thumbText.Foreground = isSet ? redBrush : unsetColor;
+                            thumbBorder.Background = isSet ? setBg : Brushes.Transparent;
+                            // Affiche toujours le texte complet au survol quand la condition est configurée.
+                            thumbBorder.ToolTip = isSet ? t : "Configurer la condition (Texte à l'écran)";
+
+                            dashRect.Stroke = isSet ? setBorder : unsetBorder;
+                            dashRect.StrokeDashArray = isSet
+                                ? null
+                                : new DoubleCollection(new[] { 6.0, 3.0 });
+                        }
+
+                        openTextPop = (placementTarget) =>
+                        {
+                            var screenPt = placementTarget.PointToScreen(new Point(0, 0));
+                            var contentX = screenPt.X;
+                            var contentYBase = screenPt.Y;
+                            var thumbBottom = screenPt.Y + placementTarget.RenderSize.Height;
+
+                            var vsl = SystemParameters.VirtualScreenLeft;
+                            var vsw = SystemParameters.VirtualScreenWidth;
+                            var screenH = SystemParameters.VirtualScreenTop + SystemParameters.VirtualScreenHeight;
+
+                            if (contentX + 280 > vsl + vsw - 8)
+                                contentX = vsl + vsw - 288;
+
+                            const double popH = 340;
+                            var spaceBelow = screenH - thumbBottom;
+                            var spaceAbove = contentYBase - SystemParameters.VirtualScreenTop;
+                            var contentY = (spaceBelow >= popH || spaceBelow >= spaceAbove) ? (thumbBottom + 6) : (contentYBase - popH - 6);
+
+                            var pop = new TextOnScreenPopoverWindow(tos, contentX, contentY);
+                            try { pop.Owner = Window.GetWindow(this); } catch { }
+
+                            if (pop.ShowDialog() == true)
+                            {
+                                RefreshThumb();
+                                SaveState();
+                                if (_currentMacro != null)
+                                {
+                                    _currentMacro.ModifiedAt = DateTime.Now;
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                                }
+                            }
+                        };
+
+                        RefreshThumb();
+                        condConfig.Children.Add(thumbBorder);
+                    }
+                    else
+                    {
+                        previewText = new TextBlock
+                        {
+                            Text = GetConditionPreviewText(condition),
+                            FontSize = 11,
+                            FontWeight = FontWeights.SemiBold,
+                            Foreground = redBrush,
+                VerticalAlignment = VerticalAlignment.Center,
+                            MaxWidth = 160,
+                            TextTrimming = TextTrimming.CharacterEllipsis,
+                            Margin = new Thickness(0, 0, 4, 0)
+                        };
+                        previewText.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                        condConfig.Children.Add(previewText);
+
+                        // Interaction spéciale pour Position souris
+                        if (condition.ConditionType == ConditionType.MousePosition)
+                    {
+                        // 1) Clic sur les coordonnées = aperçu de la zone (si définie) ou ouverture du sélecteur
+                        previewText.Cursor = Cursors.Hand;
+                        previewText.ToolTip = "Cliquer pour visualiser / définir la zone";
+
+                        previewText.MouseEnter += (s, e) =>
+                        {
+                            previewText.Foreground = GetThemeBrush("ErrorBrush");
+                            previewText.TextDecorations = TextDecorations.Underline;
+                        };
+                        previewText.MouseLeave += (s, e) =>
+                        {
+                            previewText.Foreground = redBrush;
+                            previewText.TextDecorations = null;
+                        };
+
+                        previewText.MouseLeftButtonDown += (s, e) =>
+                        {
+                            e.Handled = true;
+
+                            if (condition.MousePositionConfig == null ||
+                                (condition.MousePositionConfig.X1 == condition.MousePositionConfig.X2 &&
+                                 condition.MousePositionConfig.Y1 == condition.MousePositionConfig.Y2))
+                            {
+                                // Pas encore de zone → même comportement que bouton Zone
+                                var zoneSelector = new ZoneSelectorWindow();
+                                if (zoneSelector.ShowDialog() == true)
                 {
                     SaveState();
-                    var result = dialog.Result;
-                    ifAction.Conditions = result.Conditions != null ? new List<ConditionItem>(result.Conditions) : new List<ConditionItem>();
-                    ifAction.Operators = result.Operators != null ? new List<LogicalOperator>(result.Operators) : new List<LogicalOperator>();
-                    
-                    // Copier aussi les anciennes propriétés pour compatibilité
-                    ifAction.ConditionType = result.ConditionType;
-                    ifAction.Condition = result.Condition;
-                    ifAction.ActiveApplicationConfig = result.ActiveApplicationConfig;
-                    ifAction.KeyboardKeyConfig = result.KeyboardKeyConfig;
-                    ifAction.ProcessRunningConfig = result.ProcessRunningConfig;
-                    ifAction.PixelColorConfig = result.PixelColorConfig;
-                    ifAction.MousePositionConfig = result.MousePositionConfig;
-                    ifAction.TimeDateConfig = result.TimeDateConfig;
-                    ifAction.ImageOnScreenConfig = result.ImageOnScreenConfig;
-                    ifAction.TextOnScreenConfig = result.TextOnScreenConfig;
-                    
+                                    condition.MousePositionConfig ??= new MousePositionCondition();
+                                    condition.MousePositionConfig.X1 = zoneSelector.X1;
+                                    condition.MousePositionConfig.Y1 = zoneSelector.Y1;
+                                    condition.MousePositionConfig.X2 = zoneSelector.X2;
+                                    condition.MousePositionConfig.Y2 = zoneSelector.Y2;
+                                    previewText.Text = GetConditionPreviewText(condition);
+                                    if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                                }
+                            }
+                            else
+                            {
+                                // Zone déjà définie → aperçu visuel
+                                var cfg = condition.MousePositionConfig;
+                                var preview = new ZonePreviewWindow(cfg!.X1, cfg.Y1, cfg.X2, cfg.Y2)
+                                {
+                                    Owner = Window.GetWindow(this)
+                                };
+                                preview.ShowDialog();
+                            }
+                        };
+
+                        // 2) Bouton Zone à droite des coordonnées pour (re)définir la zone
+                        var zoneText = new TextBlock
+                        {
+                            // Icône Lucide carré pointillé + pointeur
+                            Text = "\ue509",
+                            FontSize = 14,
+                            FontFamily = (FontFamily)FindResource("FontLucide"),
+                            Foreground = GetThemeBrush("TextSecondaryBrush"),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Margin = new Thickness(0, -1, 0, 0)
+                        };
+
+                        var zoneBtnBorder = new Border
+                        {
+                            Padding = new Thickness(4, 1, 4, 1),
+                            Margin = new Thickness(0, 0, 4, 0),
+                            Background = Brushes.Transparent,
+                            BorderThickness = new Thickness(0),
+                            CornerRadius = new CornerRadius(0),
+                Cursor = Cursors.Hand,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Child = zoneText,
+                            ToolTip = "Sélectionner la zone"
+                        };
+
+                        zoneBtnBorder.MouseEnter += (s, e) =>
+                        {
+                            var red = GetThemeBrush("ErrorBrush");
+                            zoneText.Foreground = red;
+                        };
+
+                        zoneBtnBorder.MouseLeave += (s, e) =>
+                        {
+                            zoneText.Foreground = GetThemeBrush("TextSecondaryBrush");
+                        };
+
+                        zoneBtnBorder.MouseLeftButtonDown += (s, e) =>
+                        {
+                            e.Handled = true;
+                            var zoneSelector = new ZoneSelectorWindow();
+                            if (zoneSelector.ShowDialog() == true)
+            {
+                SaveState();
+                                condition.MousePositionConfig ??= new MousePositionCondition();
+                                condition.MousePositionConfig.X1 = zoneSelector.X1;
+                                condition.MousePositionConfig.Y1 = zoneSelector.Y1;
+                                condition.MousePositionConfig.X2 = zoneSelector.X2;
+                                condition.MousePositionConfig.Y2 = zoneSelector.Y2;
+                                previewText.Text = GetConditionPreviewText(condition);
+                                if (_currentMacro != null) { _currentMacro.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty); }
+                            }
+                        };
+
+                        condConfig.Children.Add(zoneBtnBorder);
+                        }
+                    }
+                }
+                Border configBtn;
+                if (condition.ConditionType == ConditionType.ImageOnScreen || condition.ConditionType == ConditionType.TextOnScreen)
+                {
+                    var borderNormal = GetThemeBrush("BorderLightBrush") ?? new SolidColorBrush(Color.FromRgb(0x5A, 0x5D, 0x5A));
+                    var borderHover = GetThemeBrush("ErrorBrush") ?? new SolidColorBrush(Color.FromRgb(0xE8, 0x40, 0x40));
+                    var fgNormal = textMuted;
+                    var fgHover = borderHover;
+
+                    var icon = new TextBlock
+                    {
+                        Text = condition.ConditionType == ConditionType.TextOnScreen ? LucideIcons.TextSearch : "\ue172", // TextSearch / SquarePen
+                        FontSize = 12,
+                        FontFamily = (FontFamily)FindResource("FontLucide"),
+                        Foreground = fgNormal,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    var cfgText = new TextBlock
+                    {
+                        Text = "Config",
+                        FontSize = 9,
+                        FontWeight = FontWeights.SemiBold,
+                        Foreground = fgNormal,
+                        Margin = new Thickness(6, 0, 0, 0),
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+
+                    var stack = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+                    stack.Children.Add(icon);
+                    stack.Children.Add(cfgText);
+
+                    configBtn = new Border
+                    {
+                        Height = 22,
+                        Background = Brushes.Transparent,
+                        BorderBrush = borderNormal,
+                        BorderThickness = new Thickness(1),
+                        CornerRadius = new CornerRadius(0),
+                        Cursor = Cursors.Hand,
+                        Padding = new Thickness(6, 0, 6, 0),
+                        Child = stack,
+                        ToolTip = "Configurer la condition"
+                    };
+
+                    configBtn.MouseEnter += (s, e) =>
+                    {
+                        configBtn.BorderBrush = borderHover;
+                        icon.Foreground = fgHover;
+                        cfgText.Foreground = fgHover;
+                    };
+                    configBtn.MouseLeave += (s, e) =>
+                    {
+                        configBtn.BorderBrush = borderNormal;
+                        icon.Foreground = fgNormal;
+                        cfgText.Foreground = fgNormal;
+                    };
+                }
+                else
+                {
+                    configBtn = new Border
+                    {
+                        Width = 22,
+                        Height = 22,
+                        Background = Brushes.Transparent,
+                        Cursor = Cursors.Hand,
+                        Child = new TextBlock { Text = "⚙", FontSize = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = textMuted },
+                        ToolTip = "Configurer la condition"
+                    };
+                }
+                configBtn.MouseLeftButtonDown += (s, e) =>
+                {
+                    e.Handled = true;
+                    if (condition.ConditionType == ConditionType.PixelColor && openPixelPop != null)
+                    {
+                        openPixelPop(configBtn);
+                        return;
+                    }
+                    if (condition.ConditionType == ConditionType.ImageOnScreen && openImagePop != null)
+                    {
+                        openImagePop(configBtn);
+                        return;
+                    }
+                    if (condition.ConditionType == ConditionType.TextOnScreen && openTextPop != null)
+                    {
+                        openTextPop(configBtn);
+                        return;
+                    }
+                    var temp = new IfAction { Conditions = new List<ConditionItem> { condition }, Operators = new List<LogicalOperator>() };
+                    var dialog = new ConditionConfigDialog(temp);
+                dialog.Owner = Window.GetWindow(this);
+                    if (dialog.ShowDialog() == true && dialog.Result?.Conditions?.Count > 0 == true)
+                {
+                    SaveState();
+                        var rc = dialog.Result.Conditions[0];
+                        condition.ConditionType = rc.ConditionType;
+                        condition.Condition = rc.Condition;
+                        condition.ActiveApplicationConfig = rc.ActiveApplicationConfig;
+                        condition.KeyboardKeyConfig = rc.KeyboardKeyConfig;
+                        condition.ProcessRunningConfig = rc.ProcessRunningConfig;
+                        condition.PixelColorConfig = rc.PixelColorConfig;
+                        condition.MousePositionConfig = rc.MousePositionConfig;
+                        condition.TimeDateConfig = rc.TimeDateConfig;
+                        condition.ImageOnScreenConfig = rc.ImageOnScreenConfig;
+                        condition.TextOnScreenConfig = rc.TextOnScreenConfig;
+                        condition.MouseClickConfig = rc.MouseClickConfig != null ? new MouseClickCondition { ClickType = rc.MouseClickConfig.ClickType } : null;
+                        condition.VariableName = rc.VariableName;
+                        condition.VariableOperator = rc.VariableOperator;
+                        condition.VariableValue = rc.VariableValue;
+                        if (previewText != null)
+                            previewText.Text = GetConditionPreviewText(condition);
                     _currentMacro!.ModifiedAt = DateTime.Now;
                     RefreshBlocks();
                     MacroChanged?.Invoke(this, EventArgs.Empty);
                 }
             };
-            mainPanel.Children.Add(fullConfigButton);
+                condConfig.Children.Add(configBtn);
+                mainPanel.Children.Add(condConfig);
 
-            // Bouton "Mode groupes" pour basculer vers l'interface des groupes
-            var groupModeButton = new Button
-            {
-                Content = LucideIcons.CreateIcon(LucideIcons.Box, 12),
-                MinWidth = 32,
-                Width = 32,
-                Height = 28,
+                // cond-remove ✕ (si pas la seule condition)
+                if (ifAction.Conditions.Count > 1)
+                {
+                    var condRemove = new TextBlock
+                    {
+                        Text = "✕",
+                        FontSize = 10,
+                        Foreground = textMuted,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 0, 0),
                 Cursor = Cursors.Hand,
-                ToolTip = "Basculer vers le mode groupes (A ET B) OU (C ET D)",
-                Padding = new Thickness(4, 0, 4, 0)
+                        Margin = new Thickness(2, 0, 0, 0),
+                        ToolTip = "Supprimer cette condition"
             };
-            if (Application.Current.TryFindResource("TimelineIfButton") is Style groupModeBtnStyle)
-                groupModeButton.Style = groupModeBtnStyle;
-            groupModeButton.Click += (s, e) =>
+                    condRemove.MouseLeftButtonDown += (s, e) =>
             {
                 SaveState();
-                // Convertir les conditions existantes en un groupe
-                if (ifAction.ConditionGroups == null)
-                    ifAction.ConditionGroups = new List<ConditionGroup>();
-                
-                if (ifAction.ConditionGroups.Count == 0 && ifAction.Conditions != null && ifAction.Conditions.Count > 0)
-                {
-                    // Migrer les conditions existantes vers un groupe
-                    var group = new ConditionGroup
-                    {
-                        Name = "Groupe 1",
-                        Conditions = new List<ConditionItem>(ifAction.Conditions)
-                    };
-                    ifAction.ConditionGroups.Add(group);
-                }
-                else if (ifAction.ConditionGroups.Count == 0)
-                {
-                    // Créer un groupe vide avec une condition par défaut
-                    var group = new ConditionGroup
-                    {
-                        Name = "Groupe 1",
-                        Conditions = new List<ConditionItem> { new ConditionItem { ConditionType = ConditionType.Boolean, Condition = true } }
-                    };
-                    ifAction.ConditionGroups.Add(group);
-                }
-                
+                        if (ifAction.Conditions.Count <= 1) return;
+                        ifAction.Conditions.RemoveAt(conditionIndex);
+                        if (conditionIndex > 0 && conditionIndex <= ifAction.Operators.Count)
+                            ifAction.Operators.RemoveAt(conditionIndex - 1);
+                        else if (conditionIndex == 0 && ifAction.Operators.Count > 0)
+                            ifAction.Operators.RemoveAt(0);
                 _currentMacro!.ModifiedAt = DateTime.Now;
                 RefreshBlocks();
                 MacroChanged?.Invoke(this, EventArgs.Empty);
+                        e.Handled = true;
+                    };
+                    mainPanel.Children.Add(condRemove);
+                }
+            }
+
+            // cond-add-group : ＋ ET / ＋ OU
+            var condAddAnd = new Border
+            {
+                Child = new TextBlock { Text = "＋ ET", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = textMuted, VerticalAlignment = VerticalAlignment.Center },
+                BorderBrush = line2,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(6, 3, 6, 3),
+                Margin = new Thickness(8, 0, 2, 0),
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = Brushes.Transparent,
+                ToolTip = "Ajouter une condition (ET)"
             };
-            mainPanel.Children.Add(groupModeButton);
+            condAddAnd.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+            condAddAnd.MouseLeftButtonDown += (s, e) =>
+                {
+                    SaveState();
+                ifAction.Conditions.Add(new ConditionItem { ConditionType = ConditionType.Boolean, Condition = true });
+                ifAction.Operators.Add(LogicalOperator.AND);
+                    _currentMacro!.ModifiedAt = DateTime.Now;
+                    RefreshBlocks();
+                    MacroChanged?.Invoke(this, EventArgs.Empty);
+                e.Handled = true;
+            };
+            mainPanel.Children.Add(condAddAnd);
+            var condAddOr = new Border
+            {
+                Child = new TextBlock { Text = "＋ OU", FontSize = 10, FontWeight = FontWeights.SemiBold, Foreground = textMuted, VerticalAlignment = VerticalAlignment.Center },
+                BorderBrush = line2,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(6, 3, 6, 3),
+                Margin = new Thickness(0, 0, 8, 0),
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                Background = Brushes.Transparent,
+                ToolTip = "Ajouter une condition (OU)"
+            };
+            condAddOr.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+            condAddOr.MouseLeftButtonDown += (s, e) =>
+            {
+                SaveState();
+                ifAction.Conditions.Add(new ConditionItem { ConditionType = ConditionType.Boolean, Condition = true });
+                ifAction.Operators.Add(LogicalOperator.OR);
+                _currentMacro!.ModifiedAt = DateTime.Now;
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, EventArgs.Empty);
+                e.Handled = true;
+            };
+            mainPanel.Children.Add(condAddOr);
+
+            // block-spacer + block-count (nombre d'actions dans le bloc Then)
+            var spacer = new Border { Width = 16, Background = Brushes.Transparent };
+            mainPanel.Children.Add(spacer);
+            var thenCount = ifAction.ThenActions?.Count ?? 0;
+            var blockCount = new TextBlock
+            {
+                Text = $"{thenCount} action{(thenCount != 1 ? "s" : "")}",
+                FontSize = 11,
+                Foreground = textMuted,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            blockCount.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+            mainPanel.Children.Add(blockCount);
 
             return mainPanel;
         }
@@ -6155,15 +8451,20 @@ namespace MacroEngine.UI
         /// Crée l'interface pour gérer les groupes de conditions visuellement (compacte, horizontale)
         /// Format: (A ET B) OU (C ET D)
         /// </summary>
-        private StackPanel CreateConditionGroupsUI(IfAction ifAction, int index, Panel parentPanel)
+        private StackPanel CreateConditionGroupsUI(IfAction ifAction, int index, Panel parentPanel, SolidColorBrush? siBrush = null, SolidColorBrush? siBorder = null, SolidColorBrush? siBg = null)
         {
+            var redBrush = siBrush ?? GetThemeBrush("TextPrimaryBrush") as SolidColorBrush ?? new SolidColorBrush(Colors.White);
+            var redBorder = siBorder ?? new SolidColorBrush(GetThemeColor("InfoColor"));
+            var redBg = siBg ?? new SolidColorBrush(Color.FromArgb(25, 0x34, 0xC8, 0xB8));
+
             var mainPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
 
-            // Label "Si"
+            // Label "Si" (style carte rouge)
             var ifLabel = new TextBlock
             {
                 Text = "Si",
@@ -6171,7 +8472,7 @@ namespace MacroEngine.UI
                 FontWeight = FontWeights.SemiBold,
                 Margin = new Thickness(0, 0, 6, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = GetThemeBrush("TextPrimaryBrush")
+                Foreground = redBrush
             };
             mainPanel.Children.Add(ifLabel);
 
@@ -6189,21 +8490,21 @@ namespace MacroEngine.UI
                         Text = "OU",
                         FontSize = 11,
                         FontWeight = FontWeights.Bold,
-                        Foreground = new SolidColorBrush(GetThemeColor("WarningColor")),
+                        Foreground = redBrush,
                         VerticalAlignment = VerticalAlignment.Center,
                         Margin = new Thickness(6, 0, 6, 0)
                     };
                     mainPanel.Children.Add(orLabel);
                 }
 
-                // Bordure du groupe (parenthèses visuelles)
+                // Bordure du groupe (style Si rouge)
                 var groupBorder = new Border
                 {
-                    BorderBrush = new SolidColorBrush(GetThemeColor("InfoColor")),
+                    BorderBrush = redBorder,
                     BorderThickness = new Thickness(2),
-                    CornerRadius = new CornerRadius(2),
+                    CornerRadius = new CornerRadius(0),
                     Padding = new Thickness(4, 2, 4, 2),
-                    Background = new SolidColorBrush(Color.FromArgb(25, GetThemeColor("InfoColor").R, GetThemeColor("InfoColor").G, GetThemeColor("InfoColor").B)),
+                    Background = redBg,
                     VerticalAlignment = VerticalAlignment.Center
                 };
 
@@ -6225,14 +8526,14 @@ namespace MacroEngine.UI
                                 Text = "ET",
                                 FontSize = 10,
                                 FontWeight = FontWeights.Bold,
-                                Foreground = new SolidColorBrush(GetThemeColor("SuccessColor")),
+                                Foreground = redBrush,
                                 VerticalAlignment = VerticalAlignment.Center,
                                 Margin = new Thickness(4, 0, 4, 0)
                             };
                             groupContent.Children.Add(andLabel);
                         }
 
-                        // ComboBox compacte pour le type de condition
+                        // ComboBox compacte pour le type de condition (style Si rouge)
                         var conditionTypeComboBox = new ComboBox
                         {
                             Width = 90,
@@ -6241,6 +8542,11 @@ namespace MacroEngine.UI
                             VerticalAlignment = VerticalAlignment.Center,
                             Padding = new Thickness(2, 0, 2, 0)
                         };
+                        if (Application.Current.TryFindResource("ComboBoxSiRed") is Style groupSiCbStyle)
+                            conditionTypeComboBox.Style = groupSiCbStyle;
+                        if (Application.Current.TryFindResource("ComboBoxItemSiRed") is Style groupSiItemStyle)
+                            conditionTypeComboBox.ItemContainerStyle = groupSiItemStyle;
+                        conditionTypeComboBox.SetResourceReference(ComboBox.FontFamilyProperty, "FontMono");
                         conditionTypeComboBox.Items.Add("Booléen");
                         conditionTypeComboBox.Items.Add("App");
                         conditionTypeComboBox.Items.Add("Touche");
@@ -6260,7 +8566,7 @@ namespace MacroEngine.UI
                             {
                                 SaveState();
                                 condition.ConditionType = (ConditionType)conditionTypeComboBox.SelectedIndex;
-                                condition.MouseClickConfig = condition.ConditionType == ConditionType.MouseClick ? new MouseClickCondition() : null;
+                                condition.MouseClickConfig = condition.ConditionType == ConditionType.MouseClick ? new MouseClickCondition { ClickType = 3 } : null;
                                 _currentMacro!.ModifiedAt = DateTime.Now;
                                 RefreshBlocks();
                                 MacroChanged?.Invoke(this, EventArgs.Empty);
@@ -6268,10 +8574,10 @@ namespace MacroEngine.UI
                         };
                         groupContent.Children.Add(conditionTypeComboBox);
 
-                        // Sous-combo type de clic (visible si type = Clic)
+                        // Sous-combo type de clic (style Si rouge)
                         var groupClickTypeComboBox = new ComboBox
                         {
-                            Width = 75,
+                            Width = 62,
                             FontSize = 10,
                             Height = 22,
                             VerticalAlignment = VerticalAlignment.Center,
@@ -6279,29 +8585,108 @@ namespace MacroEngine.UI
                             Padding = new Thickness(2, 0, 2, 0),
                             Visibility = condition.ConditionType == ConditionType.MouseClick ? Visibility.Visible : Visibility.Collapsed
                         };
+                        // Bascule Maintenu/Pressé (orange/violet) — masquée pour molette
+                        var groupAmberBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xA0, 0x20));
+                        var groupAmberBorder = new SolidColorBrush(Color.FromArgb(0x66, 0xE8, 0xA0, 0x20));
+                        var groupAmberBg = new SolidColorBrush(Color.FromArgb(0x12, 0xE8, 0xA0, 0x20));
+                        var groupPurpleBrush = new SolidColorBrush(Color.FromRgb(0xA7, 0x8B, 0xFA));
+                        var groupPurpleBorder = new SolidColorBrush(Color.FromArgb(0x66, 0xA7, 0x8B, 0xFA));
+                        var groupPurpleBg = new SolidColorBrush(Color.FromArgb(0x12, 0xA7, 0x8B, 0xFA));
+                        var groupClickStateText = new TextBlock
+                        {
+                            Text = "MNTN",
+                            FontSize = 9,
+                            FontWeight = FontWeights.ExtraBold,
+                            Foreground = groupAmberBrush,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            TextAlignment = TextAlignment.Center
+                        };
+                        groupClickStateText.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
+                        var groupClickStateToggle = new Border
+                        {
+                            Child = groupClickStateText,
+                            Background = groupAmberBg,
+                            BorderBrush = groupAmberBorder,
+                            BorderThickness = new Thickness(1),
+                            Padding = new Thickness(3, 3, 6, 3),
+                            MinHeight = 23,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Cursor = Cursors.Hand,
+                            Margin = new Thickness(2, 0, 0, 0),
+                            Visibility = condition.ConditionType == ConditionType.MouseClick ? Visibility.Visible : Visibility.Collapsed,
+                            ToolTip = "Basculer Maintenu / Pressé"
+                        };
+                        if (Application.Current.TryFindResource("ComboBoxSiRed") is Style groupClickCbStyle)
+                            groupClickTypeComboBox.Style = groupClickCbStyle;
+                        if (Application.Current.TryFindResource("ComboBoxItemSiRed") is Style groupClickItemStyle)
+                            groupClickTypeComboBox.ItemContainerStyle = groupClickItemStyle;
+                        groupClickTypeComboBox.SetResourceReference(ComboBox.FontFamilyProperty, "FontMono");
                         groupClickTypeComboBox.Items.Add("Gauche");
                         groupClickTypeComboBox.Items.Add("Droit");
                         groupClickTypeComboBox.Items.Add("Milieu");
-                        groupClickTypeComboBox.Items.Add("Mnt gauche");
-                        groupClickTypeComboBox.Items.Add("Mnt droit");
-                        groupClickTypeComboBox.Items.Add("Mnt milieu");
                         groupClickTypeComboBox.Items.Add("Molette ↑");
                         groupClickTypeComboBox.Items.Add("Molette ↓");
+
+                        var groupClickTypeWrap = new Border
+                        {
+                            CornerRadius = new CornerRadius(0),
+                            BorderBrush = redBorder,
+                            BorderThickness = new Thickness(1),
+                            Background = redBg,
+                            Padding = new Thickness(3, 2, 6, 2),
+                            Margin = new Thickness(2, 0, 0, 0),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Child = groupClickTypeComboBox
+                        };
                         if (condition.MouseClickConfig != null)
-                            groupClickTypeComboBox.SelectedIndex = Math.Max(0, Math.Min(condition.MouseClickConfig.ClickType, 7));
+                        {
+                            int ct = Math.Max(0, Math.Min(condition.MouseClickConfig.ClickType, 7));
+                            int typeIdx = ct switch { 0 => 0, 1 => 1, 2 => 2, 3 => 0, 4 => 1, 5 => 2, 6 => 3, 7 => 4, _ => 0 };
+                            int stateIdx = (ct >= 3 && ct <= 5) ? 1 : 0;
+                            bool wheel = (typeIdx == 3 || typeIdx == 4);
+                            groupClickTypeComboBox.SelectedIndex = typeIdx;
+                            groupClickStateText.Text = stateIdx == 0 ? "MNTN" : "PRS";
+                            groupClickStateText.Foreground = stateIdx == 0 ? groupAmberBrush : groupPurpleBrush;
+                            groupClickStateToggle.Background = stateIdx == 0 ? groupAmberBg : groupPurpleBg;
+                            groupClickStateToggle.BorderBrush = stateIdx == 0 ? groupAmberBorder : groupPurpleBorder;
+                            groupClickStateToggle.Visibility = wheel ? Visibility.Collapsed : Visibility.Visible;
+                        }
                         else
+                        {
                             groupClickTypeComboBox.SelectedIndex = 0;
+                        }
                         groupClickTypeComboBox.SelectionChanged += (s, e) =>
                         {
-                            if (groupClickTypeComboBox.SelectedIndex >= 0 && condition.MouseClickConfig != null)
-                            {
-                                SaveState();
-                                condition.MouseClickConfig.ClickType = groupClickTypeComboBox.SelectedIndex;
-                                _currentMacro!.ModifiedAt = DateTime.Now;
-                                MacroChanged?.Invoke(this, EventArgs.Empty);
-                            }
+                            if (groupClickTypeComboBox.SelectedIndex < 0 || condition.MouseClickConfig == null) return;
+                            int t = groupClickTypeComboBox.SelectedIndex;
+                            bool wheel = (t == 3 || t == 4);
+                            groupClickStateToggle.Visibility = wheel ? Visibility.Collapsed : Visibility.Visible;
+                            // Pour molette on force Maintenant (0) pour état interne
+                            var st = (groupClickStateText.Text == "PRS") ? 1 : 0;
+                            if (wheel) st = 0;
+                            condition.MouseClickConfig.ClickType = (t, st) switch { (0, 0) => 0, (0, 1) => 3, (1, 0) => 1, (1, 1) => 4, (2, 0) => 2, (2, 1) => 5, (3, _) => 6, (4, _) => 7, _ => 0 };
+                            SaveState(); _currentMacro!.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty);
                         };
-                        groupContent.Children.Add(groupClickTypeComboBox);
+                        groupClickStateToggle.MouseLeftButtonDown += (s, e) =>
+                        {
+                            e.Handled = true;
+                            if (condition.MouseClickConfig == null) return;
+                            // Toggle seulement si pas molette
+                            int t = groupClickTypeComboBox.SelectedIndex;
+                            if (t == 3 || t == 4) return;
+                            bool pressed = groupClickStateText.Text == "PRS";
+                            pressed = !pressed;
+                            groupClickStateText.Text = pressed ? "PRS" : "MNTN";
+                            groupClickStateText.Foreground = pressed ? groupPurpleBrush : groupAmberBrush;
+                            groupClickStateToggle.Background = pressed ? groupPurpleBg : groupAmberBg;
+                            groupClickStateToggle.BorderBrush = pressed ? groupPurpleBorder : groupAmberBorder;
+                            int st = pressed ? 1 : 0;
+                            condition.MouseClickConfig.ClickType = (t, st) switch { (0, 0) => 0, (0, 1) => 3, (1, 0) => 1, (1, 1) => 4, (2, 0) => 2, (2, 1) => 5, (3, _) => 6, (4, _) => 7, _ => 0 };
+                            SaveState(); _currentMacro!.ModifiedAt = DateTime.Now; MacroChanged?.Invoke(this, EventArgs.Empty);
+                        };
+                        groupContent.Children.Add(groupClickTypeWrap);
+                        groupContent.Children.Add(groupClickStateToggle);
 
                         // Bouton configurer (petit)
                         var configButton = new Button
@@ -6341,6 +8726,8 @@ namespace MacroEngine.UI
                                 condition.TextOnScreenConfig = resultCondition.TextOnScreenConfig;
                                 condition.MouseClickConfig = resultCondition.MouseClickConfig != null ? new MouseClickCondition { ClickType = resultCondition.MouseClickConfig.ClickType } : null;
                                 condition.VariableName = resultCondition.VariableName;
+                                condition.VariableOperator = resultCondition.VariableOperator;
+                                condition.VariableValue = resultCondition.VariableValue;
                                 _currentMacro!.ModifiedAt = DateTime.Now;
                                 RefreshBlocks();
                                 MacroChanged?.Invoke(this, EventArgs.Empty);
@@ -6558,9 +8945,9 @@ namespace MacroEngine.UI
                     break;
                 case ConditionType.MouseClick:
                     if (ifAction.Conditions == null || ifAction.Conditions.Count == 0)
-                        ifAction.Conditions = new List<ConditionItem> { new ConditionItem { ConditionType = ConditionType.MouseClick, MouseClickConfig = new MouseClickCondition() } };
+                        ifAction.Conditions = new List<ConditionItem> { new ConditionItem { ConditionType = ConditionType.MouseClick, MouseClickConfig = new MouseClickCondition { ClickType = 3 } } };
                     else if (ifAction.Conditions[0].MouseClickConfig == null)
-                        ifAction.Conditions[0].MouseClickConfig = new MouseClickCondition();
+                        ifAction.Conditions[0].MouseClickConfig = new MouseClickCondition { ClickType = 3 };
                     break;
             }
         }
@@ -6702,8 +9089,8 @@ namespace MacroEngine.UI
                     ? $"Pixel ({ifAction.PixelColorConfig.X},{ifAction.PixelColorConfig.Y}) = {ifAction.PixelColorConfig.ExpectedColor}"
                     : "Pixel: (non configuré)",
                 ConditionType.MousePosition => ifAction.MousePositionConfig != null
-                    ? $"Zone ({ifAction.MousePositionConfig.X1},{ifAction.MousePositionConfig.Y1})-({ifAction.MousePositionConfig.X2},{ifAction.MousePositionConfig.Y2})"
-                    : "Zone: (non configuré)",
+                    ? $"{ifAction.MousePositionConfig.X1},{ifAction.MousePositionConfig.Y1} → {ifAction.MousePositionConfig.X2},{ifAction.MousePositionConfig.Y2}"
+                    : "(non configuré)",
                 ConditionType.TimeDate => ifAction.TimeDateConfig != null
                     ? $"{ifAction.TimeDateConfig.ComparisonType} {GetTimeOperatorSymbol(ifAction.TimeDateConfig.Operator)} {ifAction.TimeDateConfig.Value}"
                     : "Temps: (non configuré)",
@@ -6768,8 +9155,8 @@ namespace MacroEngine.UI
                     ? $"Pixel ({condition.PixelColorConfig.X},{condition.PixelColorConfig.Y}) = {condition.PixelColorConfig.ExpectedColor}"
                     : "Pixel: (non configuré)",
                 ConditionType.MousePosition => condition.MousePositionConfig != null
-                    ? $"Zone ({condition.MousePositionConfig.X1},{condition.MousePositionConfig.Y1})-({condition.MousePositionConfig.X2},{condition.MousePositionConfig.Y2})"
-                    : "Zone: (non configuré)",
+                    ? $"{condition.MousePositionConfig.X1},{condition.MousePositionConfig.Y1} → {condition.MousePositionConfig.X2},{condition.MousePositionConfig.Y2}"
+                    : "(non configuré)",
                 ConditionType.TimeDate => condition.TimeDateConfig != null
                     ? $"{condition.TimeDateConfig.ComparisonType} {GetTimeOperatorSymbol(condition.TimeDateConfig.Operator)} {condition.TimeDateConfig.Value}"
                     : "Temps: (non configuré)",
@@ -6782,8 +9169,73 @@ namespace MacroEngine.UI
                 ConditionType.MouseClick => condition.MouseClickConfig != null
                     ? $"Clic: {GetMouseClickLabel(condition.MouseClickConfig.ClickType)}"
                     : "Clic: (non configuré)",
+                ConditionType.Variable => !string.IsNullOrEmpty(condition.VariableName)
+                    ? (condition.VariableOperator == "empty" || condition.VariableOperator == "not_empty"
+                        ? $"${condition.VariableName} {condition.VariableOperator}"
+                        : $"${condition.VariableName} {condition.VariableOperator} \"{condition.VariableValue}\"")
+                    : "Variable: (non configuré)",
                 _ => ""
             };
+        }
+
+        /// <summary>
+        /// Branche If (Alors / Sinon Si / Sinon) : même chrome que la carte <see cref="IfAction"/> (fond teinté 5 %,
+        /// bordure ext. 35 % accent, hauteur 48px, barre gauche 3px) — seule la couleur d’accent change (pas le rouge Si).
+        /// </summary>
+        private Border CreateIfBranchSectionChrome(Color accentColor, string branchTitle, Thickness outerMargin, out StackPanel bodyPanel)
+        {
+            // Mêmes formules que CreateActionCard pour IfAction (l.597–601)
+            var brushCard = new SolidColorBrush(Color.FromArgb(13, accentColor.R, accentColor.G, accentColor.B));
+            var brushBorder = new SolidColorBrush(Color.FromArgb(0x59, accentColor.R, accentColor.G, accentColor.B));
+            var accentBrush = new SolidColorBrush(accentColor);
+
+            var outer = new Border
+            {
+                Background = brushCard,
+                BorderBrush = brushBorder,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(0),
+                Margin = outerMargin,
+                CornerRadius = new CornerRadius(0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                MinWidth = 400
+            };
+
+            var root = new StackPanel { Orientation = Orientation.Vertical };
+
+            // Rangée d’en-tête identique à la carte Si : pas de zone type 72px, premier segment = barre 3px + padding 10,12,14,12
+            var headerRow = new Grid { MinHeight = 48, MaxHeight = 48 };
+            var segBorder = new Border
+            {
+                BorderThickness = new Thickness(3, 0, 0, 0),
+                BorderBrush = accentBrush,
+                Padding = new Thickness(10, 12, 14, 12),
+                VerticalAlignment = VerticalAlignment.Stretch,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            var titleBlock = new TextBlock
+            {
+                Text = branchTitle,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = accentBrush,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            titleBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontPrimary");
+            segBorder.Child = titleBlock;
+            headerRow.Children.Add(segBorder);
+            root.Children.Add(headerRow);
+
+            // Corps imbriqué sous la même boîte teintée (comme prolongement du bloc Si visuellement)
+            bodyPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(10, 0, 10, 8)
+            };
+            root.Children.Add(bodyPanel);
+
+            outer.Child = root;
+            return outer;
         }
 
         /// <summary>
@@ -6791,6 +9243,7 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateIfActionContainer(IfAction ifAction, int index)
         {
+            // Marge basse modérée : l’espace sous le bloc Sinon est surtout porté par elseActionsWrap (voir fin de méthode).
             var container = new StackPanel
             {
                 Orientation = Orientation.Vertical,
@@ -6801,35 +9254,8 @@ namespace MacroEngine.UI
             var actionContainer = CreateActionCardWithButtons(ifAction, index);
             container.Children.Add(actionContainer);
 
-            // Section Then avec bordure colorée
-            var thenColor = GetThemeColor("SuccessColor");
-            var thenSectionBorder = new Border
-            {
-                BorderBrush = new SolidColorBrush(Color.FromArgb(100, thenColor.R, thenColor.G, thenColor.B)),
-                BorderThickness = new Thickness(2, 0, 0, 0),
-                Background = new SolidColorBrush(Color.FromArgb(15, thenColor.R, thenColor.G, thenColor.B)),
-                CornerRadius = new CornerRadius(0, 2, 2, 0),
-                Margin = new Thickness(20, 4, 0, 4),
-                Padding = new Thickness(10, 6, 6, 6)
-            };
-            
-            var thenSection = new StackPanel
-            {
-                Orientation = Orientation.Vertical
-            };
-
-            // Header "Then"
-            var thenHeader = new TextBlock
-            {
-                Text = "✓ Then",
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 8),
-                Foreground = new SolidColorBrush(thenColor)
-            };
-            thenSection.Children.Add(thenHeader);
-
-            // Conteneur pour les actions Then
+            // Branche « alors » : actions imbriquées puis chips d’ajout (sous les actions)
+            var thenBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(22, 0, 0, 4) };
             if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
             {
                 var thenContainer = new StackPanel
@@ -6837,52 +9263,28 @@ namespace MacroEngine.UI
                     Orientation = Orientation.Vertical,
                     Margin = new Thickness(0, 0, 0, 4)
                 };
-
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
                 {
                     var nestedAction = ifAction.ThenActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, index, i, true); // true = Then
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, index, i, true);
                     thenContainer.Children.Add(nestedCard);
                 }
-                thenSection.Children.Add(thenContainer);
+                thenBranchWrap.Children.Add(thenContainer);
             }
-
-            // Panel pour ajouter des actions dans Then
             var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, index, true, -1);
-            thenSection.Children.Add(addThenActionsPanel);
-            thenSectionBorder.Child = thenSection;
-            container.Children.Add(thenSectionBorder);
+            addThenActionsPanel.Margin = new Thickness(50, -4, 0, 0);
+            thenBranchWrap.Children.Add(addThenActionsPanel);
+            container.Children.Add(thenBranchWrap);
 
-            // Sections Else If avec bordure colorée
-            var elseIfColor = GetThemeColor("WarningColor");
+            // Sections Sinon Si — même principe
+            var elseIfColor = Color.FromRgb(0xE8, 0xA0, 0x20);
             if (ifAction.ElseIfBranches != null)
             {
                 for (int bi = 0; bi < ifAction.ElseIfBranches.Count; bi++)
                 {
                     var branch = ifAction.ElseIfBranches[bi];
-                    var elseIfSectionBorder = new Border
-                    {
-                        BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseIfColor.R, elseIfColor.G, elseIfColor.B)),
-                        BorderThickness = new Thickness(2, 0, 0, 0),
-                        Background = new SolidColorBrush(Color.FromArgb(15, elseIfColor.R, elseIfColor.G, elseIfColor.B)),
-                        CornerRadius = new CornerRadius(0, 2, 2, 0),
-                        Margin = new Thickness(20, 4, 0, 4),
-                        Padding = new Thickness(10, 6, 6, 6)
-                    };
-                    
-                    var elseIfSection = new StackPanel
-                    {
-                        Orientation = Orientation.Vertical
-                    };
-                    var elseIfHeader = new TextBlock
-                    {
-                        Text = "⟳ Else If (" + GetConditionPreviewForBranch(branch) + ")",
-                        FontSize = 12,
-                        FontWeight = FontWeights.SemiBold,
-                        Margin = new Thickness(0, 0, 0, 8),
-                        Foreground = new SolidColorBrush(elseIfColor)
-                    };
-                    elseIfSection.Children.Add(elseIfHeader);
+                    var elseIfBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(22, 0, 0, 4) };
+                    var elseIfSectionBorder = CreateIfBranchSectionChrome(elseIfColor, "SINON SI", new Thickness(0, 0, 0, 0), out var elseIfSection);
                     if (branch.Actions != null && branch.Actions.Count > 0)
                     {
                         var elseIfContainer = new StackPanel
@@ -6897,42 +9299,25 @@ namespace MacroEngine.UI
                         }
                         elseIfSection.Children.Add(elseIfContainer);
                     }
-                    var addElseIfPanel = CreateAddIfActionsPanel(ifAction, index, false, bi);
-                    elseIfSection.Children.Add(addElseIfPanel);
-                    elseIfSectionBorder.Child = elseIfSection;
-                    container.Children.Add(elseIfSectionBorder);
+                    elseIfBranchWrap.Children.Add(elseIfSectionBorder);
+                    elseIfBranchWrap.Children.Add(CreateAddIfActionsPanel(ifAction, index, false, bi));
+                    container.Children.Add(elseIfBranchWrap);
                 }
             }
 
-            // Section Else avec bordure colorée
-            var elseColor = GetThemeColor("ErrorColor");
-            var elseSectionBorder = new Border
-            {
-                BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseColor.R, elseColor.G, elseColor.B)),
-                BorderThickness = new Thickness(2, 0, 0, 0),
-                Background = new SolidColorBrush(Color.FromArgb(15, elseColor.R, elseColor.G, elseColor.B)),
-                CornerRadius = new CornerRadius(0, 2, 2, 0),
-                Margin = new Thickness(20, 4, 0, 4),
-                Padding = new Thickness(10, 6, 6, 6)
-            };
-            
-            var elseSection = new StackPanel
-            {
-                Orientation = Orientation.Vertical
-            };
+            // Section Sinon
+            var elseColor = Color.FromRgb(0xA7, 0x8B, 0xFA);
+            // Entête SINON aligné comme le parent SI ; espace au-dessus (SI non imbriqué dans Répéter uniquement).
+            var elseHeaderWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(44, 4, 0, 4) };
+            var elseSectionBorder = CreateIfBranchSectionChrome(elseColor, "SINON", new Thickness(0, 0, 0, 4), out var elseSection);
+            // Le cadre SINON ne contient plus d'actions : retirer le body vide pour éviter une hauteur en trop.
+            elseSection.Visibility = Visibility.Collapsed;
 
-            // Header "Else"
-            var elseHeader = new TextBlock
-            {
-                Text = "✗ Else",
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 8),
-                Foreground = new SolidColorBrush(elseColor)
-            };
-            elseSection.Children.Add(elseHeader);
+            elseHeaderWrap.Children.Add(elseSectionBorder);
+            container.Children.Add(elseHeaderWrap);
 
-            // Conteneur pour les actions Else
+            // Actions SINON : même décalage gauche que la branche SI ; peu de marge sous le bloc (Si non imbriqué).
+            var elseActionsWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(22, 0, 0, 0) };
             if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
             {
                 var elseContainer = new StackPanel
@@ -6947,14 +9332,12 @@ namespace MacroEngine.UI
                     var nestedCard = CreateNestedIfActionCard(nestedAction, index, i, false); // false = Else
                     elseContainer.Children.Add(nestedCard);
                 }
-                elseSection.Children.Add(elseContainer);
+                elseActionsWrap.Children.Add(elseContainer);
             }
-
-            // Panel pour ajouter des actions dans Else
             var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, index, false, -1);
-            elseSection.Children.Add(addElseActionsPanel);
-            elseSectionBorder.Child = elseSection;
-            container.Children.Add(elseSectionBorder);
+            addElseActionsPanel.Margin = new Thickness(50, -4, 0, 0);
+            elseActionsWrap.Children.Add(addElseActionsPanel);
+            container.Children.Add(elseActionsWrap);
 
             return container;
         }
@@ -6974,37 +9357,20 @@ namespace MacroEngine.UI
             var actionContainer = CreateActionCardWithButtons(ra, index);
             container.Children.Add(actionContainer);
 
-            // Couleur du bloc Repeat (violet logique)
-            var loopColor = Color.FromRgb(138, 108, 209); // #8A6CD1
-            
-            // Conteneur stylisé pour les actions imbriquées
+            // block-body : trait vertical gauche (margin 22 + border 2) pour relier les steps imbriqués
+            var line2Brush = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26));
             var nestedSectionBorder = new Border
             {
-                BorderBrush = new SolidColorBrush(Color.FromArgb(100, loopColor.R, loopColor.G, loopColor.B)),
+                Background = Brushes.Transparent,
+                BorderBrush = line2Brush,
                 BorderThickness = new Thickness(2, 0, 0, 0),
-                Background = new SolidColorBrush(Color.FromArgb(15, loopColor.R, loopColor.G, loopColor.B)),
-                CornerRadius = new CornerRadius(0, 2, 2, 0),
-                Margin = new Thickness(20, 4, 0, 4),
-                Padding = new Thickness(10, 6, 6, 6)
+                Margin = new Thickness(22, 0, 0, 4),
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            
-            var nestedSection = new StackPanel
-            {
-                Orientation = Orientation.Vertical
-            };
-            
-            // Header "Actions à répéter"
-            var loopHeader = new TextBlock
-            {
-                Text = "🔄 Actions à répéter",
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 8),
-                Foreground = new SolidColorBrush(loopColor)
-            };
-            nestedSection.Children.Add(loopHeader);
 
-            // Créer un conteneur pour les actions imbriquées
+            var nestedSection = new StackPanel { Orientation = Orientation.Vertical };
+
             if (ra.Actions != null && ra.Actions.Count > 0)
             {
                 var nestedContainer = new StackPanel
@@ -7016,13 +9382,12 @@ namespace MacroEngine.UI
                 for (int i = 0; i < ra.Actions.Count; i++)
                 {
                     var nestedAction = ra.Actions[i];
-                    var nestedCard = CreateNestedActionCard(nestedAction, index, i);
+                    var nestedCard = CreateNestedActionCard(nestedAction, index, i, indentLevel: 1);
                     nestedContainer.Children.Add(nestedCard);
                 }
                 nestedSection.Children.Add(nestedContainer);
             }
 
-            // Ajouter un panel pour ajouter de nouvelles actions dans le RepeatAction
             var addActionsPanel = CreateAddActionsPanel(ra, index);
             nestedSection.Children.Add(addActionsPanel);
             
@@ -7034,14 +9399,43 @@ namespace MacroEngine.UI
 
         /// <summary>
         /// Crée une carte pour une action imbriquée dans un RepeatAction (niveau racine ou Repeat dans Then/Else d'un If).
-        /// Si ifActionIndex >= 0 : Repeat est dans le Then/Else du If à cet index ; sinon parentIndex = index du Repeat à la racine.
+        /// indentLevel: 1 = step-indent (16px), 2 = step-indent-2 (32px).
         /// </summary>
-        private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex, int ifActionIndex = -1, bool isThen = false, int nestedRepeatIndex = -1)
+        private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex, int ifActionIndex = -1, bool isThen = false, int nestedRepeatIndex = -1, int indentLevel = 1)
         {
-            // Si c'est un IfAction imbriqué, créer un conteneur récursif au lieu d'une simple carte
+            // Si c'est un IfAction imbriqué, créer le conteneur puis l'imbriquer visuellement (↳ + marge) comme les autres actions
             if (action is IfAction nestedIfAction)
             {
-                return CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex);
+                var level = (parentIndex >= 0 && _currentMacro != null && parentIndex < _currentMacro.Actions.Count && _currentMacro.Actions[parentIndex] is RepeatAction) ? 2 : 1;
+                var ifContainer = CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex, level);
+                // Même décalage que les autres actions imbriquées (16 px), pour aligner la carte Si avec Clic, Délai, etc.
+                var ifStepIndentPx = 16;
+                var wrapper = new Grid
+                {
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(ifStepIndentPx, 0, 0, 2),
+                    MinWidth = 400
+                };
+                wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+                wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var ifArrowText = new TextBlock
+                {
+                    Text = "↳",
+                    FontSize = 11,
+                    Foreground = GetThemeBrush("TextMutedBrush") ?? new SolidColorBrush(Color.FromRgb(0x6A, 0x7A, 0x6A)),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(0, 14, 8, 0),
+                    Opacity = 0.5
+                };
+                ifArrowText.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+                Grid.SetColumn(ifArrowText, 0);
+                wrapper.Children.Add(ifArrowText);
+                ifContainer.HorizontalAlignment = HorizontalAlignment.Stretch;
+                Grid.SetColumn(ifContainer, 1);
+                wrapper.Children.Add(ifContainer);
+                return wrapper;
             }
 
             var info = ifActionIndex >= 0
@@ -7110,26 +9504,36 @@ namespace MacroEngine.UI
                 }
             }
 
-            // Conteneur Grid pour la carte + boutons flèches + bouton supprimer
+            // step-indent : colonne ↳ (34px) + carte, padding-left 16px (niveau 1) ou 32px (niveau 2)
+            var stepIndentPx = indentLevel == 2 ? 32 : 16;
             var container = new Grid
             {
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(0, 0, 0, 2),
+                Margin = new Thickness(stepIndentPx, 0, 0, 2),
                 MinWidth = 400
             };
 
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto }); // Boutons flèches
+
+            var arrowText = new TextBlock
+            {
+                Text = "↳",
+                FontSize = 11,
+                Foreground = GetThemeBrush("TextMutedBrush") ?? new SolidColorBrush(Color.FromRgb(0x6A, 0x7A, 0x6A)),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Opacity = 0.5
+            };
+            arrowText.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+            Grid.SetColumn(arrowText, 0);
+            container.Children.Add(arrowText);
 
             card.HorizontalAlignment = HorizontalAlignment.Stretch;
-            Grid.SetColumn(card, 0);
+            Grid.SetColumn(card, 1);
             container.Children.Add(card);
-
-            // Boutons flèches pour les actions imbriquées
-            var moveButtonsContainer = CreateNestedMoveButtonsContainer(action, info);
-            Grid.SetColumn(moveButtonsContainer, 1);
-            container.Children.Add(moveButtonsContainer);
 
             return container;
         }
@@ -7340,10 +9744,10 @@ namespace MacroEngine.UI
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(20, 4, 0, 8) // Indentation
+                Margin = new Thickness(50, -4, 0, 8) // Compense la marge basse du dernier bloc d'action
             };
 
-            // Fonction helper pour créer un bouton d'ajout (texte blanc clair)
+            // Chips v2 : bg transparent, border line2, hover amber
             Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
             {
                 var tag = new RepeatActionInfo
@@ -7356,21 +9760,22 @@ namespace MacroEngine.UI
                 };
                 var button = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255)),
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(10, 5, 10, 5),
-                    Margin = new Thickness(0, 0, 6, 0),
+                    Background = Brushes.Transparent,
+                    CornerRadius = new CornerRadius(0),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    Margin = new Thickness(0, 0, 4, 0),
                     Cursor = Cursors.Hand,
                     BorderThickness = new Thickness(1),
-                    BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26)),
                     Tag = tag
                 };
                 button.MouseLeftButtonDown += AddActionToRepeat_Click;
 
-                var iconBlock = new TextBlock { Text = icon, FontSize = 11 };
+                var iconBlock = new TextBlock { Text = icon, FontSize = 10 };
                 iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
-                var textBlock = new TextBlock { Text = " " + text, FontSize = 11, FontWeight = FontWeights.Medium };
-                var brush = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+                var textBlock = new TextBlock { Text = " " + text, FontSize = 10, FontWeight = FontWeights.SemiBold };
+                textBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+                var brush = new SolidColorBrush(Color.FromRgb(0x4A, 0x5A, 0x4A));
                 iconBlock.Foreground = brush;
                 textBlock.Foreground = brush;
                 var sp = new StackPanel { Orientation = Orientation.Horizontal };
@@ -7380,16 +9785,14 @@ namespace MacroEngine.UI
 
                 button.MouseEnter += (s, e) =>
                 {
-                    button.Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
-                    button.BorderBrush = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
-                    var hoverBrush = new SolidColorBrush(Color.FromRgb(230, 228, 234));
+                    button.BorderBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xA0, 0x20));
+                    var hoverBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xA0, 0x20));
                     iconBlock.Foreground = hoverBrush;
                     textBlock.Foreground = hoverBrush;
                 };
                 button.MouseLeave += (s, e) =>
                 {
-                    button.Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255));
-                    button.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                    button.BorderBrush = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26));
                     iconBlock.Foreground = brush;
                     textBlock.Foreground = brush;
                 };
@@ -7400,7 +9803,7 @@ namespace MacroEngine.UI
             panel.Children.Add(createAddButton(LucideIcons.Keyboard, "Touche", new KeyboardAction()));
             panel.Children.Add(createAddButton(LucideIcons.Mouse, "Clic", new Core.Inputs.MouseAction()));
             panel.Children.Add(createAddButton(LucideIcons.FileText, "Texte", new TextAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Box, "Variable", new VariableAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Braces, "Variable", new VariableAction()));
             panel.Children.Add(createAddButton(LucideIcons.Timer, "Délai", new DelayAction()));
             panel.Children.Add(createAddButton(LucideIcons.HelpCircle, "Si", new IfAction()));
 
@@ -7588,12 +9991,45 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée une carte pour une action imbriquée dans un IfAction (Then, Else If ou Else). elseIfBranchIndex &lt; 0 = Then ou Else.
         /// </summary>
-        private FrameworkElement CreateNestedIfActionCard(IInputAction action, int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex = -1)
+        private FrameworkElement CreateNestedIfActionCard(IInputAction action, int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex = -1, int indentLevel = 1)
         {
             // Si c'est un RepeatAction imbriqué, créer un conteneur récursif au lieu d'une simple carte
             if (action is RepeatAction nestedRepeatAction)
             {
                 return CreateNestedRepeatActionContainer(nestedRepeatAction, parentIndex, nestedIndex, isThen);
+            }
+
+            // Si c'est un IfAction imbriqué (Si dans Then/Else), afficher le bloc complet avec ↳ devant
+            if (action is IfAction nestedIfAction)
+            {
+                var ifContainer = CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex, indentLevel);
+                var stepPx = indentLevel == 2 ? 32 : 16;
+                var wrap = new Grid
+                {
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(stepPx, 0, 0, 2),
+                    MinWidth = 400
+                };
+                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var arrow = new TextBlock
+                {
+                    Text = "↳",
+                    FontSize = 11,
+                    Foreground = GetThemeBrush("TextMutedBrush") ?? new SolidColorBrush(Color.FromRgb(0x6A, 0x7A, 0x6A)),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
+                    Margin = new Thickness(0, 14, 8, 0),
+                    Opacity = 0.5
+                };
+                arrow.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+                Grid.SetColumn(arrow, 0);
+                wrap.Children.Add(arrow);
+                ifContainer.HorizontalAlignment = HorizontalAlignment.Stretch;
+                Grid.SetColumn(ifContainer, 1);
+                wrap.Children.Add(ifContainer);
+                return wrap;
             }
 
             var card = CreateActionCard(action, parentIndex, null, new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen, ElseIfBranchIndex = elseIfBranchIndex });
@@ -7651,24 +10087,36 @@ namespace MacroEngine.UI
                 }
             }
 
+            // step-indent : colonne ↳ (34px) + carte, padding-left 16px ou 32px
+            var stepIndentPx = indentLevel == 2 ? 32 : 16;
             var container = new Grid
             {
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(0, 0, 0, 2),
+                Margin = new Thickness(stepIndentPx, 0, 0, 2),
                 MinWidth = 400
             };
 
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var arrowTextIf = new TextBlock
+            {
+                Text = "↳",
+                FontSize = 11,
+                Foreground = GetThemeBrush("TextMutedBrush") ?? new SolidColorBrush(Color.FromRgb(0x6A, 0x7A, 0x6A)),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+                Opacity = 0.5
+            };
+            arrowTextIf.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+            Grid.SetColumn(arrowTextIf, 0);
+            container.Children.Add(arrowTextIf);
 
             card.HorizontalAlignment = HorizontalAlignment.Stretch;
-            Grid.SetColumn(card, 0);
+            Grid.SetColumn(card, 1);
             container.Children.Add(card);
-
-            var moveButtonsContainer = CreateNestedIfMoveButtonsContainer(action, parentIndex, nestedIndex, isThen, elseIfBranchIndex);
-            Grid.SetColumn(moveButtonsContainer, 1);
-            container.Children.Add(moveButtonsContainer);
 
             return container;
         }
@@ -7676,35 +10124,44 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un panel avec des boutons pour ajouter des actions dans un IfAction (Then ou Else)
         /// </summary>
-        private FrameworkElement CreateAddIfActionsPanel(IfAction ifAction, int ifActionIndex, bool isThen, int elseIfBranchIndex = -1)
+        private FrameworkElement CreateAddIfActionsPanel(IfAction ifAction, int ifActionIndex, bool isThen, int elseIfBranchIndex = -1, int repeatActionIndex = -1, int nestedIfIndex = -1)
         {
             var panel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, 4, 0, 8)
+                Margin = new Thickness(0, -4, 0, 8)
             };
 
-            // Fonction helper pour créer un bouton d'ajout (texte blanc clair)
+            // Chips v2 : bg transparent, border line2, hover amber
             Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
             {
                 var button = new Border
                 {
-                    Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255)),
-                    CornerRadius = new CornerRadius(6),
-                    Padding = new Thickness(10, 5, 10, 5),
-                    Margin = new Thickness(0, 0, 6, 0),
+                    Background = Brushes.Transparent,
+                    CornerRadius = new CornerRadius(0),
+                    Padding = new Thickness(8, 4, 8, 4),
+                    Margin = new Thickness(0, 0, 4, 0),
                     Cursor = Cursors.Hand,
                     BorderThickness = new Thickness(1),
-                    BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
-                    Tag = new IfActionInfo { IfActionIndex = ifActionIndex, ActionType = actionInstance.Type.ToString(), IsThen = isThen }
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26)),
+                    Tag = new IfActionInfo
+                    {
+                        IfActionIndex = ifActionIndex,
+                        ActionType = actionInstance.Type.ToString(),
+                        IsThen = isThen,
+                        ElseIfBranchIndex = elseIfBranchIndex,
+                        RepeatActionIndex = repeatActionIndex,
+                        NestedIfIndex = nestedIfIndex
+                    }
                 };
                 button.MouseLeftButtonDown += AddActionToIf_Click;
 
-                var iconBlock = new TextBlock { Text = icon, FontSize = 11 };
+                var iconBlock = new TextBlock { Text = icon, FontSize = 10 };
                 iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
-                var textBlock = new TextBlock { Text = " " + text, FontSize = 11, FontWeight = FontWeights.Medium };
-                var brush = new SolidColorBrush(Color.FromRgb(185, 182, 194));
+                var textBlock = new TextBlock { Text = " " + text, FontSize = 10, FontWeight = FontWeights.SemiBold };
+                textBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+                var brush = new SolidColorBrush(Color.FromRgb(0x4A, 0x5A, 0x4A));
                 iconBlock.Foreground = brush;
                 textBlock.Foreground = brush;
                 var sp = new StackPanel { Orientation = Orientation.Horizontal };
@@ -7714,16 +10171,14 @@ namespace MacroEngine.UI
 
                 button.MouseEnter += (s, e) =>
                 {
-                    button.Background = new SolidColorBrush(Color.FromArgb(50, 255, 255, 255));
-                    button.BorderBrush = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255));
-                    var hoverBrush = new SolidColorBrush(Color.FromRgb(230, 228, 234));
+                    button.BorderBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xA0, 0x20));
+                    var hoverBrush = new SolidColorBrush(Color.FromRgb(0xE8, 0xA0, 0x20));
                     iconBlock.Foreground = hoverBrush;
                     textBlock.Foreground = hoverBrush;
                 };
                 button.MouseLeave += (s, e) =>
                 {
-                    button.Background = new SolidColorBrush(Color.FromArgb(25, 255, 255, 255));
-                    button.BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+                    button.BorderBrush = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26));
                     iconBlock.Foreground = brush;
                     textBlock.Foreground = brush;
                 };
@@ -7734,9 +10189,9 @@ namespace MacroEngine.UI
             panel.Children.Add(createAddButton(LucideIcons.Keyboard, "Touche", new KeyboardAction()));
             panel.Children.Add(createAddButton(LucideIcons.Mouse, "Clic", new Core.Inputs.MouseAction()));
             panel.Children.Add(createAddButton(LucideIcons.FileText, "Texte", new TextAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Box, "Variable", new VariableAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Braces, "Variable", new VariableAction()));
             panel.Children.Add(createAddButton(LucideIcons.Timer, "Délai", new DelayAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Repeat, "Répéter", new RepeatAction()));
+            panel.Children.Add(createAddButton(LucideIcons.Repeat2, "Répéter", new RepeatAction()));
 
             return panel;
         }
@@ -7927,10 +10382,23 @@ namespace MacroEngine.UI
             var button = sender as Border;
             if (button?.Tag is not IfActionInfo info) return;
 
+            IfAction? ifAction = null;
+            if (info.RepeatActionIndex >= 0 && info.NestedIfIndex >= 0)
+            {
+                // SI imbriqué dans un Répéter (cas qui bloquait l'ajout via chips)
+                if (info.RepeatActionIndex >= _currentMacro.Actions.Count) return;
+                if (_currentMacro.Actions[info.RepeatActionIndex] is not RepeatAction repeatAction) return;
+                if (repeatAction.Actions == null || info.NestedIfIndex >= repeatAction.Actions.Count) return;
+                ifAction = repeatAction.Actions[info.NestedIfIndex] as IfAction;
+            }
+            else
+            {
+                // SI au niveau racine
             var ifActionIndex = info.IfActionIndex;
             if (ifActionIndex < 0 || ifActionIndex >= _currentMacro.Actions.Count) return;
-
-            if (_currentMacro.Actions[ifActionIndex] is not IfAction ifAction) return;
+                ifAction = _currentMacro.Actions[ifActionIndex] as IfAction;
+            }
+            if (ifAction == null) return;
 
             SaveState();
 
@@ -8691,115 +11159,73 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un conteneur récursif pour un IfAction imbriqué dans un RepeatAction
         /// </summary>
-        private FrameworkElement CreateNestedIfActionContainer(IfAction ifAction, int repeatActionIndex, int nestedIndex)
+        private FrameworkElement CreateNestedIfActionContainer(IfAction ifAction, int repeatActionIndex, int nestedIndex, int indentLevel = 1)
         {
+            // Marge basse modérée : moins d’air sous le bloc SINON (voir elseBranchWrap + chips).
             var container = new StackPanel
             {
                 Orientation = Orientation.Vertical,
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0, 0, 0, 6)
             };
 
             // Créer une carte simple pour l'IfAction (sans boutons monter/descendre car c'est imbriqué)
             var card = CreateActionCard(ifAction, repeatActionIndex);
             container.Children.Add(card);
 
-            // Section Then avec bordure colorée
-            var thenColor = GetThemeColor("SuccessColor");
-            var thenSectionBorder = new Border
-            {
-                BorderBrush = new SolidColorBrush(Color.FromArgb(100, thenColor.R, thenColor.G, thenColor.B)),
-                BorderThickness = new Thickness(2, 0, 0, 0),
-                Background = new SolidColorBrush(Color.FromArgb(15, thenColor.R, thenColor.G, thenColor.B)),
-                CornerRadius = new CornerRadius(0, 2, 2, 0),
-                Margin = new Thickness(20, 4, 0, 4),
-                Padding = new Thickness(10, 6, 6, 6)
-            };
-            
-            var thenSection = new StackPanel
-            {
-                Orientation = Orientation.Vertical
-            };
-
-            var thenHeader = new TextBlock
-            {
-                Text = "✓ Then",
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 8),
-                Foreground = new SolidColorBrush(thenColor)
-            };
-            thenSection.Children.Add(thenHeader);
-
+            // If dans Repeat : actions « alors » puis ajout sous les actions
+            // Peu de marge sous la branche « alors » pour rapprocher le bloc SINON.
+            var thenBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(-10, 0, 0, 12) };
             if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
             {
                 var thenContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = new Thickness(0, 4, 0, 4)
                 };
-
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
                 {
                     var nestedAction = ifAction.ThenActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, true);
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, true, -1, 1);
                     thenContainer.Children.Add(nestedCard);
                 }
-                thenSection.Children.Add(thenContainer);
+                thenBranchWrap.Children.Add(thenContainer);
             }
+            var addThenNestedPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, true, -1, repeatActionIndex, nestedIndex);
+            addThenNestedPanel.Margin = new Thickness(50, -4, 0, 2);
+            thenBranchWrap.Children.Add(addThenNestedPanel);
+            container.Children.Add(thenBranchWrap);
 
-            var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, true);
-            thenSection.Children.Add(addThenActionsPanel);
-            thenSectionBorder.Child = thenSection;
-            container.Children.Add(thenSectionBorder);
+            // Section Sinon — If dans Repeat
+            var elseColor = Color.FromRgb(0xA7, 0x8B, 0xFA);
+            // Dans Repeat, SINON doit s'aligner comme le titre de la carte SI.
+            // Margin top négatif : moins d’espace au-dessus du bandeau SINON (après les chips « alors »).
+            var elseBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(-8, -6, 0, 0) };
+            // Marge gauche sur le chrome seul : bandeau SINON un peu à droite, actions imbriquées et chips inchangés.
+            var elseSectionBorder = CreateIfBranchSectionChrome(elseColor, "SINON", new Thickness(8, 0, 0, 4), out var elseSection);
+            // Même logique en imbriqué : pas de body vide dans le cadre SINON.
+            elseSection.Visibility = Visibility.Collapsed;
 
-            // Section Else avec bordure colorée
-            var elseColor = GetThemeColor("ErrorColor");
-            var elseSectionBorder = new Border
-            {
-                BorderBrush = new SolidColorBrush(Color.FromArgb(100, elseColor.R, elseColor.G, elseColor.B)),
-                BorderThickness = new Thickness(2, 0, 0, 0),
-                Background = new SolidColorBrush(Color.FromArgb(15, elseColor.R, elseColor.G, elseColor.B)),
-                CornerRadius = new CornerRadius(0, 2, 2, 0),
-                Margin = new Thickness(20, 4, 0, 4),
-                Padding = new Thickness(10, 6, 6, 6)
-            };
-            
-            var elseSection = new StackPanel
-            {
-                Orientation = Orientation.Vertical
-            };
-
-            var elseHeader = new TextBlock
-            {
-                Text = "✗ Else",
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 8),
-                Foreground = new SolidColorBrush(elseColor)
-            };
-            elseSection.Children.Add(elseHeader);
-
+            elseBranchWrap.Children.Add(elseSectionBorder);
             if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
             {
                 var elseContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = new Thickness(-2, 4, 0, 4)
                 };
 
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
                 {
                     var nestedAction = ifAction.ElseActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, false);
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, false, -1, 1);
                     elseContainer.Children.Add(nestedCard);
                 }
-                elseSection.Children.Add(elseContainer);
+                elseBranchWrap.Children.Add(elseContainer);
             }
-
-            var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, false);
-            elseSection.Children.Add(addElseActionsPanel);
-            elseSectionBorder.Child = elseSection;
-            container.Children.Add(elseSectionBorder);
+            var addElseNestedPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, false, -1, repeatActionIndex, nestedIndex);
+            addElseNestedPanel.Margin = new Thickness(48, -4, 0, 0);
+            elseBranchWrap.Children.Add(addElseNestedPanel);
+            container.Children.Add(elseBranchWrap);
 
             return container;
         }
@@ -8819,37 +11245,20 @@ namespace MacroEngine.UI
             var card = CreateActionCard(repeatAction, ifActionIndex, null, new NestedIfActionInfo { ParentIndex = ifActionIndex, NestedIndex = nestedIndex, IsThen = isThen, ElseIfBranchIndex = -1 });
             container.Children.Add(card);
 
-            // Couleur du bloc Repeat (violet logique)
-            var loopColor = Color.FromRgb(138, 108, 209); // #8A6CD1
-            
-            // Conteneur stylisé pour les actions imbriquées
+            // block-body : trait vertical gauche (margin 22 + border 2)
+            var line2BrushRepeat = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26));
             var nestedSectionBorder = new Border
             {
-                BorderBrush = new SolidColorBrush(Color.FromArgb(100, loopColor.R, loopColor.G, loopColor.B)),
+                Background = Brushes.Transparent,
+                BorderBrush = line2BrushRepeat,
                 BorderThickness = new Thickness(2, 0, 0, 0),
-                Background = new SolidColorBrush(Color.FromArgb(15, loopColor.R, loopColor.G, loopColor.B)),
-                CornerRadius = new CornerRadius(0, 2, 2, 0),
-                Margin = new Thickness(20, 4, 0, 4),
-                Padding = new Thickness(10, 6, 6, 6)
+                Margin = new Thickness(22, 0, 0, 4),
+                Padding = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            
-            var nestedSection = new StackPanel
-            {
-                Orientation = Orientation.Vertical
-            };
-            
-            // Header
-            var loopHeader = new TextBlock
-            {
-                Text = "🔄 Actions à répéter",
-                FontSize = 12,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 0, 8),
-                Foreground = new SolidColorBrush(loopColor)
-            };
-            nestedSection.Children.Add(loopHeader);
 
-            // Créer un conteneur pour les actions imbriquées
+            var nestedSection = new StackPanel { Orientation = Orientation.Vertical };
+
             if (repeatAction.Actions != null && repeatAction.Actions.Count > 0)
             {
                 var nestedContainer = new StackPanel
@@ -8861,13 +11270,12 @@ namespace MacroEngine.UI
                 for (int i = 0; i < repeatAction.Actions.Count; i++)
                 {
                     var nestedAction = repeatAction.Actions[i];
-                    var nestedCard = CreateNestedActionCard(nestedAction, -1, i, ifActionIndex, isThen, nestedIndex);
+                    var nestedCard = CreateNestedActionCard(nestedAction, -1, i, ifActionIndex, isThen, nestedIndex, indentLevel: 1);
                     nestedContainer.Children.Add(nestedCard);
                 }
                 nestedSection.Children.Add(nestedContainer);
             }
 
-            // Ajouter un panel pour ajouter de nouvelles actions (Repeat imbriqué dans If : ifActionIndex, isThen, nestedRepeatIndex)
             var addActionsPanel = CreateAddActionsPanel(repeatAction, -1, ifActionIndex, isThen, nestedIndex);
             nestedSection.Children.Add(addActionsPanel);
             
@@ -8932,51 +11340,22 @@ namespace MacroEngine.UI
             public string ActionType { get; set; } = "";
             public bool IsThen { get; set; }
             public int ElseIfBranchIndex { get; set; } = -1;
-        }
-
-        #endregion
-
-        #region Toggle Enable/Disable
-
-        private void UpdateMacroEnableToggle()
-        {
-            if (MacroEnableToggle == null) return;
-
-            if (_currentMacro != null)
-            {
-                MacroEnableToggle.IsEnabled = true;
-                MacroEnableToggle.IsChecked = _currentMacro.IsEnabled;
-            }
-            else
-            {
-                MacroEnableToggle.IsEnabled = false;
-                MacroEnableToggle.IsChecked = false;
-            }
-        }
-
-        private void MacroEnableToggle_Checked(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro != null)
-            {
-                _currentMacro.IsEnabled = true;
-                _currentMacro.ModifiedAt = DateTime.Now;
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        private void MacroEnableToggle_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro != null)
-            {
-                _currentMacro.IsEnabled = false;
-                _currentMacro.ModifiedAt = DateTime.Now;
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }
+            public int RepeatActionIndex { get; set; } = -1;
+            public int NestedIfIndex { get; set; } = -1;
         }
 
         #endregion
 
         #region Undo/Redo
+
+        private void TrimUndoStackIfNeeded()
+        {
+            if (_undoStack.Count <= 50) return;
+            var temp = new Stack<List<IInputAction>>();
+            for (var i = 0; i < 50; i++)
+                temp.Push(_undoStack.Pop());
+            _undoStack = temp;
+        }
 
         private void SaveState()
         {
@@ -8984,17 +11363,7 @@ namespace MacroEngine.UI
 
             var state = _currentMacro.Actions.Select(a => a.Clone()).ToList();
             _undoStack.Push(state);
-            
-            if (_undoStack.Count > 50)
-            {
-                var temp = new Stack<List<IInputAction>>();
-                for (int i = 0; i < 50; i++)
-                {
-                    temp.Push(_undoStack.Pop());
-                }
-                _undoStack = temp;
-            }
-            
+            TrimUndoStackIfNeeded();
             _redoStack.Clear();
             UpdateUndoRedoButtons();
         }
@@ -9003,48 +11372,56 @@ namespace MacroEngine.UI
         {
             if (_currentMacro == null || _undoStack.Count == 0) return;
 
-            var currentState = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            var actions = _currentMacro.Actions;
+            var currentState = new List<IInputAction>(actions.Count);
+            foreach (var a in actions)
+                currentState.Add(a.Clone());
             _redoStack.Push(currentState);
 
             var previousState = _undoStack.Pop();
             _isUndoRedo = true;
             
-            _currentMacro.Actions.Clear();
-            _currentMacro.Actions.AddRange(previousState.Select(a => a.Clone()));
+            actions.Clear();
+            actions.Capacity = Math.Max(actions.Capacity, previousState.Count);
+            foreach (var a in previousState)
+                actions.Add(a.Clone());
             _currentMacro.ModifiedAt = DateTime.Now;
             
             _isUndoRedo = false;
             UpdateUndoRedoButtons();
-            // Différer la reconstruction de la timeline pour éviter le lag
+            // ApplicationIdle : laisse traiter les entrées clavier/souris avant le gros RefreshBlocks.
+            // MacroActionsChangedOnlyEventArgs : MainWindow évite hooks + Items.Refresh + FlattenActions immédiat.
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                RefreshBlocks();
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }), System.Windows.Threading.DispatcherPriority.Loaded);
+                RefreshBlocks(() => MacroChanged?.Invoke(this, MacroActionsChangedOnlyEventArgs.Instance));
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
 
         private void Redo()
         {
             if (_currentMacro == null || _redoStack.Count == 0) return;
 
-            var currentState = _currentMacro.Actions.Select(a => a.Clone()).ToList();
+            var actions = _currentMacro.Actions;
+            var currentState = new List<IInputAction>(actions.Count);
+            foreach (var a in actions)
+                currentState.Add(a.Clone());
             _undoStack.Push(currentState);
 
             var nextState = _redoStack.Pop();
             _isUndoRedo = true;
             
-            _currentMacro.Actions.Clear();
-            _currentMacro.Actions.AddRange(nextState.Select(a => a.Clone()));
+            actions.Clear();
+            actions.Capacity = Math.Max(actions.Capacity, nextState.Count);
+            foreach (var a in nextState)
+                actions.Add(a.Clone());
             _currentMacro.ModifiedAt = DateTime.Now;
             
             _isUndoRedo = false;
             UpdateUndoRedoButtons();
-            // Différer la reconstruction de la timeline pour éviter le lag
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                RefreshBlocks();
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }), System.Windows.Threading.DispatcherPriority.Loaded);
+                RefreshBlocks(() => MacroChanged?.Invoke(this, MacroActionsChangedOnlyEventArgs.Instance));
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
 
         private void UpdateUndoRedoButtons()
@@ -9076,7 +11453,8 @@ namespace MacroEngine.UI
         public void PerformUndo()
         {
             Undo();
-            PlayUndoRedoIconRotation(UndoButton, -360);
+            Dispatcher.BeginInvoke(new Action(() => PlayUndoRedoIconRotation(UndoButton, -360)),
+                System.Windows.Threading.DispatcherPriority.Input);
         }
 
         /// <summary>
@@ -9085,7 +11463,8 @@ namespace MacroEngine.UI
         public void PerformRedo()
         {
             Redo();
-            PlayUndoRedoIconRotation(RedoButton, 360);
+            Dispatcher.BeginInvoke(new Action(() => PlayUndoRedoIconRotation(RedoButton, 360)),
+                System.Windows.Threading.DispatcherPriority.Input);
         }
 
         #endregion

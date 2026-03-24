@@ -448,9 +448,19 @@ namespace MacroEngine.Core.Inputs
         public MouseClickCondition? MouseClickConfig { get; set; }
 
         /// <summary>
-        /// Nom de la variable (pour ConditionType.Variable) — valeur booléenne ou vérité (nombre != 0, texte non vide)
+        /// Nom de la variable (pour ConditionType.Variable)
         /// </summary>
         public string? VariableName { get; set; }
+
+        /// <summary>
+        /// Opérateur de comparaison pour ConditionType.Variable : "==", "!=", ">", ">=", "&lt;", "&lt;=", "contains", "empty", "not_empty"
+        /// </summary>
+        public string? VariableOperator { get; set; } = "==";
+
+        /// <summary>
+        /// Valeur à comparer (ignorée si VariableOperator est "empty" ou "not_empty")
+        /// </summary>
+        public string? VariableValue { get; set; }
     }
 
     /// <summary>

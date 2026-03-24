@@ -527,7 +527,7 @@ namespace MacroEngine.Core.Inputs
                 ConditionType.TimeDate => EvaluateTimeDateCondition(condition.TimeDateConfig),
                 ConditionType.ImageOnScreen => EvaluateImageOnScreenCondition(condition.ImageOnScreenConfig),
                 ConditionType.TextOnScreen => EvaluateTextOnScreenCondition(condition.TextOnScreenConfig),
-                ConditionType.Variable => EvaluateVariableCondition(condition.VariableName),
+                ConditionType.Variable => EvaluateVariableCondition(condition),
                 ConditionType.MouseClick => EvaluateMouseClickCondition(condition.MouseClickConfig),
                 _ => false
             };
@@ -644,16 +644,105 @@ namespace MacroEngine.Core.Inputs
         }
 
         /// <summary>
-        /// Évalue la condition "Variable" (valeur d'une variable du contexte d'exécution).
+        /// Évalue la condition "Variable" (opérateur + valeur : ==, !=, &gt;, &gt;=, &lt;, &lt;=, contains, empty, not_empty).
         /// </summary>
-        private bool EvaluateVariableCondition(string? variableName)
+        private bool EvaluateVariableCondition(ConditionItem condition)
         {
-            if (string.IsNullOrWhiteSpace(variableName))
+            var name = condition.VariableName?.Trim();
+            if (string.IsNullOrEmpty(name))
                 return false;
             var store = ExecutionContext.Current?.Variables;
             if (store == null)
                 return false;
-            return store.GetBoolean(variableName.Trim());
+
+            var op = (condition.VariableOperator ?? "==").Trim();
+            var expectedRaw = (condition.VariableValue ?? "").Trim();
+
+            // Support : VariableValue peut contenir une référence "$otherVar"
+            // -> on remplace expectedRaw par la valeur courante de otherVar.
+            string expected = expectedRaw;
+            if (expectedRaw.StartsWith("$", StringComparison.Ordinal))
+            {
+                var otherName = expectedRaw.Substring(1).Trim();
+                if (string.IsNullOrEmpty(otherName))
+                {
+                    expected = "";
+                }
+                else if (store.TryGetValue(otherName, out object? otherRaw) && otherRaw != null)
+                {
+                    expected = otherRaw.ToString() ?? "";
+                }
+                else
+                {
+                    expected = "";
+                }
+            }
+
+            if (op == "empty")
+                return IsVariableEmpty(store, name);
+            if (op == "not_empty")
+                return !IsVariableEmpty(store, name);
+
+            bool hasVar = store.TryGetValue(name, out object? raw);
+            if (!hasVar || raw == null)
+            {
+                if (op == "==")
+                    return string.IsNullOrEmpty(expected);
+                if (op == "!=")
+                    return !string.IsNullOrEmpty(expected);
+                // Fallback pour les autres opérateurs : actual = ""
+            }
+
+            string strVal = raw?.ToString() ?? "";
+            if (double.TryParse(strVal, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double numVal) &&
+                double.TryParse(expected, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double numExpected))
+            {
+                return CompareNumeric(op, numVal, numExpected);
+            }
+
+            return CompareString(op, strVal, expected);
+        }
+
+        private static bool IsVariableEmpty(MacroVariableStore store, string name)
+        {
+            if (!store.TryGetValue(name, out object? o) || o == null)
+                return true;
+            if (o is string s)
+                return string.IsNullOrWhiteSpace(s);
+            if (o is double d)
+                return d == 0;
+            if (o is bool b)
+                return !b;
+            return string.IsNullOrWhiteSpace(o.ToString());
+        }
+
+        private static bool CompareNumeric(string op, double actual, double expected)
+        {
+            return op switch
+            {
+                "==" => Math.Abs(actual - expected) < 1e-9,
+                "!=" => Math.Abs(actual - expected) >= 1e-9,
+                ">" => actual > expected,
+                ">=" => actual >= expected,
+                "<" => actual < expected,
+                "<=" => actual <= expected,
+                _ => Math.Abs(actual - expected) < 1e-9
+            };
+        }
+
+        private static bool CompareString(string op, string actual, string expected)
+        {
+            return op switch
+            {
+                "==" => string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase),
+                "!=" => !string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase),
+                ">" => string.Compare(actual, expected, StringComparison.OrdinalIgnoreCase) > 0,
+                ">=" => string.Compare(actual, expected, StringComparison.OrdinalIgnoreCase) >= 0,
+                "<" => string.Compare(actual, expected, StringComparison.OrdinalIgnoreCase) < 0,
+                "<=" => string.Compare(actual, expected, StringComparison.OrdinalIgnoreCase) <= 0,
+                "contains" => actual.Contains(expected, StringComparison.OrdinalIgnoreCase),
+                _ => string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase)
+            };
         }
 
         /// <summary>
@@ -1156,7 +1245,9 @@ namespace MacroEngine.Core.Inputs
                 {
                     ClickType = item.MouseClickConfig.ClickType
                 } : null,
-                VariableName = item.VariableName
+                VariableName = item.VariableName,
+                VariableOperator = item.VariableOperator,
+                VariableValue = item.VariableValue
             };
         }
     }

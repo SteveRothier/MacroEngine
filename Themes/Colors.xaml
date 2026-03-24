@@ -2,55 +2,56 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ══════════════════════════════════════════════════════════════════════
-         MacroEngine - Palette de Couleurs
-         Design: Thème sombre professionnel - gris anthracite, accent cuivre (machine)
+         MacroEngine - Palette de Couleurs (v2 – thème sombre vert / ambre)
+         Inspiré du mockup MacroEngine v2 : fonds #08xxx, accent ambre, texte vert gris
          ══════════════════════════════════════════════════════════════════════ -->
 
-    <!-- Fonds principaux -->
-    <Color x:Key="BackgroundPrimaryColor">#1E1B22</Color>
-    <Color x:Key="BackgroundSecondaryColor">#25222B</Color>
-    <Color x:Key="BackgroundTertiaryColor">#2D2934</Color>
+    <!-- Fonds principaux (verts très sombres) -->
+    <Color x:Key="BackgroundPrimaryColor">#080A08</Color>
+    <Color x:Key="BackgroundSecondaryColor">#0D0F0D</Color>
+    <Color x:Key="BackgroundTertiaryColor">#111311</Color>
     
-    <!-- Accent principal – Cuivre sombre (signature MacroEngine, côté machine) -->
-    <Color x:Key="AccentPrimaryColor">#6B3E26</Color>
-    <Color x:Key="AccentHoverColor">#7F4A2E</Color>
-    <Color x:Key="AccentPressedColor">#552F1E</Color>
-    <Color x:Key="AccentSelectionColor">#2A1A12</Color>
-    <Color x:Key="AccentSecondaryColor">#6B3E26</Color>
+    <!-- Fonds niveau 3–4 (rail, cartes) -->
+    <Color x:Key="BackgroundLevel3Color">#161916</Color>
+    <Color x:Key="BackgroundLevel4Color">#1C201C</Color>
     
-    <!-- Sidebar / sélection (profils, macros) : garder un contraste lisible avec TextPrimary -->
-    <Color x:Key="SidebarAccentColor">#6B3E26</Color>
-    <Color x:Key="SidebarAccentLightColor">#2A1A12</Color>
-    <Color x:Key="SidebarAccentSelectedColor">#282530</Color>
-    <Color x:Key="SidebarAccentHoverColor">#3A2518</Color>
-    <Color x:Key="SidebarAccentBorderColor">#6B3E26</Color>
+    <!-- Accent principal – Ambre (signature v2) -->
+    <Color x:Key="AccentPrimaryColor">#E8A020</Color>
+    <Color x:Key="AccentHoverColor">#F0B840</Color>
+    <Color x:Key="AccentPressedColor">#C98A18</Color>
+    <Color x:Key="AccentSelectionColor">#1F1A08</Color>
+    <Color x:Key="AccentSecondaryColor">#E8A020</Color>
     
-    <!-- Texte -->
-    <Color x:Key="TextPrimaryColor">#E6E4EA</Color>
-    <Color x:Key="TextSecondaryColor">#B9B6C2</Color>
-    <Color x:Key="TextMutedColor">#8A8794</Color>
-    <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
+    <!-- Sidebar / sélection : ambre + fonds verts -->
+    <Color x:Key="SidebarAccentColor">#E8A020</Color>
+    <Color x:Key="SidebarAccentLightColor">#1F1A08</Color>
+    <Color x:Key="SidebarAccentSelectedColor">#161916</Color>
+    <Color x:Key="SidebarAccentHoverColor">#1C201C</Color>
+    <Color x:Key="SidebarAccentBorderColor">#E8A020</Color>
+    
+    <!-- Texte (vert gris) -->
+    <Color x:Key="TextPrimaryColor">#C8D4C8</Color>
+    <Color x:Key="TextSecondaryColor">#7A927A</Color>
+    <Color x:Key="TextMutedColor">#4A5A4A</Color>
+    <Color x:Key="TextOnAccentColor">#0A0A00</Color>
     
     <!-- États -->
-    <Color x:Key="WarningColor">#C97A3A</Color>
-    <Color x:Key="ErrorColor">#C94A4A</Color>
-    <Color x:Key="SuccessColor">#4FB58C</Color>
-    <Color x:Key="InfoColor">#4FA3D1</Color>
+    <Color x:Key="WarningColor">#E8A020</Color>
+    <Color x:Key="ErrorColor">#E84040</Color>
+    <Color x:Key="SuccessColor">#39D97A</Color>
+    <Color x:Key="InfoColor">#34C8B8</Color>
     
-    <!-- Bordures et séparateurs -->
-    <Color x:Key="BorderLightColor">#3A3642</Color>
-    <Color x:Key="BorderFocusColor">#6B3E26</Color>
-    <Color x:Key="BorderInternalColor">#2F2B36</Color>
-    <Color x:Key="BorderMediumColor">#3A3642</Color>
-    <Color x:Key="BorderDarkColor">#2F2B36</Color>
-    <!-- Biseau métallique (colonnes) : reflet haut-gauche, ombre bas-droite -->
-    <Color x:Key="BorderBevelHighlightColor">#58E6E4EA</Color>
-    <Color x:Key="BorderBevelShadowColor">#B82A2830</Color>
-    <!-- Cadre fragmenté (coins châssis) : cuivre technique -->
-    <Color x:Key="ColumnCornerAccentColor">#B87333</Color>
-    <!-- Bordures mécaniques modernes (colonnes) : bordure principale + effet inset cuivre -->
-    <Color x:Key="BorderMechanicalEdgeColor">#0FFFFFFF</Color>
-    <Color x:Key="BorderMechanicalInsetAccentColor">#266B3E26</Color>
+    <!-- Bordures et lignes (#5A5D5A = même teinte que bordures blocs d'action) -->
+    <Color x:Key="BorderLightColor">#5A5D5A</Color>
+    <Color x:Key="BorderFocusColor">#E8A020</Color>
+    <Color x:Key="BorderInternalColor">#5A5D5A</Color>
+    <Color x:Key="BorderMediumColor">#5A5D5A</Color>
+    <Color x:Key="BorderDarkColor">#5A5D5A</Color>
+    <Color x:Key="BorderBevelHighlightColor">#20FFFFFF</Color>
+    <Color x:Key="BorderBevelShadowColor">#80000000</Color>
+    <Color x:Key="ColumnCornerAccentColor">#E8A020</Color>
+    <Color x:Key="BorderMechanicalEdgeColor">#5A5D5A</Color>
+    <Color x:Key="BorderMechanicalInsetAccentColor">#26E8A020</Color>
 
     <!-- Ombres (couleurs pour DropShadowEffect) -->
     <Color x:Key="ShadowColor">#59000000</Color>
@@ -81,14 +82,21 @@
     <!-- Répéter / Boucle - Violet logique -->
     <Color x:Key="BlockLoopColor">#8A6CD1</Color>
     <Color x:Key="BlockLoopDarkColor">#795BC0</Color>
+    <!-- Répéter (carte) - Vert mockup -->
+    <Color x:Key="BlockRepeatGreenColor">#39D97A</Color>
     
     <!-- Si / Condition - Rouge décisionnel -->
     <Color x:Key="BlockConditionColor">#C94A4A</Color>
     <Color x:Key="BlockConditionDarkColor">#B83939</Color>
+    <!-- Si (carte style Répéter) - Rouge #e84040 -->
+    <Color x:Key="BlockSiRedColor">#E84040</Color>
     
     <!-- Variable - Cyan neutre / data -->
     <Color x:Key="BlockVariableColor">#5AA3A3</Color>
     <Color x:Key="BlockVariableDarkColor">#499292</Color>
+
+    <!-- Bordure commune des blocs d'action (clic / délai / touche / variable / texte) -->
+    <Color x:Key="BlockActionBorderColor">#5A5D5A</Color>
 
     <!-- Barre d'outils : bas de dégradé plus marqué (plus sombre) -->
     <Color x:Key="BlockKeyboardToolbarBottomColor">#2D7AA8</Color>
@@ -110,6 +118,10 @@
     <SolidColorBrush x:Key="BackgroundPrimaryBrush" Color="{StaticResource BackgroundPrimaryColor}"/>
     <SolidColorBrush x:Key="BackgroundSecondaryBrush" Color="{StaticResource BackgroundSecondaryColor}"/>
     <SolidColorBrush x:Key="BackgroundTertiaryBrush" Color="{StaticResource BackgroundTertiaryColor}"/>
+    <SolidColorBrush x:Key="BackgroundLevel3Brush" Color="{StaticResource BackgroundLevel3Color}"/>
+    <SolidColorBrush x:Key="BackgroundLevel4Brush" Color="{StaticResource BackgroundLevel4Color}"/>
+    <!-- Ambre avec opacité ~12 % (équivalent rgba(232,160,32,0.12)) -->
+    <SolidColorBrush x:Key="AccentDimBrush" Color="{StaticResource AccentPrimaryColor}" Opacity="0.12"/>
     <!-- Colonnes mécaniques : gradient 145° métal moderne (#232326 → #1C1C1F) -->
     <LinearGradientBrush x:Key="ColumnMechanicalBackgroundBrush" StartPoint="0.2,0" EndPoint="0.8,1">
         <GradientStop Color="#232326" Offset="0"/>
@@ -129,26 +141,22 @@
     <!-- Cadre fragmenté (coins châssis CNC) -->
     <SolidColorBrush x:Key="ColumnCornerAccentBrush" Color="{StaticResource ColumnCornerAccentColor}"/>
 
-    <!-- CTA "Nouvelle Macro" : dégradé 135° (style Raycast/Linear) -->
+    <!-- CTA "Nouvelle Macro" : ambre plein (v2) -->
     <LinearGradientBrush x:Key="AccentCtaGradientBrush" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="{StaticResource AccentHoverColor}" Offset="0"/>
         <GradientStop Color="{StaticResource AccentPrimaryColor}" Offset="0.5"/>
         <GradientStop Color="{StaticResource AccentPressedColor}" Offset="1"/>
     </LinearGradientBrush>
-    <!-- Hover : dégradé légèrement plus clair -->
     <LinearGradientBrush x:Key="AccentCtaHoverGradientBrush" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#8F5535" Offset="0"/>
+        <GradientStop Color="#F0B840" Offset="0"/>
         <GradientStop Color="{StaticResource AccentHoverColor}" Offset="0.5"/>
         <GradientStop Color="{StaticResource AccentPrimaryColor}" Offset="1"/>
     </LinearGradientBrush>
 
-    <!-- Barre gauche macro sélectionnée : dégradé cuivre métallique vertical (reflet haut, glow centre, ombre bas) -->
+    <!-- Barre gauche macro sélectionnée : ambre (v2) -->
     <LinearGradientBrush x:Key="MacroItemSelectedLeftBorderGradientBrush" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#8A5A3A" Offset="0"/>
-        <GradientStop Color="#B87333" Offset="0.35"/>
-        <GradientStop Color="#7F4A2E" Offset="0.5"/>
-        <GradientStop Color="#5A3520" Offset="0.75"/>
-        <GradientStop Color="#4A2819" Offset="1"/>
+        <GradientStop Color="#E8A020" Offset="0"/>
+        <GradientStop Color="#E8A020" Offset="1"/>
     </LinearGradientBrush>
 
     <!-- Accents -->
@@ -174,6 +182,7 @@
     <!-- États -->
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
     <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}"/>
+    <SolidColorBrush x:Key="ErrorDimBrush" Color="{StaticResource ErrorColor}" Opacity="0.12"/>
     <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}"/>
     <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource InfoColor}"/>
     
@@ -203,10 +212,13 @@
     <SolidColorBrush x:Key="BlockDelayDarkBrush" Color="{StaticResource BlockDelayDarkColor}"/>
     <SolidColorBrush x:Key="BlockLoopBrush" Color="{StaticResource BlockLoopColor}"/>
     <SolidColorBrush x:Key="BlockLoopDarkBrush" Color="{StaticResource BlockLoopDarkColor}"/>
+    <SolidColorBrush x:Key="BlockRepeatGreenBrush" Color="{StaticResource BlockRepeatGreenColor}"/>
     <SolidColorBrush x:Key="BlockConditionBrush" Color="{StaticResource BlockConditionColor}"/>
     <SolidColorBrush x:Key="BlockConditionDarkBrush" Color="{StaticResource BlockConditionDarkColor}"/>
+    <SolidColorBrush x:Key="BlockSiRedBrush" Color="{StaticResource BlockSiRedColor}"/>
     <SolidColorBrush x:Key="BlockVariableBrush" Color="{StaticResource BlockVariableColor}"/>
     <SolidColorBrush x:Key="BlockVariableDarkBrush" Color="{StaticResource BlockVariableDarkColor}"/>
+    <SolidColorBrush x:Key="BlockActionBorderBrush" Color="{StaticResource BlockActionBorderColor}"/>
     <SolidColorBrush x:Key="EditorGridBrush" Color="{StaticResource EditorGridColor}"/>
 
     <!-- Barre d'outils : dégradés marqués (haut clair → bas bien plus sombre) -->
@@ -301,49 +313,40 @@
                       ShadowDepth="2"
                       Direction="270"/>
     
-    <!-- Glow cuivre (hover important) -->
+    <!-- Glow ambre (v2) -->
     <DropShadowEffect x:Key="ShadowActionBlockHover" 
-                      Color="#6B3E26" 
+                      Color="#E8A020" 
                       Opacity="0.35" 
                       BlurRadius="12" 
                       ShadowDepth="0"
                       Direction="270"/>
-    
-    <!-- Glow cuivre subtil (sélection) -->
     <DropShadowEffect x:Key="ShadowButtonHover" 
-                      Color="#6B3E26" 
+                      Color="#E8A020" 
                       Opacity="0.18" 
                       BlurRadius="8" 
                       ShadowDepth="0"
                       Direction="270"/>
-
-    <!-- CTA "Nouvelle Macro" hover : lift + glow (style Raycast) -->
     <DropShadowEffect x:Key="ShadowCtaHover" 
-                      Color="#6B3E26" 
-                      Opacity="0.3" 
-                      BlurRadius="18" 
+                      Color="#E8A020" 
+                      Opacity="0.35" 
+                      BlurRadius="24" 
                       ShadowDepth="0"
                       Direction="270"/>
-
-    <!-- Trait gauche item macro actif : glow cuivre marqué -->
     <DropShadowEffect x:Key="ShadowMacroItemTraitGlow" 
-                      Color="#6B3E26" 
-                      Opacity="0.85" 
-                      BlurRadius="14" 
+                      Color="#E8A020" 
+                      Opacity="0.4" 
+                      BlurRadius="8" 
                       ShadowDepth="0"
                       Direction="0"/>
-    <!-- Glow sur la barre cuivre (sélectionné), même couleur cuivre que la barre -->
     <DropShadowEffect x:Key="ShadowMacroItemTraitGlowLight" 
-                      Color="#6B3E26" 
-                      Opacity="0.5" 
-                      BlurRadius="10" 
+                      Color="#E8A020" 
+                      Opacity="0.3" 
+                      BlurRadius="6" 
                       ShadowDepth="0"
                       Direction="0"/>
-
-    <!-- Panneau Propriétés - glow mécanique au survol -->
     <DropShadowEffect x:Key="ShadowPanelPropertiesHover" 
-                      Color="#6B3E26" 
-                      Opacity="0.25" 
+                      Color="#E8A020" 
+                      Opacity="0.2" 
                       BlurRadius="14" 
                       ShadowDepth="0"
                       Direction="270"/>
@@ -368,41 +371,36 @@
     <CornerRadius x:Key="RadiusSmall">2</CornerRadius>
     <CornerRadius x:Key="RadiusMacroCard">14</CornerRadius>
 
-    <!-- Colonne gauche (sidebar) : noir profond légèrement texturé (dégradé vertical, teinte projet) -->
-    <Color x:Key="SidebarColumnTopColor">#1A181E</Color>
-    <Color x:Key="SidebarColumnBottomColor">#121018</Color>
+    <!-- Colonne gauche (rail v2) : fond vert très sombre -->
+    <Color x:Key="SidebarColumnTopColor">#0D0F0D</Color>
+    <Color x:Key="SidebarColumnBottomColor">#080A08</Color>
     <LinearGradientBrush x:Key="SidebarColumnGradientBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="{StaticResource SidebarColumnTopColor}" Offset="0"/>
         <GradientStop Color="{StaticResource SidebarColumnBottomColor}" Offset="1"/>
     </LinearGradientBrush>
 
-    <!-- Colonne macros : gradient gris marqué sur toute la colonne -->
-    <Color x:Key="MacroColumnBackgroundColor">#231E26</Color>
+    <!-- Colonne macros (v2) : fond vert sombre -->
+    <Color x:Key="MacroColumnBackgroundColor">#111311</Color>
     <LinearGradientBrush x:Key="MacroColumnBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#2A262E" Offset="0"/>
-        <GradientStop Color="#231E26" Offset="0.4"/>
-        <GradientStop Color="#1C1920" Offset="1"/>
+        <GradientStop Color="#0D0F0D" Offset="0"/>
+        <GradientStop Color="#080A08" Offset="1"/>
     </LinearGradientBrush>
 
-    <!-- Cartes macro (liste) : plus sombre que le conteneur = effet de profondeur -->
-    <Color x:Key="MacroItemBackgroundColor">#1C1920</Color>
+    <Color x:Key="MacroItemBackgroundColor">#161916</Color>
     <SolidColorBrush x:Key="MacroItemBackgroundBrush" Color="{StaticResource MacroItemBackgroundColor}"/>
 
-    <!-- Liste macros : comme ref visuelle – texte blanc, hover subtil, actif = gris uniforme + trait cuivre glow -->
-    <Color x:Key="MacroItemNormalForegroundColor">#FFFFFF</Color>
+    <!-- Liste macros v2 : texte vert gris, actif = trait ambre -->
+    <Color x:Key="MacroItemNormalForegroundColor">#C8D4C8</Color>
     <SolidColorBrush x:Key="MacroItemNormalForegroundBrush" Color="{StaticResource MacroItemNormalForegroundColor}"/>
-    <!-- Hover : gris très discret sans dégradé -->
-    <Color x:Key="MacroItemHoverBackgroundColor">#06FFFFFF</Color>
+    <Color x:Key="MacroItemHoverBackgroundColor">#161916</Color>
     <SolidColorBrush x:Key="MacroItemHoverBackgroundBrush" Color="{StaticResource MacroItemHoverBackgroundColor}"/>
-    <!-- Actif : dégradé gris (part d'en bas à gauche) -->
-    <Color x:Key="MacroItemSelectedGradientLightColor">#2A2730</Color>
-    <Color x:Key="MacroItemSelectedGradientDarkColor">#1F1C24</Color>
+    <Color x:Key="MacroItemSelectedGradientLightColor">#161916</Color>
+    <Color x:Key="MacroItemSelectedGradientDarkColor">#111311</Color>
     <LinearGradientBrush x:Key="MacroItemSelectedBackgroundBrush" StartPoint="0,1" EndPoint="1,0">
         <GradientStop Color="{StaticResource MacroItemSelectedGradientLightColor}" Offset="0"/>
         <GradientStop Color="{StaticResource MacroItemSelectedGradientDarkColor}" Offset="1"/>
     </LinearGradientBrush>
-    <!-- Séparateur liste / bas de colonne : trait très discret -->
-    <Color x:Key="SeparatorSubtleColor">#18FFFFFF</Color>
+    <Color x:Key="SeparatorSubtleColor">#262D26</Color>
     <SolidColorBrush x:Key="SeparatorSubtleBrush" Color="{StaticResource SeparatorSubtleColor}"/>
 
 </ResourceDictionary>

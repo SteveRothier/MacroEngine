@@ -1,0 +1,47 @@
+<Window x:Class="MacroEngine.UI.PointPickerOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Sélection de point"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="#01000000"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ResizeMode="NoResize"
+        Cursor="Cross"
+        IsHitTestVisible="True">
+    <Grid x:Name="OverlayGrid">
+        <!-- Ligne horizontale (suivit du curseur Y) -->
+        <Line x:Name="HairH" Stroke="#E84040" StrokeThickness="1" 
+              X1="0" Y1="0" X2="100" Y2="0"/>
+        <!-- Ligne verticale (suivit du curseur X) -->
+        <Line x:Name="HairV" Stroke="#E84040" StrokeThickness="1" 
+              X1="0" Y1="0" X2="0" Y2="100"/>
+        <!-- Tooltip -->
+        <Border x:Name="TooltipBorder" 
+                Background="#0D0F0D" 
+                BorderBrush="#99E84040" 
+                BorderThickness="1" 
+                Padding="12,8" 
+                MinWidth="170"
+                HorizontalAlignment="Left"
+                VerticalAlignment="Top"
+                IsHitTestVisible="False">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <!-- Même icône que le bouton "sélection de point" dans la condition SI -->
+                    <TextBlock Text="&#xE11F;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="#E84040" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="Sélection de point" FontSize="11" FontWeight="ExtraBold" Foreground="#7A927A" VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock Margin="0,0,0,5" FontFamily="Consolas" FontSize="12" FontWeight="Bold" Foreground="#C8D4C8">
+                    <Run Text="X: "/>
+                    <Run x:Name="LiveX" Text="0"/>
+                    <Run Text="  Y: "/>
+                    <Run x:Name="LiveY" Text="0"/>
+                </TextBlock>
+                <TextBlock Text="Cliquer pour sélectionner • ESC pour annuler" 
+                           FontSize="9" Foreground="#4A5A4A" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

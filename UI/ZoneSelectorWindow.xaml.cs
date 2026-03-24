@@ -74,8 +74,8 @@ namespace MacroEngine.UI
                 _selectionRect.Visibility = Visibility.Visible;
 
                 SelectionCanvas.Children.Add(_selectionRect);
-                if (CoordinatesTextBlock != null)
-                    CoordinatesTextBlock.Visibility = Visibility.Visible;
+                if (CoordinatesBorder != null)
+                    CoordinatesBorder.Visibility = Visibility.Visible;
                 
                 // Capturer la souris pour continuer à recevoir les événements même en dehors de la fenêtre
                 CaptureMouse();
@@ -98,12 +98,16 @@ namespace MacroEngine.UI
                 _selectionRect.Width = Math.Max(0, x2 - x1);
                 _selectionRect.Height = Math.Max(0, y2 - y1);
 
-                // Mettre à jour les coordonnées affichées
-                if (CoordinatesTextBlock != null)
+                // Ligne de coordonnées sous la zone : x1,y1 → x2,y2  (L × H)
+                int w = x2 - x1, h = y2 - y1;
+                if (CoordinatesTextBlock != null && CoordinatesBorder != null)
                 {
-                    CoordinatesTextBlock.Text = $"X1: {x1}, Y1: {y1} | X2: {x2}, Y2: {y2} | Largeur: {x2 - x1}, Hauteur: {y2 - y1}";
-                    Canvas.SetLeft(CoordinatesTextBlock, Math.Min(currentPoint.X + 10, SelectionCanvas.ActualWidth - 200));
-                    Canvas.SetTop(CoordinatesTextBlock, Math.Min(currentPoint.Y + 10, SelectionCanvas.ActualHeight - 30));
+                    CoordinatesTextBlock.Text = $"{x1},{y1} → {x2},{y2}   ({w} × {h})";
+                    double left = Math.Max(0, Math.Min(x1, SelectionCanvas.ActualWidth - 220));
+                    double top = y2 + 6;
+                    if (top + 28 > SelectionCanvas.ActualHeight) top = y1 - 28 - 6;
+                    Canvas.SetLeft(CoordinatesBorder, left);
+                    Canvas.SetTop(CoordinatesBorder, top);
                 }
             }
         }
@@ -137,8 +141,8 @@ namespace MacroEngine.UI
                     SelectionCanvas.Children.Remove(_selectionRect);
                     _selectionRect = null;
                     _isSelecting = false;
-                    if (CoordinatesTextBlock != null)
-                        CoordinatesTextBlock.Visibility = Visibility.Collapsed;
+                    if (CoordinatesBorder != null)
+                        CoordinatesBorder.Visibility = Visibility.Collapsed;
                 }
             }
         }

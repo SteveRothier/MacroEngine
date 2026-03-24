@@ -86,8 +86,22 @@ namespace MacroEngine.UI
         // Liste macros : sélection uniquement au clic (pas au survol avec clic maintenu)
         private object? _macrosListPressedItem;
 
+        /// <summary>Ignore les chargements obsolètes quand on change de macro plusieurs fois vite.</summary>
+        private int _macroSelectionLoadGeneration;
+
+        /// <summary>Évite de rescanner tous les processus à chaque changement de macro (liste identique).</summary>
+        private List<ProcessIconItem>? _cachedProcessIconItems;
+        private DateTime _processIconListUtc = DateTime.MinValue;
+        private static readonly TimeSpan ProcessIconListCacheTtl = TimeSpan.FromSeconds(25);
+
         // Évite d'écraser l'icône/couleur de la macro quand on met à jour les listes depuis la macro
         private bool _updatingIconFromMacro;
+        private bool _isPropsPanelOpen = false;
+        /// <summary>Évite que la synchro du toggle déclenche Checked/Unchecked (boucle).</summary>
+        private bool _syncingMacroEnableToggle;
+        private const double PropsPanelWidth = 320.0;
+        private const double PropsPanelHiddenOffset = 16.0; // masque la bordure gauche orange hors écran
+        private static readonly TimeSpan PropsPanelAnimDuration = TimeSpan.FromMilliseconds(250);
 
         // True seulement après un clic souris sur une des listes d'icônes : on n'applique la sélection à la macro que dans ce cas
         private bool _userClickedIconList;
@@ -190,6 +204,167 @@ namespace MacroEngine.UI
             };
             LeftColumnBorder.BeginAnimation(UIElement.OpacityProperty, anim);
             InitializeIconComboBoxes();
+            UpdatePropsPanelVisibility(immediate: true);
+        }
+
+        private void PropsToggleButton_Click(object sender, RoutedEventArgs e)
+        {
+            _isPropsPanelOpen = !_isPropsPanelOpen;
+            UpdatePropsPanelVisibility(immediate: false);
+        }
+
+        private async void QuickAddAction_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null)
+            {
+                StatusText.Text = "Sélectionnez une macro d'abord.";
+                return;
+            }
+
+            if (sender is not FrameworkElement fe || fe.Tag is not string tag)
+                return;
+
+            _selectedMacro.Actions ??= new List<IInputAction>();
+
+            if (tag == "undo")
+            {
+                _blockEditor?.PerformUndo();
+                return;
+            }
+            if (tag == "redo")
+            {
+                _blockEditor?.PerformRedo();
+                return;
+            }
+            if (tag == "presets")
+            {
+                try
+                {
+                    var presetStorage = new PresetStorage();
+                    var dialog = new PresetsDialog(presetStorage);
+                    dialog.PresetSelected += (_, preset) =>
+                    {
+                        if (preset?.Actions == null) return;
+                        if (_blockEditor is TimelineEditor teUndo)
+                            teUndo.PrepareUndoForExternalMutation();
+                        foreach (var a in preset.Actions)
+                        {
+                            if (a == null) continue;
+                            var cloned = a.Clone();
+                            if (cloned != null) _selectedMacro.Actions.Add(cloned);
+                        }
+                        _selectedMacro.ModifiedAt = DateTime.Now;
+                        ActionsCountText.Text = $"{_selectedMacro.Actions.Count} action(s)";
+                        ScheduleMacroEditorRefresh(forceFullRebuild: true);
+                        TriggerAutoSave();
+                    };
+                    dialog.Owner = this;
+                    dialog.ShowDialog();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Erreur lors de l'ouverture des presets:\n{ex.Message}", "Erreur", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                return;
+            }
+
+            IInputAction? actionToAdd = tag switch
+            {
+                "keyboard" => new KeyboardAction
+                {
+                    Name = "Touche",
+                    ActionType = KeyboardActionType.Press,
+                    VirtualKeyCode = 0
+                },
+                "mouse" => new Core.Inputs.MouseAction
+                {
+                    Name = "Clic",
+                    ActionType = MouseActionType.LeftClick,
+                    X = -1,
+                    Y = -1
+                },
+                "text" => new TextAction
+                {
+                    Name = "Texte",
+                    Text = "",
+                    TypingSpeed = 50
+                },
+                "delay" => new DelayAction
+                {
+                    Name = "100ms",
+                    Duration = 100
+                },
+                "variable" => new VariableAction
+                {
+                    Name = "Variable",
+                    VariableName = "var",
+                    VariableType = VariableType.Number,
+                    Operation = VariableOperation.Set,
+                    Value = "0"
+                },
+                "condition" => new IfAction
+                {
+                    Name = "If",
+                    Conditions = new List<ConditionItem> { new ConditionItem { ConditionType = ConditionType.Boolean, Condition = true } },
+                    Operators = new List<LogicalOperator>()
+                },
+                "repeat" => new RepeatAction
+                {
+                    Name = "Répéter",
+                    RepeatMode = RepeatMode.RepeatCount,
+                    RepeatCount = 2,
+                    Actions = new List<IInputAction>()
+                },
+                _ => null
+            };
+
+            if (actionToAdd == null) return;
+
+            if (_blockEditor is TimelineEditor teUndo)
+                teUndo.PrepareUndoForExternalMutation();
+
+            _selectedMacro.Actions.Add(actionToAdd);
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            ActionsCountText.Text = $"{_selectedMacro.Actions.Count} action(s)";
+            ScheduleMacroEditorRefresh();
+            TriggerAutoSave();
+        }
+
+        private void UpdatePropsPanelVisibility(bool immediate)
+        {
+            if (PropsPanelBorder == null || PropsPanelTranslate == null) return;
+
+            double targetX = _isPropsPanelOpen ? 0 : (PropsPanelWidth + PropsPanelHiddenOffset);
+
+            // Toujours présent en overlay : on masque l'interaction quand il est fermé.
+            PropsPanelBorder.Visibility = Visibility.Visible;
+            PropsPanelBorder.IsHitTestVisible = _isPropsPanelOpen;
+
+            if (immediate)
+            {
+                PropsPanelTranslate.BeginAnimation(TranslateTransform.XProperty, null);
+                PropsPanelTranslate.X = targetX;
+                return;
+            }
+
+            double currentX = PropsPanelTranslate.X;
+            var frames = new DoubleAnimationUsingKeyFrames
+            {
+                Duration = new Duration(PropsPanelAnimDuration),
+                FillBehavior = FillBehavior.HoldEnd
+            };
+            frames.KeyFrames.Add(new DiscreteDoubleKeyFrame(currentX, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            // Approximation directe du cubic-bezier(0.22,1,0.36,1)
+            frames.KeyFrames.Add(new SplineDoubleKeyFrame(targetX, KeyTime.FromTimeSpan(PropsPanelAnimDuration), new KeySpline(0.22, 1.0, 0.36, 1.0)));
+
+            frames.Completed += (_, _) =>
+            {
+                PropsPanelTranslate.X = targetX;
+                // Quand fermé, ne capte plus les clics.
+                PropsPanelBorder.IsHitTestVisible = _isPropsPanelOpen;
+            };
+
+            PropsPanelTranslate.BeginAnimation(TranslateTransform.XProperty, frames);
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -657,45 +832,42 @@ namespace MacroEngine.UI
             _autoSaveTimer.Start();
         }
 
-        private void MacroEditor_MacroModified(object? sender, EventArgs e)
+        /// <summary>
+        /// Conflits raccourci, dictionnaire des raccourcis macros, réinstallation du hook, refresh liste.
+        /// Coûteux : appelé en différé depuis l’éditeur timeline pour éviter le lag (undo/redo, édition).
+        /// </summary>
+        private void ApplyMacroEditorHeavyRefresh()
         {
-            // Déclencher la sauvegarde automatique quand la macro est modifiée
-            TriggerAutoSave();
-            
-            // Vérifier les conflits de raccourcis avant de mettre à jour
             if (_selectedMacro != null && _selectedMacro.ShortcutKeyCode != 0)
             {
-                // Vérifier si le raccourci entre en conflit avec un raccourci global
-                if (_appConfig != null && 
-                    (_selectedMacro.ShortcutKeyCode == _appConfig.ExecuteMacroKeyCode || 
+                if (_appConfig != null &&
+                    (_selectedMacro.ShortcutKeyCode == _appConfig.ExecuteMacroKeyCode ||
                      _selectedMacro.ShortcutKeyCode == _appConfig.StopMacroKeyCode))
                 {
                     _logger?.Warning($"Le raccourci de la macro '{_selectedMacro.Name}' entre en conflit avec un raccourci global", "MainWindow");
                     new AlertDialog("Conflit de raccourci",
                         $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par un raccourci global.\nVeuillez choisir un autre raccourci.",
                         this).ShowDialog();
-                    _selectedMacro.ShortcutKeyCode = 0; // Réinitialiser le raccourci
+                    _selectedMacro.ShortcutKeyCode = 0;
                 }
                 else
                 {
-                    // Vérifier les conflits avec d'autres macros
-                    var conflictingMacro = _macros.FirstOrDefault(m => 
-                        m.Id != _selectedMacro.Id && 
-                        m.ShortcutKeyCode == _selectedMacro.ShortcutKeyCode && 
+                    var conflictingMacro = _macros.FirstOrDefault(m =>
+                        m.Id != _selectedMacro.Id &&
+                        m.ShortcutKeyCode == _selectedMacro.ShortcutKeyCode &&
                         m.ShortcutKeyCode != 0);
-                    
+
                     if (conflictingMacro != null)
                     {
                         _logger?.Warning($"Le raccourci de la macro '{_selectedMacro.Name}' entre en conflit avec '{conflictingMacro.Name}'", "MainWindow");
                         new AlertDialog("Conflit de raccourci",
                             $"Le raccourci '{GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode)}' est déjà utilisé par la macro '{conflictingMacro.Name}'.\nVeuillez choisir un autre raccourci.",
                             this).ShowDialog();
-                        _selectedMacro.ShortcutKeyCode = 0; // Réinitialiser le raccourci
+                        _selectedMacro.ShortcutKeyCode = 0;
                     }
                 }
             }
-            
-            // Mettre à jour les raccourcis de macros
+
             UpdateMacroShortcuts();
             if (_appConfig?.EnableHooks == true)
             {
@@ -706,20 +878,93 @@ namespace MacroEngine.UI
                 }
                 catch { }
             }
-            
-            // Rafraîchir l'affichage de la liste pour mettre à jour les raccourcis
+
             MacrosListBox.Items.Refresh();
+        }
+
+        private bool _macroHeavyRefreshScheduled;
+        private bool _triggerModeRefreshScheduled;
+
+        private void ScheduleDeferredTriggerModeRefresh()
+        {
+            if (_triggerModeRefreshScheduled) return;
+            _triggerModeRefreshScheduled = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _triggerModeRefreshScheduled = false;
+                UpdateTriggerModeRecommendedText();
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+
+        private void ScheduleDeferredMacroHeavyRefresh()
+        {
+            if (_macroHeavyRefreshScheduled) return;
+            _macroHeavyRefreshScheduled = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _macroHeavyRefreshScheduled = false;
+                ApplyMacroEditorHeavyRefresh();
+            }), System.Windows.Threading.DispatcherPriority.ContextIdle);
         }
 
         private void BlockEditor_MacroChanged(object? sender, EventArgs e)
         {
-            // Appeler la même logique que MacroEditor_MacroModified
-            MacroEditor_MacroModified(sender, e);
+            TriggerAutoSave();
+            // Undo/redo : seule la liste d’actions change — pas de raccourci / IsEnabled / liste macros
+            if (e is MacroActionsChangedOnlyEventArgs)
+            {
+                ScheduleDeferredTriggerModeRefresh();
+                return;
+            }
+
             UpdateMacroSummary();
-            // Mettre à jour les raccourcis globaux (au cas où IsEnabled a changé)
-            UpdateMacroShortcuts();
-            // Rafraîchir l'indication recommandée du mode de déclenchement selon les actions
             UpdateTriggerModeRecommendedText();
+            ScheduleDeferredMacroHeavyRefresh();
+        }
+
+        /// <summary>Aligne le switch Activer/Désactiver de la barre du haut sur la macro sélectionnée.</summary>
+        private void SyncMacroEnableToggleFromSelection()
+        {
+            if (MacroEnableToggle == null) return;
+            _syncingMacroEnableToggle = true;
+            try
+            {
+                if (_selectedMacro != null)
+                {
+                    MacroEnableToggle.IsEnabled = true;
+                    MacroEnableToggle.IsChecked = _selectedMacro.IsEnabled;
+                }
+                else
+                {
+                    MacroEnableToggle.IsEnabled = false;
+                    MacroEnableToggle.IsChecked = false;
+                }
+            }
+            finally
+            {
+                _syncingMacroEnableToggle = false;
+            }
+        }
+
+        private void MacroEnableToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_syncingMacroEnableToggle || _selectedMacro == null) return;
+            _selectedMacro.IsEnabled = true;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            TriggerAutoSave();
+            UpdateTriggerModeRecommendedText();
+            // Activer/désactiver : appliquer tout de suite les hooks / raccourcis (pas de délai)
+            ApplyMacroEditorHeavyRefresh();
+        }
+
+        private void MacroEnableToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_syncingMacroEnableToggle || _selectedMacro == null) return;
+            _selectedMacro.IsEnabled = false;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            TriggerAutoSave();
+            UpdateTriggerModeRecommendedText();
+            ApplyMacroEditorHeavyRefresh();
         }
 
         private void GlobalExecuteHook_KeyDown(object? sender, KeyboardHookEventArgs e)
@@ -875,7 +1120,8 @@ namespace MacroEngine.UI
             try
             {
                 _macros = await _macroStorage.LoadMacrosAsync();
-                
+                InvalidateProcessIconListCache();
+
                 if (_macros.Count == 0)
                 {
                     var testMacro = CreateTestMacro();
@@ -1043,6 +1289,7 @@ namespace MacroEngine.UI
                         _selectedMacro = filtered[0];
                         if (_blockEditor != null)
                             _blockEditor.LoadMacro(_selectedMacro);
+                        SyncMacroEnableToggleFromSelection();
                     }
                 }
                 else
@@ -1051,6 +1298,7 @@ namespace MacroEngine.UI
                     _selectedMacro = null;
                     if (_blockEditor != null)
                         _blockEditor.LoadMacro(null!);
+                    SyncMacroEnableToggleFromSelection();
                     UpdateMacroPropertiesPanel();
                 }
             }
@@ -1096,15 +1344,20 @@ namespace MacroEngine.UI
                 if (ClearShortcutButton != null)
                     ClearShortcutButton.Visibility = Visibility.Collapsed;
             }
-            // Différer le chargement lourd (éditeur de blocs, icônes, applications cibles) pour éviter le lag
+            // ApplicationIdle : laisse d’abord peindre la liste (sélection) puis charge timeline + propriétés.
+            // Génération : si l’utilisateur clique plusieurs macros vite, on n’applique que le dernier chargement.
+            int gen = ++_macroSelectionLoadGeneration;
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                if (gen != _macroSelectionLoadGeneration)
+                    return;
                 if (_selectedMacro != null)
                     _blockEditor.LoadMacro(_selectedMacro);
                 else
                     _blockEditor.LoadMacro(null!);
+                SyncMacroEnableToggleFromSelection();
                 UpdateMacroPropertiesPanel();
-            }), System.Windows.Threading.DispatcherPriority.Loaded);
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
 
         private void MacrosListBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1513,6 +1766,7 @@ namespace MacroEngine.UI
             if (_blockEditor != null && _selectedMacro != null)
             {
                 _blockEditor.LoadMacro(_selectedMacro);
+                SyncMacroEnableToggleFromSelection();
             }
 
             // Sauvegarder automatiquement après l'enregistrement
@@ -2134,6 +2388,32 @@ namespace MacroEngine.UI
                 // On est déjà sur le thread UI, pas besoin de Dispatcher.Invoke
                 _blockEditor.RefreshBlocks();
             }
+        }
+
+        /// <summary>
+        /// Regroupe les rafraîchissements timeline : le clic rend la main tout de suite.
+        /// Si <paramref name="forceFullRebuild"/> (presets, import multiple), une seule reconstruction complète.
+        /// Sinon, append incrémental sur la timeline quand c’est possible.
+        /// </summary>
+        private bool _macroEditorRefreshScheduled;
+        private bool _macroEditorRefreshForceFull;
+
+        private void ScheduleMacroEditorRefresh(bool forceFullRebuild = false)
+        {
+            if (forceFullRebuild)
+                _macroEditorRefreshForceFull = true;
+            if (_macroEditorRefreshScheduled) return;
+            _macroEditorRefreshScheduled = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _macroEditorRefreshScheduled = false;
+                bool full = _macroEditorRefreshForceFull;
+                _macroEditorRefreshForceFull = false;
+                if (full || _blockEditor is not TimelineEditor te)
+                    RefreshMacroEditor();
+                else
+                    te.RefreshAfterExternalMutation();
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         // Cache pour les coordonnées de la fenêtre (mis à jour périodiquement)
@@ -3640,9 +3920,50 @@ namespace MacroEngine.UI
             public string DisplayName { get; set; } = string.Empty;
         }
 
-        private void RefreshProcessIconsList(Action? onComplete = null)
+        private void InvalidateProcessIconListCache()
+        {
+            _cachedProcessIconItems = null;
+            _processIconListUtc = DateTime.MinValue;
+        }
+
+        /// <summary>Applique la liste d’icônes processus et la sélection pour la macro courante (thread UI).</summary>
+        private void ApplyProcessIconsListToUi(List<ProcessIconItem> list, Action? onComplete)
         {
             if (ProcessIconsListBox == null) return;
+            _userClickedIconList = false;
+            _updatingIconFromMacro = true;
+            try
+            {
+                ProcessIconsListBox.SelectedValuePath = "Path";
+                ProcessIconsListBox.ItemsSource = list;
+                var currentPath = _selectedMacro?.ProcessIconPath ?? "";
+                if (string.IsNullOrEmpty(currentPath))
+                    ProcessIconsListBox.SelectedIndex = -1;
+                else
+                    ProcessIconsListBox.SelectedValue = currentPath;
+            }
+            finally
+            {
+                if (onComplete != null)
+                    onComplete();
+                else
+                    _updatingIconFromMacro = false;
+            }
+        }
+
+        /// <param name="forceRebuild">true après import / parcours .exe : invalide le cache.</param>
+        private void RefreshProcessIconsList(Action? onComplete = null, bool forceRebuild = false)
+        {
+            if (ProcessIconsListBox == null) return;
+
+            if (!forceRebuild &&
+                _cachedProcessIconItems != null &&
+                DateTime.UtcNow - _processIconListUtc < ProcessIconListCacheTtl)
+            {
+                ApplyProcessIconsListToUi(_cachedProcessIconItems, onComplete);
+                return;
+            }
+
             _ = Task.Run(() =>
             {
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -3707,27 +4028,11 @@ namespace MacroEngine.UI
                 }
 
                 list = list.OrderBy(x => x.DisplayName, StringComparer.OrdinalIgnoreCase).ToList();
-                var currentPath = _selectedMacro?.ProcessIconPath ?? "";
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    _userClickedIconList = false;
-                    _updatingIconFromMacro = true;
-                    try
-                    {
-                        ProcessIconsListBox.SelectedValuePath = "Path";
-                        ProcessIconsListBox.ItemsSource = list;
-                        if (string.IsNullOrEmpty(currentPath))
-                            ProcessIconsListBox.SelectedIndex = -1;
-                        else
-                            ProcessIconsListBox.SelectedValue = currentPath;
-                    }
-                    finally
-                    {
-                        if (onComplete != null)
-                            onComplete();
-                        else
-                            _updatingIconFromMacro = false;
-                    }
+                    _cachedProcessIconItems = list;
+                    _processIconListUtc = DateTime.UtcNow;
+                    ApplyProcessIconsListToUi(list, onComplete);
                 }));
             });
         }
@@ -3787,8 +4092,8 @@ namespace MacroEngine.UI
                 _selectedMacro.IconType = "Process";
                 _selectedMacro.ProcessIconPath = dlg.FileName;
                 _selectedMacro.ModifiedAt = DateTime.Now;
+                InvalidateProcessIconListCache();
                 UpdateIconComboBoxesFromMacro(_selectedMacro);
-                RefreshProcessIconsList();
                 MacrosListBox.Items.Refresh();
                 try { await _macroStorage.SaveMacrosAsync(_macros); } catch { }
             }

@@ -156,7 +156,6 @@ namespace MacroEngine.UI
             _selectedBlockIndex = -1; // Désélectionner lors du chargement d'une nouvelle macro
             RefreshBlocks();
             UpdateRepeatControls();
-            UpdateMacroEnableToggle();
             
             // Réinitialiser l'historique
             _undoStack.Clear();
@@ -275,7 +274,7 @@ namespace MacroEngine.UI
                 Width = 30,
                 Height = NOTCH_HEIGHT,
                 Background = bgColor,
-                CornerRadius = new CornerRadius(0, 0, 4, 4),
+                CornerRadius = new CornerRadius(0),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(20, 0, 0, 0)
@@ -339,7 +338,7 @@ namespace MacroEngine.UI
                 Width = 30,
                 Height = NOTCH_HEIGHT,
                 Background = blockColor,
-                CornerRadius = new CornerRadius(0, 0, 4, 4),
+                CornerRadius = new CornerRadius(0),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(20, 0, 0, 0)
             };
@@ -999,46 +998,6 @@ namespace MacroEngine.UI
 
         #endregion
 
-        #region Toggle Enable/Disable
-
-        private void UpdateMacroEnableToggle()
-        {
-            if (MacroEnableToggle == null) return;
-
-            if (_currentMacro != null)
-            {
-                MacroEnableToggle.IsEnabled = true;
-                MacroEnableToggle.IsChecked = _currentMacro.IsEnabled;
-            }
-            else
-            {
-                MacroEnableToggle.IsEnabled = false;
-                MacroEnableToggle.IsChecked = false;
-            }
-        }
-
-        private void MacroEnableToggle_Checked(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro != null)
-            {
-                _currentMacro.IsEnabled = true;
-                _currentMacro.ModifiedAt = DateTime.Now;
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        private void MacroEnableToggle_Unchecked(object sender, RoutedEventArgs e)
-        {
-            if (_currentMacro != null)
-            {
-                _currentMacro.IsEnabled = false;
-                _currentMacro.ModifiedAt = DateTime.Now;
-                MacroChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
-        #endregion
-
         #region Undo/Redo
 
         /// <summary>
@@ -1085,12 +1044,14 @@ namespace MacroEngine.UI
             _currentMacro.Actions.Clear();
             _currentMacro.Actions.AddRange(previousState.Select(a => a.Clone()));
             _currentMacro.ModifiedAt = DateTime.Now;
-            
-            RefreshBlocks();
-            MacroChanged?.Invoke(this, EventArgs.Empty);
-            
+
             _isUndoRedo = false;
             UpdateUndoRedoButtons();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, MacroActionsChangedOnlyEventArgs.Instance);
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
 
         /// <summary>
@@ -1111,12 +1072,14 @@ namespace MacroEngine.UI
             _currentMacro.Actions.Clear();
             _currentMacro.Actions.AddRange(nextState.Select(a => a.Clone()));
             _currentMacro.ModifiedAt = DateTime.Now;
-            
-            RefreshBlocks();
-            MacroChanged?.Invoke(this, EventArgs.Empty);
-            
+
             _isUndoRedo = false;
             UpdateUndoRedoButtons();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                RefreshBlocks();
+                MacroChanged?.Invoke(this, MacroActionsChangedOnlyEventArgs.Instance);
+            }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         }
 
         /// <summary>

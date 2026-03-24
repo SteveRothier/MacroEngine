@@ -111,16 +111,6 @@
                             ToolTip="Refaire (Ctrl+Y)">
                         <TextBlock Text="&#xE149;" FontFamily="{StaticResource FontLucide}" FontSize="16"/>
                     </Button>
-                    <!-- Séparateur vertical -->
-                    <Border Width="1" Height="24" Background="{StaticResource BorderMediumBrush}" Margin="0,0,12,0"/>
-                    <!-- Toggle Switch : Activer/Désactiver la macro -->
-                    <ToggleButton x:Name="MacroEnableToggle"
-                                  Style="{StaticResource ToggleSwitchStyle}"
-                                  Checked="MacroEnableToggle_Checked"
-                                  Unchecked="MacroEnableToggle_Unchecked"
-                                  IsEnabled="False"
-                                  VerticalAlignment="Center"
-                                  ToolTip="Activer/Désactiver la macro"/>
                 </StackPanel>
             </Grid>
         </Border>
