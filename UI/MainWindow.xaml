@@ -548,7 +548,7 @@
                                                 <StackPanel HorizontalAlignment="Center">
                                                     <Border Width="22" Height="22" CornerRadius="4"
                                                             Background="#1234C8B8" HorizontalAlignment="Center">
-                                                        <TextBlock Text="⌨" FontSize="12" Foreground="#34C8B8"
+                                                        <TextBlock Text="&#xE284;" FontFamily="{StaticResource FontLucide}" FontSize="12" Foreground="#34C8B8"
                                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                     </Border>
                                                     <TextBlock Text="TOUCHE" FontFamily="{StaticResource FontPrimary}"
