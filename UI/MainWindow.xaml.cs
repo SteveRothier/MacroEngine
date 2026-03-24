@@ -105,6 +105,11 @@ namespace MacroEngine.UI
 
         // True seulement après un clic souris sur une des listes d'icônes : on n'applique la sélection à la macro que dans ce cas
         private bool _userClickedIconList;
+        
+        // Exécution pas-à-pas (1 clic = 1 action racine)
+        private int _stepExecutionIndex = 0;
+        private string _stepExecutionMacroId = string.Empty;
+        private bool _isStepExecuting = false;
 
         // Enregistrement des mouvements souris
         private DateTime _lastMouseMoveRecorded = DateTime.MinValue;
@@ -1327,6 +1332,7 @@ namespace MacroEngine.UI
         private void MacrosListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             _selectedMacro = MacrosListBox.SelectedItem as Macro;
+            ResetStepExecution();
             // Mise à jour immédiate des champs visibles pour éviter l'affichage de l'ancienne macro
             if (_selectedMacro != null)
             {
@@ -1390,7 +1396,104 @@ namespace MacroEngine.UI
 
         private async void ExecuteMacro_Click(object sender, RoutedEventArgs e)
         {
+            // Une exécution complète repart toujours du début.
+            ResetStepExecution();
             await ExecuteMacroAsync();
+        }
+
+        private async void StepMacro_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isStepExecuting)
+                return;
+
+            try
+            {
+                if (_selectedMacro == null)
+                {
+                    StatusText.Text = "Veuillez sélectionner une macro";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    return;
+                }
+
+                if (!_selectedMacro.IsEnabled)
+                {
+                    StatusText.Text = "La macro est désactivée";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    return;
+                }
+
+                if (_isRecording)
+                {
+                    StatusText.Text = "Impossible d'exécuter en pas à pas pendant l'enregistrement";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    return;
+                }
+
+                if (_macroEngine.State != MacroEngineState.Idle)
+                {
+                    StatusText.Text = "Une macro est déjà en cours d'exécution";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    return;
+                }
+
+                if (_selectedMacro.Actions == null || _selectedMacro.Actions.Count == 0)
+                {
+                    StatusText.Text = "La macro sélectionnée ne contient aucune action";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    return;
+                }
+
+                // Si on change de macro, on repart du début.
+                if (_stepExecutionMacroId != _selectedMacro.Id)
+                {
+                    _stepExecutionMacroId = _selectedMacro.Id;
+                    _stepExecutionIndex = 0;
+                }
+
+                // Fin atteinte : prochain clic repart à 0.
+                if (_stepExecutionIndex >= _selectedMacro.Actions.Count)
+                {
+                    _stepExecutionIndex = 0;
+                }
+
+                var actionToRun = _selectedMacro.Actions[_stepExecutionIndex];
+                int actionNumber = _stepExecutionIndex + 1;
+                int total = _selectedMacro.Actions.Count;
+
+                _isStepExecuting = true;
+                StatusText.Text = $"Pas à pas: exécution action {actionNumber}/{total}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Black;
+
+                await _macroEngine.ExecuteActionsAsync(new[] { actionToRun });
+
+                _stepExecutionIndex++;
+
+                if (_stepExecutionIndex >= total)
+                {
+                    StatusText.Text = "Pas à pas terminé (fin de la macro). Re-cliquez pour repartir au début.";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Green;
+                }
+                else
+                {
+                    StatusText.Text = $"Pas à pas prêt: prochaine action {_stepExecutionIndex + 1}/{total}";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Erreur pas à pas: {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
+            }
+            finally
+            {
+                _isStepExecuting = false;
+            }
+        }
+
+        private void ResetStepExecution()
+        {
+            _stepExecutionIndex = 0;
+            _stepExecutionMacroId = _selectedMacro?.Id ?? string.Empty;
         }
 
         private async System.Threading.Tasks.Task ExecuteMacroAsync()
@@ -2375,6 +2478,7 @@ namespace MacroEngine.UI
             else
             {
                 // Arrêter l'exécution de macro
+                ResetStepExecution();
                 _stopRequested = true;
                 _macroEngine.StopMacroAsync();
                 StatusText.Text = "Arrêté";

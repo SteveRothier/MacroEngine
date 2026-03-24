@@ -666,6 +666,53 @@
                                         </StackPanel>
                                     </DockPanel>
                                 </Border>
+                                <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,1,0">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Top" Text="EXECUTION"
+                                                   FontFamily="{StaticResource FontMono}"
+                                                   FontSize="7" FontWeight="Bold"
+                                                   Foreground="#4A5A4A"
+                                                   Margin="10,4,10,0"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Button Style="{StaticResource ActionCard}" Click="ExecuteMacro_Click">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <Border Width="22" Height="22" CornerRadius="4"
+                                                            Background="#1239D97A" HorizontalAlignment="Center">
+                                                        <TextBlock Text="&#xE13C;" FontFamily="{StaticResource FontLucide}" FontSize="12" Foreground="#39D97A"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <TextBlock Text="LANCER" FontFamily="{StaticResource FontPrimary}"
+                                                               FontSize="10" FontWeight="Bold" Foreground="#7A927A"
+                                                               HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource ActionCard}" Click="StepMacro_Click">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <Border Width="22" Height="22" CornerRadius="4"
+                                                            Background="#1AE8A020" HorizontalAlignment="Center">
+                                                        <TextBlock Text="&#xE3EA;" FontFamily="{StaticResource FontLucide}" FontSize="12" Foreground="#E8A020"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <TextBlock Text="PAS À PAS" FontFamily="{StaticResource FontPrimary}"
+                                                               FontSize="10" FontWeight="Bold" Foreground="#7A927A"
+                                                               HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                            <Button Style="{StaticResource ActionCard}" Click="StopMacro_Click">
+                                                <StackPanel HorizontalAlignment="Center">
+                                                    <Border Width="22" Height="22" CornerRadius="4"
+                                                            Background="#15E84040" HorizontalAlignment="Center">
+                                                        <TextBlock Text="&#xE167;" FontFamily="{StaticResource FontLucide}" FontSize="12" Foreground="#E84040"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+                                                    <TextBlock Text="ARRÊTER" FontFamily="{StaticResource FontPrimary}"
+                                                               FontSize="10" FontWeight="Bold" Foreground="#7A927A"
+                                                               HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
                             </StackPanel>
                         </DockPanel>
                     </Border>
