@@ -65,6 +65,23 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!--
+          Titres de sections barre d’outils (discrets : couleur atténuée, semi-gras, petite taille).
+          Fenêtre transparente : ClearType explicite pour un rendu net.
+        -->
+        <Style x:Key="ToolbarSectionLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource FontToolbarSection}"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+            <Setter Property="Opacity" Value="0.88"/>
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType"/>
+            <Setter Property="TextOptions.TextHintingMode" Value="Fixed"/>
+            <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="UseLayoutRounding" Value="True"/>
+        </Style>
         <!-- Style barre d'action (boutons type carte) -->
         <Style x:Key="ActionCard" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
             <Setter Property="Padding" Value="12,6,12,8"/>
@@ -464,8 +481,10 @@
                     <!-- ── BARRE D'ACTION (command bar) ── -->
                     <Border Grid.Row="0"
                             Background="#0D0F0D"
-                            BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1">
-                        <DockPanel LastChildFill="False">
+                            BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1"
+                            UseLayoutRounding="True" SnapsToDevicePixels="True"
+                            RenderOptions.ClearTypeHint="Enabled">
+                        <DockPanel LastChildFill="False" UseLayoutRounding="True">
                             <!-- Droite : STOP, ENREG., PROPS -->
                             <Border DockPanel.Dock="Right"
                                     BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1,0,0,0">
@@ -512,10 +531,8 @@
                                 <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,1,0">
                                     <DockPanel>
                                         <TextBlock DockPanel.Dock="Top"
+                                                   Style="{StaticResource ToolbarSectionLabelStyle}"
                                                    Text="AJOUTER UNE ACTION"
-                                                   FontFamily="{StaticResource FontMono}"
-                                                   FontSize="7" FontWeight="Bold"
-                                                   Foreground="#4A5A4A"
                                                    Margin="10,4,10,0"/>
                                         <StackPanel Orientation="Horizontal">
                                             <Button Style="{StaticResource ActionCard}" Click="QuickAddAction_Click" Tag="keyboard">
@@ -620,10 +637,9 @@
                                 </Border>
                                 <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,1,0">
                                     <DockPanel>
-                                        <TextBlock DockPanel.Dock="Top" Text="OUTILS"
-                                                   FontFamily="{StaticResource FontMono}"
-                                                   FontSize="7" FontWeight="Bold"
-                                                   Foreground="#4A5A4A"
+                                        <TextBlock DockPanel.Dock="Top"
+                                                   Style="{StaticResource ToolbarSectionLabelStyle}"
+                                                   Text="OUTILS"
                                                    Margin="10,4,10,0"/>
                                         <StackPanel Orientation="Horizontal">
                                             <Button Style="{StaticResource ActionCard}" Click="QuickAddAction_Click" Tag="presets">
@@ -668,25 +684,44 @@
                                 </Border>
                                 <Border BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,1,0">
                                     <DockPanel>
-                                        <TextBlock DockPanel.Dock="Top" Text="EXECUTION"
-                                                   FontFamily="{StaticResource FontMono}"
-                                                   FontSize="7" FontWeight="Bold"
-                                                   Foreground="#4A5A4A"
+                                        <TextBlock DockPanel.Dock="Top"
+                                                   Style="{StaticResource ToolbarSectionLabelStyle}"
+                                                   Text="EXECUTION"
                                                    Margin="10,4,10,0"/>
                                         <StackPanel Orientation="Horizontal">
-                                            <Button Style="{StaticResource ActionCard}" Click="ExecuteMacro_Click">
+                                            <Button Style="{StaticResource ActionCard}" Click="ExecuteMacro_Click"
+                                                    ToolTip="Exécuter la macro sélectionnée (bouton ou raccourci de la macro)">
                                                 <StackPanel HorizontalAlignment="Center">
-                                                    <Border Width="22" Height="22" CornerRadius="4"
-                                                            Background="#1239D97A" HorizontalAlignment="Center">
-                                                        <TextBlock Text="&#xE13C;" FontFamily="{StaticResource FontLucide}" FontSize="12" Foreground="#39D97A"
-                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
+                                                    <Grid HorizontalAlignment="Center">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Width="22" Height="22" CornerRadius="4"
+                                                                Background="#1239D97A" VerticalAlignment="Center">
+                                                            <TextBlock Text="&#xE13C;" FontFamily="{StaticResource FontLucide}" FontSize="12" Foreground="#39D97A"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <TextBlock x:Name="ExecuteMacroShortcutHintText"
+                                                                   Grid.Column="1"
+                                                                   FontFamily="{StaticResource FontMono}"
+                                                                   FontSize="7"
+                                                                   Foreground="#4A5A4A"
+                                                                   TextAlignment="Center"
+                                                                   TextWrapping="Wrap"
+                                                                   MaxWidth="56"
+                                                                   LineHeight="9"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="6,0,0,0"
+                                                                   Visibility="Collapsed"/>
+                                                    </Grid>
                                                     <TextBlock Text="LANCER" FontFamily="{StaticResource FontPrimary}"
                                                                FontSize="10" FontWeight="Bold" Foreground="#7A927A"
                                                                HorizontalAlignment="Center" Margin="0,4,0,0"/>
                                                 </StackPanel>
                                             </Button>
-                                            <Button Style="{StaticResource ActionCard}" Click="StepMacro_Click">
+                                            <Button Style="{StaticResource ActionCard}" Click="StepMacro_Click"
+                                                    ToolTip="Exécuter une seule action à chaque clic">
                                                 <StackPanel HorizontalAlignment="Center">
                                                     <Border Width="22" Height="22" CornerRadius="4"
                                                             Background="#1AE8A020" HorizontalAlignment="Center">
@@ -698,13 +733,31 @@
                                                                HorizontalAlignment="Center" Margin="0,4,0,0"/>
                                                 </StackPanel>
                                             </Button>
-                                            <Button Style="{StaticResource ActionCard}" Click="StopMacro_Click">
+                                            <Button Style="{StaticResource ActionCard}" Click="StopMacro_Click"
+                                                    ToolTip="Arrêter l'exécution ou l'enregistrement">
                                                 <StackPanel HorizontalAlignment="Center">
-                                                    <Border Width="22" Height="22" CornerRadius="4"
-                                                            Background="#15E84040" HorizontalAlignment="Center">
-                                                        <TextBlock Text="&#xE167;" FontFamily="{StaticResource FontLucide}" FontSize="12" Foreground="#E84040"
-                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
+                                                    <Grid HorizontalAlignment="Center">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Width="22" Height="22" CornerRadius="4"
+                                                                Background="#15E84040" VerticalAlignment="Center">
+                                                            <TextBlock Text="&#xE167;" FontFamily="{StaticResource FontLucide}" FontSize="12" Foreground="#E84040"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <TextBlock x:Name="StopGlobalShortcutHintText"
+                                                                   Grid.Column="1"
+                                                                   FontFamily="{StaticResource FontMono}"
+                                                                   FontSize="7"
+                                                                   Foreground="#4A5A4A"
+                                                                   TextAlignment="Center"
+                                                                   TextWrapping="Wrap"
+                                                                   MaxWidth="56"
+                                                                   LineHeight="9"
+                                                                   VerticalAlignment="Center"
+                                                                   Margin="6,0,0,0"/>
+                                                    </Grid>
                                                     <TextBlock Text="ARRÊTER" FontFamily="{StaticResource FontPrimary}"
                                                                FontSize="10" FontWeight="Bold" Foreground="#7A927A"
                                                                HorizontalAlignment="Center" Margin="0,4,0,0"/>

@@ -520,12 +520,64 @@ namespace MacroEngine.UI
         
         private void UpdateExecuteButtonText()
         {
-            if (_blockEditor?.StopButton != null && _appConfig != null && !_isRecording)
+            if (_appConfig == null)
+                return;
+
+            if (_blockEditor?.StopButton != null && !_isRecording)
             {
                 var keyCode = _appConfig.StopMacroKeyCode != 0 ? _appConfig.StopMacroKeyCode : 0x7A;
                 var keyName = GetKeyNameForShortcut((ushort)keyCode);
                 _blockEditor.StopButton.ToolTip = $"Arrêter l'enregistrement ({keyName})";
             }
+
+            UpdateExecutionToolbarShortcutHints();
+        }
+
+        /// <summary>
+        /// Raccourcis à droite de l’icône ; libellés LANCER / ARRÊTER dessous.
+        /// LANCER : raccourci de la macro si défini, sinon raccourci global Exécuter (F10 par défaut).
+        /// ARRÊTER : raccourci global.
+        /// </summary>
+        private void UpdateExecutionToolbarShortcutHints()
+        {
+            if (StopGlobalShortcutHintText != null && _appConfig != null)
+            {
+                var stopKeyCode = _appConfig.StopMacroKeyCode != 0 ? _appConfig.StopMacroKeyCode : 0x7A;
+                StopGlobalShortcutHintText.Text = FormatShortcutHintDisplay(
+                    GetKeyNameForShortcut((ushort)stopKeyCode));
+            }
+
+            if (ExecuteMacroShortcutHintText != null)
+            {
+                if (_selectedMacro != null && _selectedMacro.ShortcutKeyCode > 0)
+                {
+                    ExecuteMacroShortcutHintText.Text = FormatShortcutHintDisplay(
+                        GetKeyNameForShortcut((ushort)_selectedMacro.ShortcutKeyCode));
+                    ExecuteMacroShortcutHintText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    // Aucun raccourci sur la macro : afficher le raccourci global « Exécuter » (souvent F10).
+                    ushort executeVk = 0x79;
+                    if (_appConfig != null && _appConfig.ExecuteMacroKeyCode != 0)
+                        executeVk = (ushort)_appConfig.ExecuteMacroKeyCode;
+                    ExecuteMacroShortcutHintText.Text = FormatShortcutHintDisplay(GetKeyNameForShortcut(executeVk));
+                    ExecuteMacroShortcutHintText.Visibility = Visibility.Visible;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Si le libellé contient plusieurs mots : 1ʳᵉ ligne = premier mot, 2ᵉ ligne = le reste (ex. « Flèche » / « Haut »).
+        /// </summary>
+        private static string FormatShortcutHintDisplay(string keyName)
+        {
+            if (string.IsNullOrWhiteSpace(keyName))
+                return string.Empty;
+            var parts = keyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2)
+                return keyName;
+            return parts[0] + Environment.NewLine + string.Join(' ', parts.Skip(1));
         }
         
         private string GetKeyNameForShortcut(ushort virtualKeyCode)
@@ -1350,6 +1402,7 @@ namespace MacroEngine.UI
                 if (ClearShortcutButton != null)
                     ClearShortcutButton.Visibility = Visibility.Collapsed;
             }
+            UpdateExecutionToolbarShortcutHints();
             // ApplicationIdle : laisse d’abord peindre la liste (sélection) puis charge timeline + propriétés.
             // Génération : si l’utilisateur clique plusieurs macros vite, on n’applique que le dernier chargement.
             int gen = ++_macroSelectionLoadGeneration;
@@ -3237,6 +3290,8 @@ namespace MacroEngine.UI
                 StatusText.Text = "Raccourci non défini (conflit).";
                 StatusText.Foreground = System.Windows.Media.Brushes.Orange;
             }
+
+            UpdateExecutionToolbarShortcutHints();
         }
 
         private void SelectApps_Click(object sender, RoutedEventArgs e)
