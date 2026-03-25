@@ -9748,7 +9748,7 @@ namespace MacroEngine.UI
             };
 
             // Chips v2 : bg transparent, border line2, hover amber
-            Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
+            Func<string, string, IInputAction, Border> createAddButton = (iconGlyph, text, actionInstance) =>
             {
                 var tag = new RepeatActionInfo
                 {
@@ -9762,7 +9762,7 @@ namespace MacroEngine.UI
                 {
                     Background = Brushes.Transparent,
                     CornerRadius = new CornerRadius(0),
-                    Padding = new Thickness(8, 4, 8, 4),
+                    Padding = new Thickness(3, 3, 3, 3),
                     Margin = new Thickness(0, 0, 4, 0),
                     Cursor = Cursors.Hand,
                     BorderThickness = new Thickness(1),
@@ -9771,17 +9771,62 @@ namespace MacroEngine.UI
                 };
                 button.MouseLeftButtonDown += AddActionToRepeat_Click;
 
-                var iconBlock = new TextBlock { Text = icon, FontSize = 10 };
-                iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
-                var textBlock = new TextBlock { Text = " " + text, FontSize = 10, FontWeight = FontWeights.SemiBold };
-                textBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+                const double chipIconW = 14;
+                const double chipContentH = 18;
                 var brush = new SolidColorBrush(Color.FromRgb(0x4A, 0x5A, 0x4A));
-                iconBlock.Foreground = brush;
-                textBlock.Foreground = brush;
-                var sp = new StackPanel { Orientation = Orientation.Horizontal };
-                sp.Children.Add(iconBlock);
-                sp.Children.Add(textBlock);
-                button.Child = sp;
+                var row = new Grid
+                {
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    UseLayoutRounding = true
+                };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var iconHost = new Border
+                {
+                    Width = chipIconW,
+                    Height = chipContentH,
+                    Margin = new Thickness(0, 0, 2, 0),
+                    Background = Brushes.Transparent,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var iconBlock = new TextBlock
+                {
+                    Text = iconGlyph,
+                    FontSize = 10,
+                    Foreground = brush,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center,
+                    Padding = new Thickness(0)
+                };
+                iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
+                TextOptions.SetTextFormattingMode(iconBlock, TextFormattingMode.Display);
+                iconHost.Child = iconBlock;
+                var textHost = new Border
+                {
+                    Height = chipContentH,
+                    Background = Brushes.Transparent,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Padding = new Thickness(0, 0, 3, 0)
+                };
+                var textBlock = new TextBlock
+                {
+                    Text = text,
+                    FontSize = 10,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = brush,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Left
+                };
+                textBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontPrimary");
+                TextOptions.SetTextFormattingMode(textBlock, TextFormattingMode.Display);
+                textHost.Child = textBlock;
+                Grid.SetColumn(iconHost, 0);
+                Grid.SetColumn(textHost, 1);
+                row.Children.Add(iconHost);
+                row.Children.Add(textHost);
+                button.Child = row;
 
                 button.MouseEnter += (s, e) =>
                 {
@@ -9800,12 +9845,12 @@ namespace MacroEngine.UI
                 return button;
             };
 
-            panel.Children.Add(createAddButton(LucideIcons.Keyboard, "Touche", new KeyboardAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Mouse, "Clic", new Core.Inputs.MouseAction()));
-            panel.Children.Add(createAddButton(LucideIcons.FileText, "Texte", new TextAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Braces, "Variable", new VariableAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Timer, "Délai", new DelayAction()));
-            panel.Children.Add(createAddButton(LucideIcons.HelpCircle, "Si", new IfAction()));
+            panel.Children.Add(createAddButton("\uE284", "Touche", new KeyboardAction()));
+            panel.Children.Add(createAddButton("\uE28E", "Clic", new Core.Inputs.MouseAction()));
+            panel.Children.Add(createAddButton("\uE0CC", "Texte", new TextAction()));
+            panel.Children.Add(createAddButton("\uE36A", "Variable", new VariableAction()));
+            panel.Children.Add(createAddButton("\uE1E0", "Délai", new DelayAction()));
+            panel.Children.Add(createAddButton("\uE440", "Si", new IfAction()));
 
             return panel;
         }
@@ -10134,13 +10179,13 @@ namespace MacroEngine.UI
             };
 
             // Chips v2 : bg transparent, border line2, hover amber
-            Func<string, string, IInputAction, Border> createAddButton = (icon, text, actionInstance) =>
+            Func<string, string, IInputAction, Border> createAddButton = (iconGlyph, text, actionInstance) =>
             {
                 var button = new Border
                 {
                     Background = Brushes.Transparent,
                     CornerRadius = new CornerRadius(0),
-                    Padding = new Thickness(8, 4, 8, 4),
+                    Padding = new Thickness(3, 3, 3, 3),
                     Margin = new Thickness(0, 0, 4, 0),
                     Cursor = Cursors.Hand,
                     BorderThickness = new Thickness(1),
@@ -10157,17 +10202,62 @@ namespace MacroEngine.UI
                 };
                 button.MouseLeftButtonDown += AddActionToIf_Click;
 
-                var iconBlock = new TextBlock { Text = icon, FontSize = 10 };
-                iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
-                var textBlock = new TextBlock { Text = " " + text, FontSize = 10, FontWeight = FontWeights.SemiBold };
-                textBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+                const double chipIconW = 14;
+                const double chipContentH = 18;
                 var brush = new SolidColorBrush(Color.FromRgb(0x4A, 0x5A, 0x4A));
-                iconBlock.Foreground = brush;
-                textBlock.Foreground = brush;
-                var sp = new StackPanel { Orientation = Orientation.Horizontal };
-                sp.Children.Add(iconBlock);
-                sp.Children.Add(textBlock);
-                button.Child = sp;
+                var row = new Grid
+                {
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    UseLayoutRounding = true
+                };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var iconHost = new Border
+                {
+                    Width = chipIconW,
+                    Height = chipContentH,
+                    Margin = new Thickness(0, 0, 2, 0),
+                    Background = Brushes.Transparent,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var iconBlock = new TextBlock
+                {
+                    Text = iconGlyph,
+                    FontSize = 10,
+                    Foreground = brush,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextAlignment = TextAlignment.Center,
+                    Padding = new Thickness(0)
+                };
+                iconBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontLucide");
+                TextOptions.SetTextFormattingMode(iconBlock, TextFormattingMode.Display);
+                iconHost.Child = iconBlock;
+                var textHost = new Border
+                {
+                    Height = chipContentH,
+                    Background = Brushes.Transparent,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Padding = new Thickness(0, 0, 3, 0)
+                };
+                var textBlock = new TextBlock
+                {
+                    Text = text,
+                    FontSize = 10,
+                    FontWeight = FontWeights.SemiBold,
+                    Foreground = brush,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Left
+                };
+                textBlock.SetResourceReference(TextBlock.FontFamilyProperty, "FontPrimary");
+                TextOptions.SetTextFormattingMode(textBlock, TextFormattingMode.Display);
+                textHost.Child = textBlock;
+                Grid.SetColumn(iconHost, 0);
+                Grid.SetColumn(textHost, 1);
+                row.Children.Add(iconHost);
+                row.Children.Add(textHost);
+                button.Child = row;
 
                 button.MouseEnter += (s, e) =>
                 {
@@ -10186,12 +10276,12 @@ namespace MacroEngine.UI
                 return button;
             };
 
-            panel.Children.Add(createAddButton(LucideIcons.Keyboard, "Touche", new KeyboardAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Mouse, "Clic", new Core.Inputs.MouseAction()));
-            panel.Children.Add(createAddButton(LucideIcons.FileText, "Texte", new TextAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Braces, "Variable", new VariableAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Timer, "Délai", new DelayAction()));
-            panel.Children.Add(createAddButton(LucideIcons.Repeat2, "Répéter", new RepeatAction()));
+            panel.Children.Add(createAddButton("\uE284", "Touche", new KeyboardAction()));
+            panel.Children.Add(createAddButton("\uE28E", "Clic", new Core.Inputs.MouseAction()));
+            panel.Children.Add(createAddButton("\uE0CC", "Texte", new TextAction()));
+            panel.Children.Add(createAddButton("\uE36A", "Variable", new VariableAction()));
+            panel.Children.Add(createAddButton("\uE1E0", "Délai", new DelayAction()));
+            panel.Children.Add(createAddButton("\uE411", "Répéter", new RepeatAction()));
 
             return panel;
         }
