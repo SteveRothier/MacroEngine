@@ -139,11 +139,16 @@
                     Background="#0D0F0D"
                     BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
-                <DockPanel LastChildFill="False" VerticalAlignment="Stretch">
+                <Grid VerticalAlignment="Stretch">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
 
-                    <!-- Logo -->
-                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal"
-                                VerticalAlignment="Center" Margin="14,0,24,0">
+                    <!-- Logo (gauche) -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                VerticalAlignment="Center" Margin="14,0,16,0" HorizontalAlignment="Left">
                         <TextBlock Text="MACROENGINE"
                                    FontFamily="{StaticResource FontPrimary}"
                                    FontSize="20" FontWeight="Black"
@@ -152,41 +157,58 @@
                                 <DropShadowEffect Color="#E8A020" BlurRadius="18" ShadowDepth="0" Opacity="0.55"/>
                             </TextBlock.Effect>
                         </TextBlock>
-                        <TextBlock Text=" V2.0"
+                    </StackPanel>
+
+                    <!-- Icône (sans cadre) + nom de la macro (centre de la barre) -->
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center">
+                        <Grid Width="18" Height="18"
+                              Margin="0,0,6,0"
+                              VerticalAlignment="Center"
+                              Visibility="{Binding SelectedItem.IconType, ElementName=MacrosListBox, Converter={StaticResource IconVisibilityConverter}}">
+                            <TextBlock FontFamily="{StaticResource FontLucide}"
+                                       FontSize="12"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Center"
+                                       Text="{Binding SelectedItem.LucideIconCode, ElementName=MacrosListBox, Converter={StaticResource LucideIconCharConverter}, FallbackValue='', TargetNullValue=''}"
+                                       Foreground="{Binding SelectedItem.IconColor, ElementName=MacrosListBox, Converter={StaticResource HexToBrushConverter}}"
+                                       Visibility="{Binding SelectedItem.IconType, ElementName=MacrosListBox, Converter={StaticResource IconTypeMatchConverter}, ConverterParameter=Lucide}"/>
+                            <Image Width="15" Height="15"
+                                   VerticalAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   SnapsToDevicePixels="True"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
+                                   Source="{Binding SelectedItem.ProcessIconPath, ElementName=MacrosListBox, Converter={StaticResource ProcessIconConverter}}"
+                                   Visibility="{Binding SelectedItem.IconType, ElementName=MacrosListBox, Converter={StaticResource IconTypeMatchConverter}, ConverterParameter=Process}"/>
+                        </Grid>
+                        <TextBlock x:Name="TitleBarActiveMacroText"
+                                   Text="{Binding SelectedItem.Name, ElementName=MacrosListBox, FallbackValue='', TargetNullValue=''}"
                                    FontFamily="{StaticResource FontMono}"
-                                   FontSize="9" Foreground="#4A5A4A"
-                                   VerticalAlignment="Bottom" Margin="6,0,0,2"/>
-                </StackPanel>
+                                   FontSize="11" FontWeight="SemiBold"
+                                   Foreground="#E8A020"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   MaxWidth="400"
+                                   ToolTip="{Binding SelectedItem.Name, ElementName=MacrosListBox, FallbackValue='', TargetNullValue=''}"/>
+                    </StackPanel>
 
-                    <Rectangle DockPanel.Dock="Left" Width="1" Height="18" Fill="{StaticResource BorderLightBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
-
-                    <!-- Status dot + PRÊT -->
-                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal"
-                                VerticalAlignment="Center" Margin="0,0,16,0">
-                        <Ellipse Width="6" Height="6" Fill="#39D97A" Margin="0,0,6,0" VerticalAlignment="Center">
-                            <Ellipse.Effect>
-                                <DropShadowEffect Color="#39D97A" BlurRadius="8" ShadowDepth="0"/>
-                            </Ellipse.Effect>
-                        </Ellipse>
-                        <TextBlock Text="PRÊT"
-                                   FontFamily="{StaticResource FontMono}"
-                                   FontSize="10" FontWeight="Medium"
-                                   Foreground="#4A5A4A" VerticalAlignment="Center"/>
-                </StackPanel>
-
-                    <Rectangle DockPanel.Dock="Left" Width="1" Height="18" Fill="{StaticResource BorderLightBrush}" Margin="0,0,16,0" VerticalAlignment="Center"/>
-
-                    <!-- Macro active (lié à la sélection) -->
-                    <TextBlock x:Name="TitleBarActiveMacroText" DockPanel.Dock="Left"
-                               Text="{Binding SelectedItem.Name, ElementName=MacrosListBox, FallbackValue='', TargetNullValue=''}"
-                               FontFamily="{StaticResource FontMono}"
-                               FontSize="10" FontWeight="Medium"
-                               Foreground="#E8A020" VerticalAlignment="Center"/>
-
-                    <!-- Window controls (right) -->
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
-                                VerticalAlignment="Center" Margin="14,0"
-                            shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                    <!-- Droite : séparateurs, journaux, paramètres, fenêtre -->
+                    <StackPanel Grid.Column="2"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Margin="0,0,14,0"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Rectangle Width="1" Height="18" Fill="{StaticResource BorderLightBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Button Style="{StaticResource ButtonIcon}" Width="28" Height="28" Click="ShowLogs_Click" ToolTip="Journaux" Margin="0,0,8,0">
+                            <TextBlock Text="&#xE085;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </Button>
+                        <Button Style="{StaticResource ButtonIcon}" Width="28" Height="28" Click="Settings_Click" ToolTip="Paramètres" Margin="0,0,8,0">
+                            <TextBlock Text="&#xE30B;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
+                        </Button>
+                        <Rectangle Width="1" Height="18" Fill="{StaticResource BorderLightBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <Button x:Name="MinimizeButton" Style="{StaticResource WindowCaptionButtonStyle}" Width="40" Height="28"
                                 Foreground="{StaticResource TextPrimaryBrush}" FontFamily="{StaticResource FontLucide}" FontSize="12"
                                 Content="&#xE11C;" ToolTip="Réduire" Click="MinimizeButton_Click"/>
@@ -196,20 +218,8 @@
                         <Button x:Name="CloseButton" Style="{StaticResource WindowCaptionCloseButtonStyle}" Width="40" Height="28"
                                 Foreground="{StaticResource TextPrimaryBrush}" FontFamily="{StaticResource FontLucide}" FontSize="12"
                                 Content="&#xE1B2;" ToolTip="Fermer" Click="CloseButton_Click"/>
-                </StackPanel>
-
-                    <Rectangle DockPanel.Dock="Right" Width="1" Height="18" Fill="{StaticResource BorderLightBrush}" VerticalAlignment="Center"/>
-
-                    <!-- Paramètres + Logs -->
-                    <Button DockPanel.Dock="Right" Style="{StaticResource ButtonIcon}" Width="28" Height="28" Click="Settings_Click" ToolTip="Paramètres" Margin="0,0,8,0">
-                        <TextBlock Text="&#xE30B;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
-                    </Button>
-                    <Button DockPanel.Dock="Right" Style="{StaticResource ButtonIcon}" Width="28" Height="28" Click="ShowLogs_Click" ToolTip="Journaux">
-                        <TextBlock Text="&#xE085;" FontFamily="{StaticResource FontLucide}" FontSize="14" Foreground="{StaticResource TextPrimaryBrush}"/>
-                    </Button>
-
-                    <Rectangle DockPanel.Dock="Right" Width="1" Height="18" Fill="{StaticResource BorderLightBrush}" VerticalAlignment="Center"/>
-                </DockPanel>
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <!-- ══════════════════════════════════════ SHELL (Rail | Workspace | Props) ══════════════════════════════════════ -->
