@@ -164,6 +164,112 @@
         </Setter>
     </Style>
 
+    <!-- Activer macro : segment OFF | ON (deux demi‑zones, pastille active — pas de curseur) -->
+    <Style x:Key="MacroPowerToggleStyle" TargetType="ToggleButton">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="ToolTip" Value="Activer / désactiver la macro"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Outer"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="12,0,12,0"
+                            VerticalAlignment="Stretch"
+                            HorizontalAlignment="Stretch"
+                            SnapsToDevicePixels="True"
+                            UseLayoutRounding="True">
+                        <Grid Background="Transparent">
+                            <Border x:Name="Shell"
+                                Width="52" Height="22"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                BorderBrush="{StaticResource BorderLightBrush}"
+                                BorderThickness="1"
+                                Background="{StaticResource BackgroundLevel4Brush}"
+                                ClipToBounds="True"
+                                SnapsToDevicePixels="True">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Border x:Name="PaneOff"
+                                        Grid.Column="0"
+                                        Margin="1,1,0,1"
+                                        Background="#2A3228"
+                                        IsHitTestVisible="False"/>
+                                <Border x:Name="PaneOn"
+                                        Grid.Column="1"
+                                        Margin="0,1,1,1"
+                                        Background="#141814"
+                                        IsHitTestVisible="False"/>
+                                <Rectangle Grid.Column="0"
+                                           Grid.ColumnSpan="2"
+                                           Width="1"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Stretch"
+                                           Fill="{StaticResource BorderInternalBrush}"
+                                           IsHitTestVisible="False"/>
+                                <TextBlock x:Name="LblOff"
+                                           Grid.Column="0"
+                                           Text="OFF"
+                                           FontFamily="{StaticResource FontPrimary}"
+                                           FontSize="8"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           IsHitTestVisible="False"/>
+                                <TextBlock x:Name="LblOn"
+                                           Grid.Column="1"
+                                           Text="ON"
+                                           FontFamily="{StaticResource FontPrimary}"
+                                           FontSize="8"
+                                           FontWeight="Bold"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           IsHitTestVisible="False"/>
+                            </Grid>
+                        </Border>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Outer" Property="Background">
+                                <Setter.Value>
+                                    <SolidColorBrush Color="#12E8A020"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="PaneOff" Property="Background" Value="#141814"/>
+                            <Setter TargetName="PaneOn" Property="Background" Value="{StaticResource AccentPrimaryBrush}"/>
+                            <Setter TargetName="LblOff" Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+                            <Setter TargetName="LblOn" Property="Foreground" Value="{StaticResource TextOnAccentBrush}"/>
+                            <Setter TargetName="LblOn" Property="FontWeight" Value="Black"/>
+                            <Setter TargetName="Shell" Property="BorderBrush">
+                                <Setter.Value>
+                                    <SolidColorBrush Color="#99E8A020"/>
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Outer" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Toggle compact pour liste (pill : gris = off, cuivre = on) -->
     <Style x:Key="ToggleSwitchStyleCompact" TargetType="ToggleButton">
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
