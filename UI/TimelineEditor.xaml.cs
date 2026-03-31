@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -392,11 +392,11 @@ namespace MacroEngine.UI
             {
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(0, 0, 0, 4),
+                Margin = new Thickness(0, 0, 0, NestedTimelineLayout.BlockBottomSpacingPx),
                 MinWidth = 400
             };
 
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(44) });   // Numéro étape (01, 02…)
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NestedTimelineLayout.MainTimelineStepColumnWidthPx) });   // Numéro étape (01, 02…)
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             var stepNumberText = new TextBlock
@@ -607,7 +607,7 @@ namespace MacroEngine.UI
                 BorderBrush = brushBorder,
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(0),
-                Margin = new Thickness(0, 0, 0, 4),
+                Margin = new Thickness(0, 0, 0, NestedTimelineLayout.BlockBottomSpacingPx),
                 Cursor = Cursors.Hand,
                 RenderTransform = new ScaleTransform(1, 1),
                 RenderTransformOrigin = new Point(0.5, 0.5),
@@ -9179,6 +9179,37 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
+        /// Décalages des imbrications Si / Sinon / Répéter : une seule source de vérité.
+        /// Tout est aligné à gauche tant que les constantes restent à 0 ; augmenter
+        /// <see cref="NestedTimelineLayout.IndentPerLevelPx"/> pour une indentation par profondeur.
+        /// </summary>
+        private static class NestedTimelineLayout
+        {
+            /// <summary>Colonne « 01, 02… » sur une ligne racine (<see cref="CreateActionCardWithButtons"/>). Le corps sous la carte (Répéter, branches Si) s’aligne dessous pour que les cartes imbriquées coïncident avec la carte parente.</summary>
+            public const int MainTimelineStepColumnWidthPx = 44;
+            /// <summary>Décalage horizontal cumulé par niveau logique (profondeur × cette valeur).</summary>
+            public const int IndentPerLevelPx = 0;
+            /// <summary>Marge gauche des blocs de contenu imbriqués sans colonne numéro (ex. Si dans Répéter).</summary>
+            public const int BranchBodyMarginLeftPx = 0;
+            /// <summary>Décalage du corps sous un bloc Si/Répéter : à la racine (avec <see cref="MainTimelineStepColumnWidthPx"/>) et à chaque niveau imbriqué (même valeur pour cohérence).</summary>
+            public const int RootNestedBodyExtraInsetPx = 40;
+            /// <summary>Marge gauche des rangées de puces « + action » (0 = aligné sur les cartes quand elles partagent le même wrap).</summary>
+            public const int ChipsRowMarginLeftPx = 0;
+            /// <summary>Marge gauche de l’enveloppe du bandeau Sinon (Si racine).</summary>
+            public const int IfElseBannerWrapMarginLeftPx = 0;
+            /// <summary>Largeur de la colonne du glyphe ↳ (0 = pas de colonne, ligne pleine largeur). <c>readonly</c> évite le warning « code inaccessible » quand la branche ↳ est désactivée.</summary>
+            public static readonly int NestedArrowColumnWidthPx = 0;
+            /// <summary>Espace vertical entre cartes d’actions imbriquées.</summary>
+            public const int NestedActionBottomSpacingPx = 4;
+            public const int ActionsToChipsSpacingPx = 0;
+            /// <summary>Marge/padding bas unifié pour Si, Répéter, Sinon (parents, enfants, corps imbriqué, sauf cas où un parent porte déjà l’espace).</summary>
+            public const int BlockBottomSpacingPx = 4;
+        }
+
+        private static double GetNestedIndent(int nestingDepth) =>
+            Math.Max(0, nestingDepth) * NestedTimelineLayout.IndentPerLevelPx;
+
+        /// <summary>
         /// Branche If (Alors / Sinon Si / Sinon) : même chrome que la carte <see cref="IfAction"/> (fond teinté 5 %,
         /// bordure ext. 35 % accent, hauteur 48px, barre gauche 3px) — seule la couleur d’accent change (pas le rouge Si).
         /// </summary>
@@ -9230,7 +9261,7 @@ namespace MacroEngine.UI
             bodyPanel = new StackPanel
             {
                 Orientation = Orientation.Vertical,
-                Margin = new Thickness(10, 0, 10, 8)
+                Margin = new Thickness(10, 0, 10, NestedTimelineLayout.BlockBottomSpacingPx)
             };
             root.Children.Add(bodyPanel);
 
@@ -9243,25 +9274,21 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateIfActionContainer(IfAction ifAction, int index)
         {
-            // Marge basse modérée : l’espace sous le bloc Sinon est surtout porté par elseActionsWrap (voir fin de méthode).
-            var container = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
+            var container = new StackPanel { Orientation = Orientation.Vertical };
 
             // Ajouter la carte principale de l'action IfAction
             var actionContainer = CreateActionCardWithButtons(ifAction, index);
             container.Children.Add(actionContainer);
 
             // Branche « alors » : actions imbriquées puis chips d’ajout (sous les actions)
-            var thenBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(22, 0, 0, 4) };
+            var rootNestedLeft = NestedTimelineLayout.MainTimelineStepColumnWidthPx + NestedTimelineLayout.BranchBodyMarginLeftPx + NestedTimelineLayout.RootNestedBodyExtraInsetPx;
+            var thenBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(rootNestedLeft, 0, 0, NestedTimelineLayout.BlockBottomSpacingPx) };
             if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
             {
                 var thenContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = new Thickness(0, 0, 0, NestedTimelineLayout.ActionsToChipsSpacingPx)
                 };
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
                 {
@@ -9272,7 +9299,7 @@ namespace MacroEngine.UI
                 thenBranchWrap.Children.Add(thenContainer);
             }
             var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, index, true, -1);
-            addThenActionsPanel.Margin = new Thickness(50, -4, 0, 0);
+            addThenActionsPanel.Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
             thenBranchWrap.Children.Add(addThenActionsPanel);
             container.Children.Add(thenBranchWrap);
 
@@ -9283,14 +9310,14 @@ namespace MacroEngine.UI
                 for (int bi = 0; bi < ifAction.ElseIfBranches.Count; bi++)
                 {
                     var branch = ifAction.ElseIfBranches[bi];
-                    var elseIfBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(22, 0, 0, 4) };
+                    var elseIfBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(rootNestedLeft, 0, 0, NestedTimelineLayout.BlockBottomSpacingPx) };
                     var elseIfSectionBorder = CreateIfBranchSectionChrome(elseIfColor, "SINON SI", new Thickness(0, 0, 0, 0), out var elseIfSection);
                     if (branch.Actions != null && branch.Actions.Count > 0)
                     {
                         var elseIfContainer = new StackPanel
                         {
                             Orientation = Orientation.Vertical,
-                            Margin = new Thickness(0, 0, 0, 4)
+                            Margin = new Thickness(0, 0, 0, NestedTimelineLayout.ActionsToChipsSpacingPx)
                         };
                         for (int i = 0; i < branch.Actions.Count; i++)
                         {
@@ -9300,7 +9327,9 @@ namespace MacroEngine.UI
                         elseIfSection.Children.Add(elseIfContainer);
                     }
                     elseIfBranchWrap.Children.Add(elseIfSectionBorder);
-                    elseIfBranchWrap.Children.Add(CreateAddIfActionsPanel(ifAction, index, false, bi));
+                    var addElseIfActionsPanel = CreateAddIfActionsPanel(ifAction, index, false, bi);
+                    addElseIfActionsPanel.Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
+                    elseIfBranchWrap.Children.Add(addElseIfActionsPanel);
                     container.Children.Add(elseIfBranchWrap);
                 }
             }
@@ -9308,8 +9337,14 @@ namespace MacroEngine.UI
             // Section Sinon
             var elseColor = Color.FromRgb(0xA7, 0x8B, 0xFA);
             // Entête SINON aligné comme le parent SI ; espace au-dessus (SI non imbriqué dans Répéter uniquement).
-            var elseHeaderWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(44, 4, 0, 4) };
-            var elseSectionBorder = CreateIfBranchSectionChrome(elseColor, "SINON", new Thickness(0, 0, 0, 4), out var elseSection);
+            var elseHeaderWrap = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(
+                    NestedTimelineLayout.MainTimelineStepColumnWidthPx + NestedTimelineLayout.IfElseBannerWrapMarginLeftPx,
+                    NestedTimelineLayout.BlockBottomSpacingPx, 0, NestedTimelineLayout.BlockBottomSpacingPx)
+            };
+            var elseSectionBorder = CreateIfBranchSectionChrome(elseColor, "SINON", new Thickness(0, 0, 0, NestedTimelineLayout.BlockBottomSpacingPx), out var elseSection);
             // Le cadre SINON ne contient plus d'actions : retirer le body vide pour éviter une hauteur en trop.
             elseSection.Visibility = Visibility.Collapsed;
 
@@ -9317,13 +9352,13 @@ namespace MacroEngine.UI
             container.Children.Add(elseHeaderWrap);
 
             // Actions SINON : même décalage gauche que la branche SI ; peu de marge sous le bloc (Si non imbriqué).
-            var elseActionsWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(22, 0, 0, 0) };
+            var elseActionsWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(rootNestedLeft, 0, 0, NestedTimelineLayout.BlockBottomSpacingPx) };
             if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
             {
                 var elseContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = new Thickness(0, 0, 0, NestedTimelineLayout.ActionsToChipsSpacingPx)
                 };
 
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
@@ -9335,7 +9370,7 @@ namespace MacroEngine.UI
                 elseActionsWrap.Children.Add(elseContainer);
             }
             var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, index, false, -1);
-            addElseActionsPanel.Margin = new Thickness(50, -4, 0, 0);
+            addElseActionsPanel.Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
             elseActionsWrap.Children.Add(addElseActionsPanel);
             container.Children.Add(elseActionsWrap);
 
@@ -9347,24 +9382,21 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateRepeatActionContainer(RepeatAction ra, int index)
         {
-            var container = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
+            var container = new StackPanel { Orientation = Orientation.Vertical };
 
             // Ajouter la carte principale de l'action RepeatAction
             var actionContainer = CreateActionCardWithButtons(ra, index);
             container.Children.Add(actionContainer);
 
-            // block-body : trait vertical gauche (margin 22 + border 2) pour relier les steps imbriqués
-            var line2Brush = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26));
+            // Corps imbriqué : même retrait que la colonne « 01 » pour aligner les cartes sur la carte Répéter (pas sur le bord du bloc timeline).
             var nestedSectionBorder = new Border
             {
                 Background = Brushes.Transparent,
-                BorderBrush = line2Brush,
-                BorderThickness = new Thickness(2, 0, 0, 0),
-                Margin = new Thickness(22, 0, 0, 4),
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Margin = new Thickness(
+                    NestedTimelineLayout.MainTimelineStepColumnWidthPx + NestedTimelineLayout.BranchBodyMarginLeftPx + NestedTimelineLayout.RootNestedBodyExtraInsetPx,
+                    0, 0, 0),
                 Padding = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
@@ -9376,7 +9408,7 @@ namespace MacroEngine.UI
                 var nestedContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = new Thickness(0, 0, 0, NestedTimelineLayout.ActionsToChipsSpacingPx)
                 };
 
                 for (int i = 0; i < ra.Actions.Count; i++)
@@ -9399,25 +9431,37 @@ namespace MacroEngine.UI
 
         /// <summary>
         /// Crée une carte pour une action imbriquée dans un RepeatAction (niveau racine ou Repeat dans Then/Else d'un If).
-        /// indentLevel: 1 = step-indent (16px), 2 = step-indent-2 (32px).
+        /// indentLevel : profondeur visuelle de la carte.
         /// </summary>
         private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex, int ifActionIndex = -1, bool isThen = false, int nestedRepeatIndex = -1, int indentLevel = 1)
         {
             // Si c'est un IfAction imbriqué, créer le conteneur puis l'imbriquer visuellement (↳ + marge) comme les autres actions
             if (action is IfAction nestedIfAction)
             {
-                var level = (parentIndex >= 0 && _currentMacro != null && parentIndex < _currentMacro.Actions.Count && _currentMacro.Actions[parentIndex] is RepeatAction) ? 2 : 1;
-                var ifContainer = CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex, level);
-                // Même décalage que les autres actions imbriquées (16 px), pour aligner la carte Si avec Clic, Délai, etc.
-                var ifStepIndentPx = 16;
+                var level = Math.Max(1, indentLevel);
+                var ifContainer = CreateNestedIfActionContainer(
+                    nestedIfAction,
+                    parentIndex,
+                    nestedIndex,
+                    level,
+                    ifActionIndex,
+                    isThen,
+                    nestedRepeatIndex);
+                var ifStepIndentPx = GetNestedIndent(level);
+                if (NestedTimelineLayout.NestedArrowColumnWidthPx <= 0)
+                {
+                    ifContainer.Margin = new Thickness(ifStepIndentPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx);
+                    ifContainer.MinWidth = 400;
+                    return ifContainer;
+                }
                 var wrapper = new Grid
                 {
                     VerticalAlignment = VerticalAlignment.Stretch,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
-                    Margin = new Thickness(ifStepIndentPx, 0, 0, 2),
+                    Margin = new Thickness(ifStepIndentPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx),
                     MinWidth = 400
                 };
-                wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+                wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NestedTimelineLayout.NestedArrowColumnWidthPx) });
                 wrapper.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 var ifArrowText = new TextBlock
                 {
@@ -9504,17 +9548,23 @@ namespace MacroEngine.UI
                 }
             }
 
-            // step-indent : colonne ↳ (34px) + carte, padding-left 16px (niveau 1) ou 32px (niveau 2)
-            var stepIndentPx = indentLevel == 2 ? 32 : 16;
+            var stepIndentPx = GetNestedIndent(indentLevel);
+            if (NestedTimelineLayout.NestedArrowColumnWidthPx <= 0)
+            {
+                card.Margin = new Thickness(stepIndentPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx);
+                card.HorizontalAlignment = HorizontalAlignment.Stretch;
+                card.MinWidth = 400;
+                return card;
+            }
             var container = new Grid
             {
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(stepIndentPx, 0, 0, 2),
+                Margin = new Thickness(stepIndentPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx),
                 MinWidth = 400
             };
 
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NestedTimelineLayout.NestedArrowColumnWidthPx) });
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             var arrowText = new TextBlock
@@ -9744,7 +9794,7 @@ namespace MacroEngine.UI
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(50, -4, 0, 8) // Compense la marge basse du dernier bloc d'action
+                Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, NestedTimelineLayout.BlockBottomSpacingPx)
             };
 
             // Chips v2 : bg transparent, border line2, hover amber
@@ -10038,25 +10088,63 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateNestedIfActionCard(IInputAction action, int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex = -1, int indentLevel = 1)
         {
-            // Si c'est un RepeatAction imbriqué, créer un conteneur récursif au lieu d'une simple carte
+            // Si c'est un RepeatAction imbriqué : même décalage + colonne ↳ que les autres actions (Then / Sinon / Sinon si).
             if (action is RepeatAction nestedRepeatAction)
             {
-                return CreateNestedRepeatActionContainer(nestedRepeatAction, parentIndex, nestedIndex, isThen);
-            }
-
-            // Si c'est un IfAction imbriqué (Si dans Then/Else), afficher le bloc complet avec ↳ devant
-            if (action is IfAction nestedIfAction)
-            {
-                var ifContainer = CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex, indentLevel);
-                var stepPx = indentLevel == 2 ? 32 : 16;
+                var repeatContainer = CreateNestedRepeatActionContainer(nestedRepeatAction, parentIndex, nestedIndex, isThen, indentLevel);
+                var repeatStepIndentPx = GetNestedIndent(indentLevel);
+                if (NestedTimelineLayout.NestedArrowColumnWidthPx <= 0)
+                {
+                    repeatContainer.Margin = new Thickness(repeatStepIndentPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx);
+                    repeatContainer.MinWidth = 400;
+                    return repeatContainer;
+                }
                 var wrap = new Grid
                 {
                     VerticalAlignment = VerticalAlignment.Stretch,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
-                    Margin = new Thickness(stepPx, 0, 0, 2),
+                    Margin = new Thickness(repeatStepIndentPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx),
                     MinWidth = 400
                 };
-                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NestedTimelineLayout.NestedArrowColumnWidthPx) });
+                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var arrowRepeat = new TextBlock
+                {
+                    Text = "↳",
+                    FontSize = 11,
+                    Foreground = GetThemeBrush("TextMutedBrush") ?? new SolidColorBrush(Color.FromRgb(0x6A, 0x7A, 0x6A)),
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 8, 0),
+                    Opacity = 0.5
+                };
+                arrowRepeat.SetResourceReference(TextBlock.FontFamilyProperty, "FontDisplay");
+                Grid.SetColumn(arrowRepeat, 0);
+                wrap.Children.Add(arrowRepeat);
+                repeatContainer.HorizontalAlignment = HorizontalAlignment.Stretch;
+                Grid.SetColumn(repeatContainer, 1);
+                wrap.Children.Add(repeatContainer);
+                return wrap;
+            }
+
+            if (action is IfAction nestedIfAction)
+            {
+                var ifContainer = CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex, indentLevel);
+                var stepPx = GetNestedIndent(indentLevel);
+                if (NestedTimelineLayout.NestedArrowColumnWidthPx <= 0)
+                {
+                    ifContainer.Margin = new Thickness(stepPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx);
+                    ifContainer.MinWidth = 400;
+                    return ifContainer;
+                }
+                var wrap = new Grid
+                {
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(stepPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx),
+                    MinWidth = 400
+                };
+                wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NestedTimelineLayout.NestedArrowColumnWidthPx) });
                 wrap.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 var arrow = new TextBlock
                 {
@@ -10132,17 +10220,23 @@ namespace MacroEngine.UI
                 }
             }
 
-            // step-indent : colonne ↳ (34px) + carte, padding-left 16px ou 32px
-            var stepIndentPx = indentLevel == 2 ? 32 : 16;
+            var stepIndentPx = GetNestedIndent(indentLevel);
+            if (NestedTimelineLayout.NestedArrowColumnWidthPx <= 0)
+            {
+                card.Margin = new Thickness(stepIndentPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx);
+                card.HorizontalAlignment = HorizontalAlignment.Stretch;
+                card.MinWidth = 400;
+                return card;
+            }
             var container = new Grid
             {
                 VerticalAlignment = VerticalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(stepIndentPx, 0, 0, 2),
+                Margin = new Thickness(stepIndentPx, 0, 0, NestedTimelineLayout.NestedActionBottomSpacingPx),
                 MinWidth = 400
             };
 
-            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(34) });
+            container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(NestedTimelineLayout.NestedArrowColumnWidthPx) });
             container.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
             var arrowTextIf = new TextBlock
@@ -10169,13 +10263,22 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un panel avec des boutons pour ajouter des actions dans un IfAction (Then ou Else)
         /// </summary>
-        private FrameworkElement CreateAddIfActionsPanel(IfAction ifAction, int ifActionIndex, bool isThen, int elseIfBranchIndex = -1, int repeatActionIndex = -1, int nestedIfIndex = -1)
+        private FrameworkElement CreateAddIfActionsPanel(
+            IfAction ifAction,
+            int ifActionIndex,
+            bool isThen,
+            int elseIfBranchIndex = -1,
+            int repeatActionIndex = -1,
+            int nestedIfIndex = -1,
+            int parentIfActionIndex = -1,
+            bool parentIsThen = false,
+            int parentNestedRepeatIndex = -1)
         {
             var panel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(0, -4, 0, 8)
+                Margin = new Thickness(0, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, NestedTimelineLayout.BlockBottomSpacingPx)
             };
 
             // Chips v2 : bg transparent, border line2, hover amber
@@ -10197,7 +10300,10 @@ namespace MacroEngine.UI
                         IsThen = isThen,
                         ElseIfBranchIndex = elseIfBranchIndex,
                         RepeatActionIndex = repeatActionIndex,
-                        NestedIfIndex = nestedIfIndex
+                        NestedIfIndex = nestedIfIndex,
+                        ParentIfActionIndex = parentIfActionIndex,
+                        ParentIsThen = parentIsThen,
+                        ParentNestedRepeatIndex = parentNestedRepeatIndex
                     }
                 };
                 button.MouseLeftButtonDown += AddActionToIf_Click;
@@ -10480,6 +10586,17 @@ namespace MacroEngine.UI
                 if (_currentMacro.Actions[info.RepeatActionIndex] is not RepeatAction repeatAction) return;
                 if (repeatAction.Actions == null || info.NestedIfIndex >= repeatAction.Actions.Count) return;
                 ifAction = repeatAction.Actions[info.NestedIfIndex] as IfAction;
+            }
+            else if (info.ParentIfActionIndex >= 0 && info.ParentNestedRepeatIndex >= 0 && info.NestedIfIndex >= 0)
+            {
+                // SI imbriqué dans un Répéter qui est lui-même dans Then/Else d'un If.
+                if (info.ParentIfActionIndex >= _currentMacro.Actions.Count) return;
+                if (_currentMacro.Actions[info.ParentIfActionIndex] is not IfAction parentIfAction) return;
+                var parentList = info.ParentIsThen ? parentIfAction.ThenActions : parentIfAction.ElseActions;
+                if (parentList == null || info.ParentNestedRepeatIndex >= parentList.Count) return;
+                if (parentList[info.ParentNestedRepeatIndex] is not RepeatAction nestedRepeatAction) return;
+                if (nestedRepeatAction.Actions == null || info.NestedIfIndex >= nestedRepeatAction.Actions.Count) return;
+                ifAction = nestedRepeatAction.Actions[info.NestedIfIndex] as IfAction;
             }
             else
             {
@@ -11249,72 +11366,99 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un conteneur récursif pour un IfAction imbriqué dans un RepeatAction
         /// </summary>
-        private FrameworkElement CreateNestedIfActionContainer(IfAction ifAction, int repeatActionIndex, int nestedIndex, int indentLevel = 1)
+        private FrameworkElement CreateNestedIfActionContainer(IfAction ifAction, int repeatActionIndex, int nestedIndex, int indentLevel = 1, int parentIfActionIndex = -1, bool parentIsThen = false, int parentNestedRepeatIndex = -1)
         {
-            // Marge basse modérée : moins d’air sous le bloc SINON (voir elseBranchWrap + chips).
-            var container = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(0, 0, 0, 6)
-            };
+            var childIndentLevel = indentLevel + 1;
+            var container = new StackPanel { Orientation = Orientation.Vertical };
 
-            // Créer une carte simple pour l'IfAction (sans boutons monter/descendre car c'est imbriqué)
             var card = CreateActionCard(ifAction, repeatActionIndex);
+            // Pas de marge sous la carte Si : l’espace vers le corps est porté par thenBranchWrap (évite double écart).
+            card.Margin = new Thickness(0, 0, 0, 0);
             container.Children.Add(card);
 
-            // If dans Repeat : actions « alors » puis ajout sous les actions
-            // Peu de marge sous la branche « alors » pour rapprocher le bloc SINON.
-            var thenBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(-10, 0, 0, 12) };
+            var nestedBodyInset = NestedTimelineLayout.RootNestedBodyExtraInsetPx;
+            var thenBranchWrap = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(
+                    nestedBodyInset,
+                    NestedTimelineLayout.BlockBottomSpacingPx,
+                    0,
+                    NestedTimelineLayout.BlockBottomSpacingPx)
+            };
             if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
             {
                 var thenContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 4, 0, 4)
+                    Margin = new Thickness(0, 0, 0, NestedTimelineLayout.ActionsToChipsSpacingPx)
                 };
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
                 {
                     var nestedAction = ifAction.ThenActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, true, -1, 1);
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, true, -1, childIndentLevel);
                     thenContainer.Children.Add(nestedCard);
                 }
                 thenBranchWrap.Children.Add(thenContainer);
             }
-            var addThenNestedPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, true, -1, repeatActionIndex, nestedIndex);
-            addThenNestedPanel.Margin = new Thickness(50, -4, 0, 2);
+            var addThenNestedPanel = CreateAddIfActionsPanel(
+                ifAction, repeatActionIndex, true, -1, repeatActionIndex, nestedIndex,
+                parentIfActionIndex, parentIsThen, parentNestedRepeatIndex);
+            addThenNestedPanel.Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
             thenBranchWrap.Children.Add(addThenNestedPanel);
             container.Children.Add(thenBranchWrap);
 
-            // Section Sinon — If dans Repeat
             var elseColor = Color.FromRgb(0xA7, 0x8B, 0xFA);
-            // Dans Repeat, SINON doit s'aligner comme le titre de la carte SI.
-            // Margin top négatif : moins d’espace au-dessus du bandeau SINON (après les chips « alors »).
-            var elseBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(-8, -6, 0, 0) };
-            // Marge gauche sur le chrome seul : bandeau SINON un peu à droite, actions imbriquées et chips inchangés.
-            var elseSectionBorder = CreateIfBranchSectionChrome(elseColor, "SINON", new Thickness(8, 0, 0, 4), out var elseSection);
-            // Même logique en imbriqué : pas de body vide dans le cadre SINON.
+            var nestedSinonInElseRepeat = parentIfActionIndex >= 0 && !parentIsThen;
+            var elseBranchWrap = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(0, NestedTimelineLayout.BlockBottomSpacingPx, 0, NestedTimelineLayout.BlockBottomSpacingPx)
+            };
+            // Bandeau SINON sans marge bas : l’intervalle vers les actions est sur elseBodyWrap (même logique que Si racine).
+            var elseSinonChromeMargin = new Thickness(0, 0, 0, 0);
+            var elseSectionBorder = CreateIfBranchSectionChrome(elseColor, "SINON", elseSinonChromeMargin, out var elseSection);
             elseSection.Visibility = Visibility.Collapsed;
 
             elseBranchWrap.Children.Add(elseSectionBorder);
+
+            var elseBodyWrap = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(
+                    nestedBodyInset,
+                    NestedTimelineLayout.BlockBottomSpacingPx,
+                    0,
+                    0)
+            };
             if (ifAction.ElseActions != null && ifAction.ElseActions.Count > 0)
             {
                 var elseContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(-2, 4, 0, 4)
+                    Margin = new Thickness(0, 0, 0, NestedTimelineLayout.ActionsToChipsSpacingPx)
                 };
 
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
                 {
                     var nestedAction = ifAction.ElseActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, false, -1, 1);
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, false, -1, childIndentLevel);
                     elseContainer.Children.Add(nestedCard);
                 }
-                elseBranchWrap.Children.Add(elseContainer);
+                elseBodyWrap.Children.Add(elseContainer);
             }
-            var addElseNestedPanel = CreateAddIfActionsPanel(ifAction, repeatActionIndex, false, -1, repeatActionIndex, nestedIndex);
-            addElseNestedPanel.Margin = new Thickness(48, -4, 0, 0);
-            elseBranchWrap.Children.Add(addElseNestedPanel);
+            if (!nestedSinonInElseRepeat)
+            {
+                var addElseNestedPanel = CreateAddIfActionsPanel(
+                    ifAction, repeatActionIndex, false, -1, repeatActionIndex, nestedIndex,
+                    parentIfActionIndex, parentIsThen, parentNestedRepeatIndex);
+                addElseNestedPanel.Margin = new Thickness(
+                    NestedTimelineLayout.ChipsRowMarginLeftPx,
+                    NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
+                elseBodyWrap.Children.Add(addElseNestedPanel);
+            }
+            if (elseBodyWrap.Children.Count > 0)
+                elseBranchWrap.Children.Add(elseBodyWrap);
             container.Children.Add(elseBranchWrap);
 
             return container;
@@ -11323,26 +11467,28 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un conteneur récursif pour un RepeatAction imbriqué dans un IfAction
         /// </summary>
-        private FrameworkElement CreateNestedRepeatActionContainer(RepeatAction repeatAction, int ifActionIndex, int nestedIndex, bool isThen)
+        private FrameworkElement CreateNestedRepeatActionContainer(RepeatAction repeatAction, int ifActionIndex, int nestedIndex, bool isThen, int indentLevel = 1)
         {
-            var container = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(0, 0, 0, 8)
-            };
+            var childIndentLevel = indentLevel + 1;
+            var repeatBodyIndentPx = NestedTimelineLayout.BranchBodyMarginLeftPx + NestedTimelineLayout.RootNestedBodyExtraInsetPx;
+            var container = new StackPanel { Orientation = Orientation.Vertical };
 
             // Créer une carte pour le RepeatAction avec NestedIfActionInfo pour que la croix supprime uniquement ce Repeat (pas tout le If)
             var card = CreateActionCard(repeatAction, ifActionIndex, null, new NestedIfActionInfo { ParentIndex = ifActionIndex, NestedIndex = nestedIndex, IsThen = isThen, ElseIfBranchIndex = -1 });
+            card.Margin = new Thickness(0, 0, 0, 0);
             container.Children.Add(card);
 
-            // block-body : trait vertical gauche (margin 22 + border 2)
-            var line2BrushRepeat = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26));
+            // block-body : marge haute = seul espace sous l’en-tête Répéter (même principe que Si imbriqué).
             var nestedSectionBorder = new Border
             {
                 Background = Brushes.Transparent,
-                BorderBrush = line2BrushRepeat,
-                BorderThickness = new Thickness(2, 0, 0, 0),
-                Margin = new Thickness(22, 0, 0, 4),
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Margin = new Thickness(
+                    repeatBodyIndentPx,
+                    NestedTimelineLayout.BlockBottomSpacingPx,
+                    0,
+                    0),
                 Padding = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
@@ -11354,13 +11500,13 @@ namespace MacroEngine.UI
                 var nestedContainer = new StackPanel
                 {
                     Orientation = Orientation.Vertical,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = new Thickness(0, 0, 0, NestedTimelineLayout.ActionsToChipsSpacingPx)
                 };
 
                 for (int i = 0; i < repeatAction.Actions.Count; i++)
                 {
                     var nestedAction = repeatAction.Actions[i];
-                    var nestedCard = CreateNestedActionCard(nestedAction, -1, i, ifActionIndex, isThen, nestedIndex, indentLevel: 1);
+                    var nestedCard = CreateNestedActionCard(nestedAction, -1, i, ifActionIndex, isThen, nestedIndex, indentLevel: childIndentLevel);
                     nestedContainer.Children.Add(nestedCard);
                 }
                 nestedSection.Children.Add(nestedContainer);
@@ -11432,6 +11578,9 @@ namespace MacroEngine.UI
             public int ElseIfBranchIndex { get; set; } = -1;
             public int RepeatActionIndex { get; set; } = -1;
             public int NestedIfIndex { get; set; } = -1;
+            public int ParentIfActionIndex { get; set; } = -1;
+            public bool ParentIsThen { get; set; }
+            public int ParentNestedRepeatIndex { get; set; } = -1;
         }
 
         #endregion
