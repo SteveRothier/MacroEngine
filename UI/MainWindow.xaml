@@ -116,13 +116,17 @@
         </Style>
     </Window.Resources>
     <!-- Root — fenêtre avec bordure custom (style référence) -->
-    <Border x:Name="RootBorder" Background="#080A08" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1">
+    <Border x:Name="RootBorder" Background="#080A08" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1"
+            ClipToBounds="True">
         <Border.Style>
             <Style TargetType="Border">
+                <!-- Fenêtre (Normal) : coins arrondis. Plein écran / maximisé : pas de rayon (bords nets, alignés à la zone de travail). -->
                 <Setter Property="Margin" Value="0"/>
+                <Setter Property="CornerRadius" Value="10"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
-                        <Setter Property="Margin" Value="7"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="CornerRadius" Value="0"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>

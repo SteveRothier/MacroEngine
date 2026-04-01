@@ -126,7 +126,7 @@ namespace MacroEngine.UI
             var chrome = new WindowChrome
             {
                 CaptionHeight = 36,
-                ResizeBorderThickness = new Thickness(5),
+                ResizeBorderThickness = WindowState == WindowState.Maximized ? new Thickness(0) : new Thickness(5),
                 GlassFrameThickness = new Thickness(0),
                 UseAeroCaptionButtons = false
             };
@@ -4939,7 +4939,96 @@ namespace MacroEngine.UI
         {
             base.OnStateChanged(e);
             UpdateMaximizeButtonContent();
+            // Évite un léger décalage / bande vide autour de la fenêtre en maximisé avec WindowChrome.
+            if (WindowChrome.GetWindowChrome(this) is { } chrome)
+                chrome.ResizeBorderThickness = WindowState == WindowState.Maximized ? new Thickness(0) : new Thickness(5);
         }
+
+        /// <summary>
+        /// Avec <see cref="WindowStyle.None"/>, le mode maximisé couvre tout l’écran physique (barre des tâches comprise).
+        /// On force la taille/position max sur la zone de travail du moniteur qui contient la fenêtre.
+        /// </summary>
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+            var handle = new WindowInteropHelper(this).Handle;
+            if (handle == IntPtr.Zero) return;
+            var source = HwndSource.FromHwnd(handle);
+            source?.AddHook(MaximizedToWorkAreaHook);
+        }
+
+        private IntPtr MaximizedToWorkAreaHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            const int WM_GETMINMAXINFO = 0x0024;
+            if (msg != WM_GETMINMAXINFO) return IntPtr.Zero;
+
+            if (!TryApplyWorkAreaToMinMaxInfo(hwnd, lParam)) return IntPtr.Zero;
+
+            // Laisser le défaut traiter le message après notre écriture dans *lParam.
+            handled = false;
+            return IntPtr.Zero;
+        }
+
+        private static bool TryApplyWorkAreaToMinMaxInfo(IntPtr hwnd, IntPtr lParam)
+        {
+            var mmi = Marshal.PtrToStructure<MinMaxInfoNative>(lParam);
+            const uint MONITOR_DEFAULTTONEAREST = 2;
+            var monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            if (monitor == IntPtr.Zero) return false;
+
+            var mi = new MonitorInfoNative { cbSize = Marshal.SizeOf<MonitorInfoNative>() };
+            if (!GetMonitorInfo(monitor, ref mi)) return false;
+
+            var work = mi.rcWork;
+            var mon = mi.rcMonitor;
+            mmi.ptMaxPosition.X = work.Left - mon.Left;
+            mmi.ptMaxPosition.Y = work.Top - mon.Top;
+            mmi.ptMaxSize.X = work.Right - work.Left;
+            mmi.ptMaxSize.Y = work.Bottom - work.Top;
+            Marshal.StructureToPtr(mmi, lParam, true);
+            return true;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct PointNative
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MinMaxInfoNative
+        {
+            public PointNative ptReserved;
+            public PointNative ptMaxSize;
+            public PointNative ptMaxPosition;
+            public PointNative ptMinTrackSize;
+            public PointNative ptMaxTrackSize;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RectNative
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct MonitorInfoNative
+        {
+            public int cbSize;
+            public RectNative rcMonitor;
+            public RectNative rcWork;
+            public uint dwFlags;
+        }
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfoNative lpmi);
     }
 
     /// <summary>
