@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -1050,16 +1050,15 @@ namespace MacroEngine.UI
             buttonStrip.Children.Add(settingsBtn);
             buttonStrip.Children.Add(new Rectangle { Width = 1, Height = 24, Fill = lineBrush, Margin = new Thickness(0), VerticalAlignment = VerticalAlignment.Center });
             bool canMoveUp = false, canMoveDown = false;
-            if (nestedRepeatInfo != null && _currentMacro != null && nestedRepeatInfo.ParentIndex >= 0 && nestedRepeatInfo.ParentIndex < _currentMacro.Actions.Count && _currentMacro.Actions[nestedRepeatInfo.ParentIndex] is RepeatAction raN)
+            if (nestedRepeatInfo != null && _currentMacro != null && TryGetRepeatAndIndexFromNestedInfo(nestedRepeatInfo, out var raN, out var niRep) && raN?.Actions != null)
             {
-                canMoveUp = nestedRepeatInfo.NestedIndex > 0;
-                canMoveDown = raN.Actions != null && nestedRepeatInfo.NestedIndex < raN.Actions.Count - 1;
+                canMoveUp = niRep > 0;
+                canMoveDown = niRep < raN.Actions.Count - 1;
             }
-            else if (nestedIfInfo != null && _currentMacro != null && nestedIfInfo.ParentIndex >= 0 && nestedIfInfo.ParentIndex < _currentMacro.Actions.Count && _currentMacro.Actions[nestedIfInfo.ParentIndex] is IfAction ifN)
+            else if (nestedIfInfo != null && _currentMacro != null && TryResolveNestedIfBranchList(nestedIfInfo, out _, out var listIf) && listIf != null)
             {
-                var list = nestedIfInfo.IsThen ? ifN.ThenActions : (nestedIfInfo.ElseIfBranchIndex >= 0 ? ifN.ElseIfBranches?[nestedIfInfo.ElseIfBranchIndex].Actions : ifN.ElseActions);
-                canMoveUp = list != null && nestedIfInfo.NestedIndex > 0;
-                canMoveDown = list != null && nestedIfInfo.NestedIndex < list.Count - 1;
+                canMoveUp = nestedIfInfo.NestedIndex > 0;
+                canMoveDown = nestedIfInfo.NestedIndex < listIf.Count - 1;
             }
             else if (nestedRepeatInfo == null && nestedIfInfo == null && _currentMacro != null)
             {
@@ -1075,8 +1074,8 @@ namespace MacroEngine.UI
             }
             else if (nestedIfInfo != null)
             {
-                upBtn.MouseLeftButtonDown += (s, e) => { if (canMoveUp) { MoveNestedIfActionUp(nestedIfInfo.ParentIndex, nestedIfInfo.NestedIndex, nestedIfInfo.IsThen); e.Handled = true; } };
-                downBtn.MouseLeftButtonDown += (s, e) => { if (canMoveDown) { MoveNestedIfActionDown(nestedIfInfo.ParentIndex, nestedIfInfo.NestedIndex, nestedIfInfo.IsThen); e.Handled = true; } };
+                upBtn.MouseLeftButtonDown += (s, e) => { if (canMoveUp) { MoveNestedIfActionUp(nestedIfInfo); e.Handled = true; } };
+                downBtn.MouseLeftButtonDown += (s, e) => { if (canMoveDown) { MoveNestedIfActionDown(nestedIfInfo); e.Handled = true; } };
             }
             else
             {
@@ -9209,6 +9208,147 @@ namespace MacroEngine.UI
         private static double GetNestedIndent(int nestingDepth) =>
             Math.Max(0, nestingDepth) * NestedTimelineLayout.IndentPerLevelPx;
 
+        private enum ChipNavOp : byte
+        {
+            MacroRootChild = 0,
+            RepeatChild = 1,
+            IfThenChild = 2,
+            IfElseChild = 3,
+            IfElseIfChild = 4,
+        }
+
+        private readonly struct ChipNavStep
+        {
+            public ChipNavOp Op { get; }
+            public int A { get; }
+            public int B { get; }
+
+            public ChipNavStep(ChipNavOp op, int a = 0, int b = 0)
+            {
+                Op = op;
+                A = a;
+                B = b;
+            }
+        }
+
+        /// <summary>
+        /// Nombre maximal de niveaux d’imbrication (chaque pas du chemin après l’action racine) pour lesquels les puces
+        /// « Répéter » / « Si » restent proposées. À partir de ce niveau, seules les autres actions (touche, clic, etc.) sont offertes.
+        /// </summary>
+        private const int MaxNestingDepthForRepeatOrIfChips = 8;
+
+        private static int GetChipPathNestingDepth(IReadOnlyList<ChipNavStep> path) =>
+            Math.Max(0, path.Count - 1);
+
+        private static bool ShouldShowRepeatOrIfChips(IReadOnlyList<ChipNavStep> path) =>
+            GetChipPathNestingDepth(path) < MaxNestingDepthForRepeatOrIfChips;
+
+        private static List<ChipNavStep> CloneChipPath(IReadOnlyList<ChipNavStep>? path)
+        {
+            if (path == null || path.Count == 0) return new List<ChipNavStep>();
+            var copy = new List<ChipNavStep>(path.Count);
+            for (int i = 0; i < path.Count; i++) copy.Add(path[i]);
+            return copy;
+        }
+
+        private static List<ChipNavStep> MacroRootChipPath(int macroIndex) =>
+            new List<ChipNavStep> { new ChipNavStep(ChipNavOp.MacroRootChild, macroIndex, 0) };
+
+        private static void AppendRepeatChildPath(List<ChipNavStep> path, int childIndex) =>
+            path.Add(new ChipNavStep(ChipNavOp.RepeatChild, childIndex, 0));
+
+        private static void AppendIfThenChildPath(List<ChipNavStep> path, int childIndex) =>
+            path.Add(new ChipNavStep(ChipNavOp.IfThenChild, childIndex, 0));
+
+        private static void AppendIfElseChildPath(List<ChipNavStep> path, int childIndex) =>
+            path.Add(new ChipNavStep(ChipNavOp.IfElseChild, childIndex, 0));
+
+        private static void AppendIfElseIfChildPath(List<ChipNavStep> path, int branchIndex, int childIndexInBranch) =>
+            path.Add(new ChipNavStep(ChipNavOp.IfElseIfChild, branchIndex, childIndexInBranch));
+
+        private static void AppendIfBranchChildPath(List<ChipNavStep> path, bool isThen, int elseIfBranchIndex, int childIndexInList)
+        {
+            if (elseIfBranchIndex >= 0)
+                AppendIfElseIfChildPath(path, elseIfBranchIndex, childIndexInList);
+            else if (isThen)
+                AppendIfThenChildPath(path, childIndexInList);
+            else
+                AppendIfElseChildPath(path, childIndexInList);
+        }
+
+        private static bool TryNavigateChipPath(IList<IInputAction> rootList, IReadOnlyList<ChipNavStep> steps, out IInputAction? target)
+        {
+            target = null;
+            if (steps == null || steps.Count == 0) return false;
+            if (steps[0].Op != ChipNavOp.MacroRootChild) return false;
+            if (steps[0].A < 0 || steps[0].A >= rootList.Count) return false;
+            IInputAction cur = rootList[steps[0].A];
+            for (int i = 1; i < steps.Count; i++)
+            {
+                var st = steps[i];
+                switch (st.Op)
+                {
+                    case ChipNavOp.RepeatChild:
+                        if (cur is not RepeatAction rep || rep.Actions == null || st.A < 0 || st.A >= rep.Actions.Count) return false;
+                        cur = rep.Actions[st.A];
+                        break;
+                    case ChipNavOp.IfThenChild:
+                        if (cur is not IfAction iff || iff.ThenActions == null || st.A < 0 || st.A >= iff.ThenActions.Count) return false;
+                        cur = iff.ThenActions[st.A];
+                        break;
+                    case ChipNavOp.IfElseChild:
+                        if (cur is not IfAction iff2 || iff2.ElseActions == null || st.A < 0 || st.A >= iff2.ElseActions.Count) return false;
+                        cur = iff2.ElseActions[st.A];
+                        break;
+                    case ChipNavOp.IfElseIfChild:
+                        if (cur is not IfAction iff3 || iff3.ElseIfBranches == null || st.A < 0 || st.A >= iff3.ElseIfBranches.Count) return false;
+                        var br = iff3.ElseIfBranches[st.A];
+                        if (br.Actions == null || st.B < 0 || st.B >= br.Actions.Count) return false;
+                        cur = br.Actions[st.B];
+                        break;
+                    default:
+                        return false;
+                }
+            }
+            target = cur;
+            return true;
+        }
+
+        private bool TryResolveNestedIfBranchList(NestedIfActionInfo info, out IfAction? ifAction, out IList<IInputAction>? list)
+        {
+            ifAction = null;
+            list = null;
+            if (_currentMacro == null) return false;
+
+            if (info.PathToIf != null && info.PathToIf.Count > 0)
+            {
+                if (!TryNavigateChipPath(_currentMacro.Actions, info.PathToIf, out var node) || node is not IfAction iff)
+                    return false;
+                ifAction = iff;
+                if (info.ElseIfBranchIndex >= 0)
+                {
+                    if (iff.ElseIfBranches == null || info.ElseIfBranchIndex >= iff.ElseIfBranches.Count) return false;
+                    var br = iff.ElseIfBranches[info.ElseIfBranchIndex];
+                    list = br.Actions;
+                    return list != null;
+                }
+                list = info.IsThen ? iff.ThenActions : iff.ElseActions;
+                return list != null;
+            }
+
+            if (info.ParentIndex < 0 || info.ParentIndex >= _currentMacro.Actions.Count) return false;
+            if (_currentMacro.Actions[info.ParentIndex] is not IfAction iff0) return false;
+            ifAction = iff0;
+            if (info.ElseIfBranchIndex >= 0)
+            {
+                if (iff0.ElseIfBranches == null || info.ElseIfBranchIndex >= iff0.ElseIfBranches.Count) return false;
+                list = iff0.ElseIfBranches[info.ElseIfBranchIndex].Actions;
+                return list != null;
+            }
+            list = info.IsThen ? iff0.ThenActions : iff0.ElseActions;
+            return list != null;
+        }
+
         /// <summary>
         /// Branche If (Alors / Sinon Si / Sinon) : même chrome que la carte <see cref="IfAction"/> (fond teinté 5 %,
         /// bordure ext. 35 % accent, hauteur 48px, barre gauche 3px) — seule la couleur d’accent change (pas le rouge Si).
@@ -9283,6 +9423,7 @@ namespace MacroEngine.UI
             // Branche « alors » : actions imbriquées puis chips d’ajout (sous les actions)
             var rootNestedLeft = NestedTimelineLayout.MainTimelineStepColumnWidthPx + NestedTimelineLayout.BranchBodyMarginLeftPx + NestedTimelineLayout.RootNestedBodyExtraInsetPx;
             var thenBranchWrap = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(rootNestedLeft, 0, 0, NestedTimelineLayout.BlockBottomSpacingPx) };
+            var pathToRootIf = MacroRootChipPath(index);
             if (ifAction.ThenActions != null && ifAction.ThenActions.Count > 0)
             {
                 var thenContainer = new StackPanel
@@ -9293,12 +9434,12 @@ namespace MacroEngine.UI
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
                 {
                     var nestedAction = ifAction.ThenActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, index, i, true);
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, pathToRootIf, i, true, -1);
                     thenContainer.Children.Add(nestedCard);
                 }
                 thenBranchWrap.Children.Add(thenContainer);
             }
-            var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, index, true, -1);
+            var addThenActionsPanel = CreateAddIfActionsPanel(ifAction, pathToRootIf, true, -1);
             addThenActionsPanel.Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
             thenBranchWrap.Children.Add(addThenActionsPanel);
             container.Children.Add(thenBranchWrap);
@@ -9321,13 +9462,13 @@ namespace MacroEngine.UI
                         };
                         for (int i = 0; i < branch.Actions.Count; i++)
                         {
-                            var nestedCard = CreateNestedIfActionCard(branch.Actions[i], index, i, false, bi);
+                            var nestedCard = CreateNestedIfActionCard(branch.Actions[i], pathToRootIf, i, false, bi);
                             elseIfContainer.Children.Add(nestedCard);
                         }
                         elseIfSection.Children.Add(elseIfContainer);
                     }
                     elseIfBranchWrap.Children.Add(elseIfSectionBorder);
-                    var addElseIfActionsPanel = CreateAddIfActionsPanel(ifAction, index, false, bi);
+                    var addElseIfActionsPanel = CreateAddIfActionsPanel(ifAction, pathToRootIf, false, bi);
                     addElseIfActionsPanel.Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
                     elseIfBranchWrap.Children.Add(addElseIfActionsPanel);
                     container.Children.Add(elseIfBranchWrap);
@@ -9364,12 +9505,12 @@ namespace MacroEngine.UI
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
                 {
                     var nestedAction = ifAction.ElseActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, index, i, false); // false = Else
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, pathToRootIf, i, false, -1); // false = Else
                     elseContainer.Children.Add(nestedCard);
                 }
                 elseActionsWrap.Children.Add(elseContainer);
             }
-            var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, index, false, -1);
+            var addElseActionsPanel = CreateAddIfActionsPanel(ifAction, pathToRootIf, false, -1);
             addElseActionsPanel.Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
             elseActionsWrap.Children.Add(addElseActionsPanel);
             container.Children.Add(elseActionsWrap);
@@ -9402,6 +9543,7 @@ namespace MacroEngine.UI
             };
 
             var nestedSection = new StackPanel { Orientation = Orientation.Vertical };
+            var pathToRootRepeat = MacroRootChipPath(index);
 
             if (ra.Actions != null && ra.Actions.Count > 0)
             {
@@ -9414,13 +9556,13 @@ namespace MacroEngine.UI
                 for (int i = 0; i < ra.Actions.Count; i++)
                 {
                     var nestedAction = ra.Actions[i];
-                    var nestedCard = CreateNestedActionCard(nestedAction, index, i, indentLevel: 1);
+                    var nestedCard = CreateNestedActionCard(nestedAction, pathToRootRepeat, i, indentLevel: 1);
                     nestedContainer.Children.Add(nestedCard);
                 }
                 nestedSection.Children.Add(nestedContainer);
             }
 
-            var addActionsPanel = CreateAddActionsPanel(ra, index);
+            var addActionsPanel = CreateAddActionsPanel(ra, pathToRootRepeat);
             nestedSection.Children.Add(addActionsPanel);
             
             nestedSectionBorder.Child = nestedSection;
@@ -9432,21 +9574,19 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée une carte pour une action imbriquée dans un RepeatAction (niveau racine ou Repeat dans Then/Else d'un If).
         /// indentLevel : profondeur visuelle de la carte.
+        /// suppressNestedSiElseChips : masque les puces « ajouter » sur la branche Sinon d’un Si imbriqué (Répéter placé dans le Sinon d’un ancêtre Si).
         /// </summary>
-        private FrameworkElement CreateNestedActionCard(IInputAction action, int parentIndex, int nestedIndex, int ifActionIndex = -1, bool isThen = false, int nestedRepeatIndex = -1, int indentLevel = 1)
+        private FrameworkElement CreateNestedActionCard(IInputAction action, List<ChipNavStep> pathToContainingRepeat, int nestedIndex, int indentLevel = 1, bool suppressNestedSiElseChips = false)
         {
+            ArgumentNullException.ThrowIfNull(pathToContainingRepeat);
+
             // Si c'est un IfAction imbriqué, créer le conteneur puis l'imbriquer visuellement (↳ + marge) comme les autres actions
             if (action is IfAction nestedIfAction)
             {
                 var level = Math.Max(1, indentLevel);
-                var ifContainer = CreateNestedIfActionContainer(
-                    nestedIfAction,
-                    parentIndex,
-                    nestedIndex,
-                    level,
-                    ifActionIndex,
-                    isThen,
-                    nestedRepeatIndex);
+                var pathToThisIf = CloneChipPath(pathToContainingRepeat);
+                AppendRepeatChildPath(pathToThisIf, nestedIndex);
+                var ifContainer = CreateNestedIfActionContainer(nestedIfAction, pathToThisIf, level, suppressNestedSiElseChips);
                 var ifStepIndentPx = GetNestedIndent(level);
                 if (NestedTimelineLayout.NestedArrowColumnWidthPx <= 0)
                 {
@@ -9482,12 +9622,15 @@ namespace MacroEngine.UI
                 return wrapper;
             }
 
-            var info = ifActionIndex >= 0
-                ? new NestedActionInfo { ParentIndex = -1, NestedIndex = nestedIndex, IfActionIndex = ifActionIndex, IsThen = isThen, NestedRepeatIndex = nestedRepeatIndex }
-                : new NestedActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex };
+            var info = new NestedActionInfo
+            {
+                PathToRepeat = CloneChipPath(pathToContainingRepeat),
+                ParentIndex = -1,
+                NestedIndex = nestedIndex
+            };
 
             // Créer la carte visuelle avec CreateActionCard (croix = supprimer cette action imbriquée uniquement)
-            var card = CreateActionCard(action, parentIndex, info, null);
+            var card = CreateActionCard(action, pathToContainingRepeat[0].A, info, null);
             
             // Trouver le TextBlock titleBlock et ajouter les handlers d'édition appropriés
             var titleBlock = FindTitleBlockInCard(card);
@@ -9530,7 +9673,7 @@ namespace MacroEngine.UI
                     if (textPanel != null)
                     {
                         textPanel.Children.Remove(titleBlock);
-                        var indexForControls = info.IfActionIndex >= 0 ? info.IfActionIndex : info.ParentIndex;
+                        var indexForControls = info.PathToRepeat != null && info.PathToRepeat.Count > 0 ? info.PathToRepeat[0].A : info.ParentIndex;
                         var textControlsPanel = CreateTextActionControls((TextAction)action, indexForControls, textPanel);
                         textPanel.Children.Insert(0, textControlsPanel);
                     }
@@ -9541,7 +9684,7 @@ namespace MacroEngine.UI
                     if (textPanel != null)
                     {
                         textPanel.Children.Remove(titleBlock);
-                        var indexForControls = info.IfActionIndex >= 0 ? info.IfActionIndex : info.ParentIndex;
+                        var indexForControls = info.PathToRepeat != null && info.PathToRepeat.Count > 0 ? info.PathToRepeat[0].A : info.ParentIndex;
                         var variableControlsPanel = CreateVariableActionControls(vaNested, indexForControls, textPanel);
                         textPanel.Children.Insert(0, variableControlsPanel);
                     }
@@ -9788,8 +9931,10 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée un panel avec des boutons pour ajouter des actions dans un RepeatAction (niveau racine ou imbriqué dans If).
         /// </summary>
-        private FrameworkElement CreateAddActionsPanel(RepeatAction ra, int repeatActionIndex, int ifActionIndex = -1, bool isThen = false, int nestedRepeatIndex = -1)
+        private FrameworkElement CreateAddActionsPanel(RepeatAction ra, List<ChipNavStep> pathToRepeat)
         {
+            ArgumentNullException.ThrowIfNull(pathToRepeat);
+
             var panel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -9797,16 +9942,15 @@ namespace MacroEngine.UI
                 Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, NestedTimelineLayout.BlockBottomSpacingPx)
             };
 
+            var pathTag = CloneChipPath(pathToRepeat);
+
             // Chips v2 : bg transparent, border line2, hover amber
             Func<string, string, IInputAction, Border> createAddButton = (iconGlyph, text, actionInstance) =>
             {
                 var tag = new RepeatActionInfo
                 {
-                    RepeatActionIndex = ifActionIndex >= 0 ? -1 : repeatActionIndex,
-                    ActionType = actionInstance.Type.ToString(),
-                    IfActionIndex = ifActionIndex,
-                    IsThen = isThen,
-                    NestedRepeatIndex = nestedRepeatIndex
+                    PathToRepeat = CloneChipPath(pathTag),
+                    ActionType = actionInstance.Type.ToString()
                 };
                 var button = new Border
                 {
@@ -9900,7 +10044,8 @@ namespace MacroEngine.UI
             panel.Children.Add(createAddButton("\uE0CC", "Texte", new TextAction()));
             panel.Children.Add(createAddButton("\uE36A", "Variable", new VariableAction()));
             panel.Children.Add(createAddButton("\uE1E0", "Délai", new DelayAction()));
-            panel.Children.Add(createAddButton("\uE440", "Si", new IfAction()));
+            if (ShouldShowRepeatOrIfChips(pathToRepeat))
+                panel.Children.Add(createAddButton("\uE440", "Si", new IfAction()));
 
             return panel;
         }
@@ -9916,21 +10061,11 @@ namespace MacroEngine.UI
             if (button?.Tag is not RepeatActionInfo info) return;
 
             RepeatAction? repeatAction = null;
-            if (info.IfActionIndex >= 0)
+            if (info.PathToRepeat != null && info.PathToRepeat.Count > 0)
             {
-                // Repeat imbriqué dans le Then/Else d'un If
-                if (info.IfActionIndex >= _currentMacro.Actions.Count) return;
-                if (_currentMacro.Actions[info.IfActionIndex] is not IfAction ifAction) return;
-                var list = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
-                if (list == null || info.NestedRepeatIndex < 0 || info.NestedRepeatIndex >= list.Count) return;
-                repeatAction = list[info.NestedRepeatIndex] as RepeatAction;
-            }
-            else
-            {
-                // Repeat au niveau racine
-                var repeatActionIndex = info.RepeatActionIndex;
-                if (repeatActionIndex < 0 || repeatActionIndex >= _currentMacro.Actions.Count) return;
-                repeatAction = _currentMacro.Actions[repeatActionIndex] as RepeatAction;
+                if (!TryNavigateChipPath(_currentMacro.Actions, info.PathToRepeat, out var node) || node is not RepeatAction rep)
+                    return;
+                repeatAction = rep;
             }
 
             if (repeatAction == null) return;
@@ -10044,14 +10179,22 @@ namespace MacroEngine.UI
             repeatAction = null;
             if (_currentMacro == null) return false;
 
+            if (info.PathToRepeat != null && info.PathToRepeat.Count > 0)
+            {
+                if (!TryNavigateChipPath(_currentMacro.Actions, info.PathToRepeat, out var node) || node is not RepeatAction rep)
+                    return false;
+                repeatAction = rep;
+                return true;
+            }
+
             if (info.IfActionIndex >= 0)
             {
                 if (info.IfActionIndex >= _currentMacro.Actions.Count) return false;
                 if (_currentMacro.Actions[info.IfActionIndex] is not IfAction ifAction) return false;
                 var list = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
                 if (list == null || info.NestedRepeatIndex < 0 || info.NestedRepeatIndex >= list.Count) return false;
-                if (list[info.NestedRepeatIndex] is not RepeatAction rep) return false;
-                repeatAction = rep;
+                if (list[info.NestedRepeatIndex] is not RepeatAction rep2) return false;
+                repeatAction = rep2;
                 return true;
             }
             if (info.ParentIndex < 0 || info.ParentIndex >= _currentMacro.Actions.Count) return false;
@@ -10086,12 +10229,16 @@ namespace MacroEngine.UI
         /// <summary>
         /// Crée une carte pour une action imbriquée dans un IfAction (Then, Else If ou Else). elseIfBranchIndex &lt; 0 = Then ou Else.
         /// </summary>
-        private FrameworkElement CreateNestedIfActionCard(IInputAction action, int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex = -1, int indentLevel = 1)
+        private FrameworkElement CreateNestedIfActionCard(IInputAction action, List<ChipNavStep> pathToParentIf, int childIndexInBranch, bool isThen, int elseIfBranchIndex = -1, int indentLevel = 1)
         {
+            var pathToChild = CloneChipPath(pathToParentIf);
+            AppendIfBranchChildPath(pathToChild, isThen, elseIfBranchIndex, childIndexInBranch);
+            var repeatInPureElseBranch = !isThen && elseIfBranchIndex < 0;
+
             // Si c'est un RepeatAction imbriqué : même décalage + colonne ↳ que les autres actions (Then / Sinon / Sinon si).
             if (action is RepeatAction nestedRepeatAction)
             {
-                var repeatContainer = CreateNestedRepeatActionContainer(nestedRepeatAction, parentIndex, nestedIndex, isThen, indentLevel);
+                var repeatContainer = CreateNestedRepeatActionContainer(nestedRepeatAction, pathToChild, repeatInPureElseBranch, indentLevel);
                 var repeatStepIndentPx = GetNestedIndent(indentLevel);
                 if (NestedTimelineLayout.NestedArrowColumnWidthPx <= 0)
                 {
@@ -10129,7 +10276,7 @@ namespace MacroEngine.UI
 
             if (action is IfAction nestedIfAction)
             {
-                var ifContainer = CreateNestedIfActionContainer(nestedIfAction, parentIndex, nestedIndex, indentLevel);
+                var ifContainer = CreateNestedIfActionContainer(nestedIfAction, pathToChild, indentLevel, repeatInPureElseBranch);
                 var stepPx = GetNestedIndent(indentLevel);
                 if (NestedTimelineLayout.NestedArrowColumnWidthPx <= 0)
                 {
@@ -10165,7 +10312,17 @@ namespace MacroEngine.UI
                 return wrap;
             }
 
-            var card = CreateActionCard(action, parentIndex, null, new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen, ElseIfBranchIndex = elseIfBranchIndex });
+            var pathToIfForCard = CloneChipPath(pathToParentIf);
+            var macroIdxForCard = pathToIfForCard.Count > 0 ? pathToIfForCard[0].A : -1;
+            var nestedIfCtx = new NestedIfActionInfo
+            {
+                PathToIf = pathToIfForCard,
+                ParentIndex = macroIdxForCard,
+                NestedIndex = childIndexInBranch,
+                IsThen = isThen,
+                ElseIfBranchIndex = elseIfBranchIndex
+            };
+            var card = CreateActionCard(action, macroIdxForCard, null, nestedIfCtx);
             
             var titleBlock = FindTitleBlockInCard(card);
             if (titleBlock != null)
@@ -10176,7 +10333,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedIfKeyboardAction(parentIndex, nestedIndex, isThen, elseIfBranchIndex, titleBlock);
+                        EditNestedIfKeyboardAction(nestedIfCtx, titleBlock);
                     };
                 }
                 else if (action is DelayAction)
@@ -10185,7 +10342,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedIfDelayAction(parentIndex, nestedIndex, isThen, elseIfBranchIndex, titleBlock);
+                        EditNestedIfDelayAction(nestedIfCtx, titleBlock);
                     };
                 }
                 else if (action is Core.Inputs.MouseAction)
@@ -10194,7 +10351,7 @@ namespace MacroEngine.UI
                     titleBlock.PreviewMouseLeftButtonDown += (s, e) =>
                     {
                         e.Handled = true;
-                        EditNestedIfMouseAction(parentIndex, nestedIndex, isThen, elseIfBranchIndex, titleBlock);
+                        EditNestedIfMouseAction(nestedIfCtx, titleBlock);
                     };
                 }
                 else if (action is TextAction)
@@ -10204,7 +10361,7 @@ namespace MacroEngine.UI
                     if (textPanel != null)
                     {
                         textPanel.Children.Remove(titleBlock);
-                        var textControlsPanel = CreateTextActionControls((TextAction)action, parentIndex, textPanel);
+                        var textControlsPanel = CreateTextActionControls((TextAction)action, macroIdxForCard, textPanel);
                         textPanel.Children.Insert(0, textControlsPanel);
                     }
                 }
@@ -10214,7 +10371,7 @@ namespace MacroEngine.UI
                     if (textPanel != null)
                     {
                         textPanel.Children.Remove(titleBlock);
-                        var variableControlsPanel = CreateVariableActionControls(vaIfNested, parentIndex, textPanel);
+                        var variableControlsPanel = CreateVariableActionControls(vaIfNested, macroIdxForCard, textPanel);
                         textPanel.Children.Insert(0, variableControlsPanel);
                     }
                 }
@@ -10265,21 +10422,21 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateAddIfActionsPanel(
             IfAction ifAction,
-            int ifActionIndex,
+            List<ChipNavStep> pathToIf,
             bool isThen,
-            int elseIfBranchIndex = -1,
-            int repeatActionIndex = -1,
-            int nestedIfIndex = -1,
-            int parentIfActionIndex = -1,
-            bool parentIsThen = false,
-            int parentNestedRepeatIndex = -1)
+            int elseIfBranchIndex = -1)
         {
+            ArgumentNullException.ThrowIfNull(pathToIf);
+
             var panel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, NestedTimelineLayout.BlockBottomSpacingPx)
             };
+
+            var pathTag = CloneChipPath(pathToIf);
+            var allowRepeatOrIfChips = ShouldShowRepeatOrIfChips(pathToIf);
 
             // Chips v2 : bg transparent, border line2, hover amber
             Func<string, string, IInputAction, Border> createAddButton = (iconGlyph, text, actionInstance) =>
@@ -10295,15 +10452,10 @@ namespace MacroEngine.UI
                     BorderBrush = new SolidColorBrush(Color.FromRgb(0x26, 0x2D, 0x26)),
                     Tag = new IfActionInfo
                     {
-                        IfActionIndex = ifActionIndex,
+                        PathToIf = CloneChipPath(pathTag),
                         ActionType = actionInstance.Type.ToString(),
                         IsThen = isThen,
-                        ElseIfBranchIndex = elseIfBranchIndex,
-                        RepeatActionIndex = repeatActionIndex,
-                        NestedIfIndex = nestedIfIndex,
-                        ParentIfActionIndex = parentIfActionIndex,
-                        ParentIsThen = parentIsThen,
-                        ParentNestedRepeatIndex = parentNestedRepeatIndex
+                        ElseIfBranchIndex = elseIfBranchIndex
                     }
                 };
                 button.MouseLeftButtonDown += AddActionToIf_Click;
@@ -10387,7 +10539,8 @@ namespace MacroEngine.UI
             panel.Children.Add(createAddButton("\uE0CC", "Texte", new TextAction()));
             panel.Children.Add(createAddButton("\uE36A", "Variable", new VariableAction()));
             panel.Children.Add(createAddButton("\uE1E0", "Délai", new DelayAction()));
-            panel.Children.Add(createAddButton("\uE411", "Répéter", new RepeatAction()));
+            if (allowRepeatOrIfChips)
+                panel.Children.Add(createAddButton("\uE411", "Répéter", new RepeatAction()));
 
             return panel;
         }
@@ -10426,20 +10579,21 @@ namespace MacroEngine.UI
                 Visibility = Visibility.Visible
             };
 
+            var moveCtx = new NestedIfActionInfo
+            {
+                PathToIf = MacroRootChipPath(parentIndex),
+                ParentIndex = parentIndex,
+                NestedIndex = nestedIndex,
+                IsThen = isThen,
+                ElseIfBranchIndex = elseIfBranchIndex
+            };
+
             bool canMoveUp = false;
             bool canMoveDown = false;
-
-            if (_currentMacro != null && parentIndex >= 0 && parentIndex < _currentMacro.Actions.Count)
+            if (_currentMacro != null && TryResolveNestedIfBranchList(moveCtx, out _, out var moveList) && moveList != null)
             {
-                if (_currentMacro.Actions[parentIndex] is IfAction ifAction)
-                {
-                    var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
-                    if (actionsList != null)
-                    {
-                        canMoveUp = nestedIndex > 0;
-                        canMoveDown = nestedIndex < actionsList.Count - 1;
-                    }
-                }
+                canMoveUp = nestedIndex > 0;
+                canMoveDown = nestedIndex < moveList.Count - 1;
             }
 
             // Bouton monter (▲)
@@ -10455,7 +10609,7 @@ namespace MacroEngine.UI
                 Cursor = canMoveUp ? Cursors.Hand : Cursors.Arrow,
                 Margin = new Thickness(0, 0, 0, 1), // Marge réduite pour rapprocher les flèches
                 Padding = new Thickness(0), // Pas de padding pour maximiser l'espace pour la flèche
-                Tag = new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen }
+                Tag = moveCtx
             };
             
             var moveUpBtnText = new TextBlock
@@ -10478,7 +10632,7 @@ namespace MacroEngine.UI
             {
                 if (canMoveUp)
                 {
-                    MoveNestedIfActionUp(parentIndex, nestedIndex, isThen);
+                    MoveNestedIfActionUp(moveCtx);
                     e.Handled = true;
                 }
             };
@@ -10514,7 +10668,7 @@ namespace MacroEngine.UI
                 Cursor = canMoveDown ? Cursors.Hand : Cursors.Arrow,
                 Margin = new Thickness(0, 1, 0, 0), // Marge réduite pour rapprocher les flèches
                 Padding = new Thickness(0), // Pas de padding pour maximiser l'espace pour la flèche
-                Tag = new NestedIfActionInfo { ParentIndex = parentIndex, NestedIndex = nestedIndex, IsThen = isThen }
+                Tag = moveCtx
             };
             
             var moveDownBtnText = new TextBlock
@@ -10537,7 +10691,7 @@ namespace MacroEngine.UI
             {
                 if (canMoveDown)
                 {
-                    MoveNestedIfActionDown(parentIndex, nestedIndex, isThen);
+                    MoveNestedIfActionDown(moveCtx);
                     e.Handled = true;
                 }
             };
@@ -10578,34 +10732,9 @@ namespace MacroEngine.UI
             var button = sender as Border;
             if (button?.Tag is not IfActionInfo info) return;
 
-            IfAction? ifAction = null;
-            if (info.RepeatActionIndex >= 0 && info.NestedIfIndex >= 0)
-            {
-                // SI imbriqué dans un Répéter (cas qui bloquait l'ajout via chips)
-                if (info.RepeatActionIndex >= _currentMacro.Actions.Count) return;
-                if (_currentMacro.Actions[info.RepeatActionIndex] is not RepeatAction repeatAction) return;
-                if (repeatAction.Actions == null || info.NestedIfIndex >= repeatAction.Actions.Count) return;
-                ifAction = repeatAction.Actions[info.NestedIfIndex] as IfAction;
-            }
-            else if (info.ParentIfActionIndex >= 0 && info.ParentNestedRepeatIndex >= 0 && info.NestedIfIndex >= 0)
-            {
-                // SI imbriqué dans un Répéter qui est lui-même dans Then/Else d'un If.
-                if (info.ParentIfActionIndex >= _currentMacro.Actions.Count) return;
-                if (_currentMacro.Actions[info.ParentIfActionIndex] is not IfAction parentIfAction) return;
-                var parentList = info.ParentIsThen ? parentIfAction.ThenActions : parentIfAction.ElseActions;
-                if (parentList == null || info.ParentNestedRepeatIndex >= parentList.Count) return;
-                if (parentList[info.ParentNestedRepeatIndex] is not RepeatAction nestedRepeatAction) return;
-                if (nestedRepeatAction.Actions == null || info.NestedIfIndex >= nestedRepeatAction.Actions.Count) return;
-                ifAction = nestedRepeatAction.Actions[info.NestedIfIndex] as IfAction;
-            }
-            else
-            {
-                // SI au niveau racine
-            var ifActionIndex = info.IfActionIndex;
-            if (ifActionIndex < 0 || ifActionIndex >= _currentMacro.Actions.Count) return;
-                ifAction = _currentMacro.Actions[ifActionIndex] as IfAction;
-            }
-            if (ifAction == null) return;
+            if (info.PathToIf == null || info.PathToIf.Count == 0) return;
+            if (!TryNavigateChipPath(_currentMacro.Actions, info.PathToIf, out var node) || node is not IfAction ifAction)
+                return;
 
             SaveState();
 
@@ -10628,14 +10757,25 @@ namespace MacroEngine.UI
 
             if (newAction != null)
             {
-                var actionsList = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
-                if (actionsList == null)
+                IList<IInputAction>? actionsList;
+                if (info.ElseIfBranchIndex >= 0)
                 {
-                    actionsList = new List<IInputAction>();
-                    if (info.IsThen)
-                        ifAction.ThenActions = actionsList;
-                    else
-                        ifAction.ElseActions = actionsList;
+                    if (ifAction.ElseIfBranches == null || info.ElseIfBranchIndex >= ifAction.ElseIfBranches.Count)
+                        return;
+                    var branch = ifAction.ElseIfBranches[info.ElseIfBranchIndex];
+                    actionsList = branch.Actions ??= new List<IInputAction>();
+                }
+                else
+                {
+                    actionsList = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
+                    if (actionsList == null)
+                    {
+                        actionsList = new List<IInputAction>();
+                        if (info.IsThen)
+                            ifAction.ThenActions = (List<IInputAction>)actionsList;
+                        else
+                            ifAction.ElseActions = (List<IInputAction>)actionsList;
+                    }
                 }
                 actionsList.Add(newAction);
                 _currentMacro.ModifiedAt = DateTime.Now;
@@ -10649,13 +10789,12 @@ namespace MacroEngine.UI
         /// <summary>
         /// Déplace une action imbriquée vers le haut dans un IfAction
         /// </summary>
-        private void MoveNestedIfActionUp(int parentIndex, int nestedIndex, bool isThen)
+        private void MoveNestedIfActionUp(NestedIfActionInfo info)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count) return;
-            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction) return;
-
-            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
-            if (actionsList == null || nestedIndex <= 0 || nestedIndex >= actionsList.Count) return;
+            if (_currentMacro == null) return;
+            if (!TryResolveNestedIfBranchList(info, out _, out var actionsList) || actionsList == null) return;
+            var nestedIndex = info.NestedIndex;
+            if (nestedIndex <= 0 || nestedIndex >= actionsList.Count) return;
 
             SaveState();
             var action = actionsList[nestedIndex];
@@ -10669,13 +10808,12 @@ namespace MacroEngine.UI
         /// <summary>
         /// Déplace une action imbriquée vers le bas dans un IfAction
         /// </summary>
-        private void MoveNestedIfActionDown(int parentIndex, int nestedIndex, bool isThen)
+        private void MoveNestedIfActionDown(NestedIfActionInfo info)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count) return;
-            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction) return;
-
-            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
-            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count - 1) return;
+            if (_currentMacro == null) return;
+            if (!TryResolveNestedIfBranchList(info, out _, out var actionsList) || actionsList == null) return;
+            var nestedIndex = info.NestedIndex;
+            if (nestedIndex < 0 || nestedIndex >= actionsList.Count - 1) return;
 
             SaveState();
             var action = actionsList[nestedIndex];
@@ -10696,14 +10834,9 @@ namespace MacroEngine.UI
             var button = sender as Border;
             if (button?.Tag is not NestedIfActionInfo info) return;
 
-            var parentIndex = info.ParentIndex;
+            if (!TryResolveNestedIfBranchList(info, out _, out var actionsList) || actionsList == null) return;
             var nestedIndex = info.NestedIndex;
-
-            if (parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count) return;
-            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction) return;
-
-            var actionsList = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
-            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count) return;
+            if (nestedIndex < 0 || nestedIndex >= actionsList.Count) return;
 
             SaveState();
             actionsList.RemoveAt(nestedIndex);
@@ -10715,17 +10848,12 @@ namespace MacroEngine.UI
         }
 
         // Méthodes d'édition inline pour les actions imbriquées dans IfAction
-        private void EditNestedIfKeyboardAction(int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex, TextBlock titleText)
+        private void EditNestedIfKeyboardAction(NestedIfActionInfo info, TextBlock titleText)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
-                return;
-
-            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction)
-                return;
-
-            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
-            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count)
-                return;
+            if (_currentMacro == null) return;
+            if (!TryResolveNestedIfBranchList(info, out _, out var actionsList) || actionsList == null) return;
+            var nestedIndex = info.NestedIndex;
+            if (nestedIndex < 0 || nestedIndex >= actionsList.Count) return;
 
             if (actionsList[nestedIndex] is not KeyboardAction ka)
                 return;
@@ -10734,8 +10862,9 @@ namespace MacroEngine.UI
             if (parentPanel == null)
                 return;
 
+            var macroHint = info.PathToIf != null && info.PathToIf.Count > 0 ? info.PathToIf[0].A : info.ParentIndex;
             var originalMargin = titleText.Margin;
-            var editPanel = CreateKeyboardActionControls(ka, parentIndex, parentPanel);
+            var editPanel = CreateKeyboardActionControls(ka, macroHint, parentPanel);
             editPanel.Margin = originalMargin;
 
             var idx = parentPanel.Children.IndexOf(titleText);
@@ -10746,17 +10875,12 @@ namespace MacroEngine.UI
             parentPanel.Children.Insert(idx, editPanel);
         }
 
-        private void EditNestedIfDelayAction(int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex, TextBlock titleText)
+        private void EditNestedIfDelayAction(NestedIfActionInfo info, TextBlock titleText)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
-                return;
-
-            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction)
-                return;
-
-            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
-            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count)
-                return;
+            if (_currentMacro == null) return;
+            if (!TryResolveNestedIfBranchList(info, out _, out var actionsList) || actionsList == null) return;
+            var nestedIndex = info.NestedIndex;
+            if (nestedIndex < 0 || nestedIndex >= actionsList.Count) return;
 
             if (actionsList[nestedIndex] is not DelayAction da)
                 return;
@@ -10765,8 +10889,9 @@ namespace MacroEngine.UI
             if (parentPanel == null)
                 return;
 
+            var macroHint = info.PathToIf != null && info.PathToIf.Count > 0 ? info.PathToIf[0].A : info.ParentIndex;
             var originalMargin = titleText.Margin;
-            var editPanel = CreateDelayActionControls(da, parentIndex, parentPanel);
+            var editPanel = CreateDelayActionControls(da, macroHint, parentPanel);
             editPanel.Margin = originalMargin;
 
             var idx = parentPanel.Children.IndexOf(titleText);
@@ -10870,17 +10995,12 @@ namespace MacroEngine.UI
             }));
         }
 
-        private void EditNestedIfMouseAction(int parentIndex, int nestedIndex, bool isThen, int elseIfBranchIndex, TextBlock titleText)
+        private void EditNestedIfMouseAction(NestedIfActionInfo info, TextBlock titleText)
         {
-            if (_currentMacro == null || parentIndex < 0 || parentIndex >= _currentMacro.Actions.Count)
-                return;
-
-            if (_currentMacro.Actions[parentIndex] is not IfAction ifAction)
-                return;
-
-            var actionsList = isThen ? ifAction.ThenActions : ifAction.ElseActions;
-            if (actionsList == null || nestedIndex < 0 || nestedIndex >= actionsList.Count)
-                return;
+            if (_currentMacro == null) return;
+            if (!TryResolveNestedIfBranchList(info, out _, out var actionsList) || actionsList == null) return;
+            var nestedIndex = info.NestedIndex;
+            if (nestedIndex < 0 || nestedIndex >= actionsList.Count) return;
 
             if (actionsList[nestedIndex] is not Core.Inputs.MouseAction ma)
                 return;
@@ -11364,14 +11484,15 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée un conteneur récursif pour un IfAction imbriqué dans un RepeatAction
+        /// Crée un conteneur récursif pour un IfAction imbriqué dans un RepeatAction (chemin d’accès depuis la racine de la macro).
         /// </summary>
-        private FrameworkElement CreateNestedIfActionContainer(IfAction ifAction, int repeatActionIndex, int nestedIndex, int indentLevel = 1, int parentIfActionIndex = -1, bool parentIsThen = false, int parentNestedRepeatIndex = -1)
+        private FrameworkElement CreateNestedIfActionContainer(IfAction ifAction, List<ChipNavStep> pathToThisIf, int indentLevel = 1, bool hideElseBranchAddChips = false)
         {
             var childIndentLevel = indentLevel + 1;
             var container = new StackPanel { Orientation = Orientation.Vertical };
 
-            var card = CreateActionCard(ifAction, repeatActionIndex);
+            var macroIdx = pathToThisIf.Count > 0 ? pathToThisIf[0].A : 0;
+            var card = CreateActionCard(ifAction, macroIdx);
             // Pas de marge sous la carte Si : l’espace vers le corps est porté par thenBranchWrap (évite double écart).
             card.Margin = new Thickness(0, 0, 0, 0);
             container.Children.Add(card);
@@ -11396,20 +11517,18 @@ namespace MacroEngine.UI
                 for (int i = 0; i < ifAction.ThenActions.Count; i++)
                 {
                     var nestedAction = ifAction.ThenActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, true, -1, childIndentLevel);
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, pathToThisIf, i, true, -1, childIndentLevel);
                     thenContainer.Children.Add(nestedCard);
                 }
                 thenBranchWrap.Children.Add(thenContainer);
             }
-            var addThenNestedPanel = CreateAddIfActionsPanel(
-                ifAction, repeatActionIndex, true, -1, repeatActionIndex, nestedIndex,
-                parentIfActionIndex, parentIsThen, parentNestedRepeatIndex);
+            var addThenNestedPanel = CreateAddIfActionsPanel(ifAction, pathToThisIf, true, -1);
             addThenNestedPanel.Margin = new Thickness(NestedTimelineLayout.ChipsRowMarginLeftPx, NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
             thenBranchWrap.Children.Add(addThenNestedPanel);
             container.Children.Add(thenBranchWrap);
 
             var elseColor = Color.FromRgb(0xA7, 0x8B, 0xFA);
-            var nestedSinonInElseRepeat = parentIfActionIndex >= 0 && !parentIsThen;
+            var nestedSinonInElseRepeat = hideElseBranchAddChips;
             var elseBranchWrap = new StackPanel
             {
                 Orientation = Orientation.Vertical,
@@ -11442,16 +11561,14 @@ namespace MacroEngine.UI
                 for (int i = 0; i < ifAction.ElseActions.Count; i++)
                 {
                     var nestedAction = ifAction.ElseActions[i];
-                    var nestedCard = CreateNestedIfActionCard(nestedAction, repeatActionIndex, nestedIndex, false, -1, childIndentLevel);
+                    var nestedCard = CreateNestedIfActionCard(nestedAction, pathToThisIf, i, false, -1, childIndentLevel);
                     elseContainer.Children.Add(nestedCard);
                 }
                 elseBodyWrap.Children.Add(elseContainer);
             }
             if (!nestedSinonInElseRepeat)
             {
-                var addElseNestedPanel = CreateAddIfActionsPanel(
-                    ifAction, repeatActionIndex, false, -1, repeatActionIndex, nestedIndex,
-                    parentIfActionIndex, parentIsThen, parentNestedRepeatIndex);
+                var addElseNestedPanel = CreateAddIfActionsPanel(ifAction, pathToThisIf, false, -1);
                 addElseNestedPanel.Margin = new Thickness(
                     NestedTimelineLayout.ChipsRowMarginLeftPx,
                     NestedTimelineLayout.ActionsToChipsSpacingPx, 0, 0);
@@ -11465,16 +11582,72 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Crée un conteneur récursif pour un RepeatAction imbriqué dans un IfAction
+        /// Crée un conteneur récursif pour un RepeatAction imbriqué dans un IfAction (<paramref name="pathToThisRepeat"/> pointe vers ce Répéter).
         /// </summary>
-        private FrameworkElement CreateNestedRepeatActionContainer(RepeatAction repeatAction, int ifActionIndex, int nestedIndex, bool isThen, int indentLevel = 1)
+        private FrameworkElement CreateNestedRepeatActionContainer(RepeatAction repeatAction, List<ChipNavStep> pathToThisRepeat, bool repeatIsInPureElseBranch, int indentLevel = 1)
         {
+            ArgumentNullException.ThrowIfNull(pathToThisRepeat);
+
             var childIndentLevel = indentLevel + 1;
             var repeatBodyIndentPx = NestedTimelineLayout.BranchBodyMarginLeftPx + NestedTimelineLayout.RootNestedBodyExtraInsetPx;
             var container = new StackPanel { Orientation = Orientation.Vertical };
 
+            var macroIdx = pathToThisRepeat is { Count: > 0 } ? pathToThisRepeat[0].A : 0;
+            NestedIfActionInfo? nestedIfMeta = null;
+            if (pathToThisRepeat != null && pathToThisRepeat.Count >= 2)
+            {
+                var pathToParentIf = CloneChipPath(pathToThisRepeat);
+                pathToParentIf.RemoveAt(pathToParentIf.Count - 1);
+                var last = pathToThisRepeat[pathToThisRepeat.Count - 1];
+                bool isThenBranch;
+                int elseIfBranchIndex;
+                int nestedIndexInIfBranch;
+                switch (last.Op)
+                {
+                    case ChipNavOp.IfThenChild:
+                        isThenBranch = true;
+                        elseIfBranchIndex = -1;
+                        nestedIndexInIfBranch = last.A;
+                        nestedIfMeta = new NestedIfActionInfo
+                        {
+                            PathToIf = CloneChipPath(pathToParentIf),
+                            ParentIndex = macroIdx,
+                            NestedIndex = nestedIndexInIfBranch,
+                            IsThen = isThenBranch,
+                            ElseIfBranchIndex = elseIfBranchIndex
+                        };
+                        break;
+                    case ChipNavOp.IfElseChild:
+                        isThenBranch = false;
+                        elseIfBranchIndex = -1;
+                        nestedIndexInIfBranch = last.A;
+                        nestedIfMeta = new NestedIfActionInfo
+                        {
+                            PathToIf = CloneChipPath(pathToParentIf),
+                            ParentIndex = macroIdx,
+                            NestedIndex = nestedIndexInIfBranch,
+                            IsThen = isThenBranch,
+                            ElseIfBranchIndex = elseIfBranchIndex
+                        };
+                        break;
+                    case ChipNavOp.IfElseIfChild:
+                        isThenBranch = false;
+                        elseIfBranchIndex = last.A;
+                        nestedIndexInIfBranch = last.B;
+                        nestedIfMeta = new NestedIfActionInfo
+                        {
+                            PathToIf = CloneChipPath(pathToParentIf),
+                            ParentIndex = macroIdx,
+                            NestedIndex = nestedIndexInIfBranch,
+                            IsThen = isThenBranch,
+                            ElseIfBranchIndex = elseIfBranchIndex
+                        };
+                        break;
+                }
+            }
+
             // Créer une carte pour le RepeatAction avec NestedIfActionInfo pour que la croix supprime uniquement ce Repeat (pas tout le If)
-            var card = CreateActionCard(repeatAction, ifActionIndex, null, new NestedIfActionInfo { ParentIndex = ifActionIndex, NestedIndex = nestedIndex, IsThen = isThen, ElseIfBranchIndex = -1 });
+            var card = CreateActionCard(repeatAction, macroIdx, null, nestedIfMeta);
             card.Margin = new Thickness(0, 0, 0, 0);
             container.Children.Add(card);
 
@@ -11494,6 +11667,7 @@ namespace MacroEngine.UI
             };
 
             var nestedSection = new StackPanel { Orientation = Orientation.Vertical };
+            var suppressElse = repeatIsInPureElseBranch;
 
             if (repeatAction.Actions != null && repeatAction.Actions.Count > 0)
             {
@@ -11506,13 +11680,13 @@ namespace MacroEngine.UI
                 for (int i = 0; i < repeatAction.Actions.Count; i++)
                 {
                     var nestedAction = repeatAction.Actions[i];
-                    var nestedCard = CreateNestedActionCard(nestedAction, -1, i, ifActionIndex, isThen, nestedIndex, indentLevel: childIndentLevel);
+                    var nestedCard = CreateNestedActionCard(nestedAction, pathToThisRepeat, i, childIndentLevel, suppressElse);
                     nestedContainer.Children.Add(nestedCard);
                 }
                 nestedSection.Children.Add(nestedContainer);
             }
 
-            var addActionsPanel = CreateAddActionsPanel(repeatAction, -1, ifActionIndex, isThen, nestedIndex);
+            var addActionsPanel = CreateAddActionsPanel(repeatAction, pathToThisRepeat);
             nestedSection.Children.Add(addActionsPanel);
             
             nestedSectionBorder.Child = nestedSection;
@@ -11528,12 +11702,14 @@ namespace MacroEngine.UI
         /// </summary>
         private class NestedActionInfo
         {
+            /// <summary>Chemin depuis la racine de la macro jusqu’au Répéter contenant l’action (premier pas = MacroRootChild).</summary>
+            public List<ChipNavStep>? PathToRepeat { get; set; }
             public int ParentIndex { get; set; }
             public int NestedIndex { get; set; }
-            /// <summary>Index de l'IfAction parent quand le Repeat est dans Then/Else ; -1 si Repeat au niveau racine.</summary>
+            /// <summary>Index de l'IfAction parent quand le Repeat est dans Then/Else ; -1 si Repeat au niveau racine (héritage).</summary>
             public int IfActionIndex { get; set; } = -1;
             public bool IsThen { get; set; }
-            /// <summary>Index du Repeat dans ThenActions ou ElseActions.</summary>
+            /// <summary>Index du Repeat dans ThenActions ou ElseActions (héritage).</summary>
             public int NestedRepeatIndex { get; set; } = -1;
         }
 
@@ -11543,6 +11719,8 @@ namespace MacroEngine.UI
         /// </summary>
         private class NestedIfActionInfo
         {
+            /// <summary>Chemin jusqu’au Si parent (celui dont la branche contient l’action).</summary>
+            public List<ChipNavStep>? PathToIf { get; set; }
             public int ParentIndex { get; set; }
             public int NestedIndex { get; set; }
             public bool IsThen { get; set; }
@@ -11551,19 +11729,13 @@ namespace MacroEngine.UI
         }
 
         /// <summary>
-        /// Informations sur un RepeatAction (pour passer le contexte aux event handlers)
-        /// Si IfActionIndex >= 0 : Repeat est dans le Then/Else d'un If (référence par IfActionIndex + IsThen + NestedRepeatIndex).
-        /// Sinon : Repeat est au niveau racine (RepeatActionIndex dans _currentMacro.Actions).
+        /// Contexte des puces « + action » sous un Répéter : <see cref="PathToRepeat"/> décrit le chemin jusqu’au bloc Répéter cible.
         /// </summary>
         private class RepeatActionInfo
         {
-            public int RepeatActionIndex { get; set; }
+            /// <summary>Chemin depuis la racine jusqu’au Répéter cible (inclut MacroRootChild puis Répéter / Si / branches).</summary>
+            public List<ChipNavStep>? PathToRepeat { get; set; }
             public string ActionType { get; set; } = "";
-            /// <summary>Index de l'IfAction parent quand Repeat est dans Then/Else ; -1 si Repeat au niveau racine.</summary>
-            public int IfActionIndex { get; set; } = -1;
-            public bool IsThen { get; set; }
-            /// <summary>Index du Repeat dans ThenActions ou ElseActions.</summary>
-            public int NestedRepeatIndex { get; set; }
         }
 
         /// <summary>
@@ -11572,15 +11744,11 @@ namespace MacroEngine.UI
         /// </summary>
         private class IfActionInfo
         {
-            public int IfActionIndex { get; set; }
+            /// <summary>Chemin jusqu’au Si dont on modifie Then / Else / Sinon si.</summary>
+            public List<ChipNavStep>? PathToIf { get; set; }
             public string ActionType { get; set; } = "";
             public bool IsThen { get; set; }
             public int ElseIfBranchIndex { get; set; } = -1;
-            public int RepeatActionIndex { get; set; } = -1;
-            public int NestedIfIndex { get; set; } = -1;
-            public int ParentIfActionIndex { get; set; } = -1;
-            public bool ParentIsThen { get; set; }
-            public int ParentNestedRepeatIndex { get; set; } = -1;
         }
 
         #endregion
@@ -11798,22 +11966,32 @@ namespace MacroEngine.UI
         /// </summary>
         private void DuplicateNestedActionInIf(NestedIfActionInfo info)
         {
-            if (_currentMacro == null || info.ParentIndex < 0 || info.ParentIndex >= _currentMacro.Actions.Count) return;
-            if (_currentMacro.Actions[info.ParentIndex] is not IfAction ifAction) return;
+            if (_currentMacro == null) return;
 
-            var list = GetIfActionsList(ifAction, info.IsThen, info.ElseIfBranchIndex);
-            if (list == null)
+            IList<IInputAction>? list;
+            if (info.PathToIf != null && info.PathToIf.Count > 0)
             {
-                list = new List<IInputAction>();
-                if (info.IsThen)
-                    ifAction.ThenActions = list;
-                else if (info.ElseIfBranchIndex < 0)
-                    ifAction.ElseActions = list;
-                else if (ifAction.ElseIfBranches != null && info.ElseIfBranchIndex < ifAction.ElseIfBranches.Count)
-                    ifAction.ElseIfBranches[info.ElseIfBranchIndex].Actions = list;
-                else
-                    return;
+                if (!TryResolveNestedIfBranchList(info, out _, out list) || list == null) return;
             }
+            else
+            {
+                if (info.ParentIndex < 0 || info.ParentIndex >= _currentMacro.Actions.Count) return;
+                if (_currentMacro.Actions[info.ParentIndex] is not IfAction ifAction) return;
+                list = GetIfActionsList(ifAction, info.IsThen, info.ElseIfBranchIndex);
+                if (list == null)
+                {
+                    list = new List<IInputAction>();
+                    if (info.IsThen)
+                        ifAction.ThenActions = (List<IInputAction>)list;
+                    else if (info.ElseIfBranchIndex < 0)
+                        ifAction.ElseActions = (List<IInputAction>)list;
+                    else if (ifAction.ElseIfBranches != null && info.ElseIfBranchIndex < ifAction.ElseIfBranches.Count)
+                        ifAction.ElseIfBranches[info.ElseIfBranchIndex].Actions = (List<IInputAction>)list;
+                    else
+                        return;
+                }
+            }
+
             if (info.NestedIndex < 0 || info.NestedIndex >= list.Count) return;
 
             SaveState();
