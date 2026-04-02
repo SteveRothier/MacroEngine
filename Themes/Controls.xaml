@@ -1032,6 +1032,8 @@
         <Setter Property="Margin" Value="0,0,0,1"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
@@ -1046,7 +1048,8 @@
                                 BorderBrush="Transparent"
                                 Padding="{TemplateBinding Padding}"
                                 ClipToBounds="False">
-                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
                     </Border>
                     <ControlTemplate.Triggers>

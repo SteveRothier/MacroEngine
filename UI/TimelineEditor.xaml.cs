@@ -407,7 +407,7 @@ namespace MacroEngine.UI
                 Foreground = new SolidColorBrush(Color.FromRgb(0xE8, 0xA0, 0x20)),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(0, 0, 12, 0)
+                Margin = new Thickness(0, 0, 6, 0)
             };
             stepNumberText.SetResourceReference(TextBlock.FontFamilyProperty, "FontMono");
             Grid.SetColumn(stepNumberText, 0);
@@ -9185,13 +9185,13 @@ namespace MacroEngine.UI
         private static class NestedTimelineLayout
         {
             /// <summary>Colonne « 01, 02… » sur une ligne racine (<see cref="CreateActionCardWithButtons"/>). Le corps sous la carte (Répéter, branches Si) s’aligne dessous pour que les cartes imbriquées coïncident avec la carte parente.</summary>
-            public const int MainTimelineStepColumnWidthPx = 44;
+            public const int MainTimelineStepColumnWidthPx = 28;
             /// <summary>Décalage horizontal cumulé par niveau logique (profondeur × cette valeur).</summary>
             public const int IndentPerLevelPx = 0;
             /// <summary>Marge gauche des blocs de contenu imbriqués sans colonne numéro (ex. Si dans Répéter).</summary>
             public const int BranchBodyMarginLeftPx = 0;
             /// <summary>Décalage du corps sous un bloc Si/Répéter : à la racine (avec <see cref="MainTimelineStepColumnWidthPx"/>) et à chaque niveau imbriqué (même valeur pour cohérence).</summary>
-            public const int RootNestedBodyExtraInsetPx = 40;
+            public const int RootNestedBodyExtraInsetPx = 20;
             /// <summary>Marge gauche des rangées de puces « + action » (0 = aligné sur les cartes quand elles partagent le même wrap).</summary>
             public const int ChipsRowMarginLeftPx = 0;
             /// <summary>Marge gauche de l’enveloppe du bandeau Sinon (Si racine).</summary>

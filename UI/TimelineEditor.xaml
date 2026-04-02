@@ -22,9 +22,9 @@
                 ClipToBounds="True">
 
             <ScrollViewer x:Name="TimelineScrollViewer"
-                          VerticalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Hidden"
                           HorizontalScrollBarVisibility="Disabled"
-                          Padding="12"
+                          Padding="6,8,0,8"
                           IsDeferredScrollingEnabled="True">
                 <StackPanel x:Name="TimelineStackPanel"
                            Orientation="Vertical"

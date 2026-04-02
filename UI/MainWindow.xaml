@@ -91,6 +91,11 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+        <!-- Rail macros : hauteur max par ligne (BasedOn pour ne pas toucher la liste profils) -->
+        <Style x:Key="MacroListMainWindowItemStyle" TargetType="ListBoxItem" BasedOn="{StaticResource MacroListItemStyle}">
+            <Setter Property="MaxHeight" Value="70"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
         <!-- Style barre d'action (boutons type carte) -->
         <Style x:Key="ActionCard" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
             <Setter Property="Padding" Value="12,6,12,8"/>
@@ -116,16 +121,18 @@
         </Style>
     </Window.Resources>
     <!-- Root — fenêtre avec bordure custom (style référence) -->
-    <Border x:Name="RootBorder" Background="#080A08" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1"
+    <Border x:Name="RootBorder" Background="#080A08" BorderBrush="{StaticResource BorderLightBrush}"
             ClipToBounds="True">
         <Border.Style>
             <Style TargetType="Border">
-                <!-- Fenêtre (Normal) : coins arrondis. Plein écran / maximisé : pas de rayon (bords nets, alignés à la zone de travail). -->
+                <!-- Fenêtre (Normal) : bordure + coins arrondis. Maximisé : pas de bordure extérieure ni rayon. -->
                 <Setter Property="Margin" Value="0"/>
+                <Setter Property="BorderThickness" Value="1"/>
                 <Setter Property="CornerRadius" Value="10"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding WindowState, RelativeSource={RelativeSource AncestorType=Window}}" Value="Maximized">
                         <Setter Property="Margin" Value="0"/>
+                        <Setter Property="BorderThickness" Value="0"/>
                         <Setter Property="CornerRadius" Value="0"/>
                     </DataTrigger>
                 </Style.Triggers>
@@ -324,12 +331,12 @@
                             <ScrollViewer Style="{StaticResource ScrollViewerNoClipStyle}"
                                       VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled"
-                                      Padding="0,0,6,12"
+                                      Padding="0,0,0,12"
                                           Background="Transparent">
                                     <ListBox x:Name="MacrosListBox"
                                              Style="{StaticResource MacrosListBoxStyle}"
                                              SelectionChanged="MacrosListBox_SelectionChanged"
-                                             ItemContainerStyle="{StaticResource MacroListItemStyle}">
+                                             ItemContainerStyle="{StaticResource MacroListMainWindowItemStyle}">
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel ClipToBounds="False"/>
@@ -337,13 +344,17 @@
                             </ListBox.ItemsPanel>
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
-                                    <Grid MaxHeight="48" ClipToBounds="False">
+                                    <Grid MaxHeight="52"
+                                          MinHeight="26"
+                                          VerticalAlignment="Stretch"
+                                          ClipToBounds="True">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="34"/>
+                                            <!-- Auto : pas de colonne vide quand l'icône est masquée -->
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
 
-                                        <!-- Icône m-icon 26×26 (actif = bordure ambre + glow) -->
+                                        <!-- Icône m-icon 26×26 (sélection = bordure ambre) -->
                                         <Border Grid.Column="0"
                                                 Width="26" Height="26"
                                                 VerticalAlignment="Center"
@@ -363,11 +374,6 @@
                                                         </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
                                                             <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}"/>
-                                                            <Setter Property="Effect">
-                                                                <Setter.Value>
-                                                                    <DropShadowEffect Color="#33E8A020" BlurRadius="8" ShadowDepth="0" Opacity="1"/>
-                                                                </Setter.Value>
-                                                            </Setter>
                                                         </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -383,10 +389,10 @@
                                             </Grid>
                                         </Border>
 
-                                        <!-- Nom + raccourci empilés, alignés à gauche -->
+                                        <!-- Nom + raccourci : bloc centré verticalement (avec ou sans raccourci) -->
                                         <StackPanel Grid.Column="1"
                                                     VerticalAlignment="Center"
-                                                    HorizontalAlignment="Left"
+                                                    HorizontalAlignment="Stretch"
                                                     Orientation="Vertical">
                                             <TextBlock Text="{Binding Name}"
                                                        FontFamily="{StaticResource FontPrimary}"
@@ -397,11 +403,11 @@
                                                        Foreground="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=Foreground}"/>
                                             <TextBlock Text="{Binding ShortcutKeyCode, Converter={StaticResource KeyCodeToNameConverter}}"
                                                        FontFamily="{StaticResource FontMono}"
-                                                       FontSize="8"
+                                                       FontSize="10"
                                                        FontWeight="Bold"
                                                        HorizontalAlignment="Left"
                                                        TextTrimming="CharacterEllipsis"
-                                                       Margin="0,2,0,0"
+                                                       Margin="0,1,0,0"
                                                        Visibility="{Binding ShortcutKeyCode, Converter={StaticResource ShortcutVisibilityConverter}}">
                                                 <TextBlock.Style>
                                                     <Style TargetType="TextBlock">
@@ -795,7 +801,7 @@
                     </Border>
 
                     <!-- Zone éditeur (TimelineEditor) -->
-                    <ContentControl x:Name="MacroEditorContainer" Grid.Row="1" Margin="8"/>
+                    <ContentControl x:Name="MacroEditorContainer" Grid.Row="1" Margin="8,8,2,8"/>
                     <!-- Barre du bas (bottombar) -->
                     <Border Grid.Row="2" Background="#0D0F0D" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="0,1,0,0">
                     <Grid>
