@@ -11586,19 +11586,19 @@ namespace MacroEngine.UI
         /// </summary>
         private FrameworkElement CreateNestedRepeatActionContainer(RepeatAction repeatAction, List<ChipNavStep> pathToThisRepeat, bool repeatIsInPureElseBranch, int indentLevel = 1)
         {
-            ArgumentNullException.ThrowIfNull(pathToThisRepeat);
+            var path = pathToThisRepeat ?? throw new ArgumentNullException(nameof(pathToThisRepeat));
 
             var childIndentLevel = indentLevel + 1;
             var repeatBodyIndentPx = NestedTimelineLayout.BranchBodyMarginLeftPx + NestedTimelineLayout.RootNestedBodyExtraInsetPx;
             var container = new StackPanel { Orientation = Orientation.Vertical };
 
-            var macroIdx = pathToThisRepeat is { Count: > 0 } ? pathToThisRepeat[0].A : 0;
+            var macroIdx = path is { Count: > 0 } ? path[0].A : 0;
             NestedIfActionInfo? nestedIfMeta = null;
-            if (pathToThisRepeat != null && pathToThisRepeat.Count >= 2)
+            if (path.Count >= 2)
             {
-                var pathToParentIf = CloneChipPath(pathToThisRepeat);
+                var pathToParentIf = CloneChipPath(path);
                 pathToParentIf.RemoveAt(pathToParentIf.Count - 1);
-                var last = pathToThisRepeat[pathToThisRepeat.Count - 1];
+                var last = path[path.Count - 1];
                 bool isThenBranch;
                 int elseIfBranchIndex;
                 int nestedIndexInIfBranch;
@@ -11680,13 +11680,13 @@ namespace MacroEngine.UI
                 for (int i = 0; i < repeatAction.Actions.Count; i++)
                 {
                     var nestedAction = repeatAction.Actions[i];
-                    var nestedCard = CreateNestedActionCard(nestedAction, pathToThisRepeat, i, childIndentLevel, suppressElse);
+                    var nestedCard = CreateNestedActionCard(nestedAction, path, i, childIndentLevel, suppressElse);
                     nestedContainer.Children.Add(nestedCard);
                 }
                 nestedSection.Children.Add(nestedContainer);
             }
 
-            var addActionsPanel = CreateAddActionsPanel(repeatAction, pathToThisRepeat);
+            var addActionsPanel = CreateAddActionsPanel(repeatAction, path);
             nestedSection.Children.Add(addActionsPanel);
             
             nestedSectionBorder.Child = nestedSection;
