@@ -50,10 +50,11 @@
                                 Background="{TemplateBinding Background}"
                                 BorderThickness="0"
                                 CornerRadius="0">
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Left"/>
+                            <Border x:Name="PART_ContentHost"
+                                    Background="Transparent"
+                                    Margin="{TemplateBinding Padding}"
+                                    VerticalAlignment="Center"
+                                    HorizontalAlignment="Left"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsEnabled" Value="False">

@@ -299,6 +299,28 @@
         </Setter>
     </Style>
 
+    <!-- Même chose sans arrondi (panneau Propriétés) -->
+    <Style x:Key="ToggleSwitchStylePropsCompact" TargetType="ToggleButton" BasedOn="{StaticResource ToggleSwitchStyleCompact}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="pill" CornerRadius="0" Cursor="Hand" Background="#2A2830"/>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="pill" Property="Background" Value="{StaticResource AccentHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="pill" Property="Opacity" Value="0.9"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="pill" Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- ══════════════════════════════════════════════════════════════════════
          BADGES
          ══════════════════════════════════════════════════════════════════════ -->
@@ -469,6 +491,104 @@
         </Setter>
     </Style>
 
+    <!-- Ghost sans coins arrondis (panneau Propriétés) -->
+    <Style x:Key="ButtonGhostSquare" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="0"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{StaticResource BackgroundTertiaryBrush}"/>
+                            <Setter Property="Foreground"
+                                    Value="{StaticResource TextPrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{StaticResource BackgroundSecondaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Panneau Propriétés : texte tertiaire, survol ambre (text3 → hover amber) -->
+    <Style x:Key="ButtonGhostPropsPanelSquare" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="0"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{StaticResource BackgroundTertiaryBrush}"/>
+                            <Setter Property="Foreground"
+                                    Value="{StaticResource AccentPrimaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="border" Property="Background"
+                                    Value="{StaticResource BackgroundSecondaryBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Fermeture panneau Propriétés : texte tertiaire, survol rouge erreur -->
+    <Style x:Key="PropsCloseHeaderButtonStyle" TargetType="Button">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="2,0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource ErrorBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter Property="Opacity" Value="0.85"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Bouton Supprimer rail (btn-del v2 : transparent, bordure line2, hover rouge) -->
     <Style x:Key="ButtonGhostDanger" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
         <Setter Property="Background" Value="Transparent"/>
@@ -511,6 +631,15 @@
     <Style x:Key="ButtonPropertiesAction" TargetType="Button" BasedOn="{StaticResource ButtonGhost}">
         <Setter Property="Padding" Value="10,4"/>
         <Setter Property="MinHeight" Value="26"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
+    </Style>
+
+    <Style x:Key="ButtonPropertiesActionSquare" TargetType="Button" BasedOn="{StaticResource ButtonGhostPropsPanelSquare}">
+        <Setter Property="Padding" Value="10,4"/>
+        <Setter Property="MinHeight" Value="26"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
         <Setter Property="FontSize" Value="12"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
@@ -1094,9 +1223,9 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{StaticResource RadiusTextInput}">
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      Margin="{TemplateBinding Padding}"/>
+                        <Border x:Name="PART_ContentHost"
+                                Background="Transparent"
+                                Margin="{TemplateBinding Padding}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -1129,9 +1258,143 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="0">
+                        <Border x:Name="PART_ContentHost"
+                                Background="Transparent"
+                                Margin="{TemplateBinding Padding}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush"
+                                    Value="{StaticResource BorderMediumBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="border" Property="BorderBrush"
+                                    Value="{StaticResource BorderMediumBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="border" Property="Opacity" Value="0.5"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Champ DESCRIPTION : même teinte que la bordure gauche du panneau Propriétés (AccentPrimaryBrush, 1px) -->
+    <Style x:Key="ScrollBarDescriptionOrangeThumbStyle" TargetType="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="ThumbBorder"
+                            Width="1"
+                            MinWidth="1"
+                            HorizontalAlignment="Center"
+                            Background="{StaticResource AccentPrimaryBrush}"
+                            Opacity="0.72"
+                            Margin="0"
+                            MinHeight="16"
+                            SnapsToDevicePixels="True"/>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Opacity" Value="1"/>
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                            <Setter TargetName="ThumbBorder" Property="Opacity" Value="1"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="ScrollBarDescriptionOrangeStyle" TargetType="ScrollBar">
+        <Setter Property="Width" Value="2"/>
+        <Setter Property="MinWidth" Value="2"/>
+        <Setter Property="MaxWidth" Value="2"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="ContextMenu" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Border Background="Transparent"
+                            Width="2"
+                            MinWidth="2"
+                            MaxWidth="2"
+                            Padding="0"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            SnapsToDevicePixels="True">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Stretch"
+                               Width="1">
+                            <Track.DecreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageUpCommand" Focusable="False"
+                                              Background="Transparent" BorderThickness="0" Padding="0" MinWidth="0" MinHeight="0"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.IncreaseRepeatButton>
+                                <RepeatButton Command="ScrollBar.PageDownCommand" Focusable="False"
+                                              Background="Transparent" BorderThickness="0" Padding="0" MinWidth="0" MinHeight="0"/>
+                            </Track.IncreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb Style="{StaticResource ScrollBarDescriptionOrangeThumbStyle}"/>
+                            </Track.Thumb>
+                        </Track>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="ScrollViewerDescriptionHostStyle" TargetType="ScrollViewer">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollViewer">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="2" MinWidth="2"/>
+                        </Grid.ColumnDefinitions>
+                        <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                Grid.Column="0"
+                                                CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                CanHorizontallyScroll="False"
+                                                CanVerticallyScroll="False"
+                                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                Content="{TemplateBinding Content}"/>
+                        <ScrollBar x:Name="PART_VerticalScrollBar"
+                                   Grid.Column="1"
+                                   Value="{TemplateBinding VerticalOffset}"
+                                   Maximum="{TemplateBinding ScrollableHeight}"
+                                   ViewportSize="{TemplateBinding ViewportHeight}"
+                                   Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                                   Orientation="Vertical"
+                                   Style="{StaticResource ScrollBarDescriptionOrangeStyle}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Description macro : ScrollViewer comme hôte (Border seul laisse le texte déborder sous la bordure). -->
+    <Style x:Key="TextBoxPropsDescriptionStyle" TargetType="TextBox" BasedOn="{StaticResource TextBoxNoCornerRadius}">
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="0"
+                            ClipToBounds="True">
                         <ScrollViewer x:Name="PART_ContentHost"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      Margin="{TemplateBinding Padding}"/>
+                                      Style="{StaticResource ScrollViewerDescriptionHostStyle}"
+                                      Margin="{TemplateBinding Padding}"
+                                      HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                      VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}"
+                                      Focusable="False"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -1161,9 +1424,9 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="0">
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      Margin="{TemplateBinding Padding}"/>
+                        <Border x:Name="PART_ContentHost"
+                                Background="Transparent"
+                                Margin="{TemplateBinding Padding}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="False">
@@ -1175,7 +1438,7 @@
         </Setter>
     </Style>
 
-    <!-- TextBox inline condition Variable : désactive le scrolling interne du ScrollViewer -->
+    <!-- TextBox inline condition Variable : hôte Decorator sans ScrollViewer interne -->
     <Style x:Key="TextBoxCondVarNoScroll" TargetType="TextBox" BasedOn="{StaticResource TextBoxNoCornerRadiusKeepBorder}">
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -1190,13 +1453,9 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="0"
                             ClipToBounds="True">
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      Margin="{TemplateBinding Padding}"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Disabled"
-                                      PanningMode="None"
-                                      CanContentScroll="False"/>
+                        <Border x:Name="PART_ContentHost"
+                                Background="Transparent"
+                                Margin="{TemplateBinding Padding}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="False">
@@ -1247,15 +1506,9 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="0"
                             Padding="0">
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Style="{StaticResource ScrollViewerNoClipStyle}"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      Margin="0"
-                                      Padding="{TemplateBinding Padding}"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Hidden"
-                                      CanContentScroll="False"
-                                      PanningMode="None"/>
+                        <Border x:Name="PART_ContentHost"
+                                Background="Transparent"
+                                Margin="{TemplateBinding Padding}"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="False">
@@ -1279,10 +1532,11 @@
                             Background="{TemplateBinding Background}"
                             BorderThickness="0"
                             CornerRadius="0">
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Margin="{TemplateBinding Padding}"
-                                      VerticalAlignment="Top"
-                                      HorizontalAlignment="Left"/>
+                        <Border x:Name="PART_ContentHost"
+                                Background="Transparent"
+                                Margin="{TemplateBinding Padding}"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="Left"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="False">
@@ -1309,10 +1563,11 @@
                                 BorderBrush="Transparent"
                                 BorderThickness="0"
                                 CornerRadius="{StaticResource RadiusTextInput}">
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="Top"
-                                          HorizontalAlignment="Left"/>
+                            <Border x:Name="PART_ContentHost"
+                                    Background="Transparent"
+                                    Margin="{TemplateBinding Padding}"
+                                    VerticalAlignment="Top"
+                                    HorizontalAlignment="Left"/>
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -1336,10 +1591,11 @@
                                 BorderBrush="Transparent"
                                 BorderThickness="0"
                                 CornerRadius="{StaticResource RadiusTextInput}">
-                            <ScrollViewer x:Name="PART_ContentHost"
-                                          Margin="{TemplateBinding Padding}"
-                                          VerticalAlignment="Stretch"
-                                          HorizontalAlignment="Stretch"/>
+                            <Border x:Name="PART_ContentHost"
+                                    Background="Transparent"
+                                    Margin="{TemplateBinding Padding}"
+                                    VerticalAlignment="Stretch"
+                                    HorizontalAlignment="Stretch"/>
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -1361,10 +1617,11 @@
                             Background="{TemplateBinding Background}"
                             BorderThickness="0"
                             CornerRadius="0">
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Margin="{TemplateBinding Padding}"
-                                      VerticalAlignment="Stretch"
-                                      HorizontalAlignment="Stretch"/>
+                        <Border x:Name="PART_ContentHost"
+                                Background="Transparent"
+                                Margin="{TemplateBinding Padding}"
+                                VerticalAlignment="Stretch"
+                                HorizontalAlignment="Stretch"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsEnabled" Value="False">
@@ -1394,9 +1651,10 @@
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
                     <StackPanel>
-                        <ScrollViewer x:Name="PART_ContentHost"
-                                      Margin="{TemplateBinding Padding}"
-                                      VerticalAlignment="Center"/>
+                        <Border x:Name="PART_ContentHost"
+                                Background="Transparent"
+                                Margin="{TemplateBinding Padding}"
+                                VerticalAlignment="Center"/>
                         <Border x:Name="bottomBar"
                                 Height="2"
                                 Margin="0,2,0,0"
@@ -1446,6 +1704,60 @@
                                                 <ColumnDefinition Width="24"/>
                                             </Grid.ColumnDefinitions>
                                             <Path x:Name="Arrow" Grid.Column="1" Fill="{StaticResource TextSecondaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z"/>
+                                        </Grid>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="border" Property="BorderBrush" Value="Transparent"/>
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="border" Property="BorderBrush" Value="Transparent"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <ContentPresenter x:Name="ContentSite" IsHitTestVisible="False" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" Margin="6,2,28,2" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                        <Popup x:Name="Popup" Placement="Bottom" IsOpen="{TemplateBinding IsDropDownOpen}" AllowsTransparency="True" Focusable="False" PopupAnimation="Slide">
+                            <Grid x:Name="DropDown" SnapsToDevicePixels="True" Width="{TemplateBinding ActualWidth}" MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <Border x:Name="DropDownBorder" Background="{StaticResource BackgroundSecondaryBrush}" BorderBrush="{StaticResource BorderLightBrush}" BorderThickness="1" CornerRadius="0" Margin="0,2,0,0" Padding="4,2">
+                                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Contained"/>
+                                </Border>
+                            </Grid>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ComboBox panneau Propriétés : pas d’arrondi, typo mono 11 semi-gras -->
+    <Style x:Key="ComboBoxModernSquare" TargetType="ComboBox">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="6,4"/>
+        <Setter Property="FontFamily" Value="{StaticResource FontMono}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton x:Name="ToggleButton" Focusable="False" IsChecked="{Binding Path=IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" ClickMode="Press" Background="Transparent">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="border" Background="Transparent" BorderBrush="Transparent" BorderThickness="0" CornerRadius="0">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition/>
+                                                <ColumnDefinition Width="24"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Path x:Name="Arrow" Grid.Column="1" Fill="{StaticResource AccentPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0 Z"/>
                                         </Grid>
                                     </Border>
                                     <ControlTemplate.Triggers>
@@ -2189,6 +2501,40 @@
                                                 Margin="{TemplateBinding Padding}"/>
                         <ScrollBar x:Name="PART_VerticalScrollBar"
                                    Grid.Column="1"
+                                   Value="{TemplateBinding VerticalOffset}"
+                                   Maximum="{TemplateBinding ScrollableHeight}"
+                                   ViewportSize="{TemplateBinding ViewportHeight}"
+                                   Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                                   Orientation="Vertical"
+                                   Style="{StaticResource ScrollBarStyle}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Panneau Propriétés : pas de colonne réservée large ; barre fine superposée à droite -->
+    <Style x:Key="ScrollViewerPropsPanelStyle" TargetType="ScrollViewer">
+        <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollViewer">
+                    <Grid Background="Transparent" ClipToBounds="False">
+                        <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                Margin="0"
+                                                ClipToBounds="False"
+                                                CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                CanHorizontallyScroll="False"
+                                                CanVerticallyScroll="False"
+                                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                Content="{TemplateBinding Content}"/>
+                        <ScrollBar x:Name="PART_VerticalScrollBar"
+                                   HorizontalAlignment="Right"
+                                   Width="3"
+                                   MinWidth="3"
                                    Value="{TemplateBinding VerticalOffset}"
                                    Maximum="{TemplateBinding ScrollableHeight}"
                                    ViewportSize="{TemplateBinding ViewportHeight}"

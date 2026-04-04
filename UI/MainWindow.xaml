@@ -26,9 +26,11 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                           FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextPrimaryBrush}"/>
                                 <Border Grid.Column="1" Margin="4,0,0,0" Padding="4,2,4,2"
-                                        CornerRadius="3"
+                                        CornerRadius="0"
                                         BorderBrush="{StaticResource BorderLightBrush}"
                                         BorderThickness="1"
                                         Visibility="{Binding IsRecommended, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -91,6 +93,13 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+        <!-- Libellés champs panneau Propriétés : même rendu que TOUCHE / CLIC (barre d’outils) -->
+        <Style x:Key="PropsPanelFieldLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource FontPrimary}"/>
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+        </Style>
         <!-- Rail macros : hauteur max par ligne (BasedOn pour ne pas toucher la liste profils) -->
         <Style x:Key="MacroListMainWindowItemStyle" TargetType="ListBoxItem" BasedOn="{StaticResource MacroListItemStyle}">
             <Setter Property="MaxHeight" Value="70"/>
@@ -108,7 +117,8 @@
                                 BorderBrush="Transparent"
                                 BorderThickness="0,0,0,2"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter/>
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -528,9 +538,10 @@
                                         <Button x:Name="MainRecordToolbarButton" Padding="11,6,11,8" Cursor="Hand"
                                                 Background="#E8A020" BorderBrush="Transparent" BorderThickness="0"
                                                 FocusVisualStyle="{x:Null}"
+                                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                                 Click="StartMacro_Click"
                                                 ToolTip="Enregistrer une macro">
-                                            <StackPanel HorizontalAlignment="Center">
+                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                                                 <Ellipse x:Name="MainRecordToolbarDot" Width="8" Height="8" Fill="#0A0800"
                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 <TextBlock x:Name="MainRecordToolbarLabel" Text="ENREG." FontFamily="{StaticResource FontPrimary}"
@@ -540,12 +551,14 @@
                                             </StackPanel>
                                         </Button>
                                     </Border>
-                                    <Button x:Name="PropsToggleButton" Style="{StaticResource ActionCard}" Padding="14,6,14,8" Click="PropsToggleButton_Click">
-                                        <StackPanel HorizontalAlignment="Center">
-                                            <TextBlock Text="⚙" FontSize="14" Foreground="#E8A020" HorizontalAlignment="Center"/>
+                                    <Button x:Name="PropsToggleButton" Style="{StaticResource ActionCard}" Padding="14,6,14,8"
+                                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                            Click="PropsToggleButton_Click">
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock Text="⚙" FontSize="14" Foreground="#E8A020" HorizontalAlignment="Center" TextAlignment="Center"/>
                                             <TextBlock Text="PROPS" FontFamily="{StaticResource FontPrimary}"
                                                        FontSize="10" FontWeight="Bold"
-                                                       Foreground="#4A5A4A" HorizontalAlignment="Center"/>
+                                                       Foreground="#4A5A4A" HorizontalAlignment="Center" TextAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
                                 </StackPanel>
@@ -918,414 +931,550 @@
                     Grid.Column="2"
                     Panel.ZIndex="20"
                     HorizontalAlignment="Right"
-                    Width="320" MinWidth="320" MaxWidth="320"
-                    Background="#0D0F0D"
-                    BorderThickness="2,0,0,0"
-                    BorderBrush="#E8A020"
-                    Padding="8"
-                    DataContext="{Binding SelectedItem, ElementName=MacrosListBox}">
+                    Width="240" MinWidth="240" MaxWidth="240"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Padding="0">
                 <Border.RenderTransform>
-                    <TranslateTransform x:Name="PropsPanelTranslate" X="336"/>
+                    <TranslateTransform x:Name="PropsPanelTranslate" X="256"/>
                 </Border.RenderTransform>
-                <StackPanel HorizontalAlignment="Stretch">
-                        <!-- Titre -->
-                        <DockPanel Margin="0,0,0,10" LastChildFill="False">
-                            <TextBlock Text="Propriétés"
-                                       Style="{StaticResource TextSubheading}"
-                                       VerticalAlignment="Center"/>
-                            <Button DockPanel.Dock="Right"
-                                    Width="18" Height="18"
-                                    Padding="0"
-                                    Cursor="Hand"
-                                    Style="{StaticResource ButtonGhost}"
-                                    ToolTip="Fermer"
-                                    Click="PropsToggleButton_Click">
-                                <TextBlock Text="✕"
-                                           FontSize="11"
-                                           FontWeight="Bold"
-                                           Foreground="{StaticResource TextMutedBrush}"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
-                            </Button>
-                        </DockPanel>
-
-                        <!-- Nom de la macro -->
-                        <TextBlock Text="Nom" Style="{StaticResource TextLabel}"/>
-                        <Border Style="{StaticResource PanelPropertiesFieldElevation}">
-                            <Border Style="{StaticResource PanelPropertiesField}"
-                                    Padding="6,4">
-                                <TextBox x:Name="MacroNameTextBox"
-                                     Style="{StaticResource TextBoxPropertiesFieldCentered}"
-                                     Padding="0"
-                                     TextChanged="MacroNameTextBox_TextChanged"
-                                     TextAlignment="Left"
-                                     VerticalContentAlignment="Center"
-                                     CaretBrush="White"
-                                     Cursor="IBeam"/>
+                <Grid DataContext="{Binding SelectedItem, ElementName=MacrosListBox}">
+                    <Border Background="{StaticResource BackgroundPrimaryBrush}"
+                            BorderBrush="{StaticResource AccentPrimaryBrush}"
+                            BorderThickness="1,0,0,0">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <!-- Header -->
+                            <Border Grid.Row="0" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1">
+                                <StackPanel>
+                                    <DockPanel LastChildFill="True" Margin="8,8,8,6">
+                                        <Button DockPanel.Dock="Right" x:Name="PropsCloseHeaderButton"
+                                                Style="{StaticResource PropsCloseHeaderButtonStyle}" Padding="2,0" Cursor="Hand"
+                                                ToolTip="Fermer" Click="PropsToggleButton_Click" Margin="4,0,0,0">
+                                            <TextBlock Text="✕" FontSize="12" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                                        </Button>
+                                        <Border DockPanel.Dock="Right" Margin="0,0,6,0" Padding="4,2,6,2"
+                                                BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
+                                                VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="4" Height="4" Fill="{StaticResource SuccessBrush}" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                                <TextBlock x:Name="EngineStateText" Text="PRÊT" FontFamily="{StaticResource FontMono}"
+                                                           FontSize="8" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border DockPanel.Dock="Left" Width="24" Height="24"
+                                                Background="{StaticResource BackgroundLevel4Brush}"
+                                                BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1"
+                                                Margin="0,0,7,0" VerticalAlignment="Center">
+                                            <Grid>
+                                                <TextBlock FontFamily="{StaticResource FontLucide}" FontSize="13"
+                                                           VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                           Text="{Binding SelectedItem.LucideIconCode, ElementName=MacrosListBox, Converter={StaticResource LucideIconCharConverter}, FallbackValue='', TargetNullValue=''}"
+                                                           Foreground="{Binding SelectedItem.IconColor, ElementName=MacrosListBox, Converter={StaticResource HexToBrushConverter}}"
+                                                           Visibility="{Binding SelectedItem.IconType, ElementName=MacrosListBox, Converter={StaticResource IconTypeMatchConverter}, ConverterParameter=Lucide}"/>
+                                                <Image Width="16" Height="16" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                       Source="{Binding SelectedItem.ProcessIconPath, ElementName=MacrosListBox, Converter={StaticResource ProcessIconConverter}}"
+                                                       Visibility="{Binding SelectedItem.IconType, ElementName=MacrosListBox, Converter={StaticResource IconTypeMatchConverter}, ConverterParameter=Process}"/>
+                                            </Grid>
+                                        </Border>
+                                        <TextBlock x:Name="PropsHeaderMacroTitle" Text="{Binding SelectedItem.Name, ElementName=MacrosListBox, FallbackValue='', TargetNullValue=''}"
+                                                   FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Bold"
+                                                   Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" Margin="0,0,6,0"/>
+                                    </DockPanel>
+                                    <!-- Onglets -->
+                                    <UniformGrid Rows="1" Columns="3">
+                                        <Button x:Name="PropsTabIdentiteButton" Tag="Identite" Click="PropsTabButton_Click"
+                                                Background="Transparent" BorderThickness="0,0,0,1"
+                                                BorderBrush="{StaticResource BorderMediumBrush}" Padding="4,6"
+                                                FontFamily="{StaticResource FontPrimary}" FontSize="10" FontWeight="Bold"
+                                                Foreground="{StaticResource TextSecondaryBrush}" Cursor="Hand" Content="IDENTITÉ"/>
+                                        <Button x:Name="PropsTabExecutionButton" Tag="Execution" Click="PropsTabButton_Click"
+                                                Background="Transparent" BorderThickness="0,0,0,1"
+                                                BorderBrush="{StaticResource BorderMediumBrush}" Padding="4,6"
+                                                FontFamily="{StaticResource FontPrimary}" FontSize="10" FontWeight="Bold"
+                                                Foreground="{StaticResource TextSecondaryBrush}" Cursor="Hand" Content="EXÉCUTION"/>
+                                        <Button x:Name="PropsTabSystemeButton" Tag="Systeme" Click="PropsTabButton_Click"
+                                                Background="Transparent" BorderThickness="0,0,0,1"
+                                                BorderBrush="{StaticResource BorderMediumBrush}" Padding="4,6"
+                                                FontFamily="{StaticResource FontPrimary}" FontSize="10" FontWeight="Bold"
+                                                Foreground="{StaticResource TextSecondaryBrush}" Cursor="Hand" Content="SYSTÈME"/>
+                                    </UniformGrid>
+                                </StackPanel>
                             </Border>
-                        </Border>
-
-                        <!-- Description -->
-                        <TextBlock Text="Description" Style="{StaticResource TextLabel}"/>
-                        <Border Style="{StaticResource PanelPropertiesFieldElevation}">
-                            <Border Style="{StaticResource PanelPropertiesField}"
-                                    Padding="6,4">
-                                <TextBox x:Name="MacroDescriptionTextBox"
-                                     Style="{StaticResource TextBoxPropertiesField}"
-                                     Padding="0"
-                                     TextWrapping="Wrap"
-                                     AcceptsReturn="True"
-                                     Height="60"
-                                     TextChanged="MacroDescriptionTextBox_TextChanged"
-                                     TextAlignment="Left"
-                                     VerticalContentAlignment="Top"
-                                     CaretBrush="White"
-                                     Cursor="IBeam"
-                                     PreviewMouseDown="MacroDescriptionTextBox_PreviewMouseDown"/>
-                            </Border>
-                        </Border>
-
-                        <!-- Icône (processus uniquement) -->
-                        <StackPanel Margin="0,12,0,10">
-                            <ComboBox x:Name="IconTypeComboBox"
-                                      Style="{StaticResource ComboBoxModern}"
-                                      Width="220"
-                                      HorizontalAlignment="Stretch"
-                                      Margin="0,0,0,8"
-                                      Visibility="Collapsed"
-                                      SelectionChanged="IconTypeComboBox_SelectionChanged"/>
-                            <StackPanel x:Name="IconLucidePanel" Visibility="Collapsed" Margin="0,0,0,8">
-                                <TextBlock Text="Icône Lucide" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
-                                <Border Style="{StaticResource PanelChipsContainer}" Padding="8,6">
-                                    <ListBox x:Name="LucideIconsListBox"
-                                             Background="Transparent"
-                                             BorderThickness="0"
-                                             MaxHeight="200"
-                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                             SelectionChanged="LucideIconListBox_SelectionChanged">
-                                        <ListBox.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal"/>
-                                            </ItemsPanelTemplate>
-                                        </ListBox.ItemsPanel>
-                                        <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
-                                                <Setter Property="Padding" Value="0"/>
-                                                <Setter Property="Margin" Value="2"/>
-                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                            <Border x:Name="Bd" Width="32" Height="32" CornerRadius="4"
-                                                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
-                                                                    Cursor="Hand">
-                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <!-- Contenu scrollable -->
+                            <ScrollViewer x:Name="PropsScrollViewer" Grid.Row="1" Style="{StaticResource ScrollViewerPropsPanelStyle}"
+                                          Background="Transparent">
+                                <StackPanel>
+                                    <!-- IDENTITÉ -->
+                                    <StackPanel x:Name="PropsPaneIdentite" Visibility="Visible">
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="IDENTIFICATION" Style="{StaticResource PropsPanelFieldLabelStyle}"
+                                                           Margin="0,0,0,10"/>
+                                                <TextBlock Text="NOM DE LA MACRO" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,3"/>
+                                                <Border Background="{StaticResource BackgroundPrimaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1,1,1,1"
+                                                        Margin="0,0,0,10">
+                                                    <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="0,0,0,1">
+                                                        <TextBox x:Name="MacroNameTextBox" Style="{StaticResource TextBoxNoCornerRadius}" BorderThickness="0" Background="Transparent"
+                                                                 Padding="4,4,4,4" FontFamily="{StaticResource FontMono}" FontSize="12" FontWeight="SemiBold"
+                                                                 Foreground="{StaticResource TextPrimaryBrush}" CaretBrush="{StaticResource AccentPrimaryBrush}"
+                                                                 VerticalContentAlignment="Center" TextWrapping="NoWrap" AcceptsReturn="False"
+                                                                 TextChanged="MacroNameTextBox_TextChanged" SizeChanged="MacroIdentityTextBox_SizeChanged"/>
+                                                    </Border>
+                                                </Border>
+                                                <TextBlock Text="DESCRIPTION" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,3"/>
+                                                <Border Background="{StaticResource BackgroundPrimaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Margin="0,0,0,0" ClipToBounds="True">
+                                                    <TextBox x:Name="MacroDescriptionTextBox" Style="{StaticResource TextBoxPropsDescriptionStyle}" BorderThickness="0" Background="Transparent"
+                                                             HorizontalScrollBarVisibility="Disabled"
+                                                             Padding="4,4,4,4" FontFamily="{StaticResource FontMono}" FontSize="10" FontWeight="Normal"
+                                                             MinLines="5" MaxLines="5" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                                                             TextChanged="MacroDescriptionTextBox_TextChanged" SizeChanged="MacroIdentityTextBox_SizeChanged"
+                                                             CaretBrush="{StaticResource AccentPrimaryBrush}"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <!-- Titre ICÔNE + trait + ajout processus (alignés sur une ligne) -->
+                                                <Grid Margin="0,0,0,4" VerticalAlignment="Center">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0" Text="ICÔNE" Style="{StaticResource PropsPanelFieldLabelStyle}"
+                                                               VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                                    <Border Grid.Column="1" Height="1" VerticalAlignment="Center"
+                                                            Background="{StaticResource TextMutedBrush}" Opacity="0.85"/>
+                                                    <Button x:Name="AddProcessIconButton" Grid.Column="2" Click="AddProcessIcon_Click"
+                                                            Visibility="Collapsed" ToolTip="Ajouter une icône processus"
+                                                            FocusVisualStyle="{x:Null}" Background="Transparent" BorderThickness="0"
+                                                            Foreground="{StaticResource TextSecondaryBrush}"
+                                                            Padding="8,0,0,0" Cursor="Hand" MinWidth="32"
+                                                            VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                                            HorizontalContentAlignment="Center">
+                                                        <Button.Template>
+                                                            <ControlTemplate TargetType="Button">
+                                                                <Border x:Name="Root" Background="Transparent" Padding="{TemplateBinding Padding}">
+                                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                                      RecognizesAccessKey="False"/>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter TargetName="Root" Property="Background" Value="Transparent"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                                    </Trigger>
+                                                                    <Trigger Property="IsPressed" Value="True">
+                                                                        <Setter TargetName="Root" Property="Background" Value="Transparent"/>
+                                                                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                                    </Trigger>
+                                                                    <Trigger Property="IsEnabled" Value="False">
+                                                                        <Setter TargetName="Root" Property="Opacity" Value="0.45"/>
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Button.Template>
+                                                        <TextBlock Text="+" FontFamily="{StaticResource FontPrimary}" FontSize="18" FontWeight="Bold"
+                                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                                   VerticalAlignment="Center" TextAlignment="Center"
+                                                                   SnapsToDevicePixels="True">
+                                                            <TextBlock.RenderTransform>
+                                                                <TranslateTransform Y="-3"/>
+                                                            </TextBlock.RenderTransform>
+                                                        </TextBlock>
+                                                    </Button>
+                                                </Grid>
+                                                <ComboBox x:Name="IconTypeComboBox" Style="{StaticResource ComboBoxModernSquare}" Visibility="Collapsed"/>
+                                                <StackPanel x:Name="IconLucidePanel" Visibility="Collapsed" Margin="0,0,0,8">
+                                                    <ListBox x:Name="LucideIconsListBox" Background="Transparent" BorderThickness="0" MaxHeight="220"
+                                                             ClipToBounds="False" Padding="0,0,2,0"
+                                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                                             ScrollViewer.CanContentScroll="False"
+                                                             SelectionChanged="LucideIconListBox_SelectionChanged">
+                                                        <ListBox.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <UniformGrid Columns="6"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ListBox.ItemsPanel>
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="Padding" Value="0"/>
+                                                                <Setter Property="Margin" Value="2"/>
+                                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                                            <Border x:Name="Bd" Width="32" Height="32" CornerRadius="0"
+                                                                                    Background="Transparent"
+                                                                                    BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Cursor="Hand"
+                                                                                    HorizontalAlignment="Center" VerticalAlignment="Center" SnapsToDevicePixels="True">
+                                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                            </Border>
+                                                                            <ControlTemplate.Triggers>
+                                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#99E8A020"/>
+                                                                                </Trigger>
+                                                                                <Trigger Property="IsSelected" Value="True">
+                                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}"/>
+                                                                                </Trigger>
+                                                                            </ControlTemplate.Triggers>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="{Binding Code, Converter={StaticResource LucideIconCharConverter}}"
+                                                                           FontFamily="{StaticResource FontLucide}" FontSize="16"
+                                                                           Foreground="{StaticResource TextPrimaryBrush}" ToolTip="{Binding Label}"/>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </StackPanel>
+                                                <StackPanel x:Name="IconColorPanel" Visibility="Collapsed" Margin="0,0,0,8">
+                                                    <TextBlock Text="COULEUR" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,4"/>
+                                                    <ListBox x:Name="IconColorListBox" Background="Transparent" BorderThickness="0"
+                                                             SelectionChanged="IconColorListBox_SelectionChanged">
+                                                        <ListBox.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <WrapPanel Orientation="Horizontal"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ListBox.ItemsPanel>
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="Padding" Value="0"/>
+                                                                <Setter Property="Margin" Value="4,2"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                                            <Border x:Name="Bd" Width="28" Height="28" CornerRadius="0" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Cursor="Hand">
+                                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                            </Border>
+                                                                            <ControlTemplate.Triggers>
+                                                                                <Trigger Property="IsSelected" Value="True">
+                                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}"/>
+                                                                                    <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
+                                                                                </Trigger>
+                                                                            </ControlTemplate.Triggers>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Ellipse Width="20" Height="20" Fill="{Binding Code, Converter={StaticResource HexToBrushConverter}}" ToolTip="{Binding Label}"/>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </StackPanel>
+                                                <StackPanel x:Name="IconProcessPanel" Visibility="Collapsed" Margin="0,0,0,8">
+                                                    <ListBox x:Name="ProcessIconsListBox" Style="{StaticResource ListBoxNoScrollBarStyle}"
+                                                             Background="Transparent" BorderThickness="0" MaxHeight="120"
+                                                             ClipToBounds="False" Padding="0,0,2,0"
+                                                             SelectionChanged="ProcessIconsListBox_SelectionChanged">
+                                                        <ListBox.ItemsPanel>
+                                                            <ItemsPanelTemplate>
+                                                                <UniformGrid Columns="6"/>
+                                                            </ItemsPanelTemplate>
+                                                        </ListBox.ItemsPanel>
+                                                        <ListBox.ItemContainerStyle>
+                                                            <Style TargetType="ListBoxItem">
+                                                                <Setter Property="Padding" Value="0"/>
+                                                                <Setter Property="Margin" Value="2"/>
+                                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                                                <Setter Property="Template">
+                                                                    <Setter.Value>
+                                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                                            <Border x:Name="Bd" Width="32" Height="32" CornerRadius="0"
+                                                                                    Background="Transparent"
+                                                                                    BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Cursor="Hand"
+                                                                                    HorizontalAlignment="Center" VerticalAlignment="Center" SnapsToDevicePixels="True">
+                                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                            </Border>
+                                                                            <ControlTemplate.Triggers>
+                                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#99E8A020"/>
+                                                                                </Trigger>
+                                                                                <Trigger Property="IsSelected" Value="True">
+                                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentPrimaryBrush}"/>
+                                                                                </Trigger>
+                                                                            </ControlTemplate.Triggers>
+                                                                        </ControlTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </ListBox.ItemContainerStyle>
+                                                        <ListBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Image Width="20" Height="20" Source="{Binding Path, Converter={StaticResource ProcessIconConverter}}" Stretch="Uniform" ToolTip="{Binding DisplayName}"/>
+                                                            </DataTemplate>
+                                                        </ListBox.ItemTemplate>
+                                                    </ListBox>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="RACCOURCI CLAVIER" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,10"/>
+                                                <Border x:Name="ShortcutDisplayBorder" Background="{StaticResource BackgroundPrimaryBrush}"
+                                                        BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1,1,1,1"
+                                                        Padding="7,8,10,8" MinHeight="40">
+                                                    <Border BorderBrush="{StaticResource AccentPrimaryBrush}" BorderThickness="2,0,0,0" Margin="-7,-8,0,-8" Padding="5,8,0,8">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel>
+                                                                <TextBlock x:Name="ShortcutDisplayText" Text="Non défini" FontFamily="{StaticResource FontMono}"
+                                                                           FontSize="11" FontWeight="Black" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                                                                <TextBlock Text="Appuyez pour activer / désactiver" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}" Margin="0,2,0,0"/>
+                                                            </StackPanel>
+                                                            <Button Grid.Column="1" x:Name="ClearShortcutButton" VerticalAlignment="Center"
+                                                                    Padding="4,0" MinWidth="24" ToolTip="Retirer le raccourci"
+                                                                    Visibility="{Binding ShortcutKeyCode, Converter={StaticResource ShortcutVisibilityConverter}}"
+                                                                    Click="ClearShortcut_Click">
+                                                                <Button.Style>
+                                                                    <Style TargetType="Button">
+                                                                        <Setter Property="Background" Value="Transparent"/>
+                                                                        <Setter Property="BorderThickness" Value="0"/>
+                                                                        <Setter Property="Template">
+                                                                            <Setter.Value>
+                                                                                <ControlTemplate TargetType="Button">
+                                                                                    <TextBlock Text="&#xE284;" FontFamily="{StaticResource FontLucide}" FontSize="16"
+                                                                                               Foreground="#80E8A020" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                                </ControlTemplate>
+                                                                            </Setter.Value>
+                                                                        </Setter>
+                                                                    </Style>
+                                                                </Button.Style>
+                                                            </Button>
+                                                        </Grid>
+                                                    </Border>
+                                                </Border>
+                                                <Button Content="⟳ REDÉFINIR LE RACCOURCI" Margin="0,6,0,0" HorizontalAlignment="Stretch"
+                                                        Style="{StaticResource ButtonGhostPropsPanelSquare}" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Bold"
+                                                        BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Padding="6,5"
+                                                        Click="SetShortcut_Click"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    <!-- EXÉCUTION -->
+                                    <StackPanel x:Name="PropsPaneExecution" Visibility="Collapsed">
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="APPLICATION CIBLE" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,10"/>
+                                                <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="40"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Background="{StaticResource BackgroundLevel4Brush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,1,0" MinHeight="40">
+                                                            <TextBlock FontFamily="{StaticResource FontLucide}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                                       Text="{Binding SelectedItem.LucideIconCode, ElementName=MacrosListBox, Converter={StaticResource LucideIconCharConverter}}"
+                                                                       Foreground="{StaticResource AccentPrimaryBrush}"
+                                                                       Visibility="{Binding SelectedItem.IconType, ElementName=MacrosListBox, Converter={StaticResource IconTypeMatchConverter}, ConverterParameter=Lucide}"/>
+                                                        </Border>
+                                                        <StackPanel Grid.Column="1" Margin="8,6,4,6" VerticalAlignment="Center">
+                                                            <TextBlock x:Name="PropsTargetAppTitle" Text="—" FontFamily="{StaticResource FontDisplay}" FontSize="14" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock x:Name="PropsTargetAppSub" Text="Fenêtre active" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="2" Content="✎" FontSize="16" Foreground="{StaticResource AccentPrimaryBrush}"
+                                                                Background="Transparent" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1,0,0,0"
+                                                                Padding="12,0" MinHeight="40" VerticalAlignment="Stretch" Cursor="Hand" Click="SelectApps_Click" ToolTip="Changer l'application cible"/>
+                                                    </Grid>
+                                                </Border>
+                                                <DockPanel Margin="0,10,0,0" LastChildFill="False">
+                                                    <ToggleButton x:Name="PropsRestrictAppToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitchStylePropsCompact}"
+                                                                  Width="32" Height="17" VerticalAlignment="Center" Click="PropsRestrictAppToggle_Click"/>
+                                                    <StackPanel>
+                                                        <TextBlock Text="Restreindre à cette app" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                        <TextBlock Text="Raccourci actif seulement si la fenêtre cible est au premier plan" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,8,0"/>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="MODE DE DÉCLENCHEMENT" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,10"/>
+                                                <TextBlock Text="DÉCLENCHEUR" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,3"/>
+                                                <ComboBox x:Name="TriggerModeComboBox" Style="{StaticResource ComboBoxModernSquare}" HorizontalAlignment="Stretch"
+                                                          ItemContainerStyle="{StaticResource TriggerModeComboBoxItemStyle}" Margin="0,0,0,10"
+                                                          SelectionChanged="TriggerModeComboBox_SelectionChanged"/>
+                                                <StackPanel x:Name="TriggerModeOptionsPanel" Visibility="Collapsed" Margin="0,0,0,10">
+                                                    <TextBlock Text="INTERVALLE D'EXÉCUTION (MS)" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,3"/>
+                                                    <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBox x:Name="ContinuousMonitoringIntervalTextBox" Grid.Column="0" Style="{StaticResource TextBoxNoCornerRadius}" BorderThickness="0" Background="Transparent"
+                                                                   FontFamily="{StaticResource FontMono}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentPrimaryBrush}"
+                                                                   TextAlignment="Right" VerticalContentAlignment="Center" Padding="10,8"
+                                                                   TextChanged="ContinuousMonitoringInterval_TextChanged"/>
+                                                            <Border Grid.Column="1" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1,0,0,0" Padding="12,0" VerticalAlignment="Stretch">
+                                                                <TextBlock Text="MS" FontFamily="{StaticResource FontDisplay}" FontSize="13" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center"/>
                                                             </Border>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="Bd" Property="Background" Value="#20FFFFFF"/>
-                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                                                </Trigger>
-                                                                <Trigger Property="IsSelected" Value="True">
-                                                                    <Setter TargetName="Bd" Property="Background" Value="#25FFFFFF"/>
-                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </ListBox.ItemContainerStyle>
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <TextBlock Text="{Binding Code, Converter={StaticResource LucideIconCharConverter}}"
-                                                           FontFamily="{StaticResource FontLucide}"
-                                                           FontSize="16"
-                                                           Foreground="{StaticResource TextSecondaryBrush}"
-                                                           ToolTip="{Binding Label}"/>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </Border>
-                            </StackPanel>
-                            <StackPanel x:Name="IconColorPanel" Visibility="Collapsed" Margin="0,0,0,8">
-                                <TextBlock Text="Couleur" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
-                                <Border Style="{StaticResource PanelChipsContainer}" Padding="8,6">
-                                    <ListBox x:Name="IconColorListBox"
-                                             Background="Transparent"
-                                             BorderThickness="0"
-                                             SelectionChanged="IconColorListBox_SelectionChanged">
-                                        <ListBox.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal"/>
-                                            </ItemsPanelTemplate>
-                                        </ListBox.ItemsPanel>
-                                        <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
-                                                <Setter Property="Padding" Value="0"/>
-                                                <Setter Property="Margin" Value="4,2"/>
-                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                            <Border x:Name="Bd" Width="28" Height="28" CornerRadius="14"
-                                                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
-                                                                    Cursor="Hand">
-                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                            </Border>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                                                </Trigger>
-                                                                <Trigger Property="IsSelected" Value="True">
-                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                                                    <Setter TargetName="Bd" Property="BorderThickness" Value="2"/>
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </ListBox.ItemContainerStyle>
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Ellipse Width="20" Height="20"
-                                                         Fill="{Binding Code, Converter={StaticResource HexToBrushConverter}}"
-                                                         ToolTip="{Binding Label}"/>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </Border>
-                            </StackPanel>
-                            <StackPanel x:Name="IconProcessPanel" Visibility="Collapsed" Margin="0,0,0,0">
-                                <Grid Margin="0,0,0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="Icône" Style="{StaticResource TextLabel}" VerticalAlignment="Center"/>
-                                    <Button x:Name="AddProcessIconButton" Grid.Column="1"
-                                            Content="+ Icône"
-                                            Style="{StaticResource ButtonPropertiesAction}"
-                                            Click="AddProcessIcon_Click"
-                                            Padding="8,4" MinWidth="72"/>
-                                </Grid>
-                                <Border Style="{StaticResource PanelChipsContainer}" Padding="4,4">
-                                    <ListBox x:Name="ProcessIconsListBox"
-                                            Style="{StaticResource ListBoxNoScrollBarStyle}"
-                                            Background="Transparent"
-                                            BorderThickness="0"
-                                            MaxHeight="102"
-                                            SelectionChanged="ProcessIconsListBox_SelectionChanged">
-                                        <ListBox.ItemsPanel>
-                                            <ItemsPanelTemplate>
-                                                <WrapPanel Orientation="Horizontal"/>
-                                            </ItemsPanelTemplate>
-                                        </ListBox.ItemsPanel>
-                                        <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
-                                                <Setter Property="Padding" Value="0"/>
-                                                <Setter Property="Margin" Value="1"/>
-                                                <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                                                <Setter Property="VerticalContentAlignment" Value="Center"/>
-                                                <Setter Property="Cursor" Value="Hand"/>
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="ListBoxItem">
-                                                            <Border x:Name="Bd" Width="32" Height="32" CornerRadius="4"
-                                                                    Background="Transparent" BorderBrush="Transparent" BorderThickness="1"
-                                                                    Cursor="Hand">
-                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                            </Border>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="Bd" Property="Background" Value="#20FFFFFF"/>
-                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                                                </Trigger>
-                                                                <Trigger Property="IsSelected" Value="True">
-                                                                    <Setter TargetName="Bd" Property="Background" Value="#25FFFFFF"/>
-                                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource BorderLightBrush}"/>
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                            </Style>
-                                        </ListBox.ItemContainerStyle>
-                                        <ListBox.ItemTemplate>
-                                            <DataTemplate>
-                                                <Image Width="20" Height="20"
-                                                       Source="{Binding Path, Converter={StaticResource ProcessIconConverter}}"
-                                                       Stretch="Uniform"
-                                                       ToolTip="{Binding DisplayName}"/>
-                                            </DataTemplate>
-                                        </ListBox.ItemTemplate>
-                                    </ListBox>
-                                </Border>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <Border Style="{StaticResource SeparatorHorizontal}" Margin="0,12,0,12"/>
-
-                        <!-- Raccourci clavier -->
-                        <StackPanel Margin="0,0,0,10">
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Raccourci clavier" Style="{StaticResource TextLabel}" VerticalAlignment="Center" Margin="0"/>
-                                <Button Grid.Column="1"
-                                    Content="Définir"
-                                    Style="{StaticResource ButtonPropertiesAction}"
-                                    Click="SetShortcut_Click"
-                                    MinWidth="72"/>
-                            </Grid>
-                            <Border x:Name="ShortcutDisplayBorder"
-                                    Style="{StaticResource PanelChipsContainer}"
-                                    Padding="10,8"
-                                    MinHeight="32"
-                                    MaxHeight="32">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="ShortcutDisplayText" 
-                                               Grid.Column="0"
-                                               Text="Non défini"
-                                               Style="{StaticResource TextMono}"
-                                               FontSize="12"
-                                               TextTrimming="CharacterEllipsis"
-                                               TextWrapping="NoWrap"
-                                               VerticalAlignment="Center"/>
-                                    <Button Grid.Column="1"
-                                            x:Name="ClearShortcutButton"
-                                            Padding="4,0"
-                                            MinWidth="24"
-                                            MinHeight="24"
-                                            VerticalAlignment="Center"
-                                            Cursor="Hand"
-                                            ToolTip="Retirer le raccourci"
-                                            Visibility="{Binding ShortcutKeyCode, Converter={StaticResource ShortcutVisibilityConverter}}"
-                                            Click="ClearShortcut_Click">
-                                        <Button.Style>
-                                            <Style TargetType="Button">
-                                                <Setter Property="Background" Value="Transparent"/>
-                                                <Setter Property="BorderThickness" Value="0"/>
-                                                <Setter Property="Template">
-                                                    <Setter.Value>
-                                                        <ControlTemplate TargetType="Button">
-                                                            <TextBlock x:Name="ClearIcon"
-                                                                       Text="&#xE1B2;"
-                                                                       FontFamily="{StaticResource FontLucide}"
-                                                                       FontSize="12"
-                                                                       Foreground="{StaticResource TextMutedBrush}"
-                                                                       HorizontalAlignment="Center"
-                                                                       VerticalAlignment="Center"/>
-                                                            <ControlTemplate.Triggers>
-                                                                <Trigger Property="IsMouseOver" Value="True">
-                                                                    <Setter TargetName="ClearIcon" Property="Foreground"
-                                                                            Value="{StaticResource TextPrimaryBrush}"/>
-                                                                </Trigger>
-                                                            </ControlTemplate.Triggers>
-                                                        </ControlTemplate>
-                                                    </Setter.Value>
-                                                </Setter>
-                                                <Setter Property="Opacity" Value="0"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Border}}"
-                                                                 Value="True">
-                                                        <Setter Property="Opacity" Value="1"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Button.Style>
-                                    </Button>
-                                </Grid>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- Applications cibles -->
-                        <StackPanel Margin="0,0,0,10">
-                            <Grid Margin="0,0,0,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Applications cibles" Style="{StaticResource TextLabel}" VerticalAlignment="Center" Margin="0"/>
-                                <Button x:Name="SelectAppsButton"
-                                        Grid.Column="1"
-                                        Content="Sélectionner"
-                                        Style="{StaticResource ButtonPropertiesAction}"
-                                        Click="SelectApps_Click"
-                                        MinWidth="88"
-                                        VerticalAlignment="Center"/>
-                            </Grid>
-                            <Border Style="{StaticResource PanelChipsContainer}"
-                                    Padding="10,8"
-                                    MinHeight="36"
-                                    MaxHeight="160">
-                                <ScrollViewer Style="{StaticResource ScrollViewerNoClipStyle}"
-                                          MaxHeight="140"
-                                          Padding="0">
-                                <WrapPanel x:Name="TargetAppsPanel">
-                                    <TextBlock x:Name="NoAppsText" 
-                                               Text="Toutes les applications" 
-                                               Style="{StaticResource TextMuted}"/>
-                                </WrapPanel>
-                                </ScrollViewer>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- Mode de déclenchement (conditions If) -->
-                        <StackPanel Margin="0,0,0,10">
-                            <TextBlock Text="Mode de déclenchement" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
-                            <ComboBox x:Name="TriggerModeComboBox"
-                                      Style="{StaticResource ComboBoxModern}"
-                                      Width="220"
-                                      HorizontalAlignment="Left"
-                                      ItemContainerStyle="{StaticResource TriggerModeComboBoxItemStyle}"
-                                      SelectionChanged="TriggerModeComboBox_SelectionChanged"/>
-                            <StackPanel x:Name="TriggerModeOptionsPanel" Visibility="Collapsed" Margin="0,8,0,0">
-                                <TextBlock Text="Intervalle (ms)" Style="{StaticResource TextLabel}" Margin="0,0,0,4"/>
-                                <TextBox x:Name="ContinuousMonitoringIntervalTextBox"
-                                         Style="{StaticResource TextBoxModern}"
-                                         Width="54"
-                                         Padding="3,2"
-                                         HorizontalAlignment="Left"
-                                         Text="200"
-                                         PreviewMouseDown="MacroDescriptionTextBox_PreviewMouseDown"
-                                         TextChanged="ContinuousMonitoringInterval_TextChanged"/>
-                            </StackPanel>
-                        </StackPanel>
-
-                        <Border Style="{StaticResource SeparatorHorizontal}"/>
-
-                        <!-- État du moteur -->
-                        <TextBlock Text="État" Style="{StaticResource TextLabel}" Margin="0,8,0,0"/>
-                        <Border Style="{StaticResource PanelChipsContainer}"
-                                Padding="12,8"
-                                Margin="0,0,0,12">
-                            <TextBlock x:Name="EngineStateText" 
-                                           Text="Prêt" 
-                                           Foreground="{StaticResource SuccessBrush}"
-                                           FontWeight="Medium"/>
-                        </Border>
-
-                        <!-- Application active -->
-                        <TextBlock Text="Application active" Style="{StaticResource TextLabel}"/>
-                        <Border Style="{StaticResource PanelChipsContainer}"
-                                Padding="12,8">
-                            <TextBlock x:Name="ActiveAppText" 
-                                       Text="Aucune" 
-                                       Foreground="{StaticResource TextPrimaryBrush}"
-                                       TextWrapping="Wrap"/>
-                        </Border>
-                </StackPanel>
+                                                        </Grid>
+                                                    </Border>
+                                                </StackPanel>
+                                                <DockPanel Margin="0,4,0,6" LastChildFill="False">
+                                                    <ToggleButton x:Name="PropsRandomDelayToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitchStylePropsCompact}" Width="32" Height="17" IsEnabled="False" Opacity="0.45"/>
+                                                    <StackPanel>
+                                                        <TextBlock Text="Délai aléatoire" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                        <TextBlock Text="±20 % sur l'intervalle (bientôt)" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}"/>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                                <DockPanel Margin="0,0,0,0" LastChildFill="False">
+                                                    <ToggleButton x:Name="PropsResumeFocusToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitchStylePropsCompact}"
+                                                                  Width="32" Height="17" Click="PropsResumeFocusToggle_Click"/>
+                                                    <StackPanel>
+                                                        <TextBlock Text="Reprendre après focus" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextSecondaryBrush}"/>
+                                                        <TextBlock Text="Relance si la fenêtre cible revient au premier plan" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,8,0"/>
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="BOUCLE" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,10"/>
+                                                <TextBlock Text="CONDITION D'ARRÊT" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,3"/>
+                                                <ComboBox x:Name="PropsLoopModeComboBox" Style="{StaticResource ComboBoxModernSquare}" HorizontalAlignment="Stretch" IsEnabled="False" Opacity="0.6"
+                                                          ToolTip="Lié au mode Répéter de la macro (à venir)"/>
+                                                <Grid Margin="0,10,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="8"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0">
+                                                        <TextBlock Text="PRIORITÉ CPU" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,3"/>
+                                                        <ComboBox Style="{StaticResource ComboBoxModernSquare}" IsEnabled="False" Opacity="0.5" ToolTip="Bientôt disponible"/>
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Text="TIMEOUT (S)" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,3"/>
+                                                        <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1">
+                                                            <TextBox Style="{StaticResource TextBoxNoCornerRadius}" IsEnabled="False" Opacity="0.5" BorderThickness="0" Background="Transparent" Padding="6,6" FontFamily="{StaticResource FontMono}"
+                                                                     FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource AccentPrimaryBrush}" TextAlignment="Right" Text="0"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                    <!-- SYSTÈME -->
+                                    <StackPanel x:Name="PropsPaneSysteme" Visibility="Collapsed">
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="APPLICATION ACTIVE" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,10"/>
+                                                <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Padding="8,8" Margin="0,0,0,5">
+                                                    <DockPanel LastChildFill="False">
+                                                        <TextBlock DockPanel.Dock="Right" Text="ACTIF" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource SuccessBrush}" VerticalAlignment="Center"/>
+                                                        <Ellipse Width="6" Height="6" Fill="{StaticResource InfoBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock x:Name="PropsHostProcessName" Text="MacroEngine.exe" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                            <TextBlock x:Name="PropsHostProcessSub" Text="Processus hôte" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+                                                <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Padding="8,8">
+                                                    <DockPanel LastChildFill="False">
+                                                        <TextBlock DockPanel.Dock="Right" Text="CIBLÉ" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Bold" Foreground="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center"/>
+                                                        <Ellipse Width="6" Height="6" Fill="{StaticResource AccentPrimaryBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                                        <StackPanel VerticalAlignment="Center">
+                                                            <TextBlock x:Name="PropsTargetProcessName" Text="—" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock x:Name="PropsTargetProcessSub" Text="Application cible" FontFamily="{StaticResource FontMono}" FontSize="9" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+                                                <TextBlock x:Name="ActiveAppText" Visibility="Collapsed" Text="Aucune"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="STATISTIQUES" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,10"/>
+                                                <UniformGrid Rows="2" Columns="2">
+                                                    <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Padding="8,8" Margin="0,0,1,1">
+                                                        <StackPanel>
+                                                            <TextBlock x:Name="PropsStatExecutions" Text="0" FontFamily="{StaticResource FontDisplay}" FontSize="20" FontWeight="Black" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                                                            <TextBlock Text="EXÉCUTIONS" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Padding="8,8" Margin="1,0,0,1">
+                                                        <StackPanel>
+                                                            <TextBlock x:Name="PropsStatActions" Text="0" FontFamily="{StaticResource FontDisplay}" FontSize="20" FontWeight="Black" Foreground="{StaticResource SuccessBrush}"/>
+                                                            <TextBlock Text="ACTIONS" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Padding="8,8" Margin="0,1,1,0">
+                                                        <StackPanel>
+                                                            <TextBlock x:Name="PropsStatLastExec" Text="—" FontFamily="{StaticResource FontDisplay}" FontSize="20" FontWeight="Black" Foreground="{StaticResource InfoBrush}"/>
+                                                            <TextBlock Text="DERNIÈRE EXÉC." FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                    <Border Background="{StaticResource BackgroundTertiaryBrush}" BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Padding="8,8" Margin="1,1,0,0">
+                                                        <StackPanel>
+                                                            <TextBlock x:Name="PropsStatInterval" Text="200" FontFamily="{StaticResource FontDisplay}" FontSize="20" FontWeight="Black" Foreground="{StaticResource AccentPrimaryBrush}"/>
+                                                            <TextBlock Text="INTERVALLE MS" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Normal" Foreground="{StaticResource TextMutedBrush}"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </UniformGrid>
+                                                <Button Content="↺ RÉINITIALISER LES STATS" Margin="0,8,0,0" Style="{StaticResource ButtonGhostPropsPanelSquare}" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Bold"
+                                                        BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Padding="6,5" Click="PropsResetStats_Click"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,1" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="OPTIONS AVANCÉES" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,10"/>
+                                                <DockPanel Margin="0,0,0,6" LastChildFill="False">
+                                                    <ToggleButton x:Name="PropsStartupToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitchStylePropsCompact}" Width="32" Height="17" IsEnabled="False" Opacity="0.45"/>
+                                                    <TextBlock Text="Activer au démarrage" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,8,0"/>
+                                                </DockPanel>
+                                                <DockPanel Margin="0,0,0,6" LastChildFill="False">
+                                                    <ToggleButton x:Name="PropsStealthToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitchStylePropsCompact}" Width="32" Height="17" IsEnabled="False" Opacity="0.45"/>
+                                                    <TextBlock Text="Mode furtif" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,8,0"/>
+                                                </DockPanel>
+                                                <DockPanel LastChildFill="False">
+                                                    <ToggleButton x:Name="PropsActionLogToggle" DockPanel.Dock="Right" Style="{StaticResource ToggleSwitchStylePropsCompact}" Width="32" Height="17" IsEnabled="False" Opacity="0.45" IsChecked="True"/>
+                                                    <TextBlock Text="Journal des actions" FontFamily="{StaticResource FontMono}" FontSize="11" FontWeight="Normal" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,8,0"/>
+                                                </DockPanel>
+                                            </StackPanel>
+                                        </Border>
+                                        <Border BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="0,0,0,0" Padding="8,14,8,12">
+                                            <StackPanel>
+                                                <TextBlock Text="ZONE DE DANGER" Style="{StaticResource PropsPanelFieldLabelStyle}" Margin="0,0,0,10"/>
+                                                <Button Content="✕ SUPPRIMER CETTE MACRO" Style="{StaticResource ButtonGhostDanger}" Margin="0,0,0,4" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Bold" Click="DeleteMacro_Click"/>
+                                                <Button Content="⎘ DUPLIQUER LA MACRO" Style="{StaticResource ButtonGhostPropsPanelSquare}" Margin="0,0,0,4" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Bold"
+                                                        BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Click="DuplicateMacroProps_Click"/>
+                                                <Button Content="↓ EXPORTER EN .JSON" Style="{StaticResource ButtonGhostPropsPanelSquare}" Padding="8,6" FontFamily="{StaticResource FontMono}" FontSize="8" FontWeight="Bold"
+                                                        BorderBrush="{StaticResource BorderMediumBrush}" BorderThickness="1" Click="ExportMacro_Click"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <!-- Panneau apps (chips) masqué visuellement mais conservé pour le code-behind -->
+                                        <Border Visibility="Collapsed" Height="0">
+                                            <StackPanel>
+                                                <Button x:Name="SelectAppsButton" Click="SelectApps_Click"/>
+                                                <WrapPanel x:Name="TargetAppsPanel"/>
+                                                <TextBlock x:Name="NoAppsText" Text="Toutes les applications"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Grid>
             </Border>
             </Grid>
 
@@ -1340,4 +1489,3 @@
         </Grid>
     </Border>
 </Window>
-

@@ -43,17 +43,10 @@
                                     BorderThickness="{TemplateBinding BorderThickness}"
                                     CornerRadius="0"
                                     Padding="0">
-                                <!-- Le padding ne doit passer que via Margin du contenu -->
-                                <ScrollViewer x:Name="PART_ContentHost"
-                                              Foreground="{TemplateBinding Foreground}"
-                                              Style="{StaticResource ScrollViewerNoClipStyle}"
-                                              Margin="0"
-                                              Padding="{TemplateBinding Padding}"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              VerticalScrollBarVisibility="Hidden"
-                                              CanContentScroll="False"
-                                              PanningMode="None"
-                                              Focusable="False"/>
+                                <!-- Hôte Decorator : pas de ScrollViewer (évite la réserve à droite) -->
+                                <Border x:Name="PART_ContentHost"
+                                        Background="Transparent"
+                                        Margin="{TemplateBinding Padding}"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsFocused" Value="True">
@@ -100,8 +93,6 @@
                                  FontFamily="{StaticResource FontMono}"
                                  FontSize="11"
                                 Padding="2,3,2,3"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                                 ScrollViewer.VerticalScrollBarVisibility="Hidden"
                                  MinHeight="72"
                                  MaxHeight="140"
                                  TextWrapping="Wrap"

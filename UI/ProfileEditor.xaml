@@ -14,7 +14,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TextBox">
-                        <ScrollViewer x:Name="PART_ContentHost" Margin="0"/>
+                        <Border x:Name="PART_ContentHost" Background="Transparent" Margin="0"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>

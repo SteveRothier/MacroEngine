@@ -34,6 +34,8 @@
     <Color x:Key="TextSecondaryColor">#7A927A</Color>
     <Color x:Key="TextMutedColor">#4A5A4A</Color>
     <Color x:Key="TextOnAccentColor">#0A0A00</Color>
+    <!-- Texte sur bouton ambre du panneau Propriétés (spec mockup) -->
+    <Color x:Key="TextOnPropsSaveColor">#0A0800</Color>
     
     <!-- États -->
     <Color x:Key="WarningColor">#E8A020</Color>
@@ -178,6 +180,7 @@
     <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}"/>
     <SolidColorBrush x:Key="TextMutedBrush" Color="{StaticResource TextMutedColor}"/>
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="{StaticResource TextOnAccentColor}"/>
+    <SolidColorBrush x:Key="TextOnPropsSaveBrush" Color="{StaticResource TextOnPropsSaveColor}"/>
     
     <!-- États -->
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>

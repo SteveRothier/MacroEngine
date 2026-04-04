@@ -10591,8 +10591,8 @@ namespace MacroEngine.UI
             bool canMoveUp = false;
             bool canMoveDown = false;
             if (_currentMacro != null && TryResolveNestedIfBranchList(moveCtx, out _, out var moveList) && moveList != null)
-            {
-                canMoveUp = nestedIndex > 0;
+                    {
+                        canMoveUp = nestedIndex > 0;
                 canMoveDown = nestedIndex < moveList.Count - 1;
             }
 
@@ -10768,12 +10768,12 @@ namespace MacroEngine.UI
                 else
                 {
                     actionsList = info.IsThen ? ifAction.ThenActions : ifAction.ElseActions;
-                    if (actionsList == null)
-                    {
-                        actionsList = new List<IInputAction>();
-                        if (info.IsThen)
+                if (actionsList == null)
+                {
+                    actionsList = new List<IInputAction>();
+                    if (info.IsThen)
                             ifAction.ThenActions = (List<IInputAction>)actionsList;
-                        else
+                    else
                             ifAction.ElseActions = (List<IInputAction>)actionsList;
                     }
                 }
@@ -11978,18 +11978,18 @@ namespace MacroEngine.UI
                 if (info.ParentIndex < 0 || info.ParentIndex >= _currentMacro.Actions.Count) return;
                 if (_currentMacro.Actions[info.ParentIndex] is not IfAction ifAction) return;
                 list = GetIfActionsList(ifAction, info.IsThen, info.ElseIfBranchIndex);
-                if (list == null)
-                {
-                    list = new List<IInputAction>();
-                    if (info.IsThen)
+            if (list == null)
+            {
+                list = new List<IInputAction>();
+                if (info.IsThen)
                         ifAction.ThenActions = (List<IInputAction>)list;
-                    else if (info.ElseIfBranchIndex < 0)
+                else if (info.ElseIfBranchIndex < 0)
                         ifAction.ElseActions = (List<IInputAction>)list;
-                    else if (ifAction.ElseIfBranches != null && info.ElseIfBranchIndex < ifAction.ElseIfBranches.Count)
+                else if (ifAction.ElseIfBranches != null && info.ElseIfBranchIndex < ifAction.ElseIfBranches.Count)
                         ifAction.ElseIfBranches[info.ElseIfBranchIndex].Actions = (List<IInputAction>)list;
-                    else
-                        return;
-                }
+                else
+                    return;
+            }
             }
 
             if (info.NestedIndex < 0 || info.NestedIndex >= list.Count) return;

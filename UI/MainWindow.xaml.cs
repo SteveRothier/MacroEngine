@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -76,6 +78,10 @@ namespace MacroEngine.UI
         private DateTime _lastRapidKeyWarning = DateTime.MinValue;
         private readonly object _recordingLock = new object();
         private volatile int _recordingInProgress = 0;
+        /// <summary>Évite la réentrance lors du rognage nom/description selon l’espace affiché.</summary>
+        private bool _clampingMacroIdentityText;
+        /// <summary>Assignation programmatique de la description : ne pas reclamper ni sauvegarder dans TextChanged.</summary>
+        private bool _macroDescriptionTextFromCode;
         
         // Timer pour la sauvegarde automatique
         private System.Windows.Threading.DispatcherTimer? _autoSaveTimer;
@@ -84,6 +90,10 @@ namespace MacroEngine.UI
         // Surveillance des applications (détection d'application active)
         private ProcessMonitor? _processMonitor;
         private string _currentForegroundProcess = string.Empty;
+        private int _currentForegroundPid;
+
+        /// <summary>Stats d'exécution affichées dans l'onglet Système du panneau Propriétés (session courante).</summary>
+        private readonly Dictionary<string, (int Executions, DateTime? LastExecUtc)> _propsExecStats = new(StringComparer.Ordinal);
 
         // Liste macros : sélection uniquement au clic (pas au survol avec clic maintenu)
         private object? _macrosListPressedItem;
@@ -101,7 +111,7 @@ namespace MacroEngine.UI
         private bool _isPropsPanelOpen = false;
         /// <summary>Évite que la synchro du toggle déclenche Checked/Unchecked (boucle).</summary>
         private bool _syncingMacroEnableToggle;
-        private const double PropsPanelWidth = 320.0;
+        private const double PropsPanelWidth = 240.0; // largeur visible du panneau propriétés
         private const double PropsPanelHiddenOffset = 16.0; // masque la bordure gauche orange hors écran
         private static readonly TimeSpan PropsPanelAnimDuration = TimeSpan.FromMilliseconds(250);
 
@@ -214,6 +224,8 @@ namespace MacroEngine.UI
             LeftColumnBorder.BeginAnimation(UIElement.OpacityProperty, anim);
             InitializeIconComboBoxes();
             UpdatePropsPanelVisibility(immediate: true);
+            ApplyPropsTabVisual("Identite");
+            UpdatePropsProcessBlocks();
         }
 
         private void PropsToggleButton_Click(object sender, RoutedEventArgs e)
@@ -420,12 +432,14 @@ namespace MacroEngine.UI
         private void ProcessMonitor_ForegroundChanged(object? sender, ForegroundChangedEventArgs e)
         {
             _currentForegroundProcess = e.CurrentProcessName;
-            
+            _currentForegroundPid = e.ProcessId;
+
             // Mettre à jour l'affichage de l'application active
             Dispatcher.Invoke(() =>
             {
                 UpdateActiveApplicationDisplay(e.CurrentProcessName, e.WindowTitle);
-                
+                UpdatePropsProcessBlocks();
+
                 // Vérifier si une macro doit être exécutée automatiquement
                 CheckAutoExecuteMacros(e.CurrentProcessName);
             });
@@ -476,15 +490,25 @@ namespace MacroEngine.UI
         /// </summary>
         private bool IsMacroShortcutActiveForCurrentApp(Macro macro)
         {
-            // Si pas d'applications cibles, le raccourci est toujours actif
-            if (macro.TargetApplications == null || macro.TargetApplications.Count == 0)
-            {
+            if (macro.AppTriggerMode != AppTriggerMode.ActiveOnlyInApp)
                 return true;
-            }
 
-            // Vérifier si l'application actuelle est dans la liste des cibles
-            return macro.TargetApplications.Any(app => 
-                string.Equals(app, _currentForegroundProcess, StringComparison.OrdinalIgnoreCase));
+            if (macro.TargetApplications == null || macro.TargetApplications.Count == 0)
+                return true;
+
+            return macro.TargetApplications.Any(app =>
+                TargetsProcessName(app, _currentForegroundProcess));
+        }
+
+        private static bool TargetsProcessName(string targetEntry, string foregroundProcessName)
+        {
+            if (string.IsNullOrEmpty(foregroundProcessName))
+                return false;
+            var stem = Path.GetFileNameWithoutExtension(targetEntry);
+            if (string.IsNullOrEmpty(stem))
+                stem = targetEntry;
+            return string.Equals(stem, foregroundProcessName, StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(Path.GetFileName(targetEntry), foregroundProcessName + ".exe", StringComparison.OrdinalIgnoreCase);
         }
 
         private async System.Threading.Tasks.Task LoadConfigAndInitializeHooksAsync()
@@ -975,10 +999,12 @@ namespace MacroEngine.UI
             if (e is MacroActionsChangedOnlyEventArgs)
             {
                 ScheduleDeferredTriggerModeRefresh();
+                UpdatePropsStatsDisplay();
                 return;
             }
 
             UpdateMacroSummary();
+            UpdatePropsStatsDisplay();
             UpdateTriggerModeRecommendedText();
             ScheduleDeferredMacroHeavyRefresh();
         }
@@ -1086,7 +1112,17 @@ namespace MacroEngine.UI
         {
             Dispatcher.Invoke(() =>
             {
-                EngineStateText.Text = e.CurrentState.ToString();
+                if (EngineStateText != null)
+                {
+                    EngineStateText.Text = e.CurrentState switch
+                    {
+                        MacroEngineState.Idle => "PRÊT",
+                        MacroEngineState.Running => "EN COURS",
+                        MacroEngineState.Paused => "PAUSE",
+                        MacroEngineState.Stopping => "ARRÊT",
+                        _ => e.CurrentState.ToString().ToUpperInvariant()
+                    };
+                }
                 
                 // Gérer l'état des boutons selon le mode (enregistrement vs exécution)
                 bool isExecuting = e.CurrentState != MacroEngineState.Idle;
@@ -1396,7 +1432,8 @@ namespace MacroEngine.UI
             if (_selectedMacro != null)
             {
                 MacroNameTextBox.Text = _selectedMacro.Name;
-                MacroDescriptionTextBox.Text = _selectedMacro.Description ?? "";
+                SetMacroDescriptionTextBoxFromModel(_selectedMacro.Description);
+                ScheduleClampMacroIdentityFieldsAfterLayout();
                 ShortcutDisplayText.Text = _selectedMacro.ShortcutKeyCode > 0 ? GetKeyName((ushort)_selectedMacro.ShortcutKeyCode) : "Non défini";
                 if (ClearShortcutButton != null)
                     ClearShortcutButton.Visibility = _selectedMacro.ShortcutKeyCode != 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -1404,7 +1441,8 @@ namespace MacroEngine.UI
             else
             {
                 MacroNameTextBox.Text = "";
-                MacroDescriptionTextBox.Text = "";
+                SetMacroDescriptionTextBoxFromModel(null);
+                ScheduleClampMacroIdentityFieldsAfterLayout();
                 ShortcutDisplayText.Text = "Non défini";
                 if (ClearShortcutButton != null)
                     ClearShortcutButton.Visibility = Visibility.Collapsed;
@@ -1613,7 +1651,9 @@ namespace MacroEngine.UI
 
                 // Réinitialiser le flag d'arrêt
                 _stopRequested = false;
-                
+
+                var macroExecuted = _selectedMacro;
+
                 // Déterminer le nombre de répétitions
                 int repeatCount = 1;
                 bool repeatUntilStopped = false;
@@ -1727,6 +1767,7 @@ namespace MacroEngine.UI
                             : "Exécution terminée";
                         StatusText.Text = completedText;
                         StatusText.Foreground = System.Windows.Media.Brushes.Green;
+                        RecordMacroExecutionCompleted(macroExecuted);
                     }
                     else
                     {
@@ -3165,45 +3206,463 @@ namespace MacroEngine.UI
             }
         }
 
+        private void PropsTabButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn || btn.Tag is not string tag)
+                return;
+            ShowPropsTab(tag);
+        }
+
+        private void ShowPropsTab(string tag)
+        {
+            if (PropsPaneIdentite == null || PropsPaneExecution == null || PropsPaneSysteme == null)
+                return;
+            PropsPaneIdentite.Visibility = tag == "Identite" ? Visibility.Visible : Visibility.Collapsed;
+            PropsPaneExecution.Visibility = tag == "Execution" ? Visibility.Visible : Visibility.Collapsed;
+            PropsPaneSysteme.Visibility = tag == "Systeme" ? Visibility.Visible : Visibility.Collapsed;
+            ApplyPropsTabVisual(tag);
+        }
+
+        private void ApplyPropsTabVisual(string activeTag)
+        {
+            try
+            {
+                var accent = (Brush)FindResource("AccentPrimaryBrush");
+                var inactive = (Brush)FindResource("TextSecondaryBrush");
+                var line = (Brush)FindResource("BorderMediumBrush");
+
+                void StyleTab(Button? b, bool on)
+                {
+                    if (b == null) return;
+                    b.Foreground = on ? accent : inactive;
+                    b.BorderBrush = on ? accent : line;
+                    b.Background = on ? new SolidColorBrush(Color.FromArgb(0x0A, 0xE8, 0xA0, 0x20)) : System.Windows.Media.Brushes.Transparent;
+                }
+
+                StyleTab(PropsTabIdentiteButton, activeTag == "Identite");
+                StyleTab(PropsTabExecutionButton, activeTag == "Execution");
+                StyleTab(PropsTabSystemeButton, activeTag == "Systeme");
+            }
+            catch
+            {
+                /* ressources manquantes en design-time */
+            }
+        }
+
+        private void PropsRestrictAppToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null || sender is not ToggleButton tb)
+                return;
+            _selectedMacro.AppTriggerMode = tb.IsChecked == true ? AppTriggerMode.ActiveOnlyInApp : AppTriggerMode.Manual;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            UpdateMacroShortcuts();
+            TriggerAutoSave();
+        }
+
+        private void PropsResumeFocusToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null || sender is not ToggleButton tb)
+                return;
+            _selectedMacro.AutoExecuteOnFocus = tb.IsChecked == true;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            TriggerAutoSave();
+        }
+
+        private void PropsResetStats_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null)
+                return;
+            _propsExecStats.Remove(_selectedMacro.Id);
+            UpdatePropsStatsDisplay();
+            StatusText.Text = "Statistiques réinitialisées pour cette macro.";
+            StatusText.Foreground = System.Windows.Media.Brushes.Gray;
+        }
+
+        private void RecordMacroExecutionCompleted(Macro? macro)
+        {
+            if (macro == null || string.IsNullOrEmpty(macro.Id))
+                return;
+            _propsExecStats.TryGetValue(macro.Id, out var prev);
+            _propsExecStats[macro.Id] = (prev.Executions + 1, DateTime.UtcNow);
+            Dispatcher.BeginInvoke(new Action(UpdatePropsStatsDisplay), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        private void UpdatePropsStatsDisplay()
+        {
+            if (PropsStatExecutions == null || PropsStatActions == null || PropsStatLastExec == null || PropsStatInterval == null)
+                return;
+            if (_selectedMacro == null)
+            {
+                PropsStatExecutions.Text = "0";
+                PropsStatActions.Text = "0";
+                PropsStatLastExec.Text = "—";
+                PropsStatInterval.Text = "200";
+                return;
+            }
+
+            _propsExecStats.TryGetValue(_selectedMacro.Id, out var st);
+            PropsStatExecutions.Text = st.Executions.ToString();
+            PropsStatActions.Text = (_selectedMacro.Actions?.Count ?? 0).ToString();
+            PropsStatLastExec.Text = st.LastExecUtc.HasValue
+                ? st.LastExecUtc.Value.ToLocalTime().ToString("HH:mm:ss")
+                : "—";
+            PropsStatInterval.Text = _selectedMacro.ContinuousMonitoringIntervalMs.ToString();
+        }
+
+        private void UpdatePropsTargetAppCard()
+        {
+            if (PropsTargetAppTitle == null || PropsTargetAppSub == null)
+                return;
+            if (_selectedMacro == null)
+            {
+                PropsTargetAppTitle.Text = "—";
+                PropsTargetAppSub.Text = "";
+                return;
+            }
+
+            var targets = _selectedMacro.TargetApplications;
+            if (targets == null || targets.Count == 0)
+            {
+                PropsTargetAppTitle.Text = "Toutes les applications";
+                PropsTargetAppSub.Text = "Aucune restriction de processus";
+                return;
+            }
+
+            var first = targets[0];
+            var display = Path.GetFileNameWithoutExtension(first);
+            if (string.IsNullOrEmpty(display))
+                display = first;
+            var file = Path.GetFileName(first);
+            if (string.IsNullOrEmpty(file))
+                file = first;
+            PropsTargetAppTitle.Text = display;
+            PropsTargetAppSub.Text = $"Fenêtre active · {file}";
+        }
+
+        private void UpdatePropsProcessBlocks()
+        {
+            try
+            {
+                using var self = Process.GetCurrentProcess();
+                if (PropsHostProcessName != null)
+                    PropsHostProcessName.Text = $"{self.ProcessName}.exe";
+                if (PropsHostProcessSub != null)
+                    PropsHostProcessSub.Text = $"Processus hôte — PID {self.Id}";
+            }
+            catch
+            {
+                if (PropsHostProcessSub != null)
+                    PropsHostProcessSub.Text = "Processus hôte";
+            }
+
+            if (PropsTargetProcessName == null || PropsTargetProcessSub == null)
+                return;
+
+            if (_selectedMacro?.TargetApplications == null || _selectedMacro.TargetApplications.Count == 0)
+            {
+                PropsTargetProcessName.Text = "—";
+                PropsTargetProcessSub.Text = "Aucune application cible";
+                return;
+            }
+
+            var t0 = _selectedMacro.TargetApplications[0];
+            var fn = Path.GetFileName(t0);
+            if (string.IsNullOrEmpty(fn))
+                fn = t0;
+            PropsTargetProcessName.Text = fn;
+
+            var fg = _currentForegroundProcess;
+            if (!string.IsNullOrEmpty(fg) && _selectedMacro.TargetApplications.Any(a => TargetsProcessName(a, fg)))
+                PropsTargetProcessSub.Text = $"Application cible — PID {_currentForegroundPid}";
+            else
+                PropsTargetProcessSub.Text = "Application cible (hors premier plan)";
+        }
+
+        private static void ApplyMacroSnapshot(Macro from, Macro to)
+        {
+            to.Name = from.Name;
+            to.Description = from.Description ?? "";
+            to.Actions = from.Actions?.Select(a => a.Clone()).Where(a => a != null).Cast<IInputAction>().ToList() ?? new List<IInputAction>();
+            to.IsEnabled = from.IsEnabled;
+            to.RepeatCount = from.RepeatCount;
+            to.DelayBetweenRepeats = from.DelayBetweenRepeats;
+            to.RepeatMode = from.RepeatMode;
+            to.CreatedAt = from.CreatedAt;
+            to.ModifiedAt = from.ModifiedAt;
+            to.ShortcutKeyCode = from.ShortcutKeyCode;
+            to.TargetApplications = from.TargetApplications != null ? new List<string>(from.TargetApplications) : new List<string>();
+            to.AppTriggerMode = from.AppTriggerMode;
+            to.AutoExecuteOnFocus = from.AutoExecuteOnFocus;
+            to.TriggerMode = from.TriggerMode;
+            to.ContinuousMonitoringIntervalMs = from.ContinuousMonitoringIntervalMs;
+            to.IconType = from.IconType ?? "None";
+            to.LucideIconCode = from.LucideIconCode ?? "E081";
+            to.IconColor = from.IconColor ?? "#B9B6C2";
+            to.ProcessIconPath = from.ProcessIconPath ?? "";
+        }
+
+        private static Macro CloneMacroForDuplicate(Macro m)
+        {
+            var c = new Macro();
+            ApplyMacroSnapshot(m, c);
+            c.Id = Guid.NewGuid().ToString();
+            c.CreatedAt = DateTime.Now;
+            c.ModifiedAt = DateTime.Now;
+            c.Name = string.IsNullOrWhiteSpace(m.Name) ? "Copie" : $"{m.Name.TrimEnd()} (copie)";
+            return c;
+        }
+
+        private async void PropsCancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null)
+                return;
+            var id = _selectedMacro.Id;
+            try
+            {
+                var fromDisk = await _macroStorage.LoadMacrosAsync();
+                var snap = fromDisk.FirstOrDefault(m => m.Id == id);
+                if (snap == null)
+                {
+                    StatusText.Text = "Annulation impossible : macro absente du fichier sur disque.";
+                    StatusText.Foreground = System.Windows.Media.Brushes.Orange;
+                    return;
+                }
+                ApplyMacroSnapshot(snap, _selectedMacro);
+                UpdateMacroPropertiesPanel();
+                _blockEditor?.LoadMacro(_selectedMacro);
+                UpdateMacroShortcuts();
+                ScheduleMacroEditorRefresh(forceFullRebuild: true);
+                StatusText.Text = "Modifications annulées (état rechargé depuis le disque).";
+                StatusText.Foreground = System.Windows.Media.Brushes.Gray;
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Erreur lors de l'annulation : {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
+            }
+        }
+
+        private async void DuplicateMacroProps_Click(object sender, RoutedEventArgs e)
+        {
+            if (_selectedMacro == null)
+                return;
+            try
+            {
+                var copy = CloneMacroForDuplicate(_selectedMacro);
+                _macros.Add(copy);
+                await _macroStorage.SaveMacrosAsync(_macros);
+                try
+                {
+                    var profiles = await _profileProvider.LoadProfilesAsync();
+                    var activeProfile = profiles.FirstOrDefault(p => p.IsActive);
+                    if (activeProfile != null && !activeProfile.MacroIds.Contains(copy.Id))
+                    {
+                        activeProfile.MacroIds.Add(copy.Id);
+                        await _profileProvider.SaveProfileAsync(activeProfile);
+                    }
+                }
+                catch { /* ignorer */ }
+
+                await RefreshMacrosListForActiveProfileAsync();
+                MacrosListBox.SelectedItem = copy;
+                UpdateMacroShortcuts();
+                StatusText.Text = $"Macro dupliquée : {copy.Name}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Green;
+            }
+            catch (Exception ex)
+            {
+                StatusText.Text = $"Erreur duplication : {ex.Message}";
+                StatusText.Foreground = System.Windows.Media.Brushes.Red;
+            }
+        }
+
         #region Propriétés de la macro (panneau droite)
 
         private void MacroNameTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (_selectedMacro != null && MacroNameTextBox.Text != _selectedMacro.Name)
+            if (_clampingMacroIdentityText) return;
+            ClampMacroNameToAvailableSpace();
+            CommitMacroNameFieldToSelectedMacro();
+        }
+
+        private void MacroIdentityTextBox_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (_clampingMacroIdentityText) return;
+            if (sender == MacroNameTextBox && e.WidthChanged)
+                ClampMacroNameToAvailableSpace();
+            else if (sender == MacroDescriptionTextBox && (e.WidthChanged || e.HeightChanged))
+                ClampMacroDescriptionToAvailableSpace();
+        }
+
+        private void ClampMacroNameToAvailableSpace()
+        {
+            if (MacroNameTextBox == null) return;
+            var tb = MacroNameTextBox;
+            double innerW = tb.ActualWidth - tb.Padding.Left - tb.Padding.Right;
+            if (innerW <= 2) return;
+            string t = tb.Text ?? "";
+            int maxLen = MaxCharsPrefixFittingSingleLine(t, tb, innerW);
+            if (maxLen < t.Length)
             {
-                _selectedMacro.Name = MacroNameTextBox.Text;
-                _selectedMacro.ModifiedAt = DateTime.Now;
-                // Rafraîchir la liste des macros pour montrer le nouveau nom
-                var index = MacrosListBox.SelectedIndex;
-                MacrosListBox.Items.Refresh();
-                MacrosListBox.SelectedIndex = index;
-                _ = _macroStorage.SaveMacrosAsync(_macros);
+                SetMacroIdentityTextBoxText(tb, t.Substring(0, maxLen));
+                CommitMacroNameFieldToSelectedMacro();
             }
         }
 
-        private void MacroDescriptionTextBox_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private const int MaxMacroDescriptionLines = 5;
+
+        private static string ClampMacroDescriptionTextToLineCount(string? text, int maxLines)
         {
-            if (sender is not System.Windows.Controls.TextBox tb) return;
-            var pos = e.GetPosition(tb);
-            var index = tb.GetCharacterIndexFromPoint(pos, snapToText: false);
-            // Si clic sur le texte : comportement normal (ne pas gérer). Si clic sur zone vide : mettre curseur à la fin
-            if (index < 0)
+            if (string.IsNullOrEmpty(text)) return text ?? "";
+            var parts = text.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+            if (parts.Length <= maxLines) return text;
+            return string.Join(Environment.NewLine, parts.Take(maxLines));
+        }
+
+        private void SetMacroDescriptionTextBoxFromModel(string? description)
+        {
+            if (MacroDescriptionTextBox == null) return;
+            _macroDescriptionTextFromCode = true;
+            try
             {
-                tb.Focus();
-                tb.SelectionStart = tb.Text?.Length ?? 0;
-                tb.SelectionLength = 0;
-                e.Handled = true;
+                MacroDescriptionTextBox.Text = string.IsNullOrEmpty(description)
+                    ? ""
+                    : ClampMacroDescriptionTextToLineCount(description, MaxMacroDescriptionLines);
             }
+            finally
+            {
+                _macroDescriptionTextFromCode = false;
+            }
+        }
+
+        private void ClampMacroDescriptionToMaxLines()
+        {
+            if (MacroDescriptionTextBox == null) return;
+            var tb = MacroDescriptionTextBox;
+            string clamped = ClampMacroDescriptionTextToLineCount(tb.Text, MaxMacroDescriptionLines);
+            if (clamped == (tb.Text ?? "")) return;
+            SetMacroIdentityTextBoxText(tb, clamped);
+        }
+
+        private void ClampMacroDescriptionToAvailableSpace()
+        {
+            if (MacroDescriptionTextBox == null) return;
+            var tb = MacroDescriptionTextBox;
+            double innerW = tb.ActualWidth - tb.Padding.Left - tb.Padding.Right;
+            double innerH = tb.ActualHeight - tb.Padding.Top - tb.Padding.Bottom;
+            if (innerW <= 2 || innerH <= 2) return;
+            string t = tb.Text ?? "";
+            int maxLen = MaxCharsPrefixFittingWrappedBox(t, tb, innerW, innerH);
+            if (maxLen < t.Length)
+            {
+                SetMacroIdentityTextBoxText(tb, t.Substring(0, maxLen));
+                CommitMacroDescriptionFieldToSelectedMacro();
+            }
+        }
+
+        private void CommitMacroNameFieldToSelectedMacro()
+        {
+            if (_selectedMacro == null || MacroNameTextBox == null) return;
+            if (MacroNameTextBox.Text == _selectedMacro.Name) return;
+            _selectedMacro.Name = MacroNameTextBox.Text;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            var index = MacrosListBox.SelectedIndex;
+            MacrosListBox.Items.Refresh();
+            MacrosListBox.SelectedIndex = index;
+            _ = _macroStorage.SaveMacrosAsync(_macros);
+        }
+
+        private void CommitMacroDescriptionFieldToSelectedMacro()
+        {
+            if (_selectedMacro == null || MacroDescriptionTextBox == null) return;
+            string d = MacroDescriptionTextBox.Text ?? "";
+            if (d == (_selectedMacro.Description ?? "")) return;
+            _selectedMacro.Description = d;
+            _selectedMacro.ModifiedAt = DateTime.Now;
+            _ = _macroStorage.SaveMacrosAsync(_macros);
+        }
+
+        private void ScheduleClampMacroIdentityFieldsAfterLayout()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                ClampMacroNameToAvailableSpace();
+                ClampMacroDescriptionToAvailableSpace();
+            }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+        }
+
+        private void SetMacroIdentityTextBoxText(TextBox tb, string value)
+        {
+            int sel = tb.SelectionStart;
+            _clampingMacroIdentityText = true;
+            try
+            {
+                tb.Text = value;
+                tb.SelectionStart = Math.Min(sel, value.Length);
+                tb.SelectionLength = 0;
+            }
+            finally
+            {
+                _clampingMacroIdentityText = false;
+            }
+        }
+
+        private static int MaxCharsPrefixFittingSingleLine(string text, TextBox tb, double maxWidth)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            var typeface = new Typeface(tb.FontFamily, tb.FontStyle, tb.FontWeight, tb.FontStretch);
+            double em = tb.FontSize;
+            double ppd = VisualTreeHelper.GetDpi(tb).PixelsPerDip;
+            int lo = 0, hi = text.Length;
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) / 2;
+                var ft = new FormattedText(
+                    text.Substring(0, mid),
+                    CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    typeface,
+                    em,
+                    Brushes.Black,
+                    ppd);
+                if (ft.Width <= maxWidth) lo = mid;
+                else hi = mid - 1;
+            }
+            return lo;
+        }
+
+        private static int MaxCharsPrefixFittingWrappedBox(string text, TextBox tb, double maxWidth, double maxHeight)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            var typeface = new Typeface(tb.FontFamily, tb.FontStyle, tb.FontWeight, tb.FontStretch);
+            double em = tb.FontSize;
+            double ppd = VisualTreeHelper.GetDpi(tb).PixelsPerDip;
+            const double heightTolerance = 2.0;
+            int lo = 0, hi = text.Length;
+            while (lo < hi)
+            {
+                int mid = (lo + hi + 1) / 2;
+                var ft = new FormattedText(
+                    text.Substring(0, mid),
+                    CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    typeface,
+                    em,
+                    Brushes.Black,
+                    ppd);
+                ft.MaxTextWidth = maxWidth;
+                if (ft.Height <= maxHeight + heightTolerance) lo = mid;
+                else hi = mid - 1;
+            }
+            return lo;
         }
 
         private void MacroDescriptionTextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (_selectedMacro != null && MacroDescriptionTextBox.Text != _selectedMacro.Description)
-            {
-                _selectedMacro.Description = MacroDescriptionTextBox.Text;
-                _selectedMacro.ModifiedAt = DateTime.Now;
-                _ = _macroStorage.SaveMacrosAsync(_macros);
-            }
+            if (_clampingMacroIdentityText || _macroDescriptionTextFromCode) return;
+            ClampMacroDescriptionToMaxLines();
+            ClampMacroDescriptionToAvailableSpace();
+            CommitMacroDescriptionFieldToSelectedMacro();
         }
 
         private void ClearShortcut_Click(object sender, RoutedEventArgs e)
@@ -3691,6 +4150,8 @@ namespace MacroEngine.UI
                     TargetAppsPanel.Children.Add(tag);
                 }
             }
+
+            UpdatePropsTargetAppCard();
         }
 
         private void UpdateMacroPropertiesPanel()
@@ -3698,7 +4159,8 @@ namespace MacroEngine.UI
             if (_selectedMacro != null)
             {
                 MacroNameTextBox.Text = _selectedMacro.Name;
-                MacroDescriptionTextBox.Text = _selectedMacro.Description ?? "";
+                SetMacroDescriptionTextBoxFromModel(_selectedMacro.Description);
+                ScheduleClampMacroIdentityFieldsAfterLayout();
                 UpdateIconComboBoxesFromMacro(_selectedMacro);
                 UpdateMacroSummary();
                 // Afficher le raccourci
@@ -3715,26 +4177,41 @@ namespace MacroEngine.UI
 
                 UpdateTargetAppsDisplay();
 
+                if (PropsRestrictAppToggle != null)
+                    PropsRestrictAppToggle.IsChecked = _selectedMacro.AppTriggerMode == AppTriggerMode.ActiveOnlyInApp;
+                if (PropsResumeFocusToggle != null)
+                    PropsResumeFocusToggle.IsChecked = _selectedMacro.AutoExecuteOnFocus;
+
                 // Surveillance continue
                 SelectTriggerModeInComboBox(_selectedMacro.TriggerMode);
                 TriggerModeOptionsPanel.Visibility = _selectedMacro.TriggerMode == MacroTriggerMode.ContinuousPolling ? Visibility.Visible : Visibility.Collapsed;
                 ContinuousMonitoringIntervalTextBox.Text = _selectedMacro.ContinuousMonitoringIntervalMs.ToString();
                 UpdateTriggerModeRecommendedText();
+                UpdatePropsProcessBlocks();
+                UpdatePropsStatsDisplay();
             }
             else
             {
                 MacroNameTextBox.Text = "";
-                MacroDescriptionTextBox.Text = "";
+                SetMacroDescriptionTextBoxFromModel(null);
+                ScheduleClampMacroIdentityFieldsAfterLayout();
                 ShortcutDisplayText.Text = "Non défini";
                 if (ClearShortcutButton != null)
                     ClearShortcutButton.Visibility = Visibility.Collapsed;
                 IconLucidePanel.Visibility = Visibility.Collapsed;
                 IconColorPanel.Visibility = Visibility.Collapsed;
                 IconProcessPanel.Visibility = Visibility.Collapsed;
+                SyncAddProcessIconButtonVisibility();
                 UpdateTargetAppsDisplay();
                 SelectTriggerModeInComboBox(MacroTriggerMode.SingleExecution);
                 TriggerModeOptionsPanel.Visibility = Visibility.Collapsed;
                 UpdateTriggerModeRecommendedText();
+                if (PropsRestrictAppToggle != null)
+                    PropsRestrictAppToggle.IsChecked = false;
+                if (PropsResumeFocusToggle != null)
+                    PropsResumeFocusToggle.IsChecked = false;
+                UpdatePropsProcessBlocks();
+                UpdatePropsStatsDisplay();
             }
         }
 
@@ -4055,6 +4532,14 @@ namespace MacroEngine.UI
             ProcessIconsListBox.SelectionChanged += ProcessIconsListBox_SelectionChanged;
         }
 
+        private void SyncAddProcessIconButtonVisibility()
+        {
+            if (AddProcessIconButton == null || IconProcessPanel == null) return;
+            AddProcessIconButton.Visibility = IconProcessPanel.Visibility == Visibility.Visible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
         private void UpdateIconComboBoxesFromMacro(Macro macro, bool clearUpdatingFlag = true, Action? onProcessListReady = null)
         {
             if (IconTypeComboBox == null) return;
@@ -4078,6 +4563,7 @@ namespace MacroEngine.UI
             }
             finally
             {
+                SyncAddProcessIconButtonVisibility();
                 if (clearUpdatingFlag)
                     _updatingIconFromMacro = false;
             }
