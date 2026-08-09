@@ -12,9 +12,23 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "MacroEngine",
-        "width": 480,
-        "height": 360
+        "width": 520,
+        "height": 640,
+        "resizable": true
+      },
+      {
+        "label": "overlay",
+        "title": "MacroEngine Overlay",
+        "width": 240,
+        "height": 72,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "transparent": true
       }
     ],
     "security": {
