@@ -4,7 +4,7 @@ Moteur d’automatisation Windows (macros souris/clavier) — reboot **Tauri 2 +
 
 ## Statut
 
-**M0 — Fondations** : coquille applicative et contrats moteur. Pas d’autoclicker ni d’éditeur encore (→ M1-A).
+**M1-A — Engine proof** : autoclicker Rust (SendInput, CPS, hotkeys, arrêt d’urgence hors React). Gate SLO : [`docs/m1a-gate.md`](docs/m1a-gate.md).
 
 ## Prérequis
 
@@ -21,20 +21,24 @@ npm install
 npm run tauri dev
 ```
 
+Hotkeys : **F6** action (toggle / hold), **F8** emergency stop.
+
 Tests moteur (sans UI) :
 
 ```bash
 cd src-tauri/crates/engine
 cargo test
+cargo test --test slo_harness
 ```
 
 ## Structure
 
-- `src/` — UI React (présentation)
-- `src-tauri/` — shell Tauri (tray, IPC, logs)
-- `src-tauri/crates/engine/` — contrats moteur + tests
+- `src/` — UI React (présentation / panneau preuve M1-A)
+- `src-tauri/` — shell Tauri (tray, IPC, logs, hotkeys)
+- `src-tauri/crates/engine/` — moteur (clicker, input, scheduler, métriques)
 - `packages/schema/` — JSON Schema macros
 - `docs/m0-contracts.md` — contrats M0
+- `docs/m1a-gate.md` — gate SLO M1-A
 
 ## Checklist M0
 
@@ -46,6 +50,11 @@ cargo test
 - [x] Stubs scheduler / macro_vm + tests
 - [x] Tray, logs, IPC `get_engine_state` / `request_cancel`
 - [x] Documentation des contrats
+- [x] `npm run tauri dev` validé manuellement
+
+## Checklist M1-A (résumé)
+
+Voir [`docs/m1a-gate.md`](docs/m1a-gate.md).
 
 ## Code WPF legacy
 

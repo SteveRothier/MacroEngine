@@ -45,4 +45,4 @@ Le moteur dispatch vers des handlers. M0 : stubs `noop` / `log` / click stub / d
 - [x] Tray + logs
 - [x] Branche `legacy/wpf` + tag `legacy-wpf`
 - [x] Historique commits style Horizon sur `v2`
-- [ ] `npm run tauri dev` validé manuellement (fenêtre + tray)
+- [x] `npm run tauri dev` validé manuellement (fenêtre + tray)
