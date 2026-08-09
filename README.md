@@ -4,7 +4,7 @@ Moteur d’automatisation Windows (macros souris/clavier) — reboot **Tauri 2 +
 
 ## Statut
 
-**M1-A — Engine proof** : autoclicker Rust (SendInput, CPS, hotkeys, arrêt d’urgence hors React). Gate SLO : [`docs/m1a-gate.md`](docs/m1a-gate.md).
+**M1-B — Productization** : autoclicker avec picker, jitter, limites, stop zones, overlay, persistence. Voir [`docs/m1b-product.md`](docs/m1b-product.md). Gate timing M1-A : [`docs/m1a-gate.md`](docs/m1a-gate.md).
 
 ## Prérequis
 
@@ -33,12 +33,13 @@ cargo test --test slo_harness
 
 ## Structure
 
-- `src/` — UI React (présentation / panneau preuve M1-A)
-- `src-tauri/` — shell Tauri (tray, IPC, logs, hotkeys)
-- `src-tauri/crates/engine/` — moteur (clicker, input, scheduler, métriques)
+- `src/` — UI React (Simple / Advanced + overlay)
+- `src-tauri/` — shell Tauri (tray, IPC, overlay, settings)
+- `src-tauri/crates/engine/` — moteur (clicker, input, scheduler, stop zones)
 - `packages/schema/` — JSON Schema macros
 - `docs/m0-contracts.md` — contrats M0
 - `docs/m1a-gate.md` — gate SLO M1-A
+- `docs/m1b-product.md` — features M1-B
 
 ## Checklist M0
 
@@ -52,9 +53,9 @@ cargo test --test slo_harness
 - [x] Documentation des contrats
 - [x] `npm run tauri dev` validé manuellement
 
-## Checklist M1-A (résumé)
+## Checklist M1-B (résumé)
 
-Voir [`docs/m1a-gate.md`](docs/m1a-gate.md).
+Voir [`docs/m1b-product.md`](docs/m1b-product.md).
 
 ## Code WPF legacy
 
