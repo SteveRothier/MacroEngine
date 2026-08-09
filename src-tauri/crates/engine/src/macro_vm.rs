@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::actions::registry::{ActionContext, ActionError, ActionHandler, ActionRegistry};
@@ -98,6 +98,7 @@ impl ActionHandler for DelayHandler {
 mod tests {
     use super::*;
     use crate::schema::{parse_macro_json, Trigger};
+    use std::sync::Mutex;
 
     #[test]
     fn runs_click_delay_click_trace() {
