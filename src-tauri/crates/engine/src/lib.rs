@@ -7,6 +7,8 @@ pub mod actions;
 pub mod app_state;
 pub mod cancel;
 pub mod event_bus;
+pub mod macro_vm;
+pub mod scheduler;
 pub mod schema;
 pub mod state;
 
@@ -16,5 +18,6 @@ pub use actions::{
 pub use app_state::AppState;
 pub use cancel::CancellationToken;
 pub use event_bus::{EngineEvent, EventBus, LogLevel};
+pub use macro_vm::MacroVm;
 pub use schema::{parse_macro_json, ActionNode, MacroDocument, SchemaError, Trigger};
 pub use state::{EngineError, EngineState, StateTransitionError};
