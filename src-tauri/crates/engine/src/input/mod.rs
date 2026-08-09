@@ -21,6 +21,13 @@ pub enum MouseButton {
     Middle,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Point {
+    pub x: i32,
+    pub y: i32,
+}
+
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum InputError {
     #[error("input injection failed: {0}")]
@@ -29,9 +36,22 @@ pub enum InputError {
     UnsupportedPlatform,
 }
 
-/// Injects a full click (down + up) for the given button.
+/// Injects mouse clicks and optional cursor moves.
 pub trait MouseInjector: Send + Sync {
     fn click(&self, button: MouseButton) -> Result<(), InputError>;
+
+    fn move_to(&self, point: Point) -> Result<(), InputError> {
+        let _ = point;
+        Err(InputError::UnsupportedPlatform)
+    }
+
+    fn cursor_position(&self) -> Result<Point, InputError> {
+        Err(InputError::UnsupportedPlatform)
+    }
+
+    fn screen_size(&self) -> Result<(i32, i32), InputError> {
+        Err(InputError::UnsupportedPlatform)
+    }
 }
 
 /// Default injector for the current platform.

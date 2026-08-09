@@ -144,7 +144,7 @@ impl AppState {
 
         let handle = std::thread::spawn(move || {
             let result =
-                ClickerSession::run(&config, &cancel, injector.as_ref(), &metrics, Some(&bus), None);
+                ClickerSession::run(&config, &cancel, injector.as_ref(), &metrics, Some(&bus));
             let _ = app.finish_clicker_run();
             result
         });
@@ -265,6 +265,32 @@ impl AppState {
             let _ = handle.join();
         }
     }
+
+    /// Capture cursor after a short aim delay (picker).
+    pub fn pick_point_after(&self, delay: Duration) -> Result<crate::picker::PickedPoint, String> {
+        let token = CancellationToken::new();
+        crate::picker::pick_after_delay(self.injector.as_ref(), &token, delay)
+            .map_err(|e| e.to_string())
+    }
+
+    pub fn injector(&self) -> Arc<dyn MouseInjector> {
+        Arc::clone(&self.injector)
+    }
+
+    /// Test helper: join worker without cancelling.
+    #[cfg(test)]
+    pub fn join_worker_for_test(&self) {
+        self.join_worker();
+        if self.state() == EngineState::Stopping {
+            let _ = self.transition_to(EngineState::Idle);
+        }
+        // Worker may already have finished to Idle.
+        if self.state() == EngineState::Running {
+            // wait a bit more
+            std::thread::sleep(Duration::from_millis(50));
+            self.join_worker();
+        }
+    }
 }
 
 impl Default for AppState {
@@ -324,6 +350,7 @@ mod tests {
             button: MouseButton::Left,
             cps: 80.0,
             mode: ClickMode::Toggle,
+            ..Default::default()
         };
         app.start_clicker(cfg).unwrap();
         assert_eq!(app.state(), EngineState::Running);
@@ -344,6 +371,7 @@ mod tests {
             button: MouseButton::Left,
             cps: 100.0,
             mode: ClickMode::Toggle,
+            ..Default::default()
         })
         .unwrap();
         let t0 = std::time::Instant::now();
@@ -354,5 +382,21 @@ mod tests {
             elapsed < Duration::from_millis(200),
             "emergency stop took {elapsed:?}"
         );
+    }
+
+    #[test]
+    fn respects_max_clicks_from_config() {
+        let inj = Arc::new(RecordingInjector::new());
+        let app = AppState::with_injector(Arc::clone(&inj) as Arc<dyn MouseInjector>);
+        let mut cfg = ClickerConfig {
+            cps: 120.0,
+            ..Default::default()
+        };
+        cfg.max_clicks = Some(5);
+        app.start_clicker(cfg).unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        app.join_worker_for_test();
+        assert_eq!(app.state(), EngineState::Idle);
+        assert_eq!(inj.len(), 5);
     }
 }

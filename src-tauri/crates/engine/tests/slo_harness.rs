@@ -15,6 +15,7 @@ fn cfg(cps: f64) -> ClickerConfig {
         button: MouseButton::Left,
         cps,
         mode: ClickMode::Toggle,
+        ..Default::default()
     }
 }
 
