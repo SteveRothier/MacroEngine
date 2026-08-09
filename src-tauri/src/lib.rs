@@ -1,9 +1,11 @@
-use macroengine_engine::{AppState, EngineEvent, EngineState};
-use serde::Serialize;
+use macroengine_engine::{
+    AppState, ClickMode, ClickerConfig, ClickerMetrics, EngineEvent, EngineState, MouseButton,
+};
+use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    AppHandle, Emitter, State,
+    AppHandle, Emitter, Manager, State,
 };
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -13,6 +15,14 @@ struct EngineStatusPayload {
     state: EngineState,
     cancelled: bool,
     message: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StartClickerRequest {
+    button: MouseButton,
+    cps: f64,
+    mode: ClickMode,
 }
 
 fn status_of(engine: &AppState, message: Option<String>) -> EngineStatusPayload {
@@ -29,27 +39,34 @@ fn get_engine_state(engine: State<'_, AppState>) -> EngineStatusPayload {
 }
 
 #[tauri::command]
-fn request_cancel(engine: State<'_, AppState>) -> EngineStatusPayload {
-    engine.request_cancel();
-    log::info!("cancellation requested from UI");
-    status_of(&engine, Some("cancellation requested".into()))
+fn get_clicker_metrics(engine: State<'_, AppState>) -> ClickerMetrics {
+    engine.metrics()
 }
 
 #[tauri::command]
-fn begin_demo_run(engine: State<'_, AppState>) -> Result<EngineStatusPayload, String> {
-    match engine.state() {
-        EngineState::Idle => {}
-        EngineState::Error | EngineState::Stopping => {
-            engine
-                .transition_to(EngineState::Idle)
-                .map_err(|e| e.to_string())?;
-        }
-        EngineState::Running | EngineState::Paused => {
-            return Err("engine already active".into());
-        }
-    }
-    engine.begin_run().map_err(|e| e.to_string())?;
-    log::info!("demo run started (M0 — no input injection)");
+fn request_cancel(engine: State<'_, AppState>) -> EngineStatusPayload {
+    let state = engine.stop_clicker();
+    log::info!("stop requested from UI → {state:?}");
+    status_of(&engine, Some("stop requested".into()))
+}
+
+#[tauri::command]
+fn start_clicker(
+    engine: State<'_, AppState>,
+    request: StartClickerRequest,
+) -> Result<EngineStatusPayload, String> {
+    let config = ClickerConfig {
+        button: request.button,
+        cps: request.cps,
+        mode: request.mode,
+    };
+    engine.start_clicker(config)?;
+    log::info!(
+        "clicker started button={:?} cps={} mode={:?}",
+        request.button,
+        request.cps,
+        request.mode
+    );
     Ok(status_of(&engine, Some("running".into())))
 }
 
@@ -72,7 +89,6 @@ fn wire_engine_events(handle: AppHandle, engine: &AppState) {
                     cancelled: false,
                     message: Some(message),
                 };
-                // UI refreshes via get_engine_state after this event.
                 let _ = emit_handle.emit("engine://log", payload);
             }
         }
@@ -99,26 +115,51 @@ pub fn run() {
         .setup(move |app| {
             wire_engine_events(app.handle().clone(), &engine);
 
+            if let Err(e) = engine.install_hotkeys() {
+                log::error!("hotkeys unavailable: {e}");
+            }
+
+            let start = MenuItem::with_id(app, "start", "Démarrer", true, None::<&str>)?;
+            let stop = MenuItem::with_id(app, "stop", "Arrêter", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit])?;
+            let menu = Menu::with_items(app, &[&start, &stop, &quit])?;
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .tooltip("MacroEngine")
                 .on_menu_event(|app, event| {
-                    if event.id.as_ref() == "quit" {
-                        app.exit(0);
+                    let id = event.id.as_ref();
+                    let Some(engine) = app.try_state::<AppState>() else {
+                        return;
+                    };
+                    match id {
+                        "quit" => {
+                            engine.shutdown_hotkeys();
+                            engine.stop_clicker();
+                            app.exit(0);
+                        }
+                        "start" => {
+                            let cfg = engine.clicker_config();
+                            if let Err(e) = engine.start_clicker(cfg) {
+                                log::warn!("tray start failed: {e}");
+                            }
+                        }
+                        "stop" => {
+                            engine.stop_clicker();
+                        }
+                        _ => {}
                     }
                 })
                 .build(app)?;
 
-            log::info!("MacroEngine M0 ready");
+            log::info!("MacroEngine M1-A ready (F6 action / F8 emergency)");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_engine_state,
+            get_clicker_metrics,
             request_cancel,
-            begin_demo_run
+            start_clicker
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
