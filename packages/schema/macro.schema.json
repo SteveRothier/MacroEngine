@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://macroengine.local/schemas/macro.schema.json",
+  "title": "MacroEngine Macro",
+  "type": "object",
+  "required": ["schemaVersion", "name", "trigger", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "key"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "hotkey" },
+            "key": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "manual" }
+          }
+        }
+      ]
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["id", "type"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "const": "mouse.click" },
+              "button": {
+                "type": "string",
+                "enum": ["left", "right", "middle"],
+                "default": "left"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["id", "type", "ms"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "type": { "const": "delay" },
+              "ms": { "type": "integer", "minimum": 0 }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
