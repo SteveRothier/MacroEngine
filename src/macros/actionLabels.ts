@@ -136,3 +136,43 @@ export function actionTone(type: MacroAction["type"]): string {
 export function branchLabelFr(branch: "then" | "else"): string {
   return branch === "then" ? "alors" : "sinon";
 }
+
+/** Index of matching `mouse.up` if `start` begins a down→moves→up drag; else null. */
+export function dragGestureEndIndex(
+  list: MacroAction[],
+  start: number,
+): number | null {
+  if (list[start]?.type !== "mouse.down") return null;
+  let i = start + 1;
+  let sawMove = false;
+  while (i < list.length) {
+    const t = list[i]?.type;
+    if (t === "mouse.move") {
+      sawMove = true;
+      i += 1;
+      continue;
+    }
+    if (t === "delay") {
+      i += 1;
+      continue;
+    }
+    if (t === "mouse.up" && sawMove) return i;
+    break;
+  }
+  return null;
+}
+
+/** Title that collapses a recorded drag into a readable geste label. */
+export function actionTitleInList(list: MacroAction[], index: number): string {
+  const action = list[index];
+  if (!action) return "";
+  const end = dragGestureEndIndex(list, index);
+  if (end != null) return "Glisser";
+  for (let s = 0; s < index; s++) {
+    const e = dragGestureEndIndex(list, s);
+    if (e == null || index > e || index <= s) continue;
+    if (index === e && action.type === "mouse.up") return "Fin glisser";
+    if (action.type === "mouse.move") return "Trajectoire";
+  }
+  return actionTitleFr(action.type);
+}

@@ -87,11 +87,17 @@ struct ActivePress {
 
 struct GestureRecorder {
     press: Option<ActivePress>,
+    last_free_x: Option<i32>,
+    last_free_y: Option<i32>,
 }
 
 impl GestureRecorder {
     fn new() -> Self {
-        Self { press: None }
+        Self {
+            press: None,
+            last_free_x: None,
+            last_free_y: None,
+        }
     }
 
     fn on_down(&mut self, button: &str, x: i32, y: i32, now: Instant) -> Vec<MouseRec> {
@@ -99,6 +105,8 @@ impl GestureRecorder {
         if self.press.is_some() {
             out.extend(self.on_up(button, x, y, now));
         }
+        self.last_free_x = None;
+        self.last_free_y = None;
         self.press = Some(ActivePress {
             button: button.to_string(),
             x,
@@ -112,31 +120,41 @@ impl GestureRecorder {
     }
 
     fn on_move(&mut self, x: i32, y: i32) -> Vec<MouseRec> {
-        let Some(press) = self.press.as_mut() else {
-            return Vec::new();
-        };
-        let dx = (x - press.last_x).abs();
-        let dy = (y - press.last_y).abs();
-        if dx < MOVE_PX && dy < MOVE_PX {
-            return Vec::new();
+        if let Some(press) = self.press.as_mut() {
+            let dx = (x - press.last_x).abs();
+            let dy = (y - press.last_y).abs();
+            if dx < MOVE_PX && dy < MOVE_PX {
+                return Vec::new();
+            }
+            let mut out = Vec::new();
+            if !press.flushed_down {
+                out.push(MouseRec::Down {
+                    button: press.button.clone(),
+                    x: press.x,
+                    y: press.y,
+                });
+                press.flushed_down = true;
+            }
+            press.last_x = x;
+            press.last_y = y;
+            out.push(MouseRec::Move { x, y });
+            return out;
         }
-        let mut out = Vec::new();
-        if !press.flushed_down {
-            out.push(MouseRec::Down {
-                button: press.button.clone(),
-                x: press.x,
-                y: press.y,
-            });
-            press.flushed_down = true;
+
+        if let (Some(lx), Some(ly)) = (self.last_free_x, self.last_free_y) {
+            if (x - lx).abs() < MOVE_PX && (y - ly).abs() < MOVE_PX {
+                return Vec::new();
+            }
         }
-        press.last_x = x;
-        press.last_y = y;
-        out.push(MouseRec::Move { x, y });
-        out
+        self.last_free_x = Some(x);
+        self.last_free_y = Some(y);
+        vec![MouseRec::Move { x, y }]
     }
 
     fn on_up(&mut self, button: &str, x: i32, y: i32, now: Instant) -> Vec<MouseRec> {
         let Some(press) = self.press.take() else {
+            self.last_free_x = Some(x);
+            self.last_free_y = Some(y);
             return vec![MouseRec::Up {
                 button: button.to_string(),
                 x,
@@ -154,6 +172,8 @@ impl GestureRecorder {
         let held = now.saturating_duration_since(press.at).as_millis();
         let dx = (x - press.x).abs();
         let dy = (y - press.y).abs();
+        self.last_free_x = Some(x);
+        self.last_free_y = Some(y);
         if !press.flushed_down && held <= CLICK_MS && dx < MOVE_PX && dy < MOVE_PX {
             return vec![MouseRec::Click {
                 button: press.button,
@@ -222,20 +242,20 @@ struct ActiveKey {
 }
 
 struct KeyGestureRecorder {
-    press: Option<ActiveKey>,
+    presses: Vec<ActiveKey>,
 }
 
 impl KeyGestureRecorder {
     fn new() -> Self {
-        Self { press: None }
+        Self {
+            presses: Vec::new(),
+        }
     }
 
     fn on_down(&mut self, key: &str, mods: KeyMods, now: Instant) -> Vec<KeyRec> {
-        let mut out = Vec::new();
-        if self.press.is_some() {
-            out.extend(self.flush_held());
-        }
-        self.press = Some(ActiveKey {
+        let mut out = self.tick(now);
+        out.extend(self.flush_unflushed_downs());
+        self.presses.push(ActiveKey {
             key: key.to_string(),
             mods,
             at: now,
@@ -245,27 +265,23 @@ impl KeyGestureRecorder {
     }
 
     fn on_up(&mut self, key: &str, mods: KeyMods, now: Instant) -> Vec<KeyRec> {
-        let Some(press) = self.press.take() else {
-            return vec![KeyRec::Up {
+        let mut out = self.tick(now);
+        let Some(idx) = self.presses.iter().position(|p| p.key == key) else {
+            out.push(KeyRec::Up {
                 key: key.to_string(),
                 mods,
-            }];
+            });
+            return out;
         };
-        if press.key != key {
-            self.press = Some(press);
-            return vec![KeyRec::Up {
-                key: key.to_string(),
-                mods,
-            }];
-        }
+        let press = self.presses.remove(idx);
         let held = now.saturating_duration_since(press.at).as_millis();
         if !press.flushed_down && held <= KEY_TAP_MS {
-            return vec![KeyRec::Tap {
+            out.push(KeyRec::Tap {
                 key: press.key,
                 mods: press.mods,
-            }];
+            });
+            return out;
         }
-        let mut out = Vec::new();
         if !press.flushed_down {
             out.push(KeyRec::Down {
                 key: press.key.clone(),
@@ -279,27 +295,42 @@ impl KeyGestureRecorder {
         out
     }
 
-    fn flush_held(&mut self) -> Vec<KeyRec> {
-        let Some(press) = self.press.take() else {
-            return Vec::new();
-        };
-        if press.flushed_down {
-            self.press = Some(press);
-            return Vec::new();
+    /// Emit `key.down` for presses held longer than the tap threshold.
+    fn tick(&mut self, now: Instant) -> Vec<KeyRec> {
+        let mut out = Vec::new();
+        for press in &mut self.presses {
+            if press.flushed_down {
+                continue;
+            }
+            let held = now.saturating_duration_since(press.at).as_millis();
+            if held > KEY_TAP_MS {
+                press.flushed_down = true;
+                out.push(KeyRec::Down {
+                    key: press.key.clone(),
+                    mods: press.mods,
+                });
+            }
         }
-        let rec = KeyRec::Down {
-            key: press.key.clone(),
-            mods: press.mods,
-        };
-        self.press = Some(ActiveKey {
-            flushed_down: true,
-            ..press
-        });
-        vec![rec]
+        out
+    }
+
+    fn flush_unflushed_downs(&mut self) -> Vec<KeyRec> {
+        let mut out = Vec::new();
+        for press in &mut self.presses {
+            if press.flushed_down {
+                continue;
+            }
+            press.flushed_down = true;
+            out.push(KeyRec::Down {
+                key: press.key.clone(),
+                mods: press.mods,
+            });
+        }
+        out
     }
 
     fn finish(&mut self) -> Vec<KeyRec> {
-        self.flush_held()
+        self.flush_unflushed_downs()
     }
 }
 
@@ -378,6 +409,21 @@ fn next_id(shared: &RecordShared) -> String {
     let mut c = shared.id_counter.lock().expect("id");
     *c += 1;
     format!("r{c}")
+}
+
+fn flush_pending_key_holds(shared: &RecordShared) {
+    if shared.paused.load(Ordering::SeqCst) || shared.mouse_only {
+        return;
+    }
+    let now = Instant::now();
+    let recs = {
+        let mut g = shared.keys.lock().expect("keys");
+        g.tick(now)
+    };
+    for rec in recs {
+        let id = next_id(shared);
+        push_with_delay(shared, key_rec_to_action(id, rec));
+    }
 }
 
 fn push_with_delay(shared: &RecordShared, action: ActionNode) {
@@ -643,6 +689,7 @@ impl RecordSession {
                             DispatchMessageW(&msg);
                         }
                     } else {
+                        flush_pending_key_holds(&shared_c);
                         thread::sleep(Duration::from_millis(10));
                     }
                 }
@@ -761,6 +808,16 @@ mod tests {
     }
 
     #[test]
+    fn free_move_without_button() {
+        let mut g = GestureRecorder::new();
+        let first = g.on_move(10, 10);
+        assert!(matches!(&first[..], [MouseRec::Move { x: 10, y: 10 }]));
+        assert!(g.on_move(12, 10).is_empty());
+        let far = g.on_move(40, 10);
+        assert!(matches!(&far[..], [MouseRec::Move { x: 40, y: 10 }]));
+    }
+
+    #[test]
     fn skip_dedicated_trigger_vk() {
         let b = HotkeyBindings::default();
         assert!(skip_record_vk(b.macro_vk, &b, &[]));
@@ -789,6 +846,30 @@ mod tests {
         assert!(matches!(&second[..], [KeyRec::Down { key, .. }] if key == "A"));
         let up = g.on_up("B", KeyMods::default(), t0 + Duration::from_millis(120));
         assert!(matches!(&up[..], [KeyRec::Tap { key, .. }] if key == "B"));
+    }
+
+    #[test]
+    fn hold_emits_down_after_tap_timeout() {
+        let mut g = KeyGestureRecorder::new();
+        let t0 = Instant::now();
+        assert!(g.on_down("A", KeyMods::default(), t0).is_empty());
+        let tick = g.tick(t0 + Duration::from_millis(450));
+        assert!(matches!(&tick[..], [KeyRec::Down { key, .. }] if key == "A"));
+        let up = g.on_up("A", KeyMods::default(), t0 + Duration::from_millis(500));
+        assert!(matches!(&up[..], [KeyRec::Up { key, .. }] if key == "A"));
+    }
+
+    #[test]
+    fn multi_key_hold_keeps_both_active() {
+        let mut g = KeyGestureRecorder::new();
+        let t0 = Instant::now();
+        assert!(g.on_down("A", KeyMods::default(), t0).is_empty());
+        let second = g.on_down("B", KeyMods::default(), t0 + Duration::from_millis(50));
+        assert!(matches!(&second[..], [KeyRec::Down { key, .. }] if key == "A"));
+        let up_a = g.on_up("A", KeyMods::default(), t0 + Duration::from_millis(100));
+        assert!(matches!(&up_a[..], [KeyRec::Up { key, .. }] if key == "A"));
+        let up_b = g.on_up("B", KeyMods::default(), t0 + Duration::from_millis(120));
+        assert!(matches!(&up_b[..], [KeyRec::Tap { key, .. }] if key == "B"));
     }
 
     #[test]
