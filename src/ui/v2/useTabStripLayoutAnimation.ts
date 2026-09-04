@@ -4,22 +4,22 @@ import {
   type MutableRefObject,
   type RefObject,
 } from "react";
+import {
+  TAB_LAYOUT,
+  computeTargetTabWidth,
+  type TabStripTokens,
+} from "./tabLayout";
 
 const LAYOUT_ANIM_DURATION_MS = 200;
 const WIDTH_EPSILON_PX = 0.5;
-const STRIP_GAP_PX = 4;
-const FALLBACK_TAB_MIN_W = 36;
-const FALLBACK_TAB_MAX_W = 180;
-
-type TabStripTokens = { minW: number; maxW: number };
 
 function readTabStripTokens(scrollEl: HTMLElement): TabStripTokens {
   const style = getComputedStyle(scrollEl);
   const minW = parseFloat(style.getPropertyValue("--v2-tab-abs-min-w"));
   const maxW = parseFloat(style.getPropertyValue("--v2-tab-max-w"));
   return {
-    minW: Number.isFinite(minW) && minW > 0 ? minW : FALLBACK_TAB_MIN_W,
-    maxW: Number.isFinite(maxW) && maxW > 0 ? maxW : FALLBACK_TAB_MAX_W,
+    minW: Number.isFinite(minW) && minW > 0 ? minW : TAB_LAYOUT.MIN_W,
+    maxW: Number.isFinite(maxW) && maxW > 0 ? maxW : TAB_LAYOUT.MAX_W,
   };
 }
 
@@ -38,23 +38,6 @@ function captureWidths(
 
 function easeOutCubic(t: number): number {
   return 1 - (1 - t) ** 3;
-}
-
-function clampTabWidth(width: number, tokens: TabStripTokens): number {
-  return Math.min(tokens.maxW, Math.max(tokens.minW, width));
-}
-
-function computeTargetTabWidth(
-  scrollEl: HTMLElement,
-  addBtnEl: HTMLElement | null,
-  tabCount: number,
-  tokens: TabStripTokens,
-): number {
-  if (tabCount <= 0) return tokens.maxW;
-  const addW = addBtnEl?.offsetWidth ?? tokens.minW;
-  const gapTotal = tabCount * STRIP_GAP_PX;
-  const available = scrollEl.clientWidth - addW - gapTotal;
-  return clampTabWidth(available / tabCount, tokens);
 }
 
 function setLockedWidth(el: HTMLDivElement, width: number): void {
