@@ -18,6 +18,8 @@ export function isComplexAction(type: MacroAction["type"]): boolean {
     type === "control.if" ||
     type === "control.while" ||
     type === "http.request" ||
+    type === "json.path" ||
+    type === "script.run" ||
     type === "process.run"
   );
 }

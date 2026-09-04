@@ -4,6 +4,7 @@ import { MousePointer2, Play, Star, Workflow } from "lucide-react";
 import { StatusPill, Tooltip, TruncatedTooltip, useToast } from "../ui/v2";
 import { confirmAction } from "../ui";
 import type { AppRoute } from "../app/types";
+import { ScriptsLibraryPanel } from "../scripts/ScriptsLibraryPanel";
 import { AutomationRowMenu } from "./AutomationRowMenu";
 import { AutomationsToolbar } from "./AutomationsToolbar";
 import {
@@ -300,6 +301,10 @@ export function AutomationsTable({
         onCreateClicker={onCreateClicker}
       />
 
+      {filter === "scripts" ? (
+        <ScriptsLibraryPanel refreshKey={refreshKey} />
+      ) : (
+        <>
       {selected.size > 0 ? (
         <div className="v2-automations-selection">
           <span>
@@ -335,6 +340,7 @@ export function AutomationsTable({
           </button>
         </div>
       ) : null}
+
 
       <div className="v2-page-body v2-automations-list-body">
         {loading ? (
@@ -485,6 +491,8 @@ export function AutomationsTable({
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }

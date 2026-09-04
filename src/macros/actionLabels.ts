@@ -18,6 +18,10 @@ export function actionTitleFr(type: MacroAction["type"]): string {
       return "Processus";
     case "http.request":
       return "HTTP";
+    case "json.path":
+      return "JSON path";
+    case "script.run":
+      return "Script";
     case "key.tap":
       return "Touche";
     case "key.down":
@@ -84,6 +88,14 @@ export function actionDetailFr(action: MacroAction): string {
       const host = action.url.replace(/^https?:\/\//, "");
       return `${action.method ?? "GET"} ${host}`;
     }
+    case "json.path":
+      return `${action.sourceVar}.${action.path || "…"} → ${action.destVar}`;
+    case "script.run":
+      return action.scriptId
+        ? `@${action.scriptId}`
+        : action.source?.trim()
+          ? "inline"
+          : "(vide)";
     case "key.tap":
     case "key.down":
     case "key.up":
@@ -126,6 +138,10 @@ export function actionTone(type: MacroAction["type"]): string {
       return "if";
     case "http.request":
       return "http";
+    case "json.path":
+      return "var";
+    case "script.run":
+      return "process";
     case "var.set":
       return "var";
     case "process.run":

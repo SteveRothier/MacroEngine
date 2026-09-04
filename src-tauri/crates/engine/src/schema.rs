@@ -3,8 +3,9 @@ use thiserror::Error;
 
 use crate::settings::ProcessFilter;
 
-/// Current document format (while loops, per-macro process filter).
-pub const SCHEMA_VERSION_CURRENT: u32 = 7;
+/// Current document format (json.path, http failOnStatus, script.run).
+pub const SCHEMA_VERSION_CURRENT: u32 = 8;
+pub const SCHEMA_VERSION_V8: u32 = 8;
 pub const SCHEMA_VERSION_V6: u32 = 6;
 pub const SCHEMA_VERSION_V7: u32 = 7;
 pub const SCHEMA_VERSION_V5: u32 = 5;
@@ -202,6 +203,31 @@ pub enum ActionNode {
         status_var: Option<String>,
         #[serde(default, rename = "bodyVar")]
         body_var: Option<String>,
+        /// When true, status >= 400 aborts the macro with an error.
+        #[serde(default, rename = "failOnStatus")]
+        fail_on_status: bool,
+    },
+    #[serde(rename = "json.path")]
+    JsonPath {
+        id: String,
+        #[serde(rename = "sourceVar")]
+        source_var: String,
+        /// Dot-separated path into a JSON value (e.g. `user.name` or `items.0.id`).
+        path: String,
+        #[serde(rename = "destVar")]
+        dest_var: String,
+    },
+    #[serde(rename = "script.run")]
+    ScriptRun {
+        id: String,
+        /// Inline JS source (used when `scriptId` is absent).
+        #[serde(default)]
+        source: String,
+        /// Optional library script id (Phase 3).
+        #[serde(default, rename = "scriptId")]
+        script_id: Option<String>,
+        #[serde(default = "default_script_timeout", rename = "timeoutMs")]
+        timeout_ms: u64,
     },
     #[serde(rename = "key.tap")]
     KeyTap {
@@ -272,6 +298,10 @@ fn default_timeout() -> u64 {
     10_000
 }
 
+fn default_script_timeout() -> u64 {
+    10_000
+}
+
 impl MacroDocument {
     pub fn new_empty(name: impl Into<String>) -> Self {
         Self {
@@ -301,8 +331,9 @@ pub fn parse_macro_json(json: &str) -> Result<MacroDocument, SchemaError> {
         | SCHEMA_VERSION_V2
         | SCHEMA_VERSION_V3
         | SCHEMA_VERSION_V4
-        |         SCHEMA_VERSION_V5
+        | SCHEMA_VERSION_V5
         | SCHEMA_VERSION_V6
+        | SCHEMA_VERSION_V7
         | SCHEMA_VERSION_CURRENT => Ok(doc),
         other => Err(SchemaError::UnsupportedVersion(other)),
     }

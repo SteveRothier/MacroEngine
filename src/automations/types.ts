@@ -37,7 +37,7 @@ export type DisplayOptions = {
   sortBy: "name" | "type" | "status";
 };
 
-export type AutomationFilter = "all" | "favorites" | "recent";
+export type AutomationFilter = "all" | "favorites" | "recent" | "scripts";
 
 export const DEFAULT_DISPLAY: DisplayOptions = {
   sortBy: "name",

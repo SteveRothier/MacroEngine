@@ -45,13 +45,17 @@ export function sortByLabel(sortBy: "name" | "type" | "status"): string {
   }
 }
 
-export function filterPillTooltip(filter: "all" | "favorites" | "recent"): string {
+export function filterPillTooltip(
+  filter: "all" | "favorites" | "recent" | "scripts",
+): string {
   switch (filter) {
     case "all":
-      return "Afficher toutes les automations";
+      return "Toutes les automations";
     case "favorites":
-      return "Afficher les favoris";
+      return "Favoris uniquement";
     case "recent":
-      return "Afficher les dernières exécutions";
+      return "Dernières exécutions";
+    case "scripts":
+      return "Scripts JavaScript réutilisables";
   }
 }

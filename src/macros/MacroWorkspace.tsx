@@ -938,7 +938,7 @@ export function MacroWorkspace({
       const created = await invoke<MacroDocument>("create_saved_macro", {
         name: loaded.name || "Import",
       });
-      const merged = { ...loaded, name: created.name, schemaVersion: 6 };
+      const merged = { ...loaded, name: created.name, schemaVersion: 8 };
       const saved = await invoke<MacroDocument>("save_saved_macro", {
         id: created.name,
         doc: merged,
@@ -972,7 +972,7 @@ export function MacroWorkspace({
       const created = await invoke<MacroDocument>("create_saved_macro", {
         name: loaded.name || name,
       });
-      const merged = { ...loaded, name: created.name, schemaVersion: 6 };
+      const merged = { ...loaded, name: created.name, schemaVersion: 8 };
       const saved = await invoke<MacroDocument>("save_saved_macro", {
         id: created.name,
         doc: merged,
@@ -993,7 +993,7 @@ export function MacroWorkspace({
     const action = makeAction(kind);
     const next = {
       ...doc,
-      schemaVersion: 6,
+      schemaVersion: 8,
       actions: [...doc.actions, action],
     };
     void pushDoc(next);
@@ -1004,7 +1004,7 @@ export function MacroWorkspace({
     if (!selectedPath || activeLocked) return;
     void pushDoc({
       ...doc,
-      schemaVersion: 6,
+      schemaVersion: 8,
       actions: updateAtPath(doc.actions, selectedPath, action),
     });
   }
@@ -1034,7 +1034,7 @@ export function MacroWorkspace({
     const actions = appendChild(doc.actions, selectedPath, branch, child);
     const branchIdx = branch === "then" ? 0 : 1;
     const list = branch === "then" ? selected.then : selected.else ?? [];
-    void pushDoc({ ...doc, schemaVersion: 6, actions });
+    void pushDoc({ ...doc, schemaVersion: 8, actions });
     setSelectedPath([...selectedPath, branchIdx, list.length]);
   }
 
@@ -1513,7 +1513,7 @@ export function MacroWorkspace({
                           onChangeAction={(path, a) => {
                             void pushDoc({
                               ...doc,
-                              schemaVersion: 6,
+                              schemaVersion: 8,
                               actions: updateAtPath(doc.actions, path, a),
                             });
                           }}
