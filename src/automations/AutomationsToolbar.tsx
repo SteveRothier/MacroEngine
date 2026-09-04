@@ -19,6 +19,7 @@ const FILTER_PILLS: { value: AutomationFilter; label: string }[] = [
   { value: "all", label: "Tous" },
   { value: "favorites", label: "Favoris" },
   { value: "recent", label: "Dernières exécutions" },
+  { value: "scripts", label: "Scripts" },
 ];
 
 export function AutomationsToolbar({

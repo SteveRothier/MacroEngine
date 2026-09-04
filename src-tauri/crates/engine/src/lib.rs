@@ -12,6 +12,7 @@ pub mod env;
 pub mod event_bus;
 pub mod hotkeys;
 pub mod input;
+pub mod json_path;
 pub mod library_index;
 pub mod macro_library;
 pub mod macro_vm;
@@ -22,6 +23,8 @@ pub mod quick_access;
 pub mod record;
 pub mod scheduler;
 pub mod schema;
+pub mod script_library;
+pub mod script_runtime;
 pub mod settings;
 pub mod state;
 pub mod stop_zones;
@@ -77,6 +80,9 @@ pub use schema::{
     macro_to_json, parse_macro_json, ActionNode, CompareOp, Condition, HttpHeader, KeyMods,
     MacroDocument, MacroValue, Operand, SchemaError, Trigger, SCHEMA_VERSION_CURRENT,
     SCHEMA_VERSION_V1, SCHEMA_VERSION_V4, SCHEMA_VERSION_V5,
+};
+pub use script_library::{
+    delete_script, list_scripts, load_script, save_script, ScriptDoc, ScriptLibraryError,
 };
 pub use settings::{
     clamp_overlay_opacity, load_settings, save_settings, settings_path, AppSettings, ProcessFilter,

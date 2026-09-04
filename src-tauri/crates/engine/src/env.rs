@@ -29,6 +29,13 @@ impl MacroEnv {
         self.vars.get(name)
     }
 
+    pub fn snapshot(&self) -> Vec<(String, MacroValue)> {
+        self.vars
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+
     pub fn resolve(&self, op: &Operand) -> Result<MacroValue, ActionError> {
         match op {
             Operand::Literal(v) => Ok(v.clone()),
@@ -88,6 +95,10 @@ fn value_to_string(v: &MacroValue) -> String {
         }
         MacroValue::String(s) => s.clone(),
     }
+}
+
+pub fn value_to_string_pub(v: &MacroValue) -> String {
+    value_to_string(v)
 }
 
 fn as_number(v: &MacroValue) -> Option<f64> {

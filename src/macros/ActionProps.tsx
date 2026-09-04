@@ -1,8 +1,23 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { pickScreenPoint } from "../pick";
 import { Segmented, AddMenu } from "../ui";
 import type { AddMenuEntry } from "../ui";
 import type { CompareOp, KeyMods, MacroAction, MacroValue, Operand } from "./types";
+import type { ScriptDoc } from "../scripts/types";
+
+const SCRIPT_SNIPPET_GET = `// GET JSON → variable
+const res = caster.fetch({ method: "GET", url: "https://httpbin.org/get" });
+caster.set("status", res.status);
+caster.set("body", res.body);
+caster.log("ok " + res.status);
+`;
+
+const SCRIPT_SNIPPET_SET = `// Lire / écrire une variable
+const n = caster.get("n") ?? 0;
+caster.set("n", n + 1);
+caster.log("n=" + caster.get("n"));
+`;
 
 type Props = {
   action: MacroAction | null;
@@ -369,10 +384,10 @@ export function ActionProps({
             onChange={(e) => onChange({ ...action, url: e.target.value })}
           />
         </label>
-        <label className="v2-field">
+        <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
           <span>Body</span>
-          <input
-            type="text"
+          <textarea
+            rows={4}
             disabled={disabled}
             value={action.body ?? ""}
             onChange={(e) =>
@@ -381,6 +396,7 @@ export function ActionProps({
                 body: e.target.value === "" ? null : e.target.value,
               })
             }
+            style={{ fontFamily: "ui-monospace, Consolas, monospace", width: "100%" }}
           />
         </label>
         <label className="v2-field">
@@ -392,6 +408,17 @@ export function ActionProps({
             value={action.timeoutMs ?? 10000}
             onChange={(e) =>
               onChange({ ...action, timeoutMs: Number(e.target.value) })
+            }
+          />
+        </label>
+        <label className="v2-field">
+          <span>Échec si status ≥ 400</span>
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={!!action.failOnStatus}
+            onChange={(e) =>
+              onChange({ ...action, failOnStatus: e.target.checked })
             }
           />
         </label>
@@ -464,21 +491,83 @@ export function ActionProps({
               </button>
             </div>
           ))}
-          <button
-            type="button"
-            className="ghost"
-            disabled={disabled}
-            onClick={() =>
-              onChange({
-                ...action,
-                headers: [...(action.headers ?? []), { name: "", value: "" }],
-              })
-            }
-          >
-            Ajouter un en-tête
-          </button>
+          <div className="actions wrap" style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="ghost"
+              disabled={disabled}
+              onClick={() =>
+                onChange({
+                  ...action,
+                  headers: [...(action.headers ?? []), { name: "", value: "" }],
+                })
+              }
+            >
+              Ajouter un en-tête
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={disabled}
+              onClick={() => {
+                const headers = [...(action.headers ?? [])];
+                const idx = headers.findIndex(
+                  (h) => h.name.toLowerCase() === "authorization",
+                );
+                const bearer = {
+                  name: "Authorization",
+                  value: "Bearer {{token}}",
+                };
+                if (idx >= 0) headers[idx] = bearer;
+                else headers.push(bearer);
+                onChange({ ...action, headers });
+              }}
+            >
+              + Bearer
+            </button>
+          </div>
         </div>
       </div>
+    );
+  }
+
+  if (action.type === "json.path") {
+    return (
+      <div className="props-grid">
+        <label className="v2-field">
+          <span>Variable source (JSON)</span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={action.sourceVar}
+            onChange={(e) => onChange({ ...action, sourceVar: e.target.value })}
+          />
+        </label>
+        <label className="v2-field">
+          <span>Chemin (a.b.0.c)</span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={action.path}
+            onChange={(e) => onChange({ ...action, path: e.target.value })}
+          />
+        </label>
+        <label className="v2-field">
+          <span>Variable destination</span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={action.destVar}
+            onChange={(e) => onChange({ ...action, destVar: e.target.value })}
+          />
+        </label>
+      </div>
+    );
+  }
+
+  if (action.type === "script.run") {
+    return (
+      <ScriptRunProps action={action} disabled={disabled} onChange={onChange} />
     );
   }
 
@@ -787,6 +876,110 @@ export function ActionProps({
               ...action,
               args: e.target.value.trim() ? e.target.value.trim().split(/\s+/) : [],
             })
+          }
+        />
+      </label>
+    </div>
+  );
+}
+
+function ScriptRunProps({
+  action,
+  disabled,
+  onChange,
+}: {
+  action: Extract<MacroAction, { type: "script.run" }>;
+  disabled?: boolean;
+  onChange: (action: MacroAction) => void;
+}) {
+  const [scripts, setScripts] = useState<ScriptDoc[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void invoke<ScriptDoc[]>("list_scripts_cmd")
+      .then((list) => {
+        if (!cancelled) setScripts(list);
+      })
+      .catch(() => {
+        if (!cancelled) setScripts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const useLibrary = !!(action.scriptId && action.scriptId.length > 0);
+
+  return (
+    <div className="props-grid">
+      <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
+        <span>Script bibliothèque</span>
+        <select
+          disabled={disabled}
+          value={action.scriptId ?? ""}
+          onChange={(e) => {
+            const scriptId = e.target.value === "" ? null : e.target.value;
+            onChange({
+              ...action,
+              scriptId,
+              source: scriptId ? "" : action.source ?? "",
+            });
+          }}
+        >
+          <option value="">— Inline —</option>
+          {scripts.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+              {!s.allowNetwork ? " (sans réseau)" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      {!useLibrary ? (
+        <>
+          <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Source JavaScript</span>
+            <textarea
+              rows={10}
+              disabled={disabled}
+              value={action.source ?? ""}
+              onChange={(e) => onChange({ ...action, source: e.target.value })}
+              style={{
+                fontFamily: "ui-monospace, Consolas, monospace",
+                width: "100%",
+                fontSize: 12,
+              }}
+            />
+          </label>
+          <div className="actions wrap" style={{ gridColumn: "1 / -1" }}>
+            <button
+              type="button"
+              className="ghost"
+              disabled={disabled}
+              onClick={() => onChange({ ...action, source: SCRIPT_SNIPPET_GET })}
+            >
+              Snippet GET JSON
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              disabled={disabled}
+              onClick={() => onChange({ ...action, source: SCRIPT_SNIPPET_SET })}
+            >
+              Snippet set var
+            </button>
+          </div>
+        </>
+      ) : null}
+      <label className="v2-field">
+        <span>Timeout (ms)</span>
+        <input
+          type="number"
+          min={0}
+          disabled={disabled}
+          value={action.timeoutMs ?? 10000}
+          onChange={(e) =>
+            onChange({ ...action, timeoutMs: Number(e.target.value) })
           }
         />
       </label>

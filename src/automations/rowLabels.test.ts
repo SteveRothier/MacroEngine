@@ -44,8 +44,9 @@ describe("rowLabels", () => {
 
   it("toolbar label helpers", () => {
     expect(sortByLabel("name")).toBe("Nom");
-    expect(filterPillTooltip("recent")).toBe(
-      "Afficher les dernières exécutions",
+    expect(filterPillTooltip("recent")).toBe("Dernières exécutions");
+    expect(filterPillTooltip("scripts")).toBe(
+      "Scripts JavaScript réutilisables",
     );
   });
 });

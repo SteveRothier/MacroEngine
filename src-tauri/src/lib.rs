@@ -4,19 +4,20 @@ use std::time::Duration;
 
 use caster_engine::{
     assert_not_locked, create_library_folder, create_macro, delete_library_folder, delete_macro,
-    delete_preset, duplicate_macro, duplicate_preset, enrich_macro_summaries, export_preset_to_path,
-    get_library_index, import_preset_from_path, list_library_items, list_macro_summaries, list_macros,
-    list_preset_summaries, list_presets, load_macro, load_preset, load_quick_access, load_settings,
+    delete_preset, delete_script, duplicate_macro, duplicate_preset, enrich_macro_summaries,
+    export_preset_to_path, get_library_index, import_preset_from_path, list_library_items,
+    list_macro_summaries, list_macros, list_preset_summaries, list_presets, list_scripts,
+    load_macro, load_preset, load_quick_access, load_script, load_settings,
     list_visible_process_exes, macro_to_json, move_library_item, overlay_bands, parse_macro_json,
     prune_orphans, purge_library_trash, remove_library_entry, rename_library_entry_key,
     rename_library_folder, rename_macro, rename_preset, restore_library_item, save_macro_checked,
-    save_preset, save_preset_with_trigger, save_quick_access, save_settings,
+    save_preset, save_preset_with_trigger, save_quick_access, save_script, save_settings,
     set_favorite, set_library_item_locked, trash_library_item, AppSettings, AppState, ClickerConfig,
     ClickerMetrics, ClickerPreset, ClickerPresetSummary, DrawnRect, EngineEvent, EngineState,
     HotkeyBindings, LibraryFolder, LibraryIndexDto, LibraryKind, ListLibraryQuery, MacroDocument,
     MacroSummary, NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind,
-    RecordOptions, ScreenGeom, ScreenGeomDto, StopZone, ThemeMode, Trigger, clamp_overlay_opacity,
-    settings_path,
+    RecordOptions, ScreenGeom, ScreenGeomDto, ScriptDoc, StopZone, ThemeMode, Trigger,
+    clamp_overlay_opacity, settings_path,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -864,6 +865,26 @@ fn purge_library_trash_cmd(dir: State<'_, SettingsDir>) -> Result<usize, String>
 }
 
 #[tauri::command]
+fn list_scripts_cmd(dir: State<'_, SettingsDir>) -> Result<Vec<ScriptDoc>, String> {
+    list_scripts(&dir.0).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn load_script_cmd(dir: State<'_, SettingsDir>, id: String) -> Result<ScriptDoc, String> {
+    load_script(&dir.0, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_script_cmd(dir: State<'_, SettingsDir>, doc: ScriptDoc) -> Result<(), String> {
+    save_script(&dir.0, &doc).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_script_cmd(dir: State<'_, SettingsDir>, id: String) -> Result<(), String> {
+    delete_script(&dir.0, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn export_app_settings(
     engine: State<'_, AppState>,
     prefs: State<'_, Mutex<UiPrefs>>,
@@ -1562,6 +1583,8 @@ pub fn run() {
                 let _ = set_start_with_windows(true);
             }
             app.manage(SettingsDir(config_dir.clone()));
+            // So macro VM can resolve scriptId from the same config dir.
+            std::env::set_var("CASTER_CONFIG_DIR", &config_dir);
             engine.set_macros_config_dir(config_dir);
 
             if let Ok(display) = resolve_display(app.handle(), settings.display_id.as_deref()) {
@@ -1708,6 +1731,10 @@ pub fn run() {
             open_path,
             reveal_library_entry,
             purge_library_trash_cmd,
+            list_scripts_cmd,
+            load_script_cmd,
+            save_script_cmd,
+            delete_script_cmd,
             export_app_settings,
             import_app_settings,
             request_cancel,

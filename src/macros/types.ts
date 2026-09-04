@@ -185,6 +185,21 @@ export type MacroAction =
       headers?: { name: string; value: string }[];
       statusVar?: string | null;
       bodyVar?: string | null;
+      failOnStatus?: boolean;
+    }
+  | {
+      id: string;
+      type: "json.path";
+      sourceVar: string;
+      path: string;
+      destVar: string;
+    }
+  | {
+      id: string;
+      type: "script.run";
+      source?: string;
+      scriptId?: string | null;
+      timeoutMs?: number;
     }
   | { id: string; type: "key.tap"; key: string; mods?: KeyMods }
   | { id: string; type: "key.down"; key: string; mods?: KeyMods }
@@ -262,7 +277,7 @@ export type FlatRow = {
 
 export function emptyMacro(name = "Nouvelle macro"): MacroDocument {
   return {
-    schemaVersion: 6,
+    schemaVersion: 8,
     name,
     trigger: { type: "manual" },
     repeatCount: 1,

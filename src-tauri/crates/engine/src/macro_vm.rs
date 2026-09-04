@@ -321,6 +321,7 @@ impl MacroVm {
                     headers,
                     status_var,
                     body_var,
+                    fail_on_status,
                 } => {
                     let url = env.interpolate(url);
                     let body = body.as_ref().map(|b| env.interpolate(b));
@@ -342,6 +343,11 @@ impl MacroVm {
                         bus,
                     };
                     let (status, resp_body) = perform_http(&ctx)?;
+                    if *fail_on_status && status >= 400 {
+                        return Err(ActionError::Message(format!(
+                            "http.request failed with status {status}"
+                        )));
+                    }
                     if let Some(name) = status_var.as_ref().filter(|s| !s.is_empty()) {
                         env.set(name.clone(), MacroValue::Number(status as f64));
                     }
@@ -349,6 +355,51 @@ impl MacroVm {
                         env.set(name.clone(), MacroValue::String(resp_body));
                     }
                     trace.push(format!("http:{id}:{method}"));
+                }
+                ActionNode::JsonPath {
+                    id,
+                    source_var,
+                    path,
+                    dest_var,
+                } => {
+                    let source = env
+                        .get(source_var)
+                        .ok_or_else(|| {
+                            ActionError::Message(format!(
+                                "json.path: undefined variable '{source_var}'"
+                            ))
+                        })?;
+                    let raw = match source {
+                        MacroValue::String(s) => s.clone(),
+                        other => crate::env::value_to_string_pub(other),
+                    };
+                    let path = env.interpolate(path);
+                    let extracted = crate::json_path::extract_path_from_string(&raw, &path)?;
+                    env.set(dest_var.clone(), extracted);
+                    trace.push(format!("json.path:{id}:{path}"));
+                }
+                ActionNode::ScriptRun {
+                    id,
+                    source,
+                    script_id,
+                    timeout_ms,
+                } => {
+                    let (src, allow_network) =
+                        if let Some(sid) = script_id.as_ref().filter(|s| !s.is_empty()) {
+                            let doc = crate::script_library::load_script_doc(sid)?;
+                            (doc.source, doc.allow_network)
+                        } else {
+                            (source.clone(), true)
+                        };
+                    crate::script_runtime::run_script_with_perms(
+                        &src,
+                        *timeout_ms,
+                        env,
+                        bus,
+                        cancel,
+                        allow_network,
+                    )?;
+                    trace.push(format!("script.run:{id}"));
                 }
                 ActionNode::KeyTap { id, key, mods } => {
                     let key = env.interpolate(key);
@@ -529,6 +580,13 @@ fn action_kind_label(action: &ActionNode) -> String {
         ActionNode::Delay { ms, .. } => format!("delay {ms}ms"),
         ActionNode::ProcessRun { command, .. } => format!("process.run {command}"),
         ActionNode::HttpRequest { method, url, .. } => format!("http.request {method} {url}"),
+        ActionNode::JsonPath { path, dest_var, .. } => {
+            format!("json.path {path} → {dest_var}")
+        }
+        ActionNode::ScriptRun { script_id, .. } => match script_id {
+            Some(id) if !id.is_empty() => format!("script.run @{id}"),
+            _ => "script.run".into(),
+        },
         ActionNode::KeyTap { key, .. } => format!("key.tap {key}"),
         ActionNode::KeyDown { key, .. } => format!("key.down {key}"),
         ActionNode::KeyUp { key, .. } => format!("key.up {key}"),

@@ -8,7 +8,7 @@
   "properties": {
     "schemaVersion": {
       "type": "integer",
-      "enum": [1, 2, 3, 4, 5, 6]
+      "enum": [1, 2, 3, 4, 5, 6, 7, 8]
     },
     "name": { "type": "string", "minLength": 1 },
     "repeatCount": {
@@ -209,7 +209,32 @@
               "default": []
             },
             "statusVar": { "type": "string" },
-            "bodyVar": { "type": "string" }
+            "bodyVar": { "type": "string" },
+            "failOnStatus": { "type": "boolean", "default": false }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "sourceVar", "path", "destVar"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "json.path" },
+            "sourceVar": { "type": "string", "minLength": 1 },
+            "path": { "type": "string" },
+            "destVar": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "script.run" },
+            "source": { "type": "string", "default": "" },
+            "scriptId": { "type": "string" },
+            "timeoutMs": { "type": "integer", "minimum": 1, "default": 10000 }
           }
         },
         {

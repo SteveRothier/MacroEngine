@@ -24,6 +24,23 @@ export function makeAction(kind: MacroAction["type"]): MacroAction {
         url: "https://example.com",
         timeoutMs: 5000,
         headers: [],
+        failOnStatus: false,
+      };
+    case "json.path":
+      return {
+        id,
+        type: "json.path",
+        sourceVar: "body",
+        path: "",
+        destVar: "value",
+      };
+    case "script.run":
+      return {
+        id,
+        type: "script.run",
+        source:
+          "// Variables : caster.get / caster.set\n// Réseau : caster.fetch({ method, url, headers, body, timeoutMs })\n// Log : caster.log(msg)\n\ncaster.set('ok', true);\n",
+        timeoutMs: 10000,
       };
     case "key.tap":
       return { id, type: "key.tap", key: "A" };
@@ -111,6 +128,8 @@ export function buildActionAddMenu(
       label: "Système",
       items: [
         { id: "http", label: "HTTP", onSelect: () => onSelect("http.request") },
+        { id: "json", label: "JSON path", onSelect: () => onSelect("json.path") },
+        { id: "script", label: "Script", onSelect: () => onSelect("script.run") },
         { id: "process", label: "Processus", onSelect: () => onSelect("process.run") },
       ],
     },
