@@ -15,6 +15,7 @@ export type DocTab = {
 
 export type ShellView =
   | { type: "home" }
+  | { type: "library" }
   | { type: "doc"; tabId: string }
   | { type: "settings"; section?: SettingsSection; returnTabId?: string };
 
@@ -82,6 +83,9 @@ export function loadWorkspace(): WorkspaceState {
     if (data.shellView === "doc" && data.activeTabId && tabs.some((t) => t.id === data.activeTabId)) {
       return { tabs, shellView: { type: "doc", tabId: data.activeTabId } };
     }
+    if (data.shellView === "library") {
+      return { tabs, shellView: { type: "library" } };
+    }
     return { tabs, shellView: { type: "home" } };
   } catch {
     return initialWorkspace();
@@ -142,6 +146,10 @@ export function openDocTab(
 
 export function selectHome(state: WorkspaceState): WorkspaceState {
   return { ...state, shellView: { type: "home" } };
+}
+
+export function selectLibrary(state: WorkspaceState): WorkspaceState {
+  return { ...state, shellView: { type: "library" } };
 }
 
 export function selectDocTab(state: WorkspaceState, tabId: string): WorkspaceState {

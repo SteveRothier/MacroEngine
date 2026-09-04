@@ -13,6 +13,7 @@ import {
   prevDocTabId,
   reorderDocTabs,
   selectHome,
+  selectLibrary,
   setTabDirty,
   tabsClosedBy,
   titleBarActiveTabId,
@@ -37,6 +38,12 @@ describe("workspaces", () => {
 
   it("titleBarActiveTabId uses home on home view", () => {
     const ws = selectHome(initialWorkspace());
+    expect(titleBarActiveTabId(ws)).toBe(HOME_TAB_ID);
+  });
+
+  it("selectLibrary switches shell view", () => {
+    const ws = selectLibrary(selectHome(initialWorkspace()));
+    expect(ws.shellView).toEqual({ type: "library" });
     expect(titleBarActiveTabId(ws)).toBe(HOME_TAB_ID);
   });
 

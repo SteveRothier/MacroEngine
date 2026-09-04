@@ -5,6 +5,7 @@ import { AutomationsTable } from "../automations/AutomationsTable";
 import { useAutomationsPageState } from "../automations/useAutomationsPageState";
 import { ClickerStudio } from "../clicker/ClickerStudio";
 import { MacroEditorView } from "../macros/graph/MacroEditorView";
+import { HomeHub } from "./HomeHub";
 import {
   type EngineStatus,
   type HotkeyBindings,
@@ -47,6 +48,7 @@ import {
   reorderDocTabs,
   selectDocTab,
   selectHome,
+  selectLibrary,
   setTabDirty,
   setTabLabel,
   sortTabsForDisplay,
@@ -469,6 +471,36 @@ function MainAppV2Inner() {
     }
   }, [bumpRefresh, openDoc, toast]);
 
+  const onOpenClickerFromHub = useCallback(async () => {
+    const last = loadLastStudio();
+    if (last?.kind === "clicker") {
+      try {
+        const clickers = await invoke<{ name: string }[]>("list_clicker_library");
+        if (clickers.some((c) => c.name === last.id)) {
+          openDoc("clicker", last.id);
+          return;
+        }
+      } catch {
+        /* fall through */
+      }
+    }
+    const openClickerTab = workspace.tabs.find((t) => t.kind === "clicker");
+    if (openClickerTab) {
+      openDoc("clicker", openClickerTab.resourceId);
+      return;
+    }
+    try {
+      const clickers = await invoke<{ name: string }[]>("list_clicker_library");
+      if (clickers[0]) {
+        openDoc("clicker", clickers[0].name);
+        return;
+      }
+    } catch {
+      /* create below */
+    }
+    await onCreateClicker();
+  }, [onCreateClicker, openDoc, workspace.tabs]);
+
   const onBarContextAction = useCallback(
     async (action: BarContextAction) => {
       switch (action) {
@@ -604,31 +636,50 @@ function MainAppV2Inner() {
       );
     }
 
-    return (
-      <AutomationsTable
-        onNavigate={(r) => {
-          if (r.name === "automation") {
-            openDoc(r.kind, r.id);
+    if (workspace.shellView.type === "library") {
+      return (
+        <AutomationsTable
+          onNavigate={(r) => {
+            if (r.name === "automation") {
+              openDoc(r.kind, r.id);
+            }
+          }}
+          onCreateMacro={() => void onCreateMacro()}
+          onCreateClicker={() => void onCreateClicker()}
+          onLaunchClicker={(n) => void onLaunchClicker(n)}
+          onLaunchMacro={(n) => void onLaunchMacro(n)}
+          dirtyMacroId={
+            workspace.tabs.find((t) => t.kind === "macro" && t.dirty)?.resourceId ?? null
           }
-        }}
-        onCreateMacro={() => void onCreateMacro()}
-        onCreateClicker={() => void onCreateClicker()}
-        onLaunchClicker={(n) => void onLaunchClicker(n)}
-        onLaunchMacro={(n) => void onLaunchMacro(n)}
-        dirtyMacroId={
-          workspace.tabs.find((t) => t.kind === "macro" && t.dirty)?.resourceId ?? null
-        }
-        dirtyClickerId={
-          workspace.tabs.find((t) => t.kind === "clicker" && t.dirty)?.resourceId ?? null
-        }
-        refreshKey={refreshKey}
-        query={automationsPage.query}
-        onQueryChange={automationsPage.setQuery}
-        filter={automationsPage.filter}
-        display={automationsPage.display}
-        onDisplayChange={automationsPage.setDisplay}
-        onFilterChange={automationsPage.setFilter}
-        onRefresh={bumpRefresh}
+          dirtyClickerId={
+            workspace.tabs.find((t) => t.kind === "clicker" && t.dirty)?.resourceId ?? null
+          }
+          refreshKey={refreshKey}
+          query={automationsPage.query}
+          onQueryChange={automationsPage.setQuery}
+          filter={automationsPage.filter}
+          display={automationsPage.display}
+          onDisplayChange={automationsPage.setDisplay}
+          onFilterChange={automationsPage.setFilter}
+          onRefresh={bumpRefresh}
+        />
+      );
+    }
+
+    const last = loadLastStudio();
+    const presetLabel =
+      status.sessionKind === "clicker" && status.sessionName
+        ? status.sessionName
+        : last?.kind === "clicker"
+          ? last.id
+          : null;
+
+    return (
+      <HomeHub
+        status={status}
+        presetLabel={presetLabel}
+        onOpenLibrary={() => setWorkspace((ws) => selectLibrary(ws))}
+        onOpenClicker={() => void onOpenClickerFromHub()}
       />
     );
   })();
