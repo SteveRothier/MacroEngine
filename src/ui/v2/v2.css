@@ -2211,6 +2211,10 @@ button.v2-sidebar-item,
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--v2-accent) 50%, transparent);
 }
 
+.v2-root .action-list li.action-list-item.is-drag-gesture {
+  box-shadow: inset 3px 0 0 var(--v2-accent);
+}
+
 .v2-root .action-list-dense .action-list-head,
 .v2-root .action-list-dense .action-list-item {
   display: grid;

@@ -9,6 +9,7 @@ import type { AddMenuEntry } from "../ui";
 import { ActionParamCells } from "./ActionParamCells";
 import {
   flattenTree,
+  getAtPath,
   pathKey,
   pathsEqual,
   type ActionPath,
@@ -17,9 +18,10 @@ import {
 } from "./types";
 import {
   actionDetailFr,
-  actionTitleFr,
+  actionTitleInList,
   actionTone,
   branchLabelFr,
+  dragGestureEndIndex,
 } from "./actionLabels";
 import { actionOffsetMs, formatActionOffset } from "./sequenceUtils";
 
@@ -63,6 +65,18 @@ function padIndex(n: number): string {
 
 function parentPath(path: ActionPath): ActionPath {
   return path.slice(0, -1);
+}
+
+function siblingList(actions: MacroAction[], path: ActionPath): MacroAction[] {
+  if (path.length <= 1) return actions;
+  const branchPrefix = path.slice(0, -1);
+  const branch = branchPrefix[branchPrefix.length - 1];
+  const ifPath = branchPrefix.slice(0, -1);
+  const parent = getAtPath(actions, ifPath);
+  if (parent?.type === "control.if" && (branch === 0 || branch === 1)) {
+    return branch === 0 ? (parent.then ?? []) : (parent.else ?? []);
+  }
+  return actions;
 }
 
 function dropToReorderPaths(
@@ -306,6 +320,17 @@ export function ActionList({
           dropEdge.index === flatIndex &&
           dropEdge.edge === "after";
 
+        const siblings = siblingList(actions, row.path);
+        const siblingIdx = row.path[row.path.length - 1]!;
+        const dragEnd = dragGestureEndIndex(siblings, siblingIdx);
+        const inDragPath = (() => {
+          for (let s = 0; s < siblingIdx; s++) {
+            const e = dragGestureEndIndex(siblings, s);
+            if (e != null && siblingIdx <= e) return true;
+          }
+          return dragEnd != null;
+        })();
+
         return (
           <li
             key={pathKey(row.path)}
@@ -320,6 +345,7 @@ export function ActionList({
               dragFrom === flatIndex ? "is-drag-source" : "",
               dropBefore ? "drop-before" : "",
               dropAfter ? "drop-after" : "",
+              inDragPath ? "is-drag-gesture" : "",
             ]
               .filter(Boolean)
               .join(" ")}
@@ -354,7 +380,9 @@ export function ActionList({
               )}
             </span>
             <span className="lbl">
-              <strong className="act-type">{actionTitleFr(row.action.type)}</strong>
+              <strong className="act-type">
+                {actionTitleInList(siblings, siblingIdx)}
+              </strong>
             </span>
             <div className="act-params">
               {onChangeAction && !readOnly ? (
