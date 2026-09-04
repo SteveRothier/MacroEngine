@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "name": "Process Echo",
+  "trigger": { "type": "manual" },
+  "repeatCount": 1,
+  "actions": [
+    { "id": "p1", "type": "process.run", "command": "cmd", "args": ["/C", "echo", "Caster"] },
+    { "id": "d1", "type": "delay", "ms": 100 }
+  ]
+}

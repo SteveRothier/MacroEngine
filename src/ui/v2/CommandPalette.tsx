@@ -1,0 +1,179 @@
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+
+export type CommandItem = {
+  id: string;
+  label: string;
+  hint?: string;
+  group?: string;
+  onSelect: () => void;
+};
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  items: CommandItem[];
+};
+
+type Grouped = { group: string; items: { item: CommandItem; index: number }[] };
+
+export function CommandPalette({ open, onClose, items }: Props) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (i) =>
+        i.label.toLowerCase().includes(q) ||
+        i.hint?.toLowerCase().includes(q) ||
+        i.group?.toLowerCase().includes(q),
+    );
+  }, [items, query]);
+
+  const grouped = useMemo((): Grouped[] => {
+    const order: string[] = [];
+    const map = new Map<string, { item: CommandItem; index: number }[]>();
+    filtered.forEach((item, index) => {
+      const g = item.group?.trim() || "Commandes";
+      if (!map.has(g)) {
+        map.set(g, []);
+        order.push(g);
+      }
+      map.get(g)!.push({ item, index });
+    });
+    return order.map((group) => ({ group, items: map.get(group)! }));
+  }, [filtered]);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      setActive(0);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    setActive(0);
+  }, [query]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActive((a) => Math.min(a + 1, filtered.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActive((a) => Math.max(a - 1, 0));
+      } else if (e.key === "Enter" && filtered[active]) {
+        e.preventDefault();
+        filtered[active].onSelect();
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, filtered, active, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="v2-cmd-overlay" role="dialog" aria-modal aria-label="Palette de commandes">
+      <button type="button" className="v2-cmd-backdrop" aria-label="Fermer" onClick={onClose} />
+      <div className="v2-cmd-panel">
+        <input
+          className="v2-cmd-input"
+          autoFocus
+          placeholder="Rechercher une commande…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <ul className="v2-cmd-list" role="listbox">
+          {filtered.length === 0 ? (
+            <li className="v2-cmd-empty">Aucun résultat</li>
+          ) : (
+            grouped.map((g) => (
+              <li key={g.group} className="v2-cmd-group">
+                <div className="v2-cmd-group-label">{g.group}</div>
+                <ul className="v2-cmd-group-list">
+                  {g.items.map(({ item, index }) => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={index === active}
+                        className={["v2-cmd-item", index === active ? "active" : ""].join(" ")}
+                        onMouseEnter={() => setActive(index)}
+                        onClick={() => {
+                          item.onSelect();
+                          onClose();
+                        }}
+                      >
+                        <span>{item.label}</span>
+                        {item.hint ? <span className="v2-cmd-hint">{item.hint}</span> : null}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))
+          )}
+        </ul>
+        <div className="v2-cmd-footer">
+          <span>↑↓ naviguer</span>
+          <span>↵ ouvrir</span>
+          <span>esc fermer</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function DisplayPopover({
+  open,
+  onClose,
+  anchorRef,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  children: React.ReactNode;
+}) {
+  const [style, setStyle] = useState<React.CSSProperties>({});
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const el = anchorRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setStyle({
+      top: rect.bottom + 4,
+      left: rect.left,
+    });
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      const el = anchorRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        const pop = document.querySelector(".v2-display-popover");
+        if (pop && pop.contains(e.target as Node)) return;
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open, onClose, anchorRef]);
+
+  if (!open) return null;
+  return (
+    <div className="v2-display-popover" style={style}>
+      {children}
+    </div>
+  );
+}

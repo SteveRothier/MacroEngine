@@ -1,0 +1,301 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://caster.local/schemas/macro.schema.json",
+  "title": "Caster Macro",
+  "type": "object",
+  "required": ["schemaVersion", "name", "trigger", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "enum": [1, 2, 3, 4, 5, 6]
+    },
+    "name": { "type": "string", "minLength": 1 },
+    "repeatCount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 1
+    },
+    "trigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "key"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "hotkey" },
+            "key": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "const": "manual" }
+          }
+        }
+      ]
+    },
+    "actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/action" }
+    }
+  },
+  "$defs": {
+    "macroValue": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string" }
+      ]
+    },
+    "operand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["var"],
+          "additionalProperties": false,
+          "properties": {
+            "var": { "type": "string", "minLength": 1 }
+          }
+        },
+        { "$ref": "#/$defs/macroValue" }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "required": ["left", "op", "right"],
+      "additionalProperties": false,
+      "properties": {
+        "left": { "$ref": "#/$defs/operand" },
+        "op": {
+          "type": "string",
+          "enum": ["eq", "ne", "gt", "lt", "gte", "lte"]
+        },
+        "right": { "$ref": "#/$defs/operand" }
+      }
+    },
+    "keyMods": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ctrl": { "type": "boolean", "default": false },
+        "alt": { "type": "boolean", "default": false },
+        "shift": { "type": "boolean", "default": false }
+      }
+    },
+    "httpHeader": {
+      "type": "object",
+      "required": ["name", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "value": { "type": "string" }
+      }
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["id", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "mouse.click" },
+            "button": {
+              "type": "string",
+              "enum": ["left", "right", "middle"],
+              "default": "left"
+            },
+            "x": { "type": "integer" },
+            "y": { "type": "integer" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "x", "y"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "mouse.move" },
+            "x": { "type": "integer" },
+            "y": { "type": "integer" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "mouse.down" },
+            "button": {
+              "type": "string",
+              "enum": ["left", "right", "middle"],
+              "default": "left"
+            },
+            "x": { "type": "integer" },
+            "y": { "type": "integer" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "mouse.up" },
+            "button": {
+              "type": "string",
+              "enum": ["left", "right", "middle"],
+              "default": "left"
+            },
+            "x": { "type": "integer" },
+            "y": { "type": "integer" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "delta"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "mouse.wheel" },
+            "delta": { "type": "integer" },
+            "x": { "type": "integer" },
+            "y": { "type": "integer" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "ms"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "delay" },
+            "ms": { "type": "integer", "minimum": 0 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "command"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "process.run" },
+            "command": { "type": "string", "minLength": 1 },
+            "args": {
+              "type": "array",
+              "items": { "type": "string" },
+              "default": []
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "url"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "http.request" },
+            "method": { "type": "string", "default": "GET" },
+            "url": { "type": "string", "minLength": 1 },
+            "body": { "type": "string" },
+            "timeoutMs": { "type": "integer", "minimum": 1, "default": 10000 },
+            "headers": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/httpHeader" },
+              "default": []
+            },
+            "statusVar": { "type": "string" },
+            "bodyVar": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "key"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "key.tap" },
+            "key": { "type": "string", "minLength": 1 },
+            "mods": { "$ref": "#/$defs/keyMods" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "key"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "key.down" },
+            "key": { "type": "string", "minLength": 1 },
+            "mods": { "$ref": "#/$defs/keyMods" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "key"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "key.up" },
+            "key": { "type": "string", "minLength": 1 },
+            "mods": { "$ref": "#/$defs/keyMods" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "text"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "clipboard.set" },
+            "text": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "clipboard.get" },
+            "name": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "name", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "var.set" },
+            "name": { "type": "string", "minLength": 1 },
+            "value": { "$ref": "#/$defs/macroValue" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["id", "type", "condition", "then"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string" },
+            "type": { "const": "control.if" },
+            "condition": { "$ref": "#/$defs/condition" },
+            "then": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/action" }
+            },
+            "else": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/action" },
+              "default": []
+            }
+          }
+        }
+      ]
+    }
+  }
+}

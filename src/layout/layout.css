@@ -1,0 +1,57 @@
+/* Layout engine — Workspace under shell grid */
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.workspace.layout-narrow {
+  max-width: var(--layout-narrow-max);
+  margin-inline: auto;
+}
+
+.workspace-header {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.workspace-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0.35rem var(--page-pad-x) var(--page-pad-bottom);
+  overflow: hidden;
+  gap: 0;
+}
+
+.workspace-flush .workspace-body {
+  padding: 0;
+}
+
+.workspace-hub .workspace-body {
+  padding: 0;
+}
+
+.workspace-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-gap, 0.65rem);
+}
+
+.workspace-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+}

@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 2,
+  "name": "Click + Delay",
+  "trigger": { "type": "manual" },
+  "repeatCount": 1,
+  "actions": [
+    { "id": "a1", "type": "mouse.click", "button": "left" },
+    { "id": "a2", "type": "delay", "ms": 200 },
+    { "id": "a3", "type": "mouse.click", "button": "left" }
+  ]
+}

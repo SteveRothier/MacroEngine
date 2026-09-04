@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Caster — Mockups UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --font: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    --radius: 8px;
+    --radius-sm: 6px;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ background:#E7E8EC; font-family:var(--font); }
+  body{ padding:48px 32px 96px; }
+
+  .gallery{ max-width:1280px; margin:0 auto; display:flex; flex-direction:column; gap:64px; }
+  .intro{ max-width:1280px; margin:0 auto 8px; }
+  .intro h1{ font-size:15px; font-weight:600; color:#2B2E36; letter-spacing:-.01em; }
+  .intro p{ font-size:12.5px; color:#8B90A0; margin-top:4px; }
+
+  .frame-block .frame-label{
+    font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:#9297A5; margin-bottom:10px; font-weight:600;
+  }
+  .frame-block .frame-label span{ color:#C2C5CE; font-weight:500; text-transform:none; letter-spacing:0; margin-left:8px; }
+  .frame-scroll{ overflow-x:auto; padding-bottom:2px; }
+
+  /* ============ WINDOW ============ */
+  .window{
+    width:1280px; height:800px; flex-shrink:0;
+    display:flex; flex-direction:column;
+    border-radius:11px; overflow:hidden;
+    box-shadow: 0 20px 48px -12px rgba(20,22,30,.28);
+    border:1px solid var(--win-border-outer);
+    font-family:var(--font);
+  }
+
+  .window[data-theme="light"]{
+    --bg:#F4F5F7; --card:#FFFFFF; --border:#E4E6EB;
+    --text:#1B1E24; --text-muted:#868B96; --text-dim:#AEB2BB;
+    --accent:#2F6FED; --accent-soft:rgba(47,111,237,.10); --accent-soft-strong:rgba(47,111,237,.16);
+    --seg-track:#E9EAEE; --seg-active:#FFFFFF;
+    --danger:#E5484D; --danger-soft:rgba(229,72,77,.10);
+    --win-border-outer:#DEE0E5;
+    --shadow-sm: 0 1px 2px rgba(20,20,30,.05);
+  }
+  .window[data-theme="dark"]{
+    --bg:#12141A; --card:#1E222B; --border:#2A2E38;
+    --text:#E9EAEF; --text-muted:#888EA0; --text-dim:#565B6A;
+    --accent:#2F6FED; --accent-soft:rgba(47,111,237,.16); --accent-soft-strong:rgba(47,111,237,.24);
+    --seg-track:#191C24; --seg-active:#2A2F3B;
+    --danger:#F16269; --danger-soft:rgba(241,98,105,.14);
+    --win-border-outer:#20232C;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+  }
+
+  .window{ background:var(--bg); color:var(--text); }
+
+  /* ============ TITLEBAR ============ */
+  .titlebar{
+    position:relative; height:44px; flex-shrink:0;
+    display:flex; align-items:center;
+    padding:0 10px 0 12px;
+    border-bottom:1px solid var(--border);
+  }
+  .tb-left{ display:flex; align-items:center; gap:2px; }
+  .navitem{
+    display:flex; align-items:center; gap:6px;
+    padding:6px 10px; border-radius:var(--radius-sm);
+    color:var(--text-muted); user-select:none;
+  }
+  .navitem svg{ width:14px; height:14px; stroke:currentColor; flex-shrink:0; }
+  .navitem span{ font-size:12px; font-weight:500; white-space:nowrap; }
+  .navitem.active{ background:var(--accent-soft); color:var(--accent); }
+  .navitem.active span{ font-weight:600; }
+
+  .tb-chips{ display:flex; align-items:center; margin-left:12px; padding-left:12px; border-left:1px solid var(--border); }
+
+  .seg{ display:inline-flex; align-items:center; background:var(--seg-track); border-radius:var(--radius-sm); padding:2px; gap:1px; }
+  .seg .opt{ padding:4.5px 11px; font-size:11.5px; font-weight:500; color:var(--text-muted); border-radius:5px; white-space:nowrap; }
+  .seg .opt.active{ background:var(--seg-active); color:var(--text); font-weight:600; box-shadow:var(--shadow-sm); }
+
+  .tb-brand{
+    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+    font-size:11px; font-weight:600; letter-spacing:.14em; color:var(--text-dim);
+    pointer-events:none; user-select:none;
+  }
+
+  .tb-right{ margin-left:auto; display:flex; align-items:center; gap:2px; }
+  .winctrl{ width:26px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:5px; color:var(--text-muted); }
+  .winctrl svg{ width:10px; height:10px; }
+  .winctrl.close:hover{ background:var(--danger); }
+  .winctrl.close:hover svg{ stroke:#fff; }
+
+  /* ============ CONTENT ============ */
+  .content{ flex:1; min-height:0; overflow:hidden; }
+
+  /* ---- Status bar ---- */
+  .statusbar{
+    height:26px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between;
+    padding:0 14px; border-top:1px solid var(--border);
+    font-size:11px; color:var(--text-muted);
+  }
+  .sb-left{ display:flex; align-items:center; gap:8px; }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--text-dim); }
+  .dot.on{ background:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .sb-right{ display:flex; align-items:center; gap:16px; }
+  .kbd{ font-family:var(--font-mono); font-size:10.5px; background:var(--card); border:1px solid var(--border); border-radius:4px; padding:1.5px 5px; color:var(--text-muted); }
+
+  /* ============ ACCUEIL ============ */
+  .hub{ height:100%; display:flex; align-items:center; justify-content:center; }
+  .hub-inner{ width:420px; display:flex; flex-direction:column; align-items:center; text-align:center; }
+  .hub-status{ display:flex; flex-direction:column; align-items:center; gap:10px; margin-bottom:34px; }
+  .hub-dot-row{ display:flex; align-items:center; gap:8px; }
+  .hub-dot-row .dot{ width:8px; height:8px; }
+  .hub-status-title{ font-size:15px; font-weight:600; }
+  .hub-status-sub{ font-size:12.5px; color:var(--text-muted); }
+  .hub-cta{ display:flex; flex-direction:column; align-items:center; gap:10px; width:220px; margin-bottom:30px; }
+  .hub-cta .btn{ width:100%; justify-content:center; }
+  .hub-summary{ display:flex; align-items:center; gap:18px; font-size:12px; color:var(--text-muted); }
+  .hub-summary .item{ display:flex; align-items:center; gap:6px; }
+  .hub-summary svg{ width:13px; height:13px; stroke:var(--text-dim); }
+  .hub-divider{ width:1px; height:12px; background:var(--border); }
+
+  /* ============ BUTTONS ============ */
+  .btn{ display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; padding:8px 15px; border-radius:var(--radius-sm); user-select:none; }
+  .btn svg{ width:13px; height:13px; }
+  .btn-primary{ background:var(--accent); color:#fff; }
+  .btn-outline{ background:var(--card); border:1px solid var(--border); color:var(--text); }
+  .btn-outline.muted{ color:var(--text-muted); }
+  .btn-lg{ padding:11px 20px; font-size:13.5px; }
+  .btn-ghost{ background:transparent; color:var(--text-muted); border:1px solid transparent; }
+
+  /* ============ CLICKER ============ */
+  .clicker-wrap{ height:100%; display:flex; flex-direction:column; }
+  .clicker-scroll{ flex:1; overflow-y:auto; padding:22px 28px 26px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-top:16px; }
+  .panel{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px 16px 6px; }
+  .panel-title{ font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-muted); font-weight:600; margin-bottom:6px; }
+  .frow{ display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--border); gap:14px; }
+  .frow:last-child{ border-bottom:none; }
+  .frow-label{ font-size:12.5px; font-weight:500; color:var(--text); }
+  .frow-sub{ font-size:11px; color:var(--text-muted); margin-top:1px; }
+  .frow-control{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+
+  .field{ display:flex; align-items:center; gap:6px; }
+  .input{ width:58px; background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:5px 8px; font-size:12px; font-family:var(--font-mono); color:var(--text); text-align:right; }
+  .input.wide{ width:52px; }
+  .unit{ font-size:11px; color:var(--text-muted); }
+
+  .switch{ width:30px; height:17px; border-radius:10px; background:var(--border); position:relative; flex-shrink:0; }
+  .switch.on{ background:var(--accent); }
+  .switch .knob{ width:13px; height:13px; border-radius:50%; background:#fff; position:absolute; top:2px; left:2px; box-shadow:0 1px 1px rgba(0,0,0,.2); }
+  .switch.on .knob{ left:15px; }
+
+  .empty-hint{ font-size:12px; color:var(--text-dim); }
+  .link-btn{ font-size:12px; font-weight:600; color:var(--accent); display:flex; align-items:center; gap:5px; }
+  .link-btn svg{ width:12px; height:12px; }
+
+  .dock{
+    height:66px; flex-shrink:0; display:flex; align-items:center; justify-content:center; gap:14px;
+    border-top:1px solid var(--border); background:var(--card);
+  }
+  .dock-hotkey{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; margin-left:8px; padding-left:16px; border-left:1px solid var(--border); }
+  .dock-hotkey .lbl{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; }
+
+  /* ============ MACROS ============ */
+  .macros-empty{ height:100%; display:flex; align-items:center; justify-content:center; }
+  .macros-inner{ width:360px; display:flex; flex-direction:column; align-items:center; text-align:center; }
+  .macros-icon{ width:52px; height:52px; border-radius:12px; background:var(--card); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; margin-bottom:20px; }
+  .macros-icon svg{ width:24px; height:24px; stroke:var(--text-dim); }
+  .macros-inner h2{ font-size:15px; font-weight:600; margin-bottom:8px; }
+  .macros-inner p{ font-size:12.5px; color:var(--text-muted); line-height:1.55; margin-bottom:24px; }
+  .macros-btns{ display:flex; gap:10px; }
+
+  /* ============ PARAMETRES ============ */
+  .settings-wrap{ height:100%; display:flex; }
+  .settings-rail{ width:206px; flex-shrink:0; border-right:1px solid var(--border); padding:18px 10px; }
+  .rail-item{ display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:var(--radius-sm); font-size:12.5px; font-weight:500; color:var(--text-muted); margin-bottom:2px; }
+  .rail-item svg{ width:14px; height:14px; stroke:currentColor; flex-shrink:0; }
+  .rail-item.active{ background:var(--accent-soft); color:var(--accent); font-weight:600; }
+
+  .settings-main{ flex:1; padding:26px 40px; overflow-y:auto; }
+  .settings-head{ margin-bottom:22px; }
+  .settings-head h2{ font-size:15px; font-weight:600; margin-bottom:4px; }
+  .settings-head p{ font-size:12.5px; color:var(--text-muted); }
+
+  .srow{ display:flex; align-items:center; justify-content:space-between; padding:15px 0; border-bottom:1px solid var(--border); gap:24px; max-width:640px; }
+  .srow:last-child{ border-bottom:none; }
+  .srow-label{ font-size:13px; font-weight:500; color:var(--text); }
+  .srow-sub{ font-size:11.5px; color:var(--text-muted); margin-top:3px; max-width:340px; line-height:1.4; }
+
+  .swatch{ width:18px; height:18px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; border:2px solid var(--card); box-shadow:0 0 0 1.5px var(--accent); }
+  .swatch svg{ width:9px; height:9px; stroke:#fff; }
+  .swatch-row{ display:flex; align-items:center; gap:10px; }
+  .swatch-name{ font-size:12px; color:var(--text-muted); }
+
+  .select{ display:flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:12px; color:var(--text); }
+  .select svg{ width:11px; height:11px; stroke:var(--text-muted); }
+
+  /* utility svgs */
+  svg{ display:block; }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Caster — Mockups d'interface</h1>
+  <p>Fenêtre frameless, style Tauri · 1280×800 · IBM Plex Sans · Accent unique #2F6FED</p>
+</div>
+
+<div class="gallery">
+
+  <!-- ======================================================= -->
+  <!-- 1. ACCUEIL — LIGHT -->
+  <!-- ======================================================= -->
+  <div class="frame-block">
+    <div class="frame-label">Accueil <span>Thème clair — hub central, une seule action prioritaire</span></div>
+    <div class="frame-scroll">
+    <div class="window" data-theme="light">
+      <div class="titlebar">
+        <div class="tb-left">
+          <div class="navitem active">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+            <span>Accueil</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 15 2.5-6L21 9.5 6 3z"/></svg>
+            <span>Clicker</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+            <span>Macros</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            <span>Paramètres</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor" stroke="none"/></svg>
+            <span>À propos</span>
+          </div>
+        </div>
+        <div class="tb-brand">Caster</div>
+        <div class="tb-right">
+          <div class="winctrl"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl close"><svg viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="hub">
+          <div class="hub-inner">
+            <div class="hub-status">
+              <div class="hub-dot-row"><span class="dot on"></span><span class="hub-status-title">Moteur actif</span></div>
+              <div class="hub-status-sub">Session Clicker en cours depuis 04:12 · 2 480 clics envoyés</div>
+            </div>
+            <div class="hub-cta">
+              <div class="btn btn-primary btn-lg" style="width:100%;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 15 2.5-6L21 9.5 6 3z"/></svg>
+                Ouvrir Clicker
+              </div>
+              <div class="btn btn-outline" style="width:100%;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+                Macros
+              </div>
+            </div>
+            <div class="hub-summary">
+              <div class="item">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+                Preset : Farming AFK
+              </div>
+              <div class="hub-divider"></div>
+              <div class="item">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg>
+                F6 pour démarrer / arrêter
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <div class="sb-left"><span class="dot on"></span><span>Moteur actif · aucune donnée envoyée</span></div>
+        <div class="sb-right"><span>Processus : cible non définie</span><span>v1.4.2</span></div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- 2. ACCUEIL — DARK -->
+  <!-- ======================================================= -->
+  <div class="frame-block">
+    <div class="frame-label">Accueil <span>Thème sombre</span></div>
+    <div class="frame-scroll">
+    <div class="window" data-theme="dark">
+      <div class="titlebar">
+        <div class="tb-left">
+          <div class="navitem active">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+            <span>Accueil</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 15 2.5-6L21 9.5 6 3z"/></svg>
+            <span>Clicker</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+            <span>Macros</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            <span>Paramètres</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor" stroke="none"/></svg>
+            <span>À propos</span>
+          </div>
+        </div>
+        <div class="tb-brand">Caster</div>
+        <div class="tb-right">
+          <div class="winctrl"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl close"><svg viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="hub">
+          <div class="hub-inner">
+            <div class="hub-status">
+              <div class="hub-dot-row"><span class="dot"></span><span class="hub-status-title">Moteur inactif</span></div>
+              <div class="hub-status-sub">Aucune session en cours</div>
+            </div>
+            <div class="hub-cta">
+              <div class="btn btn-primary btn-lg" style="width:100%;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 15 2.5-6L21 9.5 6 3z"/></svg>
+                Ouvrir Clicker
+              </div>
+              <div class="btn btn-outline" style="width:100%;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+                Macros
+              </div>
+            </div>
+            <div class="hub-summary">
+              <div class="item">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+                Preset : Farming AFK
+              </div>
+              <div class="hub-divider"></div>
+              <div class="item">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg>
+                F6 pour démarrer / arrêter
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <div class="sb-left"><span class="dot"></span><span>Moteur inactif · aucune donnée envoyée</span></div>
+        <div class="sb-right"><span>Processus : cible non définie</span><span>v1.4.2</span></div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- 3. CLICKER — mode Avancé -->
+  <!-- ======================================================= -->
+  <div class="frame-block">
+    <div class="frame-label">Clicker <span>Mode avancé — Entrée, Timing, Cible, Limites, Zones + dock de session</span></div>
+    <div class="frame-scroll">
+    <div class="window" data-theme="light">
+      <div class="titlebar">
+        <div class="tb-left">
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+            <span>Accueil</span>
+          </div>
+          <div class="navitem active">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 15 2.5-6L21 9.5 6 3z"/></svg>
+            <span>Clicker</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+            <span>Macros</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            <span>Paramètres</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor" stroke="none"/></svg>
+            <span>À propos</span>
+          </div>
+          <div class="tb-chips">
+            <div class="seg">
+              <div class="opt">Simple</div>
+              <div class="opt active">Avancé</div>
+            </div>
+          </div>
+        </div>
+        <div class="tb-brand">Caster</div>
+        <div class="tb-right">
+          <div class="winctrl"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl close"><svg viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        </div>
+      </div>
+
+      <div class="clicker-wrap">
+        <div class="clicker-scroll">
+          <div class="grid2">
+            <div class="panel">
+              <div class="panel-title">Entrée</div>
+              <div class="frow">
+                <div class="frow-label">Bouton</div>
+                <div class="seg"><div class="opt active">Gauche</div><div class="opt">Droit</div><div class="opt">Milieu</div></div>
+              </div>
+              <div class="frow">
+                <div class="frow-label">Type de clic</div>
+                <div class="seg"><div class="opt active">Simple</div><div class="opt">Double</div></div>
+              </div>
+              <div class="frow">
+                <div>
+                  <div class="frow-label">Répétitions</div>
+                  <div class="frow-sub">Illimité tant que la session est active</div>
+                </div>
+                <div class="frow-control">
+                  <div class="input" style="color:var(--text-dim);">—</div>
+                  <div class="switch on"><div class="knob"></div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-title">Timing</div>
+              <div class="frow">
+                <div class="frow-label">Intervalle</div>
+                <div class="field"><div class="input">50</div><div class="unit">ms</div></div>
+              </div>
+              <div class="frow">
+                <div>
+                  <div class="frow-label">Variation aléatoire</div>
+                  <div class="frow-sub">Évite un rythme parfaitement régulier</div>
+                </div>
+                <div class="field"><div class="input">10</div><div class="unit">%</div></div>
+              </div>
+              <div class="frow">
+                <div class="frow-label">Délai de démarrage</div>
+                <div class="field"><div class="input">3</div><div class="unit">s</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid3">
+            <div class="panel">
+              <div class="panel-title">Cible</div>
+              <div class="frow">
+                <div class="frow-label">Mode</div>
+              </div>
+              <div class="frow" style="padding-top:0;">
+                <div class="seg" style="width:100%;"><div class="opt active" style="flex:1;text-align:center;">Position fixe</div><div class="opt" style="flex:1;text-align:center;">Suivre le curseur</div></div>
+              </div>
+              <div class="frow">
+                <div class="frow-label">Coordonnées</div>
+                <div class="frow-control">
+                  <div class="input wide">812</div>
+                  <div class="input wide">430</div>
+                </div>
+              </div>
+              <div class="frow" style="border-bottom:none;justify-content:flex-end;">
+                <div class="link-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+                  Capturer la position
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-title">Limites</div>
+              <div class="frow">
+                <div>
+                  <div class="frow-label">Durée max</div>
+                  <div class="frow-sub">Arrête la session automatiquement</div>
+                </div>
+                <div class="frow-control">
+                  <div class="input" style="color:var(--text-dim);">—</div>
+                  <div class="unit">min</div>
+                </div>
+              </div>
+              <div class="frow" style="border-bottom:none;">
+                <div class="frow-label">Nombre de clics max</div>
+                <div class="input">5000</div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-title">Zones</div>
+              <div class="frow" style="border-bottom:none;">
+                <div>
+                  <div class="frow-label">Zone active</div>
+                  <div class="frow-sub empty-hint">Aucune zone définie — clics envoyés à la cible ci-dessus</div>
+                </div>
+              </div>
+              <div class="frow" style="border-bottom:none;padding-top:2px;">
+                <div class="btn btn-outline" style="width:100%;justify-content:center;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4h6M4 4v6M20 4h-6M20 4v6M4 20h6M4 20v-6M20 20h-6M20 20v-6"/></svg>
+                  Définir une zone
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dock">
+          <div class="btn btn-primary btn-lg">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            Démarrer
+          </div>
+          <div class="btn btn-outline btn-lg muted">
+            <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1.5"/></svg>
+            Arrêter
+          </div>
+          <div class="dock-hotkey">
+            <span class="lbl">Raccourci</span>
+            <span class="kbd">F6</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <div class="sb-left"><span class="dot"></span><span>Prêt · aucune session en cours</span></div>
+        <div class="sb-right"><span>Cible : 812, 430</span><span>v1.4.2</span></div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- 4. MACROS — état vide (dark) -->
+  <!-- ======================================================= -->
+  <div class="frame-block">
+    <div class="frame-label">Macros <span>Thème sombre — état vide, une action claire</span></div>
+    <div class="frame-scroll">
+    <div class="window" data-theme="dark">
+      <div class="titlebar">
+        <div class="tb-left">
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+            <span>Accueil</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 15 2.5-6L21 9.5 6 3z"/></svg>
+            <span>Clicker</span>
+          </div>
+          <div class="navitem active">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+            <span>Macros</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            <span>Paramètres</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor" stroke="none"/></svg>
+            <span>À propos</span>
+          </div>
+          <div class="tb-chips">
+            <div class="seg">
+              <div class="opt">Timeline</div>
+              <div class="opt active">Liste</div>
+            </div>
+          </div>
+        </div>
+        <div class="tb-brand">Caster</div>
+        <div class="tb-right">
+          <div class="winctrl"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl close"><svg viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="macros-empty">
+          <div class="macros-inner">
+            <div class="macros-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+            </div>
+            <h2>Aucune macro pour l'instant</h2>
+            <p>Enregistrez une séquence de clics et de touches, ou ajoutez un clic manuellement.</p>
+            <div class="macros-btns">
+              <div class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+                Enregistrer
+              </div>
+              <div class="btn btn-outline">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                Clic
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <div class="sb-left"><span class="dot"></span><span>Moteur inactif</span></div>
+        <div class="sb-right"><span>0 macro</span><span>v1.4.2</span></div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- 5. PARAMETRES — LIGHT -->
+  <!-- ======================================================= -->
+  <div class="frame-block">
+    <div class="frame-label">Paramètres <span>Thème clair — rail à gauche, lignes de réglage à droite</span></div>
+    <div class="frame-scroll">
+    <div class="window" data-theme="light">
+      <div class="titlebar">
+        <div class="tb-left">
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+            <span>Accueil</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 15 2.5-6L21 9.5 6 3z"/></svg>
+            <span>Clicker</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+            <span>Macros</span>
+          </div>
+          <div class="navitem active">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            <span>Paramètres</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor" stroke="none"/></svg>
+            <span>À propos</span>
+          </div>
+        </div>
+        <div class="tb-brand">Caster</div>
+        <div class="tb-right">
+          <div class="winctrl"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl close"><svg viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        </div>
+      </div>
+
+      <div class="settings-wrap">
+        <div class="settings-rail">
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+            Général
+          </div>
+          <div class="rail-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+            Apparence
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg>
+            Raccourcis
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+            Processus
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6a2 2 0 0 1 2-2h9l5 5v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 4v4h6V4"/></svg>
+            Presets
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 1 5.4-5.4L14.7 6.3z"/></svg>
+            Maintenance
+          </div>
+        </div>
+
+        <div class="settings-main">
+          <div class="settings-head">
+            <h2>Apparence</h2>
+            <p>Personnalisez l'apparence de Caster.</p>
+          </div>
+
+          <div class="srow">
+            <div class="srow-label">Thème</div>
+            <div class="seg"><div class="opt active">Clair</div><div class="opt">Sombre</div></div>
+          </div>
+          <div class="srow">
+            <div class="srow-label">Densité</div>
+            <div class="seg"><div class="opt active">Confortable</div><div class="opt">Compacte</div></div>
+          </div>
+          <div class="srow">
+            <div>
+              <div class="srow-label">Couleur d'accent</div>
+              <div class="srow-sub">Utilisée pour les actions principales et les états actifs</div>
+            </div>
+            <div class="swatch-row">
+              <div class="swatch"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></div>
+              <span class="swatch-name">Bleu acier</span>
+            </div>
+          </div>
+          <div class="srow">
+            <div>
+              <div class="srow-label">Réduire les animations</div>
+              <div class="srow-sub">Limite les transitions d'interface</div>
+            </div>
+            <div class="switch"><div class="knob"></div></div>
+          </div>
+          <div class="srow">
+            <div class="srow-label">Icône de la barre des tâches</div>
+            <div class="select">Monochrome <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <div class="sb-left"><span class="dot"></span><span>Moteur inactif</span></div>
+        <div class="sb-right"><span>Config. locale — aucune synchronisation</span><span>v1.4.2</span></div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- 6. PARAMETRES — DARK -->
+  <!-- ======================================================= -->
+  <div class="frame-block">
+    <div class="frame-label">Paramètres <span>Thème sombre</span></div>
+    <div class="frame-scroll">
+    <div class="window" data-theme="dark">
+      <div class="titlebar">
+        <div class="tb-left">
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+            <span>Accueil</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l6 15 2.5-6L21 9.5 6 3z"/></svg>
+            <span>Clicker</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 3 8l9 5 9-5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>
+            <span>Macros</span>
+          </div>
+          <div class="navitem active">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V20a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H4a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H10a1.7 1.7 0 0 0 1-1.6V4a2 2 0 1 1 4 0v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V10a1.7 1.7 0 0 0 1.6 1H20a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            <span>Paramètres</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7.5" r=".6" fill="currentColor" stroke="none"/></svg>
+            <span>À propos</span>
+          </div>
+        </div>
+        <div class="tb-brand">Caster</div>
+        <div class="tb-right">
+          <div class="winctrl"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg></div>
+          <div class="winctrl close"><svg viewBox="0 0 12 12"><line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="currentColor" stroke-width="1.2"/></svg></div>
+        </div>
+      </div>
+
+      <div class="settings-wrap">
+        <div class="settings-rail">
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+            Général
+          </div>
+          <div class="rail-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+            Apparence
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h12"/></svg>
+            Raccourcis
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+            Processus
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6a2 2 0 0 1 2-2h9l5 5v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M8 4v4h6V4"/></svg>
+            Presets
+          </div>
+          <div class="rail-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17v3h3l5.3-5.3a4 4 0 0 1 5.4-5.4L14.7 6.3z"/></svg>
+            Maintenance
+          </div>
+        </div>
+
+        <div class="settings-main">
+          <div class="settings-head">
+            <h2>Apparence</h2>
+            <p>Personnalisez l'apparence de Caster.</p>
+          </div>
+
+          <div class="srow">
+            <div class="srow-label">Thème</div>
+            <div class="seg"><div class="opt">Clair</div><div class="opt active">Sombre</div></div>
+          </div>
+          <div class="srow">
+            <div class="srow-label">Densité</div>
+            <div class="seg"><div class="opt active">Confortable</div><div class="opt">Compacte</div></div>
+          </div>
+          <div class="srow">
+            <div>
+              <div class="srow-label">Couleur d'accent</div>
+              <div class="srow-sub">Utilisée pour les actions principales et les états actifs</div>
+            </div>
+            <div class="swatch-row">
+              <div class="swatch"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></div>
+              <span class="swatch-name">Bleu acier</span>
+            </div>
+          </div>
+          <div class="srow">
+            <div>
+              <div class="srow-label">Réduire les animations</div>
+              <div class="srow-sub">Limite les transitions d'interface</div>
+            </div>
+            <div class="switch"><div class="knob"></div></div>
+          </div>
+          <div class="srow">
+            <div class="srow-label">Icône de la barre des tâches</div>
+            <div class="select">Monochrome <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="statusbar">
+        <div class="sb-left"><span class="dot"></span><span>Moteur inactif</span></div>
+        <div class="sb-right"><span>Config. locale — aucune synchronisation</span><span>v1.4.2</span></div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
