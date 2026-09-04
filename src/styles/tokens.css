@@ -1,0 +1,194 @@
+:root {
+  --font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Rajdhani", "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
+
+  /* Light — cold gray ops console (derived from dark) */
+  --bg: #e8ebf0;
+  --bg-elev: #dde2ea;
+  --bg-card: #f4f6f9;
+  --bg-sidebar: #e2e6ed;
+  --bg-input: #ffffff;
+  --surface: var(--bg-card);
+  --surface-alt: var(--bg-elev);
+  --surface-raised: #ffffff;
+  --surface-hover: color-mix(in srgb, var(--text) 4%, var(--bg-card));
+  --surface-active: color-mix(in srgb, var(--accent) 8%, var(--bg-card));
+
+  --border: #c8ced9;
+  --border-soft: #d8dde6;
+  --border-strong: #aeb6c4;
+  --text: #0f1218;
+  --muted: #5a6270;
+  --label: #7a8494;
+  --text-muted: var(--muted);
+  --text-faint: #8b93a0;
+
+  --accent: #2f6fed;
+  --accent-hover: #1f5ad4;
+  --accent-soft: rgba(42, 106, 239, 0.12);
+  --accent-text: #1a4fc4;
+  --accent-border: rgba(42, 106, 239, 0.4);
+  --accent-tint: var(--accent-soft);
+  --accent-tint-strong: rgba(42, 106, 239, 0.18);
+  --accent-live: #0fbf7a;
+  --accent-live-hover: #0aa86b;
+  --accent-live-soft: rgba(15, 191, 122, 0.14);
+  --glow-live: none;
+  --panel-edge: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+
+  --ok: #0f9a5c;
+  --ok-soft: rgba(15, 154, 92, 0.12);
+  --ok-text: #0c7a49;
+  --success: var(--ok);
+  --success-tint: var(--ok-soft);
+
+  --danger: #d33535;
+  --danger-bg: rgba(211, 53, 53, 0.09);
+  --danger-border: rgba(211, 53, 53, 0.55);
+  --danger-hover: #b82a2a;
+  --danger-text: #c42b2b;
+
+  --warn: #c9920a;
+  --warn-soft: rgba(201, 146, 10, 0.12);
+
+  --act-mouse: #2a6aef;
+  --act-delay: #7a8494;
+  --act-key: #1a9aad;
+  --act-if: #e03a3a;
+  --act-http: #0d9a8a;
+  --act-var: #0f9a5c;
+  --act-process: #4a6fa5;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --space-1: 0.2rem;
+  --space-2: 0.45rem;
+  --space-3: 0.65rem;
+  --space-4: 0.85rem;
+  --space-5: 1.1rem;
+
+  --text-xs: 0.7rem;
+  --text-sm: 0.8rem;
+  --font-size: 13px;
+  --text-lg: 1rem;
+  --control-h: 1.95rem;
+
+  --tb-h: 40px;
+  --nav-strip-h: 32px;
+  --sb-h: 26px;
+  --titlebar-h: var(--tb-h);
+  --statusbar-h: var(--sb-h);
+  --sidebar-w: 52px;
+  --settings-stack: 0.55rem;
+  --card-pad-y: 0.85rem;
+  --card-pad-x: 1rem;
+  --page-gap: 0.75rem;
+  --list-pill-radius: 6px;
+  --list-row-gap: 0.2rem;
+  --list-row-pad-y: 0.38rem;
+  --list-row-pad-x: 0.55rem;
+  --focus-ring: 2px solid var(--accent-border);
+  --shadow-sm: 0 1px 2px rgba(15, 18, 24, 0.06);
+  --shadow: 0 8px 24px rgba(15, 18, 24, 0.1);
+  --shadow-lg: 0 16px 40px rgba(15, 18, 24, 0.14);
+
+  --bp-compact: 820px;
+  --bp-medium: 980px;
+  --bp-wide: 1100px;
+  --bp-xl: 1400px;
+  --content-max: min(76rem, 100%);
+  --layout-narrow-max: min(44rem, 100%);
+  --page-pad-x: clamp(1rem, 2.5vw, 1.75rem);
+  --page-pad-bottom: 1.25rem;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 110ms;
+  --dur: 160ms;
+
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath stroke='%235a6270' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
+
+  color: var(--text);
+  background: var(--bg);
+  font-family: var(--font);
+  font-size: var(--font-size);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: light;
+}
+
+/* Picker must stay see-through (theme --bg would otherwise paint a solid screen). */
+html[data-window="picker"],
+html[data-window="picker"] body,
+html[data-window="picker"] #root,
+html[data-window="zones"],
+html[data-window="zones"] body,
+html[data-window="zones"] #root {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+[data-theme="dark"] {
+  --bg: #0b0c0f;
+  --bg-elev: #101218;
+  --bg-card: #12141a;
+  --bg-sidebar: #0e1015;
+  --bg-input: #12141a;
+  --surface: #12141a;
+  --surface-alt: #161922;
+  --surface-raised: #161922;
+  --surface-hover: color-mix(in srgb, #fff 5%, #12141a);
+  --surface-active: color-mix(in srgb, var(--accent) 12%, #12141a);
+
+  --border: #222632;
+  --border-soft: #1a1e28;
+  --border-strong: #2e3545;
+  --text: #eceef2;
+  --muted: #8b93a3;
+  --label: #6a7385;
+  --text-muted: var(--muted);
+  --text-faint: #555e70;
+
+  --accent: #2f6fed;
+  --accent-hover: #4a84f0;
+  --accent-soft: rgba(47, 111, 237, 0.16);
+  --accent-text: #9bb8ff;
+  --accent-border: rgba(47, 111, 237, 0.45);
+  --accent-tint-strong: rgba(47, 111, 237, 0.24);
+  --accent-live: #2ee6a6;
+  --accent-live-hover: #4aefb5;
+  --accent-live-soft: rgba(46, 230, 166, 0.14);
+  --glow-live: none;
+  --panel-edge: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  --ok: #2ee6a6;
+  --ok-soft: rgba(46, 230, 166, 0.14);
+  --ok-text: #5aefbb;
+
+  --danger: #e24a4a;
+  --danger-bg: rgba(226, 74, 74, 0.14);
+  --danger-border: rgba(226, 74, 74, 0.5);
+  --danger-hover: #f06060;
+  --danger-text: #f07070;
+
+  --warn: #d4a017;
+  --warn-soft: rgba(212, 160, 23, 0.14);
+
+  --act-mouse: #4d8aff;
+  --act-delay: #6a7385;
+  --act-key: #2ec4d9;
+  --act-if: #ff4d5a;
+  --act-http: #2ee6c0;
+  --act-var: #2ee6a6;
+  --act-process: #6a8fd4;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.6);
+
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath stroke='%238b93a3' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
+
+  color-scheme: dark;
+}
