@@ -13,6 +13,7 @@ import {
   getAtPath,
   insertAtPath,
   moveInParent,
+  pasteAfterAtPath,
   removeAtPath,
   reorderAtPath,
   updateAtPath,
@@ -426,6 +427,24 @@ export function MacroEditorView({
     }
   }, [flushAutosave, locked, onStatus, recording, toast]);
 
+  const onRunFrom = useCallback(
+    async (path: ActionPath) => {
+      if (locked || recording || editorLocked) return;
+      try {
+        await flushAutosave();
+        const st = await invoke<EngineStatus>("launch_saved_macro", {
+          name: macroIdRef.current,
+          fromPath: path,
+        });
+        onStatus(st);
+        toast.success("Test depuis l’étape lancé");
+      } catch (e) {
+        toast.error(errMessage(e, "Échec du test depuis l’étape"));
+      }
+    },
+    [editorLocked, flushAutosave, locked, onStatus, recording, toast],
+  );
+
   const onStartRecord = useCallback(async () => {
     if (locked || recording) return;
     try {
@@ -603,6 +622,30 @@ export function MacroEditorView({
     [doc, editorLocked, updateDoc],
   );
 
+  const onInsertBefore = useCallback(
+    (path: ActionPath, kind: MacroAction["type"]) => {
+      if (editorLocked) return;
+      const leaf = path[path.length - 1]!;
+      const insertPath: ActionPath = [...path.slice(0, -1), leaf];
+      const action = makeAction(kind);
+      const actions = insertAtPath(doc.actions, insertPath, action);
+      updateDoc({ ...doc, actions });
+      setSelectedPath(insertPath);
+    },
+    [doc, editorLocked, updateDoc],
+  );
+
+  const onPasteAfter = useCallback(
+    (path: ActionPath, action: MacroAction) => {
+      if (editorLocked) return;
+      const result = pasteAfterAtPath(doc.actions, path, action);
+      if (!result) return;
+      updateDoc({ ...doc, actions: result.actions });
+      setSelectedPath(result.newPath);
+    },
+    [doc, editorLocked, updateDoc],
+  );
+
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   const titleBarPortal = useTitleBarSlot(
@@ -615,10 +658,19 @@ export function MacroEditorView({
       recordPaused={recordPaused}
       recordCount={recordCount}
       onPlay={() => void onPlay()}
+      onPlayFrom={
+        selectedPath && !editorLocked
+          ? () => void onRunFrom(selectedPath)
+          : undefined
+      }
       onStartRecord={() => void onStartRecord()}
       onPauseRecord={() => void onPauseRecord()}
       onResumeRecord={() => void onResumeRecord()}
       onStopRecord={() => void onStopRecord()}
+      canUndo={canUndo}
+      canRedo={canRedo}
+      onUndo={editorLocked ? undefined : undo}
+      onRedo={editorLocked ? undefined : redo}
       meta={
         <MacroMetaBar
           doc={doc}
@@ -699,7 +751,10 @@ export function MacroEditorView({
               onRemove={onRemove}
               onDuplicate={onDuplicate}
               onMove={onMove}
+              onRunFrom={editorLocked ? undefined : (path) => void onRunFrom(path)}
+              onInsertBefore={onInsertBefore}
               onInsertAfter={onInsertAfter}
+              onPasteAfter={onPasteAfter}
               onAddKind={editorLocked ? undefined : addAction}
               onOpenAddMenu={
                 editorLocked ? undefined : () => setAddMenuOpen(true)

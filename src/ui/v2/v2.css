@@ -657,12 +657,25 @@ button.v2-titlebar-icon-btn,
   cursor: pointer;
 }
 
-button.v2-titlebar-icon-btn:hover,
-.v2-titlebar-icon-btn:hover,
-button.v2-titlebar-icon-btn.active,
-.v2-titlebar-icon-btn.active {
+button.v2-titlebar-icon-btn:hover:not(:disabled),
+.v2-titlebar-icon-btn:hover:not(:disabled),
+button.v2-titlebar-icon-btn.active:not(:disabled),
+.v2-titlebar-icon-btn.active:not(:disabled) {
   background: color-mix(in srgb, var(--v2-text-primary) 8%, transparent);
   color: var(--v2-text-primary);
+}
+
+button.v2-titlebar-icon-btn:active:not(:disabled),
+.v2-titlebar-icon-btn:active:not(:disabled) {
+  background: color-mix(in srgb, var(--v2-text-primary) 14%, transparent);
+  color: var(--v2-text-primary);
+}
+
+button.v2-titlebar-icon-btn:disabled,
+.v2-titlebar-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  background: transparent;
 }
 
 button.v2-titlebar-btn.v2-btn,
@@ -4249,6 +4262,61 @@ button.v2-segmented-btn.active,
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.v2-auto-folder-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 0 2px 8px;
+}
+
+.v2-auto-folder-chips.is-drop-active {
+  padding-bottom: 10px;
+}
+
+.v2-auto-folder-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: var(--v2-radius-md);
+  border: 1px solid var(--v2-border-subtle);
+  background: var(--v2-bg-surface);
+  color: var(--v2-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.v2-auto-folder-chip:hover,
+.v2-auto-folder-chip.is-active,
+.v2-auto-folder-chip.is-over {
+  border-color: var(--v2-border-strong);
+  color: var(--v2-text);
+  background: color-mix(in srgb, var(--v2-accent) 12%, var(--v2-bg-surface));
+}
+
+.v2-auto-folder-chip.is-over {
+  outline: 2px solid color-mix(in srgb, var(--v2-accent) 55%, transparent);
+}
+
+.v2-auto-folder-chip.is-disabled,
+.v2-auto-folder-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.v2-auto-folder-chip-kind {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.65;
+}
+
+.v2-auto-row-prop--secondary.is-drop-over {
+  outline: 2px solid color-mix(in srgb, var(--v2-accent) 55%, transparent);
+  border-radius: var(--v2-radius-sm);
 }
 
 .v2-auto-folder-drop-strip {

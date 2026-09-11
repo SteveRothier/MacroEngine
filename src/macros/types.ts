@@ -430,7 +430,7 @@ export function insertAtPath(
   });
 }
 
-function remapActionIds(action: MacroAction): MacroAction {
+export function remapActionIds(action: MacroAction): MacroAction {
   const id = newActionId();
   if (action.type === "control.if") {
     return {
@@ -441,6 +441,22 @@ function remapActionIds(action: MacroAction): MacroAction {
     };
   }
   return { ...action, id };
+}
+
+/** Insert a remapped clone of `action` immediately after `path`. */
+export function pasteAfterAtPath(
+  actions: MacroAction[],
+  path: ActionPath,
+  action: MacroAction,
+): { actions: MacroAction[]; newPath: ActionPath } | null {
+  if (path.length === 0) return null;
+  const copy = remapActionIds(structuredClone(action));
+  const leaf = path[path.length - 1]!;
+  const insertPath: ActionPath = [...path.slice(0, -1), leaf + 1];
+  return {
+    actions: insertAtPath(actions, insertPath, copy),
+    newPath: insertPath,
+  };
 }
 
 /** Clone action at path and insert the copy immediately after. */
@@ -553,7 +569,9 @@ export function reorderAtPath(
 ): MacroAction[] {
   const fromParent = fromPath.slice(0, -1);
   const toParent = toPath.slice(0, -1);
-  if (!pathsEqual(fromParent, toParent)) return actions;
+  if (!pathsEqual(fromParent, toParent)) {
+    return moveAtPath(actions, fromPath, toPath) ?? actions;
+  }
   const fromIdx = fromPath[fromPath.length - 1]!;
   const toIdx = toPath[toPath.length - 1]!;
   if (fromIdx === toIdx) return actions;
@@ -567,6 +585,90 @@ export function reorderAtPath(
     next.splice(toIdx, 0, item);
     return next;
   });
+}
+
+/** True if `ancestor` is a strict prefix of `path` (moving into own subtree). */
+export function isAncestorPath(ancestor: ActionPath, path: ActionPath): boolean {
+  if (ancestor.length >= path.length) return false;
+  return ancestor.every((n, i) => path[i] === n);
+}
+
+/** Adjust `target` after removing the action at `removed`. */
+export function adjustPathAfterRemove(
+  removed: ActionPath,
+  target: ActionPath,
+): ActionPath {
+  if (removed.length === 0 || target.length === 0) return target;
+  const out = target.slice();
+  const rParentLen = removed.length - 1;
+  const rIdx = removed[rParentLen]!;
+  if (out.length <= rParentLen) return out;
+  const sameParent = removed
+    .slice(0, rParentLen)
+    .every((n, i) => out[i] === n);
+  if (sameParent && out[rParentLen]! > rIdx) {
+    out[rParentLen] = out[rParentLen]! - 1;
+  }
+  return out;
+}
+
+/**
+ * Move an action across parents (e.g. root ↔ if.then / if.else).
+ * `toPath` is the destination index path after the move.
+ */
+export function moveAtPath(
+  actions: MacroAction[],
+  fromPath: ActionPath,
+  toPath: ActionPath,
+): MacroAction[] | null {
+  if (fromPath.length === 0 || toPath.length === 0) return null;
+  if (pathsEqual(fromPath, toPath)) return null;
+  if (isAncestorPath(fromPath, toPath)) return null;
+
+  const fromParent = fromPath.slice(0, -1);
+  const toParent = toPath.slice(0, -1);
+  const fromIdx = fromPath[fromPath.length - 1]!;
+  const toIdx = toPath[toPath.length - 1]!;
+
+  if (pathsEqual(fromParent, toParent)) {
+    if (fromIdx === toIdx) return actions;
+    return rewriteList(actions, fromPath, (list) => {
+      if (fromIdx < 0 || fromIdx >= list.length || toIdx < 0 || toIdx >= list.length) {
+        return list;
+      }
+      const next = list.slice();
+      const [item] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, item);
+      return next;
+    });
+  }
+
+  const src = getAtPath(actions, fromPath);
+  if (!src) return null;
+
+  const without = removeAtPath(actions, fromPath);
+  const insertPath = adjustPathAfterRemove(fromPath, toPath);
+  if (insertPath.length === 0) return null;
+  const leaf = insertPath[insertPath.length - 1]!;
+  const parent = insertPath.slice(0, -1);
+  let max = 0;
+  if (parent.length === 0) {
+    max = without.length;
+  } else {
+    const branch = parent[parent.length - 1];
+    const ifPath = parent.slice(0, -1);
+    const node = getAtPath(without, ifPath);
+    if (node?.type === "control.if" && (branch === 0 || branch === 1)) {
+      max = (branch === 0 ? node.then : node.else)?.length ?? 0;
+    } else {
+      return null;
+    }
+  }
+  const clamped: ActionPath = [
+    ...parent,
+    Math.max(0, Math.min(leaf, max)),
+  ];
+  return insertAtPath(without, clamped, src);
 }
 
 function rewriteList(

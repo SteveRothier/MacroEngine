@@ -11,6 +11,7 @@ import {
   ArrowDown,
   ArrowUp,
   CircleDot,
+  ClipboardPaste,
   Clock,
   Copy,
   GitBranch,
@@ -18,8 +19,10 @@ import {
   ListPlus,
   MousePointer2,
   MousePointerClick,
+  Play,
   Plus,
   Redo2,
+  Scissors,
   Trash2,
   Undo2,
 } from "lucide-react";
@@ -36,6 +39,7 @@ import { ActionParamCells } from "./ActionParamCells";
 import {
   flattenTree,
   getAtPath,
+  isAncestorPath,
   pathKey,
   pathsEqual,
   type ActionPath,
@@ -62,7 +66,10 @@ type Props = {
   onRemove: (path: ActionPath) => void;
   onDuplicate?: (path: ActionPath) => void;
   onMove?: (path: ActionPath, dir: -1 | 1) => void;
+  onRunFrom?: (path: ActionPath) => void;
+  onInsertBefore?: (path: ActionPath, kind: MacroAction["type"]) => void;
   onInsertAfter?: (path: ActionPath, kind: MacroAction["type"]) => void;
+  onPasteAfter?: (path: ActionPath, action: MacroAction) => void;
   onAddKind?: (kind: MacroAction["type"]) => void;
   onOpenAddMenu?: () => void;
   onChangeAction?: (path: ActionPath, action: MacroAction) => void;
@@ -81,6 +88,51 @@ type Props = {
 const DRAG_THRESHOLD_PX = 6;
 const EDGE_HYSTERESIS_PX = 6;
 const FLIP_MS = 200;
+const AUTO_SCROLL_EDGE_PX = 48;
+const AUTO_SCROLL_MAX_PX = 18;
+
+/** In-memory step clipboard (not OS clipboard). */
+let actionClipboard: MacroAction | null = null;
+
+function isEditableTarget(t: EventTarget | null): boolean {
+  if (!(t instanceof HTMLElement)) return false;
+  return (
+    t.tagName === "INPUT" ||
+    t.tagName === "TEXTAREA" ||
+    t.tagName === "SELECT" ||
+    t.isContentEditable
+  );
+}
+
+function kindInsertItems(
+  prefix: string,
+  disabled: boolean,
+  onPick: (kind: MacroAction["type"]) => void,
+): MenuItemDef[] {
+  return [
+    {
+      id: `${prefix}-click`,
+      label: "Clic",
+      icon: <MousePointer2 size={14} />,
+      disabled,
+      onSelect: () => onPick("mouse.click"),
+    },
+    {
+      id: `${prefix}-delay`,
+      label: "Délai",
+      icon: <Clock size={14} />,
+      disabled,
+      onSelect: () => onPick("delay"),
+    },
+    {
+      id: `${prefix}-if`,
+      label: "Condition",
+      icon: <GitBranch size={14} />,
+      disabled,
+      onSelect: () => onPick("control.if"),
+    },
+  ];
+}
 
 type DropEdge = {
   index: number;
@@ -137,17 +189,40 @@ function dropToReorderPaths(
   drop: DropEdge,
 ): { fromPath: ActionPath; toPath: ActionPath } | null {
   const fromPath = rows[fromIndex]?.path;
-  const dropPath = rows[drop.index]?.path;
+  const dropRow = rows[drop.index];
+  const dropPath = dropRow?.path;
   if (!fromPath || !dropPath) return null;
-  if (!pathsEqual(parentPath(fromPath), parentPath(dropPath))) return null;
+  if (isAncestorPath(fromPath, dropPath)) return null;
 
-  const fromIdx = fromPath[fromPath.length - 1]!;
+  // Nest into then when dropping after an if from another list (not sibling reorder).
+  if (
+    dropRow.action.type === "control.if" &&
+    drop.edge === "after" &&
+    !pathsEqual(fromPath, dropPath) &&
+    !pathsEqual(parentPath(fromPath), parentPath(dropPath))
+  ) {
+    const intoThen: ActionPath = [...dropPath, 0, 0];
+    if (isAncestorPath(fromPath, intoThen)) return null;
+    return { fromPath, toPath: intoThen };
+  }
+
+  const fromParent = parentPath(fromPath);
+  const dropParent = parentPath(dropPath);
+
+  if (pathsEqual(fromParent, dropParent)) {
+    const fromIdx = fromPath[fromPath.length - 1]!;
+    let insertIdx = dropPath[dropPath.length - 1]!;
+    if (drop.edge === "after") insertIdx += 1;
+    let toIdx = insertIdx;
+    if (fromIdx < insertIdx) toIdx = insertIdx - 1;
+    if (toIdx === fromIdx) return null;
+    return { fromPath, toPath: [...fromParent, toIdx] };
+  }
+
+  // Cross-parent: insert before/after the hit row in its sibling list.
   let insertIdx = dropPath[dropPath.length - 1]!;
   if (drop.edge === "after") insertIdx += 1;
-  let toIdx = insertIdx;
-  if (fromIdx < insertIdx) toIdx = insertIdx - 1;
-  if (toIdx === fromIdx) return null;
-  return { fromPath, toPath: [...parentPath(fromPath), toIdx] };
+  return { fromPath, toPath: [...dropParent, insertIdx] };
 }
 
 function hitTestListDrop(
@@ -170,12 +245,11 @@ function hitTestListDrop(
   const fromPath = rows[fromIndex]?.path;
   const hitPath = rows[index]?.path;
   if (!fromPath || !hitPath) return null;
-  if (!pathsEqual(parentPath(fromPath), parentPath(hitPath))) return null;
+  if (isAncestorPath(fromPath, hitPath)) return null;
 
   const rect = row.getBoundingClientRect();
   const mid = rect.top + rect.height / 2;
-  const prevEdge =
-    prev?.index === index ? prev.edge : null;
+  const prevEdge = prev?.index === index ? prev.edge : null;
   let edge: "before" | "after";
   if (prevEdge && Math.abs(y - mid) < EDGE_HYSTERESIS_PX) {
     edge = prevEdge;
@@ -183,6 +257,18 @@ function hitTestListDrop(
     edge = y < mid ? "before" : "after";
   }
   return { index, edge };
+}
+
+function autoScrollNearEdges(list: HTMLElement | null, clientY: number) {
+  if (!list) return;
+  const rect = list.getBoundingClientRect();
+  if (clientY < rect.top + AUTO_SCROLL_EDGE_PX) {
+    const t = 1 - (clientY - rect.top) / AUTO_SCROLL_EDGE_PX;
+    list.scrollTop -= Math.ceil(AUTO_SCROLL_MAX_PX * Math.min(1, Math.max(0, t)));
+  } else if (clientY > rect.bottom - AUTO_SCROLL_EDGE_PX) {
+    const t = 1 - (rect.bottom - clientY) / AUTO_SCROLL_EDGE_PX;
+    list.scrollTop += Math.ceil(AUTO_SCROLL_MAX_PX * Math.min(1, Math.max(0, t)));
+  }
 }
 
 export function ActionList({
@@ -196,7 +282,10 @@ export function ActionList({
   onRemove,
   onDuplicate,
   onMove,
+  onRunFrom,
+  onInsertBefore,
   onInsertAfter,
+  onPasteAfter,
   onAddKind,
   onOpenAddMenu,
   onChangeAction,
@@ -217,6 +306,7 @@ export function ActionList({
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null);
   const [ghost, setGhost] = useState<DragGhost | null>(null);
+  const [clipboardTick, setClipboardTick] = useState(0);
   const rowCtx = useContextMenuState();
   const emptyCtx = useContextMenuState();
   const [ctxPath, setCtxPath] = useState<ActionPath | null>(null);
@@ -227,10 +317,32 @@ export function ActionList({
   const suppressClickRef = useRef(false);
   const onReorderRef = useRef(onReorder);
   const onRemoveRef = useRef(onRemove);
+  const onPasteAfterRef = useRef(onPasteAfter);
   const pendingFlipRef = useRef<Map<string, DOMRect> | null>(null);
   rowsRef.current = rows;
   onReorderRef.current = onReorder;
   onRemoveRef.current = onRemove;
+  onPasteAfterRef.current = onPasteAfter;
+
+  const copyPath = (path: ActionPath) => {
+    const src = getAtPath(actions, path);
+    if (!src) return;
+    actionClipboard = structuredClone(src);
+    setClipboardTick((n) => n + 1);
+  };
+
+  const cutPath = (path: ActionPath) => {
+    const src = getAtPath(actions, path);
+    if (!src) return;
+    actionClipboard = structuredClone(src);
+    setClipboardTick((n) => n + 1);
+    onRemove(path);
+  };
+
+  const pasteAfterPath = (path: ActionPath) => {
+    if (!actionClipboard || !onPasteAfter) return;
+    onPasteAfter(path, structuredClone(actionClipboard));
+  };
 
   const ctxRowItems: MenuItemDef[] = useMemo(() => {
     if (!ctxPath) return [];
@@ -238,27 +350,25 @@ export function ActionList({
     const idx = ctxPath[ctxPath.length - 1] ?? 0;
     const canUp = idx > 0;
     const canDown = idx < siblings.length - 1;
+    const canInsert = !!(onInsertBefore || onInsertAfter);
     const addSub: MenuItemDef[] = [
       {
-        id: "insert-click",
-        label: "Clic",
-        icon: <MousePointer2 size={14} />,
-        disabled: !onInsertAfter,
-        onSelect: () => onInsertAfter?.(ctxPath, "mouse.click"),
+        id: "insert-before",
+        label: "Insérer avant",
+        icon: <Plus size={14} />,
+        disabled: !onInsertBefore,
+        submenu: kindInsertItems("before", !onInsertBefore, (kind) =>
+          onInsertBefore?.(ctxPath, kind),
+        ),
       },
       {
-        id: "insert-delay",
-        label: "Délai",
-        icon: <Clock size={14} />,
+        id: "insert-after",
+        label: "Insérer après",
+        icon: <Plus size={14} />,
         disabled: !onInsertAfter,
-        onSelect: () => onInsertAfter?.(ctxPath, "delay"),
-      },
-      {
-        id: "insert-if",
-        label: "Condition",
-        icon: <GitBranch size={14} />,
-        disabled: !onInsertAfter,
-        onSelect: () => onInsertAfter?.(ctxPath, "control.if"),
+        submenu: kindInsertItems("after", !onInsertAfter, (kind) =>
+          onInsertAfter?.(ctxPath, kind),
+        ),
       },
     ];
     if (onOpenAddMenu) {
@@ -273,6 +383,32 @@ export function ActionList({
       );
     }
     return [
+      {
+        id: "run-from",
+        label: "Tester depuis ici",
+        icon: <Play size={14} />,
+        disabled: !onRunFrom,
+        onSelect: () => onRunFrom?.(ctxPath),
+      },
+      {
+        id: "copy",
+        label: "Copier",
+        icon: <Copy size={14} />,
+        onSelect: () => copyPath(ctxPath),
+      },
+      {
+        id: "cut",
+        label: "Couper",
+        icon: <Scissors size={14} />,
+        onSelect: () => cutPath(ctxPath),
+      },
+      {
+        id: "paste",
+        label: "Coller après",
+        icon: <ClipboardPaste size={14} />,
+        disabled: !onPasteAfter || !actionClipboard,
+        onSelect: () => pasteAfterPath(ctxPath),
+      },
       {
         id: "duplicate",
         label: "Dupliquer",
@@ -298,6 +434,7 @@ export function ActionList({
         id: "ajout",
         label: "Ajout",
         icon: <Plus size={14} />,
+        disabled: !canInsert && !onOpenAddMenu,
         submenu: addSub,
       },
       {
@@ -344,13 +481,17 @@ export function ActionList({
     onClearSelection,
     onDuplicate,
     onInsertAfter,
+    onInsertBefore,
     onMove,
     onOpenAddMenu,
+    onPasteAfter,
     onRedo,
     onRemove,
+    onRunFrom,
     onSelect,
     onUndo,
     selectedPath,
+    clipboardTick,
   ]);
 
   const emptyMenuItems: MenuItemDef[] = useMemo(() => {
@@ -465,17 +606,32 @@ export function ActionList({
     if (locked || !selectedPath || selectedPath.length < 1) return;
     const path = selectedPath;
     function onKey(e: KeyboardEvent) {
-      if (e.key !== "Delete" && e.key !== "Backspace") return;
-      const t = e.target as HTMLElement | null;
-      if (
-        t &&
-        (t.tagName === "INPUT" ||
-          t.tagName === "TEXTAREA" ||
-          t.tagName === "SELECT" ||
-          t.isContentEditable)
-      ) {
+      if (isEditableTarget(e.target)) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && (e.key === "c" || e.key === "C")) {
+        e.preventDefault();
+        const src = getAtPath(actions, path);
+        if (!src) return;
+        actionClipboard = structuredClone(src);
+        setClipboardTick((n) => n + 1);
         return;
       }
+      if (mod && (e.key === "x" || e.key === "X")) {
+        e.preventDefault();
+        const src = getAtPath(actions, path);
+        if (!src) return;
+        actionClipboard = structuredClone(src);
+        setClipboardTick((n) => n + 1);
+        onRemoveRef.current(path);
+        return;
+      }
+      if (mod && (e.key === "v" || e.key === "V")) {
+        if (!actionClipboard || !onPasteAfterRef.current) return;
+        e.preventDefault();
+        onPasteAfterRef.current(path, structuredClone(actionClipboard));
+        return;
+      }
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
       e.preventDefault();
       void (async () => {
         const ok = await confirmAction({
@@ -489,7 +645,7 @@ export function ActionList({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [locked, selectedPath]);
+  }, [actions, locked, selectedPath]);
 
   let prevAbs = 0;
 
@@ -601,6 +757,7 @@ export function ActionList({
       } else {
         setGhost((g) => (g ? { ...g, x: ev.clientX, y: ev.clientY } : g));
       }
+      autoScrollNearEdges(listRef.current, ev.clientY);
       const hit = hitTestListDrop(
         ev.clientX,
         ev.clientY,
@@ -659,8 +816,8 @@ export function ActionList({
     onSelect(path);
   }
 
-  const dragParent =
-    dragFrom != null ? parentPath(rows[dragFrom]?.path ?? []) : null;
+  const dragFromPath =
+    dragFrom != null ? (rows[dragFrom]?.path ?? null) : null;
 
   return (
     <div
@@ -710,16 +867,17 @@ export function ActionList({
           const abs = actionOffsetMs(actions, row.path);
           const displayOffset = formatActionOffset(actions, row.path, prevAbs);
           prevAbs = abs;
-          const sameParent =
-            dragParent != null &&
-            pathsEqual(dragParent, parentPath(row.path));
+          const canDropHere =
+            dragFromPath != null &&
+            !pathsEqual(dragFromPath, row.path) &&
+            !isAncestorPath(dragFromPath, row.path);
           const dropBefore =
-            sameParent &&
+            canDropHere &&
             dropEdge &&
             dropEdge.index === flatIndex &&
             dropEdge.edge === "before";
           const dropAfter =
-            sameParent &&
+            canDropHere &&
             dropEdge &&
             dropEdge.index === flatIndex &&
             dropEdge.edge === "after";
