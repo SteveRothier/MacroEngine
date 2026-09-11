@@ -20,6 +20,7 @@ type Props = {
   theme: ThemeMode;
   onThemeChange: (t: ThemeMode) => void;
   onDirtyChange?: (id: string, dirty: boolean) => void;
+  onRenamed?: (from: string, to: string) => void;
   hotkeys: HotkeyBindings;
   onOpenProcessSettings?: () => void;
 };
@@ -41,6 +42,7 @@ export function ClickerStudio({
   refresh,
   theme,
   onDirtyChange,
+  onRenamed,
   hotkeys,
   onOpenProcessSettings,
 }: Props) {
@@ -58,6 +60,7 @@ export function ClickerStudio({
     refresh,
     theme,
     onDirtyChange: handleDirtyChange,
+    onRenamed,
   });
 
   const titleBarPortal = useTitleBarSlot(
