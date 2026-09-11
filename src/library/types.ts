@@ -1,4 +1,4 @@
-export type LibraryKind = "macro" | "clicker";
+export type LibraryKind = "macro" | "clicker" | "script";
 
 export type LibraryFolder = {
   id: string;

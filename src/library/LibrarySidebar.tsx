@@ -17,6 +17,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { Icons } from "../ui";
+import {
+  ContextMenu,
+  useContextMenuState,
+  type MenuItemDef,
+} from "../ui/v2";
 import type { LibraryItemView, LibraryKind } from "./types";
 import { useLibraryIndex } from "./useLibraryIndex";
 import "./library.css";
@@ -148,6 +153,76 @@ function isNoOpPlacement(
   return placement.beforeId === nextId;
 }
 
+function buildLibraryItemMenuItems({
+  item,
+  folders,
+  trashed,
+  onMove,
+  onDuplicate,
+  onRename,
+  onToggleLock,
+  onTrash,
+  onRestore,
+  onDelete,
+}: {
+  item: LibraryItemView;
+  folders: { id: string; name: string }[];
+  trashed: boolean;
+  onMove: (folderId: string | null) => void;
+  onDuplicate?: () => void;
+  onRename?: () => void;
+  onToggleLock: () => void;
+  onTrash: () => void;
+  onRestore: () => void;
+  onDelete?: () => void;
+}): MenuItemDef[] {
+  const items: MenuItemDef[] = [];
+  if (onRename && !item.locked) {
+    items.push({ id: "rename", label: "Renommer", onSelect: onRename });
+  }
+  if (onDuplicate) {
+    items.push({ id: "duplicate", label: "Dupliquer", onSelect: onDuplicate });
+  }
+  items.push({
+    id: "lock",
+    label: item.locked ? "Déverrouiller" : "Verrouiller",
+    onSelect: onToggleLock,
+  });
+  if (folders.length > 0 && !item.locked) {
+    items.push({
+      id: "move-root",
+      label: "Déplacer → Racine",
+      onSelect: () => onMove(null),
+    });
+    for (const f of folders) {
+      items.push({
+        id: `move-${f.id}`,
+        label: `Déplacer → ${f.name}`,
+        onSelect: () => onMove(f.id),
+      });
+    }
+  }
+  if (trashed) {
+    items.push({ id: "restore", label: "Restaurer", onSelect: onRestore });
+    if (onDelete && !item.locked) {
+      items.push({
+        id: "delete",
+        label: "Supprimer définitivement",
+        danger: true,
+        onSelect: onDelete,
+      });
+    }
+  } else if (!item.locked) {
+    items.push({
+      id: "trash",
+      label: "Mettre à la corbeille",
+      danger: true,
+      onSelect: onTrash,
+    });
+  }
+  return items;
+}
+
 function ItemMenu({
   item,
   folders,
@@ -173,6 +248,18 @@ function ItemMenu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const items = buildLibraryItemMenuItems({
+    item,
+    folders,
+    trashed,
+    onMove,
+    onDuplicate,
+    onRename,
+    onToggleLock,
+    onTrash,
+    onRestore,
+    onDelete,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -196,59 +283,25 @@ function ItemMenu({
       </button>
       {open ? (
         <div className="library-menu" role="menu">
-          {onRename && !item.locked ? (
-            <button type="button" role="menuitem" onClick={() => { setOpen(false); onRename(); }}>
-              Renommer
+          {items.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              role="menuitem"
+              className={entry.danger ? "danger-text" : undefined}
+              onClick={() => {
+                setOpen(false);
+                entry.onSelect?.();
+              }}
+            >
+              {entry.label}
             </button>
+          ))}
+          {item.locked && !trashed ? (
+            <p className="hint library-menu-locked-hint">
+              Verrouillé — déverrouille pour renommer ou supprimer.
+            </p>
           ) : null}
-          {onDuplicate ? (
-            <button type="button" role="menuitem" onClick={() => { setOpen(false); onDuplicate(); }}>
-              Dupliquer
-            </button>
-          ) : null}
-          <button type="button" role="menuitem" onClick={() => { setOpen(false); onToggleLock(); }}>
-            {item.locked ? "Déverrouiller" : "Verrouiller"}
-          </button>
-          {folders.length > 0 && !item.locked ? (
-            <>
-              <button type="button" role="menuitem" onClick={() => { setOpen(false); onMove(null); }}>
-                Déplacer → Racine
-              </button>
-              {folders.map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => { setOpen(false); onMove(f.id); }}
-                >
-                  Déplacer → {f.name}
-                </button>
-              ))}
-            </>
-          ) : null}
-          {trashed ? (
-            <>
-              <button type="button" role="menuitem" onClick={() => { setOpen(false); onRestore(); }}>
-                Restaurer
-              </button>
-              {onDelete && !item.locked ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="danger-text"
-                  onClick={() => { setOpen(false); onDelete(); }}
-                >
-                  Supprimer définitivement
-                </button>
-              ) : null}
-            </>
-          ) : !item.locked ? (
-            <button type="button" role="menuitem" className="danger-text" onClick={() => { setOpen(false); onTrash(); }}>
-              Mettre à la corbeille
-            </button>
-          ) : (
-            <p className="hint library-menu-locked-hint">Verrouillé — déverrouille pour renommer ou supprimer.</p>
-          )}
         </div>
       ) : null}
     </div>
@@ -294,6 +347,20 @@ function LibraryItemRow({
   onItemPointerDown: (id: string, e: ReactPointerEvent) => void;
   suppressClickRef: MutableRefObject<boolean>;
 }) {
+  const ctxMenu = useContextMenuState();
+  const menuItems = buildLibraryItemMenuItems({
+    item,
+    folders,
+    trashed: item.trashed,
+    onMove,
+    onDuplicate: onDuplicate ? () => onDuplicate(item.id) : undefined,
+    onRename: onRenameRequest ? () => onRenameRequest(item.id) : undefined,
+    onToggleLock,
+    onTrash,
+    onRestore,
+    onDelete: onDelete ? () => onDelete(item.id) : undefined,
+  });
+
   return (
     <li
       className={[
@@ -310,6 +377,11 @@ function LibraryItemRow({
         .join(" ")}
       data-library-item-id={item.id}
       data-library-item-folder={item.folderId ?? ""}
+      onContextMenu={(e) => {
+        if (disabled || menuItems.length === 0) return;
+        if ((e.target as HTMLElement).closest(".library-menu-wrap")) return;
+        ctxMenu.openFromEvent(e);
+      }}
     >
       {onToggleFavorite ? (
         <button
@@ -406,6 +478,17 @@ function LibraryItemRow({
           </button>
         ) : null}
       </div>
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        items={menuItems}
+        onClose={ctxMenu.close}
+        onSelect={(id) => {
+          menuItems.find((entry) => entry.id === id)?.onSelect?.();
+        }}
+        ariaLabel={`Actions pour ${item.name}`}
+      />
     </li>
   );
 }

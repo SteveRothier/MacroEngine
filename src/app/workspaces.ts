@@ -2,7 +2,7 @@ import type { SettingsSection } from "./types";
 
 export const HOME_TAB_ID = "home";
 
-export type DocTabKind = "macro" | "clicker";
+export type DocTabKind = "macro" | "clicker" | "script";
 
 export type DocTab = {
   id: string;
@@ -41,7 +41,7 @@ export function parseDocTabId(id: string): { kind: DocTabKind; resourceId: strin
   const i = id.indexOf(":");
   if (i <= 0) return null;
   const kind = id.slice(0, i);
-  if (kind !== "macro" && kind !== "clicker") return null;
+  if (kind !== "macro" && kind !== "clicker" && kind !== "script") return null;
   return { kind, resourceId: id.slice(i + 1) };
 }
 
@@ -95,7 +95,7 @@ export function loadWorkspace(): WorkspaceState {
 function isValidTab(t: DocTab): t is DocTab {
   return (
     typeof t.id === "string" &&
-    (t.kind === "macro" || t.kind === "clicker") &&
+    (t.kind === "macro" || t.kind === "clicker" || t.kind === "script") &&
     typeof t.resourceId === "string" &&
     typeof t.label === "string"
   );

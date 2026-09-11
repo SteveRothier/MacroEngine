@@ -1,6 +1,6 @@
 export type AppRoute =
   | { name: "automations" }
-  | { name: "automation"; id: string; kind: "macro" | "clicker" }
+  | { name: "automation"; id: string; kind: "macro" | "clicker" | "script"; label?: string }
   | { name: "runs" }
   | { name: "settings"; section?: SettingsSection };
 

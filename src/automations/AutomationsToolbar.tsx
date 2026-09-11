@@ -1,25 +1,56 @@
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Plus, SlidersHorizontal } from "lucide-react";
-import { DisplayPopover, Tooltip } from "../ui/v2";
-import type { AutomationFilter, DisplayOptions } from "./types";
-import { filterPillTooltip, sortByLabel } from "./rowLabels";
+import { useRef, type RefObject } from "react";
+import {
+  ChevronDown,
+  Clock,
+  Code2,
+  History,
+  MousePointer2,
+  Plus,
+  Search,
+  Star,
+  Workflow,
+} from "lucide-react";
+import { DropdownMenu, Select, Tooltip } from "../ui/v2";
+import type {
+  AutomationFilter,
+  AutomationFolderOption,
+  FilterCounts,
+} from "./types";
+import { folderOptionKey } from "./types";
+import { filterPillTooltip } from "./rowLabels";
 
 type Props = {
   query: string;
   onQueryChange: (q: string) => void;
   filter: AutomationFilter;
   onFilterChange: (f: AutomationFilter) => void;
-  display: DisplayOptions;
-  onDisplayChange: (d: DisplayOptions) => void;
+  folderKey: string | null;
+  onFolderKeyChange: (key: string | null) => void;
+  folders: AutomationFolderOption[];
+  counts: FilterCounts;
   onCreateMacro: () => void;
   onCreateClicker: () => void;
+  onCreateScript: () => void;
+  searchInputRef?: RefObject<HTMLInputElement | null>;
+  createOpen?: boolean;
+  onCreateOpenChange?: (open: boolean) => void;
 };
 
-const FILTER_PILLS: { value: AutomationFilter; label: string }[] = [
-  { value: "all", label: "Tous" },
-  { value: "favorites", label: "Favoris" },
-  { value: "recent", label: "Dernières exécutions" },
-  { value: "scripts", label: "Scripts" },
+const FILTER_PILLS: {
+  value: AutomationFilter;
+  label: string;
+  icon: typeof Clock;
+  countKey: keyof FilterCounts;
+}[] = [
+  { value: "all", label: "Tous", icon: Clock, countKey: "all" },
+  { value: "favorites", label: "Favoris", icon: Star, countKey: "favorites" },
+  {
+    value: "recent",
+    label: "Dernières exécutions",
+    icon: History,
+    countKey: "recent",
+  },
+  { value: "scripts", label: "Scripts", icon: Code2, countKey: "scripts" },
 ];
 
 export function AutomationsToolbar({
@@ -27,32 +58,36 @@ export function AutomationsToolbar({
   onQueryChange,
   filter,
   onFilterChange,
-  display,
-  onDisplayChange,
+  folderKey,
+  onFolderKeyChange,
+  folders,
+  counts,
   onCreateMacro,
   onCreateClicker,
+  onCreateScript,
+  searchInputRef,
+  createOpen,
+  onCreateOpenChange,
 }: Props) {
-  const [displayOpen, setDisplayOpen] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
-  const displayBtnRef = useRef<HTMLButtonElement>(null);
-  const createWrapRef = useRef<HTMLDivElement>(null);
+  const localSearchRef = useRef<HTMLInputElement>(null);
+  const searchRef = searchInputRef ?? localSearchRef;
 
-  useEffect(() => {
-    if (!createOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!createWrapRef.current?.contains(e.target as Node)) {
-        setCreateOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [createOpen]);
+  const folderOptions = [
+    { value: "", label: "Tous les dossiers" },
+    ...folders.map((f) => ({
+      value: folderOptionKey(f),
+      label:
+        folders.filter((o) => o.name === f.name).length > 1
+          ? `${f.name} (${f.kind === "macro" ? "macro" : "clicker"})`
+          : f.name,
+    })),
+  ];
 
   return (
     <div className="v2-automations-chrome">
       <div className="v2-automations-filter-bar">
         <div className="v2-filter-pills" role="group" aria-label="Filtre">
-          {FILTER_PILLS.map(({ value, label }) => (
+          {FILTER_PILLS.map(({ value, label, icon: Icon, countKey }) => (
             <Tooltip key={value} content={filterPillTooltip(value)}>
               <button
                 type="button"
@@ -61,93 +96,82 @@ export function AutomationsToolbar({
                   .join(" ")}
                 onClick={() => onFilterChange(value)}
               >
+                <Icon size={13} aria-hidden />
                 {label}
+                <span className="v2-filter-pill-count">{counts[countKey]}</span>
               </button>
             </Tooltip>
           ))}
         </div>
         <div className="v2-automations-filter-bar-end">
-          <Tooltip content="Rechercher par nom">
+          {folders.length > 0 ? (
+            <Select
+              className="v2-select v2-automations-folder-select"
+              value={folderKey ?? ""}
+              triggerLabel={
+                folderKey
+                  ? `Dossier : ${
+                      folders.find((f) => folderOptionKey(f) === folderKey)
+                        ?.name ?? "…"
+                    }`
+                  : "Dossier"
+              }
+              ariaLabel="Filtrer par dossier"
+              options={folderOptions}
+              onChange={(v) => onFolderKeyChange(v || null)}
+            />
+          ) : null}
+          <label className="v2-automations-search">
+            <Search
+              size={12}
+              aria-hidden
+              className="v2-automations-search-icon"
+            />
             <input
+              ref={searchRef}
               type="search"
-              placeholder="Filtrer…"
+              placeholder="Rechercher…"
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               className="v2-search-inline v2-automations-filter-search"
-              aria-label="Filtrer les automations"
+              aria-label="Rechercher les automations"
             />
-          </Tooltip>
-          <Tooltip content={`Trier par : ${sortByLabel(display.sortBy)}`}>
-            <button
-              ref={displayBtnRef}
-              type="button"
-              className="v2-btn v2-btn-ghost v2-automations-display-btn"
-              onClick={() => setDisplayOpen((o) => !o)}
-              aria-label={`Trier par : ${sortByLabel(display.sortBy)}`}
-            >
-              <SlidersHorizontal size={14} aria-hidden />
-            </button>
-          </Tooltip>
-          <DisplayPopover
-            open={displayOpen}
-            onClose={() => setDisplayOpen(false)}
-            anchorRef={displayBtnRef}
+          </label>
+          <DropdownMenu
+            label="Créer"
+            ariaLabel="Créer une automation"
+            align="end"
+            triggerClassName="v2-btn v2-btn-primary v2-automations-create-btn"
+            open={createOpen}
+            onOpenChange={onCreateOpenChange}
+            items={[
+              {
+                id: "macro",
+                label: "Macro",
+                description: "Séquence d’actions",
+                icon: <Workflow size={14} />,
+                onSelect: onCreateMacro,
+              },
+              {
+                id: "clicker",
+                label: "Clicker",
+                description: "Preset CPS",
+                icon: <MousePointer2 size={14} />,
+                onSelect: onCreateClicker,
+              },
+              {
+                id: "script",
+                label: "Script",
+                description: "JavaScript",
+                icon: <Code2 size={14} />,
+                onSelect: onCreateScript,
+              },
+            ]}
           >
-            <label className="v2-field">
-              <span>Trier par</span>
-              <select
-                value={display.sortBy}
-                onChange={(e) =>
-                  onDisplayChange({
-                    ...display,
-                    sortBy: e.target.value as DisplayOptions["sortBy"],
-                  })
-                }
-              >
-                <option value="name">Nom</option>
-                <option value="type">Type</option>
-                <option value="status">Statut</option>
-              </select>
-            </label>
-          </DisplayPopover>
-          <div className="v2-toolbar-menu" ref={createWrapRef}>
-            <Tooltip content="Créer une automation">
-              <button
-                type="button"
-                className="v2-btn v2-btn-primary v2-automations-create-btn"
-                onClick={() => setCreateOpen((o) => !o)}
-                aria-expanded={createOpen}
-              >
-                <Plus size={14} aria-hidden />
-                Créer
-                <ChevronDown size={14} aria-hidden />
-              </button>
-            </Tooltip>
-            {createOpen ? (
-              <div className="v2-menu-popover">
-                <button
-                  type="button"
-                  className="v2-btn v2-btn-ghost"
-                  onClick={() => {
-                    setCreateOpen(false);
-                    onCreateMacro();
-                  }}
-                >
-                  Macro vierge
-                </button>
-                <button
-                  type="button"
-                  className="v2-btn v2-btn-ghost"
-                  onClick={() => {
-                    setCreateOpen(false);
-                    onCreateClicker();
-                  }}
-                >
-                  Preset clicker
-                </button>
-              </div>
-            ) : null}
-          </div>
+            <Plus size={14} aria-hidden />
+            Créer
+            <ChevronDown size={14} aria-hidden />
+          </DropdownMenu>
         </div>
       </div>
     </div>

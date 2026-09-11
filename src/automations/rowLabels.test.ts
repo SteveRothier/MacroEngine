@@ -4,6 +4,7 @@ import {
   filterPillTooltip,
   kindTooltip,
   metaTooltip,
+  rowSubtitle,
   sortByLabel,
   statusTooltip,
 } from "./rowLabels";
@@ -21,6 +22,7 @@ const baseRow: AutomationRow = {
   favorite: false,
   locked: false,
   dirty: false,
+  meta: "28 actions",
 };
 
 describe("rowLabels", () => {
@@ -34,6 +36,28 @@ describe("rowLabels", () => {
   it("metaTooltip joins trigger folder and last run", () => {
     expect(metaTooltip(baseRow)).toBe("F6 · Albion · hier");
     expect(metaTooltip({ ...baseRow, folderLabel: "—" })).toBe("F6 · hier");
+  });
+
+  it("rowSubtitle prefers meta and folder over type", () => {
+    expect(rowSubtitle(baseRow)).toBe("28 actions · Albion");
+    expect(
+      rowSubtitle({
+        ...baseRow,
+        kind: "clicker",
+        meta: "117 CPS",
+        folderLabel: "—",
+      }),
+    ).toBe("117 CPS");
+    expect(
+      rowSubtitle({
+        ...baseRow,
+        kind: "script",
+        meta: undefined,
+        folderLabel: "—",
+        permLabels: ["réseau"],
+      }),
+    ).toBe("1 accès");
+    expect(rowSubtitle(baseRow, { running: true })).toBe("En cours");
   });
 
   it("status and favorite tooltips", () => {
