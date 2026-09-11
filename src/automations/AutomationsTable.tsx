@@ -14,6 +14,7 @@ import {
   Copy,
   Folder,
   FolderOpen,
+  FolderPlus,
   Lock,
   LockOpen,
   MousePointer2,
@@ -233,6 +234,7 @@ export function AutomationsTable({
 
   useEffect(() => {
     let un: (() => void) | undefined;
+    let prevBusy = false;
     void listen<{
       state?: string;
       sessionKind?: string | null;
@@ -245,11 +247,16 @@ export function AutomationsTable({
       } else {
         setLiveScriptName(null);
       }
+      if (prevBusy && !busy) {
+        void refresh();
+        onRefresh?.();
+      }
+      prevBusy = busy;
     }).then((fn) => {
       un = fn;
     });
     return () => un?.();
-  }, []);
+  }, [onRefresh, refresh]);
 
   async function onToggleFavorite(r: AutomationRow, ev?: MouseEvent) {
     ev?.stopPropagation();
@@ -574,6 +581,60 @@ export function AutomationsTable({
       toast.success("Déplacement effectué");
     } catch (e) {
       toast.error(errMessage(e, "Impossible de déplacer"));
+    }
+  }
+
+  async function onCreateFolder(kind: "macro" | "clicker") {
+    const name = await promptAction({
+      title:
+        kind === "macro" ? "Nouveau dossier (macros)" : "Nouveau dossier (clickers)",
+      defaultValue: "",
+      confirmLabel: "Créer",
+      placeholder: "Nom du dossier",
+    });
+    if (!name?.trim()) return;
+    const trimmed = name.trim();
+    try {
+      const created = await invoke<{ id: string; name: string }>(
+        "create_library_folder_cmd",
+        { kind, name: trimmed, parentId: null },
+      );
+      await refresh();
+      onRefresh?.();
+      onFolderKeyChange(folderOptionKey({ kind, id: created.id }));
+      toast.success(`Dossier créé · ${created.name}`);
+    } catch (e) {
+      toast.error(errMessage(e, "Impossible de créer le dossier"));
+    }
+  }
+
+  async function onRenameFolder() {
+    if (!folderKey) {
+      toast.info("Filtrez d’abord un dossier à renommer");
+      return;
+    }
+    const folder = folders.find((f) => folderOptionKey(f) === folderKey);
+    if (!folder) return;
+    const nextName = await promptAction({
+      title: "Renommer le dossier",
+      defaultValue: folder.name,
+      confirmLabel: "Renommer",
+      placeholder: "Nouveau nom",
+    });
+    if (!nextName) return;
+    const trimmed = nextName.trim();
+    if (!trimmed || trimmed === folder.name) return;
+    try {
+      const renamed = await invoke<{ id: string; name: string }>(
+        "rename_library_folder_cmd",
+        { kind: folder.kind, id: folder.id, name: trimmed },
+      );
+      await refresh();
+      onRefresh?.();
+      onFolderKeyChange(folderOptionKey({ kind: folder.kind, id: renamed.id }));
+      toast.success(`Dossier renommé · ${renamed.name}`);
+    } catch (e) {
+      toast.error(errMessage(e, "Impossible de renommer le dossier"));
     }
   }
 
@@ -962,6 +1023,35 @@ export function AutomationsTable({
         icon: <Code2 size={14} />,
         onSelect: () => onCreateScript(),
       },
+      {
+        id: "create-folder",
+        label: "Nouveau dossier",
+        icon: <FolderPlus size={14} />,
+        submenu: [
+          {
+            id: "folder-macro",
+            label: "Macros",
+            icon: <Workflow size={14} />,
+            onSelect: () => void onCreateFolder("macro"),
+          },
+          {
+            id: "folder-clicker",
+            label: "Clickers",
+            icon: <MousePointer2 size={14} />,
+            onSelect: () => void onCreateFolder("clicker"),
+          },
+        ],
+      },
+      ...(folderKey
+        ? [
+            {
+              id: "rename-folder",
+              label: "Renommer le dossier",
+              icon: <PenLine size={14} />,
+              onSelect: () => void onRenameFolder(),
+            },
+          ]
+        : []),
       { id: "sep-empty", label: "", separator: true },
       {
         id: "refresh",
@@ -983,6 +1073,7 @@ export function AutomationsTable({
     ],
     [
       filter,
+      folderKey,
       onCreateClicker,
       onCreateMacro,
       onCreateScript,
@@ -1021,6 +1112,16 @@ export function AutomationsTable({
         onCreateMacro={onCreateMacro}
         onCreateClicker={onCreateClicker}
         onCreateScript={onCreateScript}
+        onCreateFolder={(kind) => void onCreateFolder(kind)}
+        onRenameFolder={() => void onRenameFolder()}
+        dragRow={dragRow}
+        dropFolderKey={dropFolderKey}
+        onDropFolderKeyChange={setDropFolderKey}
+        onDropOntoFolder={(folder) => {
+          if (!dragRow) return;
+          void moveRowToFolder(dragRow, folder);
+          clearFolderDrag();
+        }}
         searchInputRef={searchInputRef}
         createOpen={createOpen}
         onCreateOpenChange={setCreateOpen}
@@ -1362,7 +1463,68 @@ export function AutomationsTable({
                               <TruncatedTooltip
                                 content={propSecondary ?? metaTooltip(r)}
                               >
-                                <span className="v2-auto-row-prop v2-auto-row-prop--secondary">
+                                <span
+                                  className={[
+                                    "v2-auto-row-prop",
+                                    "v2-auto-row-prop--secondary",
+                                    dragRow &&
+                                    dragRow.kind !== "script" &&
+                                    r.folderId &&
+                                    r.kind === dragRow.kind &&
+                                    dropFolderKey ===
+                                      folderOptionKey({
+                                        kind: r.kind,
+                                        id: r.folderId,
+                                      })
+                                      ? "is-drop-over"
+                                      : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                  onPointerEnter={() => {
+                                    if (
+                                      !dragRow ||
+                                      dragRow.kind === "script" ||
+                                      !r.folderId ||
+                                      r.kind !== dragRow.kind
+                                    ) {
+                                      return;
+                                    }
+                                    setDropFolderKey(
+                                      folderOptionKey({
+                                        kind: r.kind,
+                                        id: r.folderId,
+                                      }),
+                                    );
+                                  }}
+                                  onPointerLeave={() => {
+                                    if (!r.folderId) return;
+                                    const key = folderOptionKey({
+                                      kind: r.kind as "macro" | "clicker",
+                                      id: r.folderId,
+                                    });
+                                    setDropFolderKey((k) =>
+                                      k === key ? null : k,
+                                    );
+                                  }}
+                                  onPointerUp={(e) => {
+                                    if (
+                                      !dragRow ||
+                                      dragRow.kind === "script" ||
+                                      !r.folderId ||
+                                      r.kind !== dragRow.kind
+                                    ) {
+                                      return;
+                                    }
+                                    e.stopPropagation();
+                                    void moveRowToFolder(dragRow, {
+                                      id: r.folderId,
+                                      name: r.folderLabel,
+                                      kind: r.kind,
+                                    });
+                                    clearFolderDrag();
+                                  }}
+                                >
                                   {propSecondary ? (
                                     <>
                                       <Folder size={11} aria-hidden />
@@ -1371,9 +1533,19 @@ export function AutomationsTable({
                                   ) : null}
                                 </span>
                               </TruncatedTooltip>
-                              <span className="v2-auto-row-prop v2-auto-row-prop--run">
-                                {propLastRun ?? ""}
-                              </span>
+                              <Tooltip
+                                content={
+                                  r.lastRunTooltip && propLastRun
+                                    ? r.lastRunTooltip
+                                    : propLastRun
+                                      ? `Dernière exécution · ${propLastRun}`
+                                      : "Jamais exécuté"
+                                }
+                              >
+                                <span className="v2-auto-row-prop v2-auto-row-prop--run">
+                                  {propLastRun ?? ""}
+                                </span>
+                              </Tooltip>
                               <Tooltip content={statusTooltip(r.status)}>
                                 <span
                                   className={[
