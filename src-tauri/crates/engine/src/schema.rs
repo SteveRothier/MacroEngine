@@ -228,6 +228,12 @@ pub enum ActionNode {
         script_id: Option<String>,
         #[serde(default = "default_script_timeout", rename = "timeoutMs")]
         timeout_ms: u64,
+        /// Optional overrides for `//@param` values.
+        #[serde(default)]
+        params: std::collections::HashMap<String, MacroValue>,
+        /// Store `caster.return(...)` into this macro variable.
+        #[serde(default, rename = "resultVar")]
+        result_var: Option<String>,
     },
     #[serde(rename = "key.tap")]
     KeyTap {

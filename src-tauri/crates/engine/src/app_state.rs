@@ -26,6 +26,7 @@ enum ActiveKind {
     None,
     Clicker,
     Macro,
+    Script,
     Record,
 }
 
@@ -69,6 +70,8 @@ pub struct AppState {
     macros_config_dir: Arc<Mutex<Option<std::path::PathBuf>>>,
     /// Last loaded / saved clicker preset name (for Accueil récents).
     active_clicker_preset: Arc<Mutex<Option<String>>>,
+    /// Script currently running as an autonomous session.
+    active_script_name: Arc<Mutex<Option<String>>>,
     /// Live chord → macro name for per-macro triggers.
     macro_triggers: Arc<Mutex<std::collections::HashMap<TriggerBinding, String>>>,
     /// Live chord → clicker preset name for per-preset triggers.
@@ -120,6 +123,7 @@ impl AppState {
             record_replace: Arc::new(AtomicBool::new(false)),
             macros_config_dir: Arc::new(Mutex::new(None)),
             active_clicker_preset: Arc::new(Mutex::new(None)),
+            active_script_name: Arc::new(Mutex::new(None)),
             macro_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
             clicker_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
             ui_release: Arc::new(Mutex::new(None)),
@@ -260,6 +264,10 @@ impl AppState {
                 Some("macro"),
                 self.loaded_macro().map(|d| d.name),
             ),
+            ActiveKind::Script => (
+                Some("script"),
+                self.active_script_name.lock().expect("script name").clone(),
+            ),
             ActiveKind::Record => (
                 Some("record"),
                 self.loaded_macro().map(|d| d.name),
@@ -273,6 +281,8 @@ impl AppState {
             (Some("clicker"), None) => Some("Clicker".into()),
             (Some("macro"), Some(name)) => Some(format!("Macro « {name} »")),
             (Some("macro"), None) => Some("Macro".into()),
+            (Some("script"), Some(name)) => Some(format!("Script « {name} »")),
+            (Some("script"), None) => Some("Script".into()),
             (Some("record"), Some(name)) => Some(format!("Enregistrement « {name} »")),
             (Some("record"), None) => Some("Enregistrement".into()),
             _ => None,
@@ -719,7 +729,8 @@ impl AppState {
             (active, state)
         };
         match decision {
-            (ActiveKind::Macro, EngineState::Running | EngineState::Paused) => {
+            (ActiveKind::Macro, EngineState::Running | EngineState::Paused)
+            | (ActiveKind::Script, EngineState::Running | EngineState::Paused) => {
                 let handle = {
                     let _lifecycle = self.lifecycle.lock().expect("lifecycle");
                     self.stop_engine_begin_locked()
@@ -851,6 +862,13 @@ impl AppState {
             return;
         };
         let _ = crate::quick_access::push_recent(&dir, crate::quick_access::QuickKind::Macro, name);
+    }
+
+    fn note_recent_script(&self, id: &str) {
+        let Some(dir) = self.macros_config_dir() else {
+            return;
+        };
+        let _ = crate::quick_access::push_recent(&dir, crate::quick_access::QuickKind::Script, id);
     }
 
     pub fn rebuild_macro_triggers(&self) -> Result<(), String> {
@@ -1113,7 +1131,8 @@ impl AppState {
                 return Ok(self.state());
             }
             (ActiveKind::Clicker, _, _)
-            | (ActiveKind::Macro, EngineState::Running | EngineState::Paused, _) => {
+            | (ActiveKind::Macro, EngineState::Running | EngineState::Paused, _)
+            | (ActiveKind::Script, EngineState::Running | EngineState::Paused, _) => {
                 let handle = {
                     let _lifecycle = self.lifecycle.lock().expect("lifecycle");
                     self.stop_engine_begin_locked()
@@ -1174,7 +1193,8 @@ impl AppState {
                 self.detach_or_join_worker(handle, true);
                 Ok(self.state())
             }
-            (ActiveKind::Macro, EngineState::Running | EngineState::Paused) => {
+            (ActiveKind::Macro, EngineState::Running | EngineState::Paused)
+            | (ActiveKind::Script, EngineState::Running | EngineState::Paused) => {
                 let handle = {
                     let _lifecycle = self.lifecycle.lock().expect("lifecycle");
                     self.stop_engine_begin_locked()
@@ -1194,6 +1214,92 @@ impl AppState {
                 self.start_macro_inner(&via)
             }
         }
+    }
+
+    /// Run a library script outside of a macro (M5). Cancel via F8 / `request_cancel`.
+    pub fn start_script_session(&self, script_id: &str) -> Result<EngineState, String> {
+        self.wait_while_stopping(Duration::from_millis(1000));
+        let _lifecycle = self.lifecycle.lock().expect("lifecycle");
+        self.ensure_idle_ready()?;
+        let dir = self
+            .macros_config_dir()
+            .unwrap_or_else(crate::script_library::config_dir_default);
+        let doc = crate::script_library::load_script(&dir, script_id)
+            .map_err(|e| e.to_string())?;
+        let script_name = doc.name.clone();
+        self.bus.publish(EngineEvent::Log {
+            level: LogLevel::Info,
+            message: format!("Script « {script_name} » · exécution autonome"),
+        });
+        self.note_recent_script(script_id);
+        self.begin_run().map_err(|e| e.to_string())?;
+        *self.active.lock().expect("active lock") = ActiveKind::Script;
+        *self.active_script_name.lock().expect("script name") = Some(script_name.clone());
+
+        let cancel = self.cancel.clone();
+        let pause = self.pause.clone();
+        let injector = Arc::clone(&self.injector);
+        let bus = Arc::clone(&self.bus);
+        let app = self.clone();
+        let config_dir = dir.clone();
+
+        let handle = std::thread::spawn(move || {
+            let mut env = crate::env::MacroEnv::new();
+            for (k, v) in &doc.param_values {
+                env.set(k.clone(), v.clone());
+            }
+            for def in crate::script_params::parse_param_defs(&doc.source) {
+                if env.get(&def.name).is_none() {
+                    if let Some(d) = def.default {
+                        env.set(def.name, d);
+                    }
+                }
+            }
+            let mut opts = crate::script_runtime::ScriptOptions {
+                allow_network: doc.allow_network,
+                allow_clipboard: doc.allow_clipboard,
+                allow_fs: doc.allow_fs,
+                allow_macro_control: doc.allow_macro_control,
+                config_dir: config_dir.clone(),
+                injector: Some(Arc::clone(&injector)),
+                run_macro: None,
+            };
+            if opts.allow_macro_control {
+                let inj = Arc::clone(&injector);
+                let cancel_c = cancel.clone();
+                let pause_c = pause.clone();
+                let bus_ptr = &*bus as *const EventBus as usize;
+                opts.run_macro = Some(Arc::new(move |macro_id: &str| {
+                    let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                    crate::macro_vm::nest_run_macro(macro_id, &inj, &cancel_c, &pause_c, bus)
+                }));
+            }
+            match crate::script_runtime::run_script_with_options(
+                &doc.source,
+                60_000,
+                &mut env,
+                &bus,
+                &cancel,
+                &opts,
+            ) {
+                Ok(_) => {
+                    bus.publish(EngineEvent::Log {
+                        level: LogLevel::Info,
+                        message: format!("Fin script « {script_name} »"),
+                    });
+                }
+                Err(e) => {
+                    bus.publish(EngineEvent::Log {
+                        level: LogLevel::Warn,
+                        message: format!("Arrêt script « {script_name} » · {e}"),
+                    });
+                }
+            }
+            *app.active_script_name.lock().expect("script name") = None;
+            let _ = app.finish_run();
+        });
+        *self.worker.lock().expect("worker lock") = Some(handle);
+        Ok(self.state())
     }
 
     pub fn install_hotkeys(&self) -> Result<(), String> {
