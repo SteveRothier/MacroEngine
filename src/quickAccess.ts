@@ -1,9 +1,13 @@
 export type QuickKind = "clicker" | "macro" | "script";
 
+export type RecentRunStatus = "ok" | "error" | "cancelled";
+
 export type RecentEntry = {
   kind: QuickKind;
   id: string;
   at: number;
+  status?: RecentRunStatus | null;
+  durationMs?: number | null;
 };
 
 export type QuickAccess = {

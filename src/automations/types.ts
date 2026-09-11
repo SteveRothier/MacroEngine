@@ -14,6 +14,7 @@ export type AutomationRow = {
   folderId: string | null;
   status: AutomationStatus;
   lastRunLabel: string;
+  lastRunTooltip?: string;
   favorite: boolean;
   locked: boolean;
   dirty: boolean;

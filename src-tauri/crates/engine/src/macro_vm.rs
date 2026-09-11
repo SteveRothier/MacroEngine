@@ -14,6 +14,55 @@ use crate::schema::{ActionNode, MacroDocument, MacroProcessFilterMode, MacroValu
 use crate::settings::ProcessFilter;
 use std::sync::Mutex;
 
+/// Slice the action tree so execution starts at `path` (inclusive) within its sibling list.
+pub fn actions_from_path(actions: &[ActionNode], path: &[usize]) -> Result<Vec<ActionNode>, String> {
+    if path.is_empty() {
+        return Ok(actions.to_vec());
+    }
+    let mut list = actions;
+    let mut depth = 0;
+    while depth < path.len() {
+        let idx = path[depth];
+        if depth + 1 == path.len() {
+            if idx >= list.len() {
+                return Err(format!("from_path index {idx} hors limites"));
+            }
+            return Ok(list[idx..].to_vec());
+        }
+        let node = list
+            .get(idx)
+            .ok_or_else(|| format!("from_path index {idx} hors limites"))?;
+        match node {
+            ActionNode::ControlIf {
+                then,
+                else_branch,
+                ..
+            } => {
+                let branch = *path
+                    .get(depth + 1)
+                    .ok_or_else(|| "from_path branche manquante".to_string())?;
+                let branch_list: &[ActionNode] = if branch == 0 {
+                    then.as_slice()
+                } else {
+                    else_branch.as_slice()
+                };
+                if depth + 2 == path.len() {
+                    // Path points at the branch itself → run whole branch.
+                    return Ok(branch_list.to_vec());
+                }
+                list = branch_list;
+                depth += 2;
+            }
+            _ => {
+                return Err(
+                    "from_path ne peut naviguer que dans des conditions (if)".into(),
+                );
+            }
+        }
+    }
+    Ok(list.to_vec())
+}
+
 /// Executes parsed macros via ActionRegistry (real injection when configured).
 pub struct MacroVm {
     registry: ActionRegistry,
@@ -102,12 +151,35 @@ impl MacroVm {
         bus: &EventBus,
         process_filter: Option<Arc<Mutex<ProcessFilter>>>,
     ) -> Result<Vec<String>, ActionError> {
+        self.run_from_path(doc, cancel, pause, bus, process_filter, None)
+    }
+
+    /// Run the macro starting at `from_path` (same encoding as the UI action tree).
+    /// When `from_path` is set, only that action and its following siblings in the
+    /// same list are executed (parent control.if wrappers are not re-run).
+    pub fn run_from_path(
+        &self,
+        doc: &MacroDocument,
+        cancel: &CancellationToken,
+        pause: &PauseGate,
+        bus: &EventBus,
+        process_filter: Option<Arc<Mutex<ProcessFilter>>>,
+        from_path: Option<&[usize]>,
+    ) -> Result<Vec<String>, ActionError> {
+        let sliced = match from_path {
+            None | Some([]) => None,
+            Some(path) => Some(actions_from_path(&doc.actions, path).map_err(ActionError::Message)?),
+        };
+        let mut run_doc = doc.clone();
+        if let Some(actions) = sliced {
+            run_doc.actions = actions;
+        }
         let mut trace = Vec::new();
         let mut env = MacroEnv::new();
-        let effective_filter = effective_process_filter(doc, process_filter);
+        let effective_filter = effective_process_filter(&run_doc, process_filter);
         let mut iteration = 0u32;
         loop {
-            if doc.repeat_count > 0 && iteration >= doc.repeat_count {
+            if run_doc.repeat_count > 0 && iteration >= run_doc.repeat_count {
                 break;
             }
             if cancel.is_cancelled() {
@@ -118,7 +190,7 @@ impl MacroVm {
             }
 
             self.execute_actions(
-                &doc.actions,
+                &run_doc.actions,
                 &mut env,
                 cancel,
                 pause,
@@ -126,15 +198,15 @@ impl MacroVm {
                 iteration,
                 &[],
                 &mut trace,
-                &doc.name,
+                &run_doc.name,
                 effective_filter.as_ref(),
             )?;
 
             iteration = iteration.saturating_add(1);
-            if doc.repeat_count == 0 {
+            if run_doc.repeat_count == 0 {
                 continue;
             }
-            if iteration >= doc.repeat_count {
+            if iteration >= run_doc.repeat_count {
                 break;
             }
         }

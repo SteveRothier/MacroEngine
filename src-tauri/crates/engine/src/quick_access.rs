@@ -17,12 +17,24 @@ pub enum QuickKind {
     Script,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RecentRunStatus {
+    Ok,
+    Error,
+    Cancelled,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentEntry {
     pub kind: QuickKind,
     pub id: String,
     pub at: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<RecentRunStatus>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -102,9 +114,45 @@ pub fn push_recent(
             kind,
             id: id.to_string(),
             at: now_ms(),
+            status: None,
+            duration_ms: None,
         },
     );
     data.recent.truncate(MAX_RECENT);
+    save_quick_access(&dir, &data)?;
+    Ok(data)
+}
+
+/// Update the most recent matching entry with run outcome (status + duration).
+pub fn finalize_recent(
+    dir: impl AsRef<Path>,
+    kind: QuickKind,
+    id: &str,
+    status: RecentRunStatus,
+    duration_ms: u64,
+) -> Result<QuickAccess, QuickAccessError> {
+    let id = id.trim();
+    if id.is_empty() {
+        return load_quick_access(dir);
+    }
+    let mut data = load_quick_access(&dir)?;
+    if let Some(entry) = data.recent.iter_mut().find(|e| e.kind == kind && e.id == id) {
+        entry.status = Some(status);
+        entry.duration_ms = Some(duration_ms);
+        entry.at = now_ms();
+    } else {
+        data.recent.insert(
+            0,
+            RecentEntry {
+                kind,
+                id: id.to_string(),
+                at: now_ms(),
+                status: Some(status),
+                duration_ms: Some(duration_ms),
+            },
+        );
+        data.recent.truncate(MAX_RECENT);
+    }
     save_quick_access(&dir, &data)?;
     Ok(data)
 }
@@ -183,12 +231,15 @@ mod tests {
         push_recent(&dir, QuickKind::Macro, "demo").unwrap();
         push_recent(&dir, QuickKind::Clicker, "fast").unwrap();
         push_recent(&dir, QuickKind::Macro, "demo").unwrap();
+        finalize_recent(&dir, QuickKind::Macro, "demo", RecentRunStatus::Ok, 42).unwrap();
         let loaded = load_quick_access(&dir).unwrap();
         assert_eq!(loaded.favorites.clicker_presets, vec!["fast"]);
         assert_eq!(loaded.favorites.macros, vec!["demo"]);
         assert_eq!(loaded.recent.len(), 2);
         assert_eq!(loaded.recent[0].id, "demo");
         assert_eq!(loaded.recent[0].kind, QuickKind::Macro);
+        assert_eq!(loaded.recent[0].status, Some(RecentRunStatus::Ok));
+        assert_eq!(loaded.recent[0].duration_ms, Some(42));
         assert_eq!(loaded.recent[1].id, "fast");
         let _ = fs::remove_dir_all(dir);
     }
@@ -205,11 +256,15 @@ mod tests {
                     kind: QuickKind::Clicker,
                     id: "gone".into(),
                     at: 1,
+                    status: None,
+                    duration_ms: None,
                 },
                 RecentEntry {
                     kind: QuickKind::Macro,
                     id: "live".into(),
                     at: 2,
+                    status: Some(RecentRunStatus::Ok),
+                    duration_ms: Some(120),
                 },
             ],
         };

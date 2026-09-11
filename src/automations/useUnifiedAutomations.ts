@@ -16,7 +16,7 @@ import type {
   FilterCounts,
 } from "./types";
 import { folderOptionKey } from "./types";
-import { lastRunLabelMap, rowKey } from "./relativeTime";
+import { lastRunLabelMap, lastRunTooltipMap, rowKey } from "./relativeTime";
 
 type MacroSummary = {
   name: string;
@@ -116,6 +116,7 @@ export function useUnifiedAutomations(options: {
       const favClickers = qa.favorites.clickerPresets ?? [];
       setRecentOrder(qa.recent.map((r) => rowKey(r.kind, r.id)));
       const runLabels = lastRunLabelMap(qa.recent);
+      const runTooltips = lastRunTooltipMap(qa.recent);
       setFolders([
         ...toFolderOptions("macro", macroIndex.folders),
         ...toFolderOptions("clicker", clickerIndex.folders),
@@ -142,6 +143,7 @@ export function useUnifiedAutomations(options: {
               ? "attention"
               : "healthy",
           lastRunLabel: runLabels.get(rowKey("macro", it.id)) ?? "—",
+          lastRunTooltip: runTooltips.get(rowKey("macro", it.id)),
           favorite: favMacros.includes(it.id),
           locked: it.locked,
           dirty: options.dirtyMacroId === it.id,
@@ -165,6 +167,7 @@ export function useUnifiedAutomations(options: {
               ? "attention"
               : "healthy",
           lastRunLabel: runLabels.get(rowKey("clicker", it.id)) ?? "—",
+          lastRunTooltip: runTooltips.get(rowKey("clicker", it.id)),
           favorite: favClickers.includes(it.id),
           locked: it.locked,
           dirty: options.dirtyClickerId === it.id,
@@ -183,6 +186,7 @@ export function useUnifiedAutomations(options: {
           folderId: null,
           status: options.dirtyScriptId === s.id ? "attention" : "healthy",
           lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? "—",
+          lastRunTooltip: runTooltips.get(rowKey("script", s.id)),
           favorite: false,
           locked: false,
           dirty: options.dirtyScriptId === s.id,
