@@ -737,6 +737,11 @@ function MainAppV2Inner() {
           theme={theme}
           onThemeChange={onThemeChange}
           onDirtyChange={onActiveDocDirtyChange}
+          onRenamed={(_from, to) => {
+            if (!activeDocTabId) return;
+            setWorkspace((ws) => renameDocTab(ws, activeDocTabId, to, to));
+            bumpRefresh();
+          }}
           hotkeys={hotkeys}
           onOpenProcessSettings={() => goSettings("process")}
         />

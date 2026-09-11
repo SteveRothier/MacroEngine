@@ -12,6 +12,7 @@ import {
   openSettings,
   prevDocTabId,
   reorderDocTabs,
+  renameDocTab,
   selectHome,
   selectLibrary,
   setTabDirty,
@@ -166,5 +167,19 @@ describe("workspaces", () => {
     ws = toggleTabPin(ws, docTabId("macro", "A"));
     const next = closeDocTab(ws, docTabId("macro", "A"));
     expect(next.tabs).toHaveLength(1);
+  });
+
+  it("renameDocTab updates id label and shell view", () => {
+    let ws = initialWorkspace();
+    ws = openDocTab(ws, "macro", "Old", "Old");
+    const oldId = docTabId("macro", "Old");
+    ws = renameDocTab(ws, oldId, "New", "New");
+    expect(ws.tabs[0]?.resourceId).toBe("New");
+    expect(ws.tabs[0]?.label).toBe("New");
+    expect(ws.tabs[0]?.id).toBe(docTabId("macro", "New"));
+    expect(ws.shellView).toEqual({
+      type: "doc",
+      tabId: docTabId("macro", "New"),
+    });
   });
 });

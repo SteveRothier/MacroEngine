@@ -60,14 +60,18 @@ export type UseClickerEditorOptions = {
   onStatus: (s: EngineStatus) => void;
   refresh: () => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;
+  onRenamed?: (from: string, to: string) => void;
   theme: ThemeMode;
 };
 
 export function useClickerEditor(opts: UseClickerEditorOptions) {
-  const { presetId, status, onStatus, refresh, onDirtyChange, theme } = opts;
+  const { presetId, status, onStatus, refresh, onDirtyChange, onRenamed, theme } =
+    opts;
   const { loadSettings, saveBundle } = useClickerSettingsApi();
   const onDirtyChangeRef = useRef(onDirtyChange);
   onDirtyChangeRef.current = onDirtyChange;
+  const onRenamedRef = useRef(onRenamed);
+  onRenamedRef.current = onRenamed;
 
   const [cps, setCps] = useState(10);
   const [cpsMin, setCpsMin] = useState(0);
@@ -599,26 +603,29 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const onRenamePreset = useCallback(
     async (raw: string) => {
       if (!selectedPreset || locked) return;
+      const from = selectedPreset;
       const to = raw.trim();
-      if (!to || to === selectedPreset) return;
+      if (!to || to === from) return;
       try {
         if (dirty) {
           await invoke("save_clicker_preset", {
-            name: selectedPreset,
+            name: from,
             config: buildConfig(),
           });
         }
         const preset = await invoke<{
           name: string;
           config: ClickerConfigPayload;
-        }>("rename_clicker_preset", { from: selectedPreset, to });
+        }>("rename_clicker_preset", { from, to });
         await onLoadPreset(preset.name, { skipDirtyGuard: true });
+        onRenamedRef.current?.(from, preset.name);
+        await refresh();
       } catch (e) {
-        setPresetName(selectedPreset);
+        setPresetName(from);
         console.error(e);
       }
     },
-    [buildConfig, dirty, locked, onLoadPreset, selectedPreset],
+    [buildConfig, dirty, locked, onLoadPreset, refresh, selectedPreset],
   );
 
   const onImportPreset = useCallback(async () => {
