@@ -73,8 +73,8 @@ pub use picker::{
     draw_zone_rect, pick_after_delay, pick_now, DrawnRect, PickedPoint, PickerError,
 };
 pub use quick_access::{
-    load_quick_access, prune_orphans, push_recent, save_quick_access, set_favorite, Favorites, QuickAccess,
-    QuickAccessError, QuickKind, RecentEntry, MAX_RECENT,
+    finalize_recent, load_quick_access, prune_orphans, push_recent, save_quick_access, set_favorite,
+    Favorites, QuickAccess, QuickAccessError, QuickKind, RecentEntry, RecentRunStatus, MAX_RECENT,
 };
 pub use record::{postprocess_actions, RecordOptions, RecordPostProcess, RecordSession};
 pub use schema::{

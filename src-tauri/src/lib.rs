@@ -558,8 +558,13 @@ fn launch_saved_macro(
     dir: State<'_, SettingsDir>,
     engine: State<'_, AppState>,
     name: String,
+    from_path: Option<Vec<usize>>,
 ) -> Result<EngineStatusPayload, String> {
-    engine.activate_macro_by_name(&dir.0, &name)?;
+    if let Some(path) = from_path.filter(|p| !p.is_empty()) {
+        engine.activate_macro_by_name_from_path(&dir.0, &name, path)?;
+    } else {
+        engine.activate_macro_by_name(&dir.0, &name)?;
+    }
     Ok(status_of(&engine, Some(format!("macro:{name}"))))
 }
 

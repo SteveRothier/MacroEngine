@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::cancel::CancellationToken;
 use crate::clicker::{ClickMode, ClickerConfig, ClickerSession};
@@ -446,6 +446,7 @@ impl AppState {
         let natural_flag = Arc::clone(&natural_complete);
 
         let handle = std::thread::spawn(move || {
+            let started = Instant::now();
             let _ = ClickerSession::run_with_zone_screen(
                 &config,
                 &cancel,
@@ -458,6 +459,18 @@ impl AppState {
                 Some(natural_flag.as_ref()),
             );
             let natural = natural_complete.load(Ordering::SeqCst);
+            let cancelled = cancel.is_cancelled();
+            let status = if natural {
+                crate::quick_access::RecentRunStatus::Ok
+            } else if cancelled {
+                crate::quick_access::RecentRunStatus::Cancelled
+            } else {
+                crate::quick_access::RecentRunStatus::Ok
+            };
+            app.finalize_recent_clicker(
+                status,
+                started.elapsed().as_millis() as u64,
+            );
             let _ = app.finish_run();
             if natural {
                 if let Some(name) = on_complete.filter(|s| !s.trim().is_empty()) {
@@ -477,10 +490,24 @@ impl AppState {
     pub fn start_macro_from(&self, source: &str) -> Result<EngineState, String> {
         self.wait_while_stopping(Duration::from_millis(1000));
         let _lifecycle = self.lifecycle.lock().expect("lifecycle");
-        self.start_macro_inner(source)
+        self.start_macro_inner(source, None)
     }
 
-    fn start_macro_inner(&self, via: &str) -> Result<EngineState, String> {
+    pub fn start_macro_from_path(
+        &self,
+        source: &str,
+        from_path: Vec<usize>,
+    ) -> Result<EngineState, String> {
+        self.wait_while_stopping(Duration::from_millis(1000));
+        let _lifecycle = self.lifecycle.lock().expect("lifecycle");
+        self.start_macro_inner(source, Some(from_path))
+    }
+
+    fn start_macro_inner(
+        &self,
+        via: &str,
+        from_path: Option<Vec<usize>>,
+    ) -> Result<EngineState, String> {
         self.ensure_idle_ready()?;
         let doc = self
             .loaded_macro()
@@ -510,13 +537,16 @@ impl AppState {
         let recent_name = macro_name.clone();
 
         let handle = std::thread::spawn(move || {
+            let started = Instant::now();
             let vm = MacroVm::with_injector(injector);
-            match vm.run_with_process_filter(
+            let from = from_path.as_deref();
+            let status = match vm.run_from_path(
                 &doc,
                 &cancel,
                 &pause,
                 &bus,
                 Some(process_filter),
+                from,
             ) {
                 Ok(trace) => {
                     bus.publish(EngineEvent::Log {
@@ -527,14 +557,25 @@ impl AppState {
                             trace.len()
                         ),
                     });
+                    crate::quick_access::RecentRunStatus::Ok
                 }
                 Err(e) => {
                     bus.publish(EngineEvent::Log {
                         level: LogLevel::Warn,
                         message: format!("Arrêt « {macro_name} » · {e}"),
                     });
+                    if cancel.is_cancelled() {
+                        crate::quick_access::RecentRunStatus::Cancelled
+                    } else {
+                        crate::quick_access::RecentRunStatus::Error
+                    }
                 }
-            }
+            };
+            app.finalize_recent_macro(
+                &macro_name,
+                status,
+                started.elapsed().as_millis() as u64,
+            );
             let _ = app.finish_run();
         });
         *self.worker.lock().expect("worker lock") = Some(handle);
@@ -676,7 +717,7 @@ impl AppState {
         let _ = self.worker.lock().expect("worker lock").take();
         let _lifecycle = self.lifecycle.lock().expect("lifecycle");
         self.set_macro(doc);
-        if let Err(e) = self.start_macro_inner("Enchaînement clicker") {
+        if let Err(e) = self.start_macro_inner("Enchaînement clicker", None) {
             self.bus.publish(EngineEvent::Log {
                 level: LogLevel::Warn,
                 message: format!("échec démarrage macro enchaînée: {e}"),
@@ -747,7 +788,7 @@ impl AppState {
             _ => {
                 let via = format_vk_label(self.hotkey_bindings().macro_vk);
                 let _lifecycle = self.lifecycle.lock().expect("lifecycle");
-                self.start_macro_inner(&via)
+                self.start_macro_inner(&via, None)
             }
         }
     }
@@ -869,6 +910,62 @@ impl AppState {
             return;
         };
         let _ = crate::quick_access::push_recent(&dir, crate::quick_access::QuickKind::Script, id);
+    }
+
+    fn finalize_recent_clicker(
+        &self,
+        status: crate::quick_access::RecentRunStatus,
+        duration_ms: u64,
+    ) {
+        let Some(dir) = self.macros_config_dir() else {
+            return;
+        };
+        let id = self
+            .active_clicker_preset()
+            .unwrap_or_else(|| "Config actuelle".into());
+        let _ = crate::quick_access::finalize_recent(
+            &dir,
+            crate::quick_access::QuickKind::Clicker,
+            &id,
+            status,
+            duration_ms,
+        );
+    }
+
+    fn finalize_recent_macro(
+        &self,
+        name: &str,
+        status: crate::quick_access::RecentRunStatus,
+        duration_ms: u64,
+    ) {
+        let Some(dir) = self.macros_config_dir() else {
+            return;
+        };
+        let _ = crate::quick_access::finalize_recent(
+            &dir,
+            crate::quick_access::QuickKind::Macro,
+            name,
+            status,
+            duration_ms,
+        );
+    }
+
+    fn finalize_recent_script(
+        &self,
+        id: &str,
+        status: crate::quick_access::RecentRunStatus,
+        duration_ms: u64,
+    ) {
+        let Some(dir) = self.macros_config_dir() else {
+            return;
+        };
+        let _ = crate::quick_access::finalize_recent(
+            &dir,
+            crate::quick_access::QuickKind::Script,
+            id,
+            status,
+            duration_ms,
+        );
     }
 
     pub fn rebuild_macro_triggers(&self) -> Result<(), String> {
@@ -1203,7 +1300,7 @@ impl AppState {
                 let doc = load_macro(config_dir, name).map_err(|e| e.to_string())?;
                 let _lifecycle = self.lifecycle.lock().expect("lifecycle");
                 self.set_macro(doc);
-                self.start_macro_inner(&via)
+                self.start_macro_inner(&via, None)
             }
             (ActiveKind::Clicker, _) => Err("clicker is active".into()),
             (ActiveKind::Record, _) => Ok(self.state()),
@@ -1211,9 +1308,45 @@ impl AppState {
                 let doc = load_macro(config_dir, name).map_err(|e| e.to_string())?;
                 let _lifecycle = self.lifecycle.lock().expect("lifecycle");
                 self.set_macro(doc);
-                self.start_macro_inner(&via)
+                self.start_macro_inner(&via, None)
             }
         }
+    }
+
+    /// Load + run a saved macro starting at `from_path` (UI action path).
+    pub fn activate_macro_by_name_from_path(
+        &self,
+        config_dir: &std::path::Path,
+        name: &str,
+        from_path: Vec<usize>,
+    ) -> Result<EngineState, String> {
+        use crate::macro_library::load_macro;
+        self.wait_while_stopping(Duration::from_millis(1000));
+        if matches!(
+            *self.active.lock().expect("active lock"),
+            ActiveKind::Clicker
+        ) {
+            return Err("clicker is active".into());
+        }
+        if matches!(
+            self.state(),
+            EngineState::Running | EngineState::Paused
+        ) {
+            let handle = {
+                let _lifecycle = self.lifecycle.lock().expect("lifecycle");
+                self.stop_engine_begin_locked()
+            };
+            self.detach_or_join_worker(handle, true);
+        }
+        let doc = load_macro(config_dir, name).map_err(|e| e.to_string())?;
+        let via = format!("Tester depuis étape {}", from_path
+            .iter()
+            .map(|i| (i + 1).to_string())
+            .collect::<Vec<_>>()
+            .join("."));
+        let _lifecycle = self.lifecycle.lock().expect("lifecycle");
+        self.set_macro(doc);
+        self.start_macro_inner(&via, Some(from_path))
     }
 
     /// Run a library script outside of a macro (M5). Cancel via F8 / `request_cancel`.
@@ -1242,8 +1375,10 @@ impl AppState {
         let bus = Arc::clone(&self.bus);
         let app = self.clone();
         let config_dir = dir.clone();
+        let script_id_owned = script_id.to_string();
 
         let handle = std::thread::spawn(move || {
+            let started = Instant::now();
             let mut env = crate::env::MacroEnv::new();
             for (k, v) in &doc.param_values {
                 env.set(k.clone(), v.clone());
@@ -1274,7 +1409,7 @@ impl AppState {
                     crate::macro_vm::nest_run_macro(macro_id, &inj, &cancel_c, &pause_c, bus)
                 }));
             }
-            match crate::script_runtime::run_script_with_options(
+            let status = match crate::script_runtime::run_script_with_options(
                 &doc.source,
                 60_000,
                 &mut env,
@@ -1287,14 +1422,25 @@ impl AppState {
                         level: LogLevel::Info,
                         message: format!("Fin script « {script_name} »"),
                     });
+                    crate::quick_access::RecentRunStatus::Ok
                 }
                 Err(e) => {
                     bus.publish(EngineEvent::Log {
                         level: LogLevel::Warn,
                         message: format!("Arrêt script « {script_name} » · {e}"),
                     });
+                    if cancel.is_cancelled() {
+                        crate::quick_access::RecentRunStatus::Cancelled
+                    } else {
+                        crate::quick_access::RecentRunStatus::Error
+                    }
                 }
-            }
+            };
+            app.finalize_recent_script(
+                &script_id_owned,
+                status,
+                started.elapsed().as_millis() as u64,
+            );
             *app.active_script_name.lock().expect("script name") = None;
             let _ = app.finish_run();
         });
