@@ -4,6 +4,7 @@ import type { EngineStatus, HotkeyBindings } from "../macros/types";
 import { HotkeySettings } from "../settings/HotkeySettings";
 import { applyTheme, type ThemeMode } from "../theme";
 import { Card, Icons, RadioGroup, Segmented, Switch } from "../ui";
+import { Select } from "../ui/v2";
 import {
   DEFAULT_CLICKER,
   DEFAULT_PROCESS_FILTER,
@@ -244,21 +245,19 @@ export function ClickerPanel({
           <span>Ajouter un .exe</span>
           <div className="actions wrap">
             {liveExes.length > 0 ? (
-              <select
+              <Select
+                className="v2-select"
                 value=""
                 disabled={running || !processFilter.enabled}
-                aria-label="Processus visibles"
-                onChange={(e) => addProcessName(e.target.value)}
-              >
-                <option value="">Choisir un processus…</option>
-                {liveExes
-                  .filter((n) => !processFilter.names.includes(n))
-                  .map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-              </select>
+                ariaLabel="Processus visibles"
+                options={[
+                  { value: "", label: "Choisir un processus…" },
+                  ...liveExes
+                    .filter((n) => !processFilter.names.includes(n))
+                    .map((n) => ({ value: n, label: n })),
+                ]}
+                onChange={(v) => addProcessName(v)}
+              />
             ) : null}
             <input
               type="text"

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   CORNER_LABELS,
   EDGES,
@@ -8,14 +9,68 @@ import {
   type ZoneAction,
   type ZoneKind,
 } from "../clickerTypes";
+import {
+  ContextMenu,
+  Select,
+  useContextMenuState,
+  usePointerReorder,
+  type MenuItemDef,
+} from "../../ui/v2";
 import type { ClickerEditor } from "../useClickerEditor";
 
 type Props = { editor: ClickerEditor };
 
 const ZONE_ACTIONS: ZoneAction[] = ["stop", "pause", "start"];
 
+const ZONE_ACTION_OPTS = ZONE_ACTIONS.map((a) => ({
+  value: a,
+  label: ZONE_ACTION_LABEL[a],
+}));
+
+const ZONE_KIND_OPTS = (Object.keys(ZONE_KIND_LABEL) as ZoneKind[]).map((k) => ({
+  value: k,
+  label: ZONE_KIND_LABEL[k],
+}));
+
+const CLICK_MODE_OPTS = [
+  { value: "random", label: "Aléatoire" },
+  { value: "center", label: "Centre" },
+];
+
 export function ClickerZonesSection({ editor: e }: Props) {
   const selected = e.zoneModel.customZones.find((z) => z.id === e.selectedZoneId);
+  const ctxMenu = useContextMenuState();
+  const [ctxZoneId, setCtxZoneId] = useState<string | null>(null);
+  const zones = e.zoneModel.customZones;
+  const reorder = usePointerReorder({
+    items: zones,
+    getId: (z) => z.id,
+    disabled: e.editDisabled,
+    onReorder: (from, to) => {
+      e.setZoneModel((m) => {
+        const next = [...m.customZones];
+        const [moved] = next.splice(from, 1);
+        if (!moved) return m;
+        next.splice(to, 0, moved);
+        return { ...m, customZones: next };
+      });
+    },
+  });
+
+  const ctxItems: MenuItemDef[] = [
+    { id: "edit", label: "Éditer" },
+    ...(e.editDisabled
+      ? []
+      : [{ id: "delete", label: "Supprimer", danger: true } satisfies MenuItemDef]),
+  ];
+
+  function removeZone(id: string) {
+    e.setZoneModel((m) => ({
+      ...m,
+      customZones: m.customZones.filter((cz) => cz.id !== id),
+    }));
+    if (e.selectedZoneId === id) e.setSelectedZoneId(null);
+  }
 
   return (
     <div className="v2-clicker-section v2-clicker-zones-panel">
@@ -97,22 +152,30 @@ export function ClickerZonesSection({ editor: e }: Props) {
         <div className="v2-clicker-zones-block-head">
           <span>Zones personnalisées</span>
           <span className="v2-clicker-hint-inline">
-            {e.zoneModel.customZones.length} zone(s)
+            {zones.length} zone(s)
           </span>
         </div>
-        {e.zoneModel.customZones.length === 0 ? (
+        {zones.length === 0 ? (
           <p className="v2-clicker-hint">Dessinez depuis l&apos;aperçu →</p>
         ) : (
           <ul className="v2-clicker-zone-list">
-            {e.zoneModel.customZones.map((z) => (
+            {zones.map((z, index) => (
               <li
                 key={z.id}
+                data-reorder-id={z.id}
                 className={[
                   "v2-clicker-zone-line",
                   e.selectedZoneId === z.id ? "selected" : "",
+                  reorder.draggingIndex === index ? "is-dragging" : "",
+                  reorder.overIndex === index ? "is-drop-over" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
+                onPointerDown={(ev) => reorder.onPointerDown(index, ev)}
+                onContextMenu={(ev) => {
+                  setCtxZoneId(z.id);
+                  ctxMenu.openFromEvent(ev);
+                }}
               >
                 <button
                   type="button"
@@ -134,13 +197,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   className="v2-clicker-zone-line-remove"
                   disabled={e.editDisabled}
                   aria-label="Supprimer"
-                  onClick={() => {
-                    e.setZoneModel((m) => ({
-                      ...m,
-                      customZones: m.customZones.filter((cz) => cz.id !== z.id),
-                    }));
-                    if (e.selectedZoneId === z.id) e.setSelectedZoneId(null);
-                  }}
+                  onClick={() => removeZone(z.id)}
                 >
                   ✕
                 </button>
@@ -154,57 +211,48 @@ export function ClickerZonesSection({ editor: e }: Props) {
             <div className="v2-field-row">
               <label className="v2-field v2-field--compact">
                 <span>Action</span>
-                <select
+                <Select
+                  className="v2-select"
                   value={selected.action}
                   disabled={e.editDisabled}
                   title={ZONE_ACTION_HINT[selected.action]}
-                  onChange={(ev) =>
+                  options={ZONE_ACTION_OPTS}
+                  onChange={(v) =>
                     e.updateCustomZone(selected.id, {
-                      action: ev.target.value as ZoneAction,
+                      action: v as ZoneAction,
                     })
                   }
-                >
-                  {ZONE_ACTIONS.map((a) => (
-                    <option key={a} value={a} title={ZONE_ACTION_HINT[a]}>
-                      {ZONE_ACTION_LABEL[a]}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
               <label className="v2-field v2-field--compact">
                 <span>Type</span>
-                <select
+                <Select
+                  className="v2-select"
                   value={selected.kind}
                   disabled={e.editDisabled}
-                  onChange={(ev) =>
+                  options={ZONE_KIND_OPTS}
+                  onChange={(v) =>
                     e.updateCustomZone(selected.id, {
-                      kind: ev.target.value as ZoneKind,
+                      kind: v as ZoneKind,
                     })
                   }
-                >
-                  {(Object.keys(ZONE_KIND_LABEL) as ZoneKind[]).map((k) => (
-                    <option key={k} value={k}>
-                      {ZONE_KIND_LABEL[k]}
-                    </option>
-                  ))}
-                </select>
+                />
               </label>
             </div>
             {selected.kind === "click" ? (
               <label className="v2-field v2-field--compact">
                 <span>Échantillon</span>
-                <select
+                <Select
+                  className="v2-select"
                   value={selected.clickMode}
                   disabled={e.editDisabled}
-                  onChange={(ev) =>
+                  options={CLICK_MODE_OPTS}
+                  onChange={(v) =>
                     e.updateCustomZone(selected.id, {
-                      clickMode: ev.target.value as ClickSampleMode,
+                      clickMode: v as ClickSampleMode,
                     })
                   }
-                >
-                  <option value="random">Aléatoire</option>
-                  <option value="center">Centre</option>
-                </select>
+                />
               </label>
             ) : null}
             <label className="v2-field v2-field--compact">
@@ -222,6 +270,20 @@ export function ClickerZonesSection({ editor: e }: Props) {
           </div>
         ) : null}
       </div>
+
+      <ContextMenu
+        open={ctxMenu.open}
+        x={ctxMenu.x}
+        y={ctxMenu.y}
+        items={ctxItems}
+        onClose={ctxMenu.close}
+        onSelect={(id) => {
+          if (!ctxZoneId) return;
+          if (id === "edit") e.setSelectedZoneId(ctxZoneId);
+          if (id === "delete" && !e.editDisabled) removeZone(ctxZoneId);
+        }}
+        ariaLabel="Actions sur la zone"
+      />
     </div>
   );
 }
