@@ -11,6 +11,27 @@
       rel="stylesheet"
     />
     <title>Caster</title>
+    <!-- Force WebKit scrollbar path (WebView2) before React CSS loads -->
+    <style>
+      *::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      *::-webkit-scrollbar-track {
+        background: #121212;
+        border-radius: 0;
+      }
+      *::-webkit-scrollbar-thumb {
+        background: #4f4f4f;
+        border-radius: 0;
+        border: none;
+      }
+      *::-webkit-scrollbar-button {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+    </style>
   </head>
 
   <body>

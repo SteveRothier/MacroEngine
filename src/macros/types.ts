@@ -1,4 +1,4 @@
-export type EngineSessionKind = "clicker" | "macro" | "record";
+export type EngineSessionKind = "clicker" | "macro" | "record" | "script";
 
 export type EngineStatus = {
   state: string;
@@ -200,6 +200,8 @@ export type MacroAction =
       source?: string;
       scriptId?: string | null;
       timeoutMs?: number;
+      params?: Record<string, MacroValue>;
+      resultVar?: string | null;
     }
   | { id: string; type: "key.tap"; key: string; mods?: KeyMods }
   | { id: string; type: "key.down"; key: string; mods?: KeyMods }
@@ -411,6 +413,50 @@ export function updateAtPath(
 
 export function removeAtPath(actions: MacroAction[], path: ActionPath): MacroAction[] {
   return rewriteList(actions, path, (list, idx) => list.filter((_, i) => i !== idx));
+}
+
+/** Insert `action` at `path` index (shifts following siblings). */
+export function insertAtPath(
+  actions: MacroAction[],
+  path: ActionPath,
+  action: MacroAction,
+): MacroAction[] {
+  if (path.length === 0) return actions;
+  return rewriteList(actions, path, (list, idx) => {
+    const next = list.slice();
+    const at = Math.max(0, Math.min(idx, next.length));
+    next.splice(at, 0, action);
+    return next;
+  });
+}
+
+function remapActionIds(action: MacroAction): MacroAction {
+  const id = newActionId();
+  if (action.type === "control.if") {
+    return {
+      ...action,
+      id,
+      then: (action.then ?? []).map(remapActionIds),
+      else: (action.else ?? []).map(remapActionIds),
+    };
+  }
+  return { ...action, id };
+}
+
+/** Clone action at path and insert the copy immediately after. */
+export function duplicateAtPath(
+  actions: MacroAction[],
+  path: ActionPath,
+): { actions: MacroAction[]; newPath: ActionPath } | null {
+  const src = getAtPath(actions, path);
+  if (!src || path.length === 0) return null;
+  const copy = remapActionIds(structuredClone(src));
+  const leaf = path[path.length - 1]!;
+  const insertPath: ActionPath = [...path.slice(0, -1), leaf + 1];
+  return {
+    actions: insertAtPath(actions, insertPath, copy),
+    newPath: insertPath,
+  };
 }
 
 export function appendChild(

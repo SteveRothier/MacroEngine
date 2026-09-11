@@ -1,16 +1,28 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { pickScreenPoint } from "../pick";
-import type { AddMenuEntry } from "../ui";
+import { Select, type ActionPickerEntry } from "../ui/v2";
 import { ActionProps } from "./ActionProps";
 import { actionDetailFr } from "./actionLabels";
 import type { KeyMods, MacroAction } from "./types";
+
+const MOUSE_BUTTON_OPTS = [
+  { value: "left", label: "Gauche" },
+  { value: "right", label: "Droit" },
+  { value: "middle", label: "Molette" },
+];
+
+const POSITION_OPTS = [
+  { value: "cursor", label: "Curseur" },
+  { value: "position", label: "XY" },
+];
 
 type Props = {
   action: MacroAction;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else") => AddMenuEntry[];
+  branchAddMenuItems?: (branch: "then" | "else") => ActionPickerEntry[];
+  onOpenScript?: (scriptId: string, label?: string) => void;
 };
 
 export function isComplexAction(type: MacroAction["type"]): boolean {
@@ -67,19 +79,18 @@ function CompactXY({
   return (
     <>
       {optional ? (
-        <select
+        <Select
           className="action-cell-select"
           disabled={disabled || picking}
           value={isCursor ? "cursor" : "position"}
           title="Position"
-          onChange={(e) => {
-            if (e.target.value === "cursor") onChangeXY(null, null);
+          ariaLabel="Position"
+          options={POSITION_OPTS}
+          onChange={(v) => {
+            if (v === "cursor") onChangeXY(null, null);
             else onChangeXY(x ?? 0, y ?? 0);
           }}
-        >
-          <option value="cursor">Curseur</option>
-          <option value="position">XY</option>
-        </select>
+        />
       ) : null}
       {!isCursor ? (
         <>
@@ -121,13 +132,15 @@ function ComplexPopover({
   disabled,
   onChange,
   branchAddMenuItems,
+  onOpenScript,
   onClose,
   anchor,
 }: {
   action: MacroAction;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else") => AddMenuEntry[];
+  branchAddMenuItems?: (branch: "then" | "else") => ActionPickerEntry[];
+  onOpenScript?: (scriptId: string, label?: string) => void;
   onClose: () => void;
   anchor: DOMRect;
 }) {
@@ -176,6 +189,7 @@ function ComplexPopover({
           disabled={disabled}
           onChange={onChange}
           branchAddMenuItems={branchAddMenuItems}
+          onOpenScript={onOpenScript}
         />
       </div>
     </div>,
@@ -188,6 +202,7 @@ export function ActionParamCells({
   disabled,
   onChange,
   branchAddMenuItems,
+  onOpenScript,
 }: Props) {
   const [popOpen, setPopOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -221,6 +236,7 @@ export function ActionParamCells({
             disabled={disabled}
             onChange={onChange}
             branchAddMenuItems={branchAddMenuItems}
+            onOpenScript={onOpenScript}
             anchor={anchor}
             onClose={() => setPopOpen(false)}
           />
@@ -254,22 +270,20 @@ export function ActionParamCells({
   ) {
     return (
       <div className="action-cell-edit">
-        <select
+        <Select
           className="action-cell-select"
           disabled={disabled}
           value={action.button ?? "left"}
           title="Bouton"
-          onChange={(e) =>
+          ariaLabel="Bouton"
+          options={MOUSE_BUTTON_OPTS}
+          onChange={(v) =>
             onChange({
               ...action,
-              button: e.target.value as "left" | "right" | "middle",
+              button: v as "left" | "right" | "middle",
             })
           }
-        >
-          <option value="left">Gauche</option>
-          <option value="right">Droit</option>
-          <option value="middle">Molette</option>
-        </select>
+        />
         <CompactXY
           x={action.x}
           y={action.y}

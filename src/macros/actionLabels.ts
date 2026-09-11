@@ -92,9 +92,9 @@ export function actionDetailFr(action: MacroAction): string {
       return `${action.sourceVar}.${action.path || "…"} → ${action.destVar}`;
     case "script.run":
       return action.scriptId
-        ? `@${action.scriptId}`
+        ? action.scriptId
         : action.source?.trim()
-          ? "inline"
+          ? "Inline"
           : "(vide)";
     case "key.tap":
     case "key.down":

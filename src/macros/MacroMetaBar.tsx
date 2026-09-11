@@ -22,6 +22,7 @@ type Props = {
   macroId: string;
   locked: boolean;
   onChange: (next: MacroDocument) => void;
+  onNameCommit?: (name: string) => void;
   onError: (message: string) => void;
 };
 
@@ -49,7 +50,14 @@ function triggerConflictsWithReserved(
   return false;
 }
 
-export function MacroMetaBar({ doc, macroId, locked, onChange, onError }: Props) {
+export function MacroMetaBar({
+  doc,
+  macroId,
+  locked,
+  onChange,
+  onNameCommit,
+  onError,
+}: Props) {
   const [capturing, setCapturing] = useState(false);
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -123,6 +131,13 @@ export function MacroMetaBar({ doc, macroId, locked, onChange, onError }: Props)
           value={doc.name}
           disabled={locked}
           onChange={(e) => onChange({ ...doc, name: e.target.value })}
+          onBlur={(e) => onNameCommit?.(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
         />
       </label>
       <label className="v2-macro-meta-row">
@@ -149,10 +164,10 @@ export function MacroMetaBar({ doc, macroId, locked, onChange, onError }: Props)
             .filter(Boolean)
             .join(" ")}
           disabled={locked}
-          title="Lance cette macro hors éditeur — clic pour modifier, clic droit pour retirer"
+          title="Lancer cette macro hors éditeur — clic pour modifier, clic droit pour retirer"
           aria-label={
             capturing
-              ? "Appuie sur une touche, Échap pour annuler"
+              ? "Appuyez sur une touche, Échap pour annuler"
               : triggerLabel
                 ? `Raccourci ${triggerLabel}`
                 : "Définir un raccourci"

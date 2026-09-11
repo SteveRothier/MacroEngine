@@ -1,29 +1,54 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { FileCode2 } from "lucide-react";
 import { pickScreenPoint } from "../pick";
-import { Segmented, AddMenu } from "../ui";
-import type { AddMenuEntry } from "../ui";
+import { Segmented } from "../ui";
+import { ActionPickerMenu, DropdownMenu, Select, Tooltip } from "../ui/v2";
+import type { ActionPickerEntry, DropdownEntry } from "../ui/v2";
 import type { CompareOp, KeyMods, MacroAction, MacroValue, Operand } from "./types";
 import type { ScriptDoc } from "../scripts/types";
+import { ScriptParamsFields } from "../scripts/ScriptParamsFields";
+import { activePermissionLabels } from "../scripts/ScriptPermissionsMenu";
+import { parseParamDefs } from "../scripts/parseParams";
+import {
+  SCRIPT_PRESETS,
+  type ScriptPreset,
+} from "../scripts/presets";
+import { actionTitleFr } from "./actionLabels";
 
-const SCRIPT_SNIPPET_GET = `// GET JSON → variable
-const res = caster.fetch({ method: "GET", url: "https://httpbin.org/get" });
-caster.set("status", res.status);
-caster.set("body", res.body);
-caster.log("ok " + res.status);
-`;
+const MOUSE_BUTTON_OPTS = [
+  { value: "left", label: "Gauche" },
+  { value: "right", label: "Droit" },
+  { value: "middle", label: "Molette" },
+];
 
-const SCRIPT_SNIPPET_SET = `// Lire / écrire une variable
-const n = caster.get("n") ?? 0;
-caster.set("n", n + 1);
-caster.log("n=" + caster.get("n"));
-`;
+const HTTP_METHOD_OPTS = [
+  { value: "GET", label: "GET" },
+  { value: "POST", label: "POST" },
+  { value: "PUT", label: "PUT" },
+  { value: "DELETE", label: "DELETE" },
+];
+
+const OPERAND_MODE_OPTS = [
+  { value: "var", label: "Variable" },
+  { value: "lit", label: "Littéral" },
+];
+
+const COMPARE_OP_OPTS = [
+  { value: "eq", label: "=" },
+  { value: "ne", label: "≠" },
+  { value: "gt", label: ">" },
+  { value: "lt", label: "<" },
+  { value: "gte", label: "≥" },
+  { value: "lte", label: "≤" },
+];
 
 type Props = {
   action: MacroAction | null;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else") => AddMenuEntry[];
+  branchAddMenuItems?: (branch: "then" | "else") => ActionPickerEntry[];
+  onOpenScript?: (scriptId: string, label?: string) => void;
 };
 
 function isVarOperand(o: Operand): o is { var: string } {
@@ -216,6 +241,7 @@ export function ActionProps({
   disabled,
   onChange,
   branchAddMenuItems,
+  onOpenScript,
 }: Props) {
   const [picking, setPicking] = useState(false);
 
@@ -228,20 +254,18 @@ export function ActionProps({
       <div className="props-grid">
         <label className="v2-field">
           <span>Bouton</span>
-          <select
+          <Select
+            className="v2-select"
             value={action.button ?? "left"}
             disabled={disabled || picking}
-            onChange={(e) =>
+            options={MOUSE_BUTTON_OPTS}
+            onChange={(v) =>
               onChange({
                 ...action,
-                button: e.target.value as "left" | "right" | "middle",
+                button: v as "left" | "right" | "middle",
               })
             }
-          >
-            <option value="left">Gauche</option>
-            <option value="right">Droit</option>
-            <option value="middle">Molette</option>
-          </select>
+          />
         </label>
         <PointFields
           x={action.x}
@@ -284,20 +308,18 @@ export function ActionProps({
       <div className="props-grid">
         <label className="v2-field">
           <span>Bouton</span>
-          <select
+          <Select
+            className="v2-select"
             value={action.button ?? "left"}
             disabled={disabled || picking}
-            onChange={(e) =>
+            options={MOUSE_BUTTON_OPTS}
+            onChange={(v) =>
               onChange({
                 ...action,
-                button: e.target.value as "left" | "right" | "middle",
+                button: v as "left" | "right" | "middle",
               })
             }
-          >
-            <option value="left">Gauche</option>
-            <option value="right">Droit</option>
-            <option value="middle">Molette</option>
-          </select>
+          />
         </label>
         <PointFields
           x={action.x}
@@ -364,16 +386,13 @@ export function ActionProps({
       <div className="props-grid">
         <label className="v2-field">
           <span>Méthode</span>
-          <select
+          <Select
+            className="v2-select"
             value={action.method ?? "GET"}
             disabled={disabled}
-            onChange={(e) => onChange({ ...action, method: e.target.value })}
-          >
-            <option value="GET">GET</option>
-            <option value="POST">POST</option>
-            <option value="PUT">PUT</option>
-            <option value="DELETE">DELETE</option>
-          </select>
+            options={HTTP_METHOD_OPTS}
+            onChange={(method) => onChange({ ...action, method })}
+          />
         </label>
         <label className="v2-field">
           <span>URL ({`{{var}}`} ok)</span>
@@ -567,7 +586,12 @@ export function ActionProps({
 
   if (action.type === "script.run") {
     return (
-      <ScriptRunProps action={action} disabled={disabled} onChange={onChange} />
+      <ScriptRunProps
+        action={action}
+        disabled={disabled}
+        onChange={onChange}
+        onOpenScript={onOpenScript}
+      />
     );
   }
 
@@ -728,25 +752,21 @@ export function ActionProps({
       <div className="props-grid">
         <label className="v2-field">
           <span>Gauche</span>
-          <select
+          <Select
+            className="v2-select"
             disabled={disabled}
             value={operandMode(left)}
-            onChange={(e) =>
+            options={OPERAND_MODE_OPTS}
+            onChange={(v) =>
               onChange({
                 ...action,
                 condition: {
                   ...action.condition,
-                  left:
-                    e.target.value === "var"
-                      ? { var: "n" }
-                      : 0,
+                  left: v === "var" ? { var: "n" } : 0,
                 },
               })
             }
-          >
-            <option value="var">Variable</option>
-            <option value="lit">Littéral</option>
-          </select>
+          />
         </label>
         <label className="v2-field">
           <span>{operandMode(left) === "var" ? "Var" : "Valeur"}</span>
@@ -770,45 +790,39 @@ export function ActionProps({
         </label>
         <label className="v2-field">
           <span>Opérateur</span>
-          <select
+          <Select
+            className="v2-select"
             disabled={disabled}
             value={action.condition.op}
-            onChange={(e) =>
+            options={COMPARE_OP_OPTS}
+            onChange={(op) =>
               onChange({
                 ...action,
                 condition: {
                   ...action.condition,
-                  op: e.target.value as CompareOp,
+                  op: op as CompareOp,
                 },
               })
             }
-          >
-            <option value="eq">=</option>
-            <option value="ne">≠</option>
-            <option value="gt">&gt;</option>
-            <option value="lt">&lt;</option>
-            <option value="gte">≥</option>
-            <option value="lte">≤</option>
-          </select>
+          />
         </label>
         <label className="v2-field">
           <span>Droite</span>
-          <select
+          <Select
+            className="v2-select"
             disabled={disabled}
             value={operandMode(right)}
-            onChange={(e) =>
+            options={OPERAND_MODE_OPTS}
+            onChange={(v) =>
               onChange({
                 ...action,
                 condition: {
                   ...action.condition,
-                  right: e.target.value === "var" ? { var: "n" } : 0,
+                  right: v === "var" ? { var: "n" } : 0,
                 },
               })
             }
-          >
-            <option value="var">Variable</option>
-            <option value="lit">Littéral</option>
-          </select>
+          />
         </label>
         <label className="v2-field">
           <span>{operandMode(right) === "var" ? "Var" : "Valeur"}</span>
@@ -833,12 +847,12 @@ export function ActionProps({
         <div className="actions wrap">
           {branchAddMenuItems ? (
             <>
-              <AddMenu
+              <ActionPickerMenu
                 label="+ Alors"
                 disabled={disabled}
                 items={branchAddMenuItems("then")}
               />
-              <AddMenu
+              <ActionPickerMenu
                 label="+ Sinon"
                 disabled={disabled}
                 items={branchAddMenuItems("else")}
@@ -887,12 +901,18 @@ function ScriptRunProps({
   action,
   disabled,
   onChange,
+  onOpenScript,
 }: {
   action: Extract<MacroAction, { type: "script.run" }>;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
+  onOpenScript?: (scriptId: string, label?: string) => void;
 }) {
   const [scripts, setScripts] = useState<ScriptDoc[]>([]);
+  const [libDoc, setLibDoc] = useState<ScriptDoc | null>(null);
+  const [sourceOpen, setSourceOpen] = useState(true);
+  const [paramsOpen, setParamsOpen] = useState(true);
+  const [execOpen, setExecOpen] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -910,79 +930,251 @@ function ScriptRunProps({
 
   const useLibrary = !!(action.scriptId && action.scriptId.length > 0);
 
+  useEffect(() => {
+    if (!useLibrary || !action.scriptId) {
+      setLibDoc(null);
+      return;
+    }
+    let cancelled = false;
+    void invoke<ScriptDoc>("load_script_cmd", { id: action.scriptId })
+      .then((doc) => {
+        if (!cancelled) setLibDoc(doc);
+      })
+      .catch(() => {
+        if (!cancelled) setLibDoc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [useLibrary, action.scriptId]);
+
+  const paramSource = useLibrary ? (libDoc?.source ?? "") : (action.source ?? "");
+  const defs = parseParamDefs(paramSource);
+  const params = action.params ?? {};
+  const permLabels = libDoc ? activePermissionLabels(libDoc) : [];
+
+  function applyPreset(preset: ScriptPreset) {
+    onChange({
+      ...action,
+      scriptId: null,
+      source: preset.source,
+      params: {},
+    });
+  }
+
   return (
-    <div className="props-grid">
-      <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
-        <span>Script bibliothèque</span>
-        <select
-          disabled={disabled}
-          value={action.scriptId ?? ""}
-          onChange={(e) => {
-            const scriptId = e.target.value === "" ? null : e.target.value;
-            onChange({
-              ...action,
-              scriptId,
-              source: scriptId ? "" : action.source ?? "",
-            });
-          }}
+    <div className="v2-scriptrun-props">
+      <div className="v2-scriptrun-props-title">
+        {actionTitleFr("script.run")}
+        {useLibrary && libDoc ? (
+          <span className="v2-scriptrun-props-sub">· {libDoc.name}</span>
+        ) : !useLibrary ? (
+          <span className="v2-scriptrun-props-sub">· Inline</span>
+        ) : null}
+      </div>
+
+      <section className="v2-scriptrun-section">
+        <button
+          type="button"
+          className="v2-scriptrun-section-head"
+          onClick={() => setSourceOpen((v) => !v)}
         >
-          <option value="">— Inline —</option>
-          {scripts.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-              {!s.allowNetwork ? " (sans réseau)" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      {!useLibrary ? (
-        <>
-          <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
-            <span>Source JavaScript</span>
-            <textarea
-              rows={10}
-              disabled={disabled}
-              value={action.source ?? ""}
-              onChange={(e) => onChange({ ...action, source: e.target.value })}
-              style={{
-                fontFamily: "ui-monospace, Consolas, monospace",
-                width: "100%",
-                fontSize: 12,
-              }}
-            />
-          </label>
-          <div className="actions wrap" style={{ gridColumn: "1 / -1" }}>
-            <button
-              type="button"
-              className="ghost"
-              disabled={disabled}
-              onClick={() => onChange({ ...action, source: SCRIPT_SNIPPET_GET })}
-            >
-              Snippet GET JSON
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={disabled}
-              onClick={() => onChange({ ...action, source: SCRIPT_SNIPPET_SET })}
-            >
-              Snippet set var
-            </button>
+          Source {sourceOpen ? "▾" : "▸"}
+        </button>
+        {sourceOpen ? (
+          <div className="v2-scriptrun-section-body props-grid">
+            <div className="v2-field" style={{ gridColumn: "1 / -1" }}>
+              <Segmented
+                value={useLibrary ? "library" : "inline"}
+                onChange={(mode) => {
+                  if (mode === "inline") {
+                    onChange({ ...action, scriptId: null });
+                  } else {
+                    const first = scripts[0]?.id ?? null;
+                    onChange({
+                      ...action,
+                      scriptId: action.scriptId || first,
+                      source: "",
+                    });
+                  }
+                }}
+                options={[
+                  { value: "library", label: "Bibliothèque" },
+                  { value: "inline", label: "Inline" },
+                ]}
+                disabled={disabled}
+              />
+            </div>
+            {useLibrary ? (
+              <>
+                <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
+                  <span>Script bibliothèque</span>
+                  <Select
+                    className="v2-select"
+                    disabled={disabled}
+                    value={action.scriptId ?? ""}
+                    options={[
+                      { value: "", label: "— Choisir —" },
+                      ...scripts.map((s) => ({ value: s.id, label: s.name })),
+                    ]}
+                    onChange={(v) => {
+                      const scriptId = v === "" ? null : v;
+                      onChange({
+                        ...action,
+                        scriptId,
+                        source: scriptId ? "" : action.source ?? "",
+                      });
+                    }}
+                  />
+                </label>
+                {libDoc && permLabels.length > 0 ? (
+                  <div
+                    className="v2-script-perm-chips"
+                    style={{ gridColumn: "1 / -1" }}
+                  >
+                    {permLabels.map((p) => (
+                      <span key={p} className="v2-script-perm-chip">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {action.scriptId && onOpenScript ? (
+                  <button
+                    type="button"
+                    className="v2-btn v2-btn-ghost"
+                    style={{ gridColumn: "1 / -1" }}
+                    disabled={disabled}
+                    onClick={() =>
+                      onOpenScript(action.scriptId!, libDoc?.name)
+                    }
+                  >
+                    Ouvrir dans l’éditeur
+                  </button>
+                ) : null}
+              </>
+            ) : (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <label className="v2-field">
+                  <span>Source JavaScript</span>
+                  <textarea
+                    rows={7}
+                    disabled={disabled}
+                    value={action.source ?? ""}
+                    onChange={(e) =>
+                      onChange({ ...action, source: e.target.value })
+                    }
+                    className="v2-script-inline-source"
+                  />
+                </label>
+                <div className="v2-scriptrun-examples">
+                  <DropdownMenu
+                    label="Exemples ▾"
+                    disabled={disabled}
+                    triggerClassName="v2-btn v2-btn-ghost"
+                    menuClassName="v2-scriptrun-examples-menu"
+                    items={
+                      [
+                        ...SCRIPT_PRESETS.map((p) => ({
+                          id: `ex-${p.id}`,
+                          label: p.name,
+                          icon: <FileCode2 size={14} />,
+                          onSelect: () => applyPreset(p),
+                        })),
+                        { id: "sep-min", label: "", separator: true },
+                        {
+                          id: "minimal",
+                          label: "Template minimal",
+                          icon: <FileCode2 size={14} />,
+                          onSelect: () => {
+                            onChange({
+                              ...action,
+                              source:
+                                "//@param label string world\ncaster.log(caster.get('label'));\n",
+                            });
+                          },
+                        },
+                      ] satisfies DropdownEntry[]
+                    }
+                  />
+                </div>
+              </div>
+            )}
           </div>
-        </>
+        ) : null}
+      </section>
+
+      {defs.length > 0 ? (
+        <section className="v2-scriptrun-section">
+          <button
+            type="button"
+            className="v2-scriptrun-section-head"
+            onClick={() => setParamsOpen((v) => !v)}
+          >
+            Paramètres {paramsOpen ? "▾" : "▸"}
+          </button>
+          {paramsOpen ? (
+            <div className="v2-scriptrun-section-body">
+              <ScriptParamsFields
+                defs={defs}
+                values={params}
+                disabled={disabled}
+                compact={false}
+                onChange={(name, value) =>
+                  onChange({
+                    ...action,
+                    params: { ...params, [name]: value },
+                  })
+                }
+              />
+            </div>
+          ) : null}
+        </section>
       ) : null}
-      <label className="v2-field">
-        <span>Timeout (ms)</span>
-        <input
-          type="number"
-          min={0}
-          disabled={disabled}
-          value={action.timeoutMs ?? 10000}
-          onChange={(e) =>
-            onChange({ ...action, timeoutMs: Number(e.target.value) })
-          }
-        />
-      </label>
+
+      <section className="v2-scriptrun-section">
+        <button
+          type="button"
+          className="v2-scriptrun-section-head"
+          onClick={() => setExecOpen((v) => !v)}
+        >
+          Exécution {execOpen ? "▾" : "▸"}
+        </button>
+        {execOpen ? (
+          <div className="v2-scriptrun-section-body props-grid">
+            <label className="v2-field">
+              <span>Timeout (ms)</span>
+              <input
+                type="number"
+                min={0}
+                disabled={disabled}
+                value={action.timeoutMs ?? 10000}
+                onChange={(e) =>
+                  onChange({ ...action, timeoutMs: Number(e.target.value) })
+                }
+              />
+            </label>
+            <label className="v2-field">
+              <span>Stocker le résultat dans</span>
+              <Tooltip content="Le résultat du script sera accessible dans la macro sous ce nom.">
+                <input
+                  type="text"
+                  disabled={disabled}
+                  placeholder="nomDeVariable"
+                  value={action.resultVar ?? ""}
+                  onChange={(e) =>
+                    onChange({
+                      ...action,
+                      resultVar:
+                        e.target.value.trim() === "" ? null : e.target.value,
+                    })
+                  }
+                />
+              </Tooltip>
+            </label>
+          </div>
+        ) : null}
+      </section>
     </div>
   );
 }
