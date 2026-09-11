@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AddMenu, confirmAction } from "../../ui";
-import { useToast } from "../../ui/v2";
+import { confirmAction } from "../../ui";
+import { ActionPickerMenu, useToast } from "../../ui/v2";
 import { ActionList } from "../ActionList";
 import { buildActionAddMenu, makeAction } from "../actionFactory";
 import { MacroMetaBar } from "../MacroMetaBar";
 import {
   appendChild,
+  duplicateAtPath,
   emptyMacro,
   getAtPath,
+  insertAtPath,
+  moveInParent,
   removeAtPath,
   reorderAtPath,
   updateAtPath,
@@ -23,13 +26,26 @@ import { MacroTitleBarTools } from "./MacroTitleBarTools";
 import { useTitleBarSlot } from "../../ui/v2/TitleBarContext";
 
 const AUTOSAVE_MS = 400;
+const HISTORY_MAX = 50;
+
+type HistoryEntry = {
+  doc: MacroDocument;
+  selectedPath: ActionPath | null;
+};
+
+function cloneDoc(doc: MacroDocument): MacroDocument {
+  return structuredClone(doc);
+}
 
 type Props = {
   macroId: string;
   onBack: () => void;
   onDirtyChange?: (id: string, dirty: boolean) => void;
+  /** Called after a successful library rename (id changed). */
+  onRenamed?: (from: string, to: string) => void;
   engineState: string;
   onStatus: (s: EngineStatus) => void;
+  onOpenScript?: (scriptId: string, label?: string) => void;
 };
 
 function saveErrorMessage(e: unknown): string {
@@ -54,8 +70,10 @@ export function MacroEditorView({
   macroId,
   onBack,
   onDirtyChange,
+  onRenamed,
   onStatus,
   engineState,
+  onOpenScript,
 }: Props) {
   const toast = useToast();
   const [doc, setDoc] = useState<MacroDocument>(() => emptyMacro(macroId));
@@ -68,6 +86,8 @@ export function MacroEditorView({
   const [recording, setRecording] = useState(false);
   const [recordPaused, setRecordPaused] = useState(false);
   const [recordCount, setRecordCount] = useState(0);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
   const baselineRef = useRef("");
   const autosaveTimer = useRef<number | null>(null);
   const docRef = useRef(doc);
@@ -75,14 +95,23 @@ export function MacroEditorView({
   const macroIdRef = useRef(macroId);
   const lockedRef = useRef(locked);
   const dirtyRef = useRef(dirty);
+  const selectedPathRef = useRef(selectedPath);
+  const pastRef = useRef<HistoryEntry[]>([]);
+  const futureRef = useRef<HistoryEntry[]>([]);
 
   docRef.current = doc;
   uiLayoutRef.current = uiLayout;
   macroIdRef.current = macroId;
   lockedRef.current = locked;
   dirtyRef.current = dirty;
+  selectedPathRef.current = selectedPath;
 
   const editorLocked = locked || recording;
+
+  const syncHistoryFlags = useCallback(() => {
+    setCanUndo(pastRef.current.length > 0);
+    setCanRedo(futureRef.current.length > 0);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +125,10 @@ export function MacroEditorView({
         setDirty(false);
         setSelectedPath(null);
         setActivePath(null);
+        pastRef.current = [];
+        futureRef.current = [];
+        setCanUndo(false);
+        setCanRedo(false);
         const ext = loaded as MacroDocument & { uiLayout?: MacroUiLayout };
         setUiLayout(ext.uiLayout);
         try {
@@ -254,10 +287,120 @@ export function MacroEditorView({
     }
   }, [engineState]);
 
-  const updateDoc = useCallback((next: MacroDocument) => {
-    setDoc(next);
-    setDirty(JSON.stringify(next) !== baselineRef.current);
-  }, []);
+  const updateDoc = useCallback(
+    (next: MacroDocument, opts?: { skipHistory?: boolean }) => {
+      if (!opts?.skipHistory && !lockedRef.current) {
+        pastRef.current = [
+          ...pastRef.current,
+          {
+            doc: cloneDoc(docRef.current),
+            selectedPath: selectedPathRef.current
+              ? [...selectedPathRef.current]
+              : null,
+          },
+        ].slice(-HISTORY_MAX);
+        futureRef.current = [];
+        syncHistoryFlags();
+      }
+      setDoc(next);
+      setDirty(JSON.stringify(next) !== baselineRef.current);
+    },
+    [syncHistoryFlags],
+  );
+
+  const undo = useCallback(() => {
+    if (lockedRef.current || pastRef.current.length === 0) return;
+    const prev = pastRef.current[pastRef.current.length - 1]!;
+    pastRef.current = pastRef.current.slice(0, -1);
+    futureRef.current = [
+      ...futureRef.current,
+      {
+        doc: cloneDoc(docRef.current),
+        selectedPath: selectedPathRef.current
+          ? [...selectedPathRef.current]
+          : null,
+      },
+    ].slice(-HISTORY_MAX);
+    syncHistoryFlags();
+    setSelectedPath(prev.selectedPath);
+    selectedPathRef.current = prev.selectedPath;
+    updateDoc(prev.doc, { skipHistory: true });
+  }, [syncHistoryFlags, updateDoc]);
+
+  const redo = useCallback(() => {
+    if (lockedRef.current || futureRef.current.length === 0) return;
+    const next = futureRef.current[futureRef.current.length - 1]!;
+    futureRef.current = futureRef.current.slice(0, -1);
+    pastRef.current = [
+      ...pastRef.current,
+      {
+        doc: cloneDoc(docRef.current),
+        selectedPath: selectedPathRef.current
+          ? [...selectedPathRef.current]
+          : null,
+      },
+    ].slice(-HISTORY_MAX);
+    syncHistoryFlags();
+    setSelectedPath(next.selectedPath);
+    selectedPathRef.current = next.selectedPath;
+    updateDoc(next.doc, { skipHistory: true });
+  }, [syncHistoryFlags, updateDoc]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (lockedRef.current || recording) return;
+      const mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === "z" || e.key === "Z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if (e.key === "y" || e.key === "Y") {
+        e.preventDefault();
+        redo();
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [recording, redo, undo]);
+
+  const commitRename = useCallback(
+    async (rawName: string) => {
+      if (lockedRef.current || recording) return;
+      const from = macroIdRef.current;
+      const trimmed = rawName.trim();
+      if (!trimmed || trimmed === from) {
+        updateDoc({ ...docRef.current, name: from });
+        return;
+      }
+      try {
+        if (dirtyRef.current) {
+          await persistNow({ ...docRef.current, name: from }, from);
+        }
+        const renamed = await invoke<MacroDocument>("rename_saved_macro", {
+          from,
+          to: trimmed,
+        });
+        setDoc(renamed);
+        baselineRef.current = JSON.stringify(renamed);
+        setDirty(false);
+        onRenamed?.(from, renamed.name);
+      } catch (e) {
+        updateDoc({ ...docRef.current, name: from });
+        toast.error(errMessage(e, "Renommage impossible"));
+      }
+    },
+    [onRenamed, persistNow, recording, toast, updateDoc],
+  );
 
   const applyRecordedDoc = useCallback(
     (next: MacroDocument) => {
@@ -318,6 +461,29 @@ export function MacroEditorView({
       await syncRecordState();
     }
   }, [flushAutosave, locked, recording, syncRecordState, toast]);
+
+  const onApplyPreset = useCallback(
+    async (name: string) => {
+      if (lockedRef.current || recording) return;
+      try {
+        const loaded = await invoke<MacroDocument>("load_preset_macro", {
+          name,
+        });
+        const next: MacroDocument = {
+          ...docRef.current,
+          actions: loaded.actions,
+          repeatCount: loaded.repeatCount,
+          schemaVersion: loaded.schemaVersion ?? docRef.current.schemaVersion,
+        };
+        updateDoc(next);
+        setSelectedPath(null);
+        toast.success(`Modèle « ${name} » appliqué`);
+      } catch (e) {
+        toast.error(errMessage(e, "Preset introuvable"));
+      }
+    },
+    [recording, toast, updateDoc],
+  );
 
   const onPauseRecord = useCallback(async () => {
     try {
@@ -401,6 +567,44 @@ export function MacroEditorView({
     [doc, updateDoc],
   );
 
+  const onDuplicate = useCallback(
+    (path: ActionPath) => {
+      if (editorLocked) return;
+      const result = duplicateAtPath(doc.actions, path);
+      if (!result) return;
+      updateDoc({ ...doc, actions: result.actions });
+      setSelectedPath(result.newPath);
+    },
+    [doc, editorLocked, updateDoc],
+  );
+
+  const onMove = useCallback(
+    (path: ActionPath, dir: -1 | 1) => {
+      if (editorLocked) return;
+      const next = moveInParent(doc.actions, path, dir);
+      if (!next) return;
+      const leaf = path[path.length - 1]!;
+      updateDoc({ ...doc, actions: next });
+      setSelectedPath([...path.slice(0, -1), leaf + dir]);
+    },
+    [doc, editorLocked, updateDoc],
+  );
+
+  const onInsertAfter = useCallback(
+    (path: ActionPath, kind: MacroAction["type"]) => {
+      if (editorLocked) return;
+      const leaf = path[path.length - 1]!;
+      const insertPath: ActionPath = [...path.slice(0, -1), leaf + 1];
+      const action = makeAction(kind);
+      const actions = insertAtPath(doc.actions, insertPath, action);
+      updateDoc({ ...doc, actions });
+      setSelectedPath(insertPath);
+    },
+    [doc, editorLocked, updateDoc],
+  );
+
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+
   const titleBarPortal = useTitleBarSlot(
     doc.name || macroId,
     <MacroTitleBarTools
@@ -421,6 +625,7 @@ export function MacroEditorView({
           macroId={macroId}
           locked={editorLocked}
           onChange={updateDoc}
+          onNameCommit={(name) => void commitRename(name)}
           onError={(msg) => toast.error(msg)}
         />
       }
@@ -431,7 +636,22 @@ export function MacroEditorView({
     return (
       <div className="v2-page v2-macro-editor">
         {titleBarPortal}
-        <div className="v2-macro-loading">Chargement de la macro…</div>
+        <div
+          className="v2-macro-loading"
+          aria-busy="true"
+          aria-label="Chargement de la macro"
+        >
+          <div className="v2-skeleton-page v2-skeleton-page--center">
+            <div
+              className="v2-skeleton v2-skeleton-line v2-skeleton-line--lg"
+              style={{ width: "55%" }}
+            />
+            <div className="v2-skeleton v2-skeleton-line" style={{ width: "88%" }} />
+            <div className="v2-skeleton v2-skeleton-line" style={{ width: "72%" }} />
+            <div className="v2-skeleton v2-skeleton-line" style={{ width: "80%" }} />
+            <div className="v2-skeleton v2-skeleton-line" style={{ width: "64%" }} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -442,13 +662,30 @@ export function MacroEditorView({
       <div className="v2-editor-layout">
         <div className="v2-seq-panel">
           <div className="v2-seq-toolbar">
-            <AddMenu
+            <ActionPickerMenu
               label="+ Ajouter"
               disabled={editorLocked}
               items={buildActionAddMenu(addAction)}
+              open={addMenuOpen}
+              onOpenChange={setAddMenuOpen}
             />
           </div>
-          <div className="v2-seq-scroll">
+          <div
+            className="v2-seq-scroll"
+            onContextMenu={
+              editorLocked
+                ? undefined
+                : (e) => {
+                    const t = e.target as HTMLElement;
+                    if (t.closest(".action-list-item")) return;
+                    if (t.closest(".v2-context-menu")) return;
+                    // Let ActionList handle empty/list background; still block browser menu on padding
+                    if (!t.closest(".action-list")) {
+                      e.preventDefault();
+                    }
+                  }
+            }
+          >
             <ActionList
               actions={doc.actions}
               selectedPath={selectedPath}
@@ -460,7 +697,27 @@ export function MacroEditorView({
                 if (next) updateDoc({ ...doc, actions: next });
               }}
               onRemove={onRemove}
+              onDuplicate={onDuplicate}
+              onMove={onMove}
+              onInsertAfter={onInsertAfter}
+              onAddKind={editorLocked ? undefined : addAction}
+              onOpenAddMenu={
+                editorLocked ? undefined : () => setAddMenuOpen(true)
+              }
               onEmptyAdd={editorLocked ? undefined : () => addAction("mouse.click")}
+              onStartRecord={
+                editorLocked || recording
+                  ? undefined
+                  : () => void onStartRecord()
+              }
+              onApplyPreset={
+                editorLocked ? undefined : (name) => void onApplyPreset(name)
+              }
+              onClearSelection={() => setSelectedPath(null)}
+              onUndo={editorLocked ? undefined : undo}
+              onRedo={editorLocked ? undefined : redo}
+              canUndo={canUndo}
+              canRedo={canRedo}
               onChangeAction={(path, a) =>
                 updateDoc({
                   ...doc,
@@ -470,6 +727,7 @@ export function MacroEditorView({
               branchAddMenuItems={(branch) =>
                 buildActionAddMenu((kind) => addToBranch(branch, kind))
               }
+              onOpenScript={onOpenScript}
             />
           </div>
         </div>

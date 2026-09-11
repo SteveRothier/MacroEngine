@@ -20,6 +20,18 @@ select,
   caret-color: auto;
 }
 
+/* Hide native number spinners (WebKit / Firefox) */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .badge {
   margin-top: 0.5rem;
   padding: 0.45rem 0.85rem;
@@ -121,7 +133,7 @@ select,
 }
 
 /* Shell / v2 chrome — excluded from global button styles below */
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.ui-segment):not(.action-row):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item) {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.ui-segment):not(.action-row):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):not(.v2-auto-colhead-label):not(.v2-automations-section-label):not(.v2-filter-pill):not(.v2-auto-row-play-btn):not(.v2-auto-row-menu-btn):not(.v2-automation-fav):not(.v2-select-trigger) {
   appearance: none;
   border: 1px solid var(--border-soft);
   background: var(--surface);
@@ -144,7 +156,7 @@ button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):no
     color var(--dur-fast) var(--ease-out);
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.ui-segment):not(.action-row):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):not(.ghost):not(.danger):not(.tiny):not(.active):not(.primary):not(.live):not(.zone-handle):hover:not(:disabled) {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.ui-segment):not(.action-row):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):not(.v2-auto-colhead-label):not(.v2-automations-section-label):not(.v2-filter-pill):not(.v2-auto-row-play-btn):not(.v2-auto-row-menu-btn):not(.v2-automation-fav):not(.v2-select-trigger):not(.ghost):not(.danger):not(.tiny):not(.active):not(.primary):not(.live):not(.zone-handle):hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: var(--border);
 }
@@ -182,16 +194,16 @@ button.live:hover:not(:disabled) {
   color: #0b0c0f;
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):active:not(:disabled):not(.zone-handle) {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):not(.v2-auto-colhead-label):not(.v2-automations-section-label):not(.v2-filter-pill):not(.v2-auto-row-play-btn):not(.v2-auto-row-menu-btn):not(.v2-automation-fav):not(.v2-select-trigger):active:not(:disabled):not(.zone-handle) {
   background: var(--surface-alt);
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):focus-visible {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):not(.v2-auto-colhead-label):not(.v2-automations-section-label):not(.v2-filter-pill):not(.v2-auto-row-play-btn):not(.v2-auto-row-menu-btn):not(.v2-automation-fav):not(.v2-select-trigger):focus-visible {
   outline: 2px solid var(--accent-border);
   outline-offset: 2px;
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):disabled {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.v2-btn):not(.v2-sidebar-item):not(.v2-sidebar-toggle):not(.v2-sidebar-recent-item):not(.v2-titlebar-tab):not(.v2-titlebar-btn):not(.v2-doc-tab-main):not(.v2-doc-tab-close):not(.v2-doc-tab-add-btn):not(.v2-search-trigger):not(.v2-settings-rail-item):not(.v2-segmented-btn):not(.v2-theme-swatch):not(.v2-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.v2-menu-item):not(.v2-auto-colhead-label):not(.v2-automations-section-label):not(.v2-filter-pill):not(.v2-auto-row-play-btn):not(.v2-auto-row-menu-btn):not(.v2-automation-fav):not(.v2-select-trigger):disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
