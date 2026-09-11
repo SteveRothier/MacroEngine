@@ -24,6 +24,7 @@ pub mod record;
 pub mod scheduler;
 pub mod schema;
 pub mod script_library;
+pub mod script_params;
 pub mod script_runtime;
 pub mod settings;
 pub mod state;
@@ -84,6 +85,7 @@ pub use schema::{
 pub use script_library::{
     delete_script, list_scripts, load_script, save_script, ScriptDoc, ScriptLibraryError,
 };
+pub use script_params::{parse_param_defs, ScriptParamDef};
 pub use settings::{
     clamp_overlay_opacity, load_settings, save_settings, settings_path, AppSettings, ProcessFilter,
     ProcessFilterMode, SettingsError, ThemeMode,

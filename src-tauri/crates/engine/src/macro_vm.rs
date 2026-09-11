@@ -383,22 +383,76 @@ impl MacroVm {
                     source,
                     script_id,
                     timeout_ms,
+                    params,
+                    result_var,
                 } => {
-                    let (src, allow_network) =
+                    let (src, mut opts) =
                         if let Some(sid) = script_id.as_ref().filter(|s| !s.is_empty()) {
                             let doc = crate::script_library::load_script_doc(sid)?;
-                            (doc.source, doc.allow_network)
+                            for (k, v) in &doc.param_values {
+                                if !params.contains_key(k) {
+                                    env.set(k.clone(), v.clone());
+                                }
+                            }
+                            (
+                                doc.source,
+                                crate::script_runtime::ScriptOptions {
+                                    allow_network: doc.allow_network,
+                                    allow_clipboard: doc.allow_clipboard,
+                                    allow_fs: doc.allow_fs,
+                                    allow_macro_control: doc.allow_macro_control,
+                                    config_dir: crate::script_library::config_dir_default(),
+                                    injector: Some(Arc::clone(&self.injector)),
+                                    run_macro: None,
+                                },
+                            )
                         } else {
-                            (source.clone(), true)
+                            (
+                                source.clone(),
+                                crate::script_runtime::ScriptOptions {
+                                    allow_network: true,
+                                    allow_clipboard: false,
+                                    allow_fs: false,
+                                    allow_macro_control: false,
+                                    config_dir: crate::script_library::config_dir_default(),
+                                    injector: Some(Arc::clone(&self.injector)),
+                                    run_macro: None,
+                                },
+                            )
                         };
-                    crate::script_runtime::run_script_with_perms(
+                    for (k, v) in params {
+                        env.set(k.clone(), v.clone());
+                    }
+                    for def in crate::script_params::parse_param_defs(&src) {
+                        if env.get(&def.name).is_none() {
+                            if let Some(d) = def.default {
+                                env.set(def.name, d);
+                            }
+                        }
+                    }
+                    if opts.allow_macro_control {
+                        let injector = Arc::clone(&self.injector);
+                        let cancel_c = cancel.clone();
+                        let pause_c = pause.clone();
+                        let bus_ptr = bus as *const EventBus as usize;
+                        opts.run_macro = Some(Arc::new(move |macro_id: &str| {
+                            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                            nest_run_macro(macro_id, &injector, &cancel_c, &pause_c, bus)
+                        }));
+                    }
+                    let returned = crate::script_runtime::run_script_with_options(
                         &src,
                         *timeout_ms,
                         env,
                         bus,
                         cancel,
-                        allow_network,
+                        &opts,
                     )?;
+                    if let Some(name) = result_var.as_ref().filter(|s| !s.is_empty()) {
+                        if let Some(v) = returned {
+                            env.set(name.clone(), v);
+                        }
+                    }
                     trace.push(format!("script.run:{id}"));
                 }
                 ActionNode::KeyTap { id, key, mods } => {
@@ -547,6 +601,34 @@ impl MacroVm {
         }
         Ok(())
     }
+}
+
+pub(crate) fn nest_run_macro(
+    macro_id: &str,
+    injector: &Arc<dyn MouseInjector>,
+    cancel: &CancellationToken,
+    pause: &PauseGate,
+    bus: &EventBus,
+) -> Result<(), ActionError> {
+    thread_local! {
+        static DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    }
+    let depth = DEPTH.with(|d| d.get());
+    if depth >= 3 {
+        return Err(ActionError::Message(
+            "caster.runMacro: profondeur max (3) atteinte".into(),
+        ));
+    }
+    let dir = crate::script_library::config_dir_default();
+    let doc = crate::macro_library::load_macro(&dir, macro_id)
+        .map_err(|e| ActionError::Message(format!("runMacro: {e}")))?;
+    DEPTH.with(|d| d.set(depth + 1));
+    let result = (|| {
+        let vm = MacroVm::with_injector(Arc::clone(injector));
+        vm.run(&doc, cancel, pause, bus).map(|_| ())
+    })();
+    DEPTH.with(|d| d.set(depth));
+    result
 }
 
 fn effective_process_filter(

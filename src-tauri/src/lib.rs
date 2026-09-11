@@ -512,7 +512,12 @@ fn get_quick_access(dir: State<'_, SettingsDir>) -> Result<QuickAccess, String> 
     let mut qa = load_quick_access(&dir.0).map_err(|e| e.to_string())?;
     let clicker = list_presets(&dir.0).unwrap_or_default();
     let macros = list_macros(&dir.0).unwrap_or_default();
-    if prune_orphans(&mut qa, &clicker, &macros) {
+    let scripts = list_scripts(&dir.0)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|s| s.id)
+        .collect::<Vec<_>>();
+    if prune_orphans(&mut qa, &clicker, &macros, &scripts) {
         let _ = save_quick_access(&dir.0, &qa);
     }
     Ok(qa)
@@ -562,6 +567,7 @@ fn parse_quick_kind(kind: &str) -> Result<QuickKind, String> {
     match kind {
         "clicker" => Ok(QuickKind::Clicker),
         "macro" => Ok(QuickKind::Macro),
+        "script" => Ok(QuickKind::Script),
         _ => Err(format!("unknown quick kind: {kind}")),
     }
 }
@@ -882,6 +888,15 @@ fn save_script_cmd(dir: State<'_, SettingsDir>, doc: ScriptDoc) -> Result<(), St
 #[tauri::command]
 fn delete_script_cmd(dir: State<'_, SettingsDir>, id: String) -> Result<(), String> {
     delete_script(&dir.0, &id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn run_script_session_cmd(
+    engine: State<'_, AppState>,
+    id: String,
+) -> Result<EngineStatusPayload, String> {
+    engine.start_script_session(&id)?;
+    Ok(status_of(&engine, Some("script running".into())))
 }
 
 #[tauri::command]
@@ -1735,6 +1750,7 @@ pub fn run() {
             load_script_cmd,
             save_script_cmd,
             delete_script_cmd,
+            run_script_session_cmd,
             export_app_settings,
             import_app_settings,
             request_cancel,

@@ -14,6 +14,7 @@ pub const MAX_RECENT: usize = 12;
 pub enum QuickKind {
     Clicker,
     Macro,
+    Script,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -122,6 +123,7 @@ pub fn set_favorite(
     let list = match kind {
         QuickKind::Clicker => &mut data.favorites.clicker_presets,
         QuickKind::Macro => &mut data.favorites.macros,
+        QuickKind::Script => return Err(QuickAccessError::InvalidKind),
     };
     list.retain(|n| n != id);
     if favorite {
@@ -138,6 +140,7 @@ pub fn prune_orphans(
     data: &mut QuickAccess,
     clicker_ids: &[String],
     macro_ids: &[String],
+    script_ids: &[String],
 ) -> bool {
     let before = data.clone();
     data.favorites.clicker_presets.retain(|id| {
@@ -151,6 +154,7 @@ pub fn prune_orphans(
             e.id == SYNTHETIC_CLICKER_ID || clicker_ids.iter().any(|n| n == &e.id)
         }
         QuickKind::Macro => macro_ids.iter().any(|n| n == &e.id),
+        QuickKind::Script => script_ids.iter().any(|n| n == &e.id),
     });
     before != *data
 }
@@ -213,10 +217,25 @@ mod tests {
             &mut qa,
             &["keep".into()],
             &["live".into()],
+            &[],
         ));
         assert_eq!(qa.favorites.clicker_presets, vec!["keep".to_string()]);
         assert_eq!(qa.favorites.macros, vec!["live".to_string()]);
         assert_eq!(qa.recent.len(), 1);
         assert_eq!(qa.recent[0].id, "live");
+    }
+
+    #[test]
+    fn script_recent_roundtrip_and_prune() {
+        let dir = temp_dir();
+        let _ = fs::create_dir_all(&dir);
+        push_recent(&dir, QuickKind::Script, "s1").unwrap();
+        let loaded = load_quick_access(&dir).unwrap();
+        assert_eq!(loaded.recent.len(), 1);
+        assert_eq!(loaded.recent[0].kind, QuickKind::Script);
+        let mut qa = loaded;
+        assert!(prune_orphans(&mut qa, &[], &[], &[]));
+        assert!(qa.recent.is_empty());
+        let _ = fs::remove_dir_all(dir);
     }
 }

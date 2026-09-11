@@ -1,5 +1,6 @@
 //! Reusable JS scripts stored under the app config directory.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -7,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::actions::registry::ActionError;
+use crate::schema::MacroValue;
 
 #[derive(Debug, Error)]
 pub enum ScriptLibraryError {
@@ -33,6 +35,15 @@ pub struct ScriptDoc {
     /// When true, `caster.fetch` is allowed.
     #[serde(default = "default_network")]
     pub allow_network: bool,
+    #[serde(default)]
+    pub allow_clipboard: bool,
+    #[serde(default)]
+    pub allow_fs: bool,
+    #[serde(default)]
+    pub allow_macro_control: bool,
+    /// Saved UI defaults for `//@param` values.
+    #[serde(default)]
+    pub param_values: HashMap<String, MacroValue>,
 }
 
 fn default_network() -> bool {
@@ -62,6 +73,11 @@ pub fn ensure_scripts_dir(config_dir: &Path) -> Result<(), ScriptLibraryError> {
     Ok(())
 }
 
+pub fn ensure_script_data_dir(config_dir: &Path) -> Result<(), ScriptLibraryError> {
+    fs::create_dir_all(config_dir.join("script-data"))?;
+    Ok(())
+}
+
 pub fn list_scripts(config_dir: &Path) -> Result<Vec<ScriptDoc>, ScriptLibraryError> {
     ensure_scripts_dir(config_dir)?;
     let mut out = Vec::new();
@@ -88,15 +104,10 @@ pub fn load_script(config_dir: &Path, id: &str) -> Result<ScriptDoc, ScriptLibra
     Ok(serde_json::from_str(&raw)?)
 }
 
-/// Load source for macro VM (uses default config dir from env / known path).
-/// Prefer `load_script` with explicit config dir from Tauri; this helper is for
-/// in-process resolution via `CASTER_CONFIG_DIR` or a relative fallback.
 pub fn load_script_source(id: &str) -> Result<String, ActionError> {
     let dir = std::env::var("CASTER_CONFIG_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs_next_config()
-        });
+        .unwrap_or_else(|_| dirs_next_config());
     let doc = load_script(&dir, id)?;
     Ok(doc.source)
 }
@@ -108,8 +119,13 @@ pub fn load_script_doc(id: &str) -> Result<ScriptDoc, ActionError> {
     Ok(load_script(&dir, id)?)
 }
 
+pub fn config_dir_default() -> PathBuf {
+    std::env::var("CASTER_CONFIG_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| dirs_next_config())
+}
+
 fn dirs_next_config() -> PathBuf {
-    // Mirror typical Tauri app config: %APPDATA%/com.steverothier.caster
     if let Some(base) = std::env::var_os("APPDATA") {
         return PathBuf::from(base).join("com.steverothier.caster");
     }
@@ -118,6 +134,7 @@ fn dirs_next_config() -> PathBuf {
 
 pub fn save_script(config_dir: &Path, doc: &ScriptDoc) -> Result<(), ScriptLibraryError> {
     ensure_scripts_dir(config_dir)?;
+    let _ = ensure_script_data_dir(config_dir);
     let path = script_path(config_dir, &doc.id);
     let raw = serde_json::to_string_pretty(doc)?;
     fs::write(path, raw)?;
@@ -150,6 +167,10 @@ mod tests {
             name: "Hello".into(),
             source: "caster.set('x', 1);".into(),
             allow_network: false,
+            allow_clipboard: false,
+            allow_fs: false,
+            allow_macro_control: false,
+            param_values: HashMap::new(),
         };
         save_script(&dir, &doc).unwrap();
         let loaded = load_script(&dir, "hello").unwrap();
