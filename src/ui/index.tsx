@@ -352,6 +352,7 @@ function placeMenu(
   return { top, left, origin };
 }
 
+/** @deprecated Prefer DropdownMenu / ActionPickerMenu (v2). Kept for MacroWorkspace legacy. */
 export function AddMenu({
   label = "+ Ajouter",
   disabled,

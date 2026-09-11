@@ -4,24 +4,10 @@ import {
   type MutableRefObject,
   type RefObject,
 } from "react";
-import {
-  TAB_LAYOUT,
-  computeTargetTabWidth,
-  type TabStripTokens,
-} from "./tabLayout";
+import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
-const LAYOUT_ANIM_DURATION_MS = 200;
-const WIDTH_EPSILON_PX = 0.5;
-
-function readTabStripTokens(scrollEl: HTMLElement): TabStripTokens {
-  const style = getComputedStyle(scrollEl);
-  const minW = parseFloat(style.getPropertyValue("--v2-tab-abs-min-w"));
-  const maxW = parseFloat(style.getPropertyValue("--v2-tab-max-w"));
-  return {
-    minW: Number.isFinite(minW) && minW > 0 ? minW : TAB_LAYOUT.MIN_W,
-    maxW: Number.isFinite(maxW) && maxW > 0 ? maxW : TAB_LAYOUT.MAX_W,
-  };
-}
+const LAYOUT_ANIM_DURATION_MS = 180;
+const WIDTH_EPSILON_PX = 0.75;
 
 function captureWidths(
   tabIds: string[],
@@ -41,7 +27,7 @@ function easeOutCubic(t: number): number {
 }
 
 function setLockedWidth(el: HTMLDivElement, width: number): void {
-  const px = `${width}px`;
+  const px = `${Math.max(0, width)}px`;
   el.style.flex = "none";
   el.style.width = px;
   el.style.minWidth = width <= 0 ? "0px" : px;
@@ -72,17 +58,13 @@ function runBatchAnimation(jobs: AnimJob[], onAllDone: () => void): void {
   const start = performance.now();
 
   const finish = () => {
-    for (const { el, to } of jobs) {
-      setLockedWidth(el, to);
+    // Leave flex unlocked at the measured end — no second layout snap.
+    for (const { el } of jobs) {
+      clearLockedWidth(el);
     }
-    batchRafId = requestAnimationFrame(() => {
-      for (const { el } of jobs) {
-        clearLockedWidth(el);
-      }
-      cancelBatch = null;
-      batchRafId = 0;
-      onAllDone();
-    });
+    cancelBatch = null;
+    batchRafId = 0;
+    onAllDone();
   };
 
   const tick = (now: number) => {
@@ -110,11 +92,16 @@ function runBatchAnimation(jobs: AnimJob[], onAllDone: () => void): void {
   batchRafId = requestAnimationFrame(tick);
 }
 
+/**
+ * FLIP width animation on tab add/remove:
+ * measure natural flex widths after commit, lock to previous widths, animate to measured.
+ * Avoids bounce from formula targets that disagree with flex.
+ */
 export function useTabStripLayoutAnimation({
   tabIds,
   tabElsRef,
   scrollRef,
-  addBtnRef,
+  addBtnRef: _addBtnRef,
   enabled = true,
   onAnimationEnd,
 }: {
@@ -125,8 +112,10 @@ export function useTabStripLayoutAnimation({
   enabled?: boolean;
   onAnimationEnd?: () => void;
 }) {
+  const reducedMotion = usePrefersReducedMotion();
+  const animEnabled = enabled && !reducedMotion;
   const snapshotRef = useRef<Map<string, number>>(new Map());
-  const prevCountRef = useRef(0);
+  const prevIdsRef = useRef<string[]>([]);
   const isLayoutAnimatingRef = useRef(false);
   const onAnimationEndRef = useRef(onAnimationEnd);
   onAnimationEndRef.current = onAnimationEnd;
@@ -139,60 +128,83 @@ export function useTabStripLayoutAnimation({
   useLayoutEffect(() => {
     const tabEls = tabElsRef.current;
     const prevSnapshot = snapshotRef.current;
+    const prevIds = prevIdsRef.current;
     const scrollEl = scrollRef.current;
 
-    if (!enabled) {
+    if (!animEnabled) {
+      cancelBatch?.();
+      setAnimating(false);
       snapshotRef.current = captureWidths(tabIds, tabEls);
-      prevCountRef.current = tabIds.length;
+      prevIdsRef.current = tabIds.slice();
       return;
     }
 
     if (prevSnapshot.size === 0 || !scrollEl) {
       snapshotRef.current = captureWidths(tabIds, tabEls);
-      prevCountRef.current = tabIds.length;
+      prevIdsRef.current = tabIds.slice();
       return;
     }
 
-    const countDelta = tabIds.length - prevCountRef.current;
+    const sameSet =
+      prevIds.length === tabIds.length &&
+      prevIds.every((id, i) => id === tabIds[i]);
+    if (sameSet) {
+      // Labels/chrome may change width; keep snapshot fresh, no anim.
+      if (!isLayoutAnimatingRef.current) {
+        snapshotRef.current = captureWidths(tabIds, tabEls);
+      }
+      return;
+    }
+
+    const countDelta = tabIds.length - prevIds.length;
+    // Reorder only: skip width anim.
     if (countDelta === 0) {
       snapshotRef.current = captureWidths(tabIds, tabEls);
+      prevIdsRef.current = tabIds.slice();
       return;
     }
 
-    const tokens = readTabStripTokens(scrollEl);
-    const targetWidth = computeTargetTabWidth(
-      scrollEl,
-      addBtnRef.current,
-      tabIds.length,
-      tokens,
-    );
+    // Drop any in-flight locks so we measure true flex targets.
+    cancelBatch?.();
+    setAnimating(false);
+    for (const id of tabIds) {
+      const el = tabEls.get(id);
+      if (el) clearLockedWidth(el);
+    }
 
-    const prevIds = new Set(prevSnapshot.keys());
-    const isClosing = countDelta < 0;
+    // Natural flex widths after React commit (targets).
+    const nextWidths = captureWidths(tabIds, tabEls);
+    const prevIdSet = new Set(prevIds);
     const jobs: AnimJob[] = [];
 
     for (const id of tabIds) {
       const el = tabEls.get(id);
       if (!el) continue;
+      const to = nextWidths.get(id) ?? 0;
 
-      if (!prevIds.has(id)) {
-        jobs.push({ el, from: 0, to: targetWidth });
+      if (!prevIdSet.has(id)) {
+        jobs.push({ el, from: 0, to });
         continue;
       }
 
-      const oldWidth = prevSnapshot.get(id);
-      if (oldWidth == null) continue;
-
-      const widthDelta = Math.abs(oldWidth - targetWidth);
-      if (widthDelta <= WIDTH_EPSILON_PX && !isClosing) continue;
-
-      jobs.push({ el, from: oldWidth, to: targetWidth });
+      const from = prevSnapshot.get(id) ?? to;
+      if (Math.abs(from - to) <= WIDTH_EPSILON_PX) continue;
+      jobs.push({ el, from, to });
     }
 
     if (jobs.length === 0) {
-      snapshotRef.current = captureWidths(tabIds, tabEls);
-      prevCountRef.current = tabIds.length;
+      snapshotRef.current = nextWidths;
+      prevIdsRef.current = tabIds.slice();
       return;
+    }
+
+    // Treat current ids as committed so re-renders with the same set don't restart.
+    prevIdsRef.current = tabIds.slice();
+
+    // Lock to start widths before paint so first frame isn't the flex snap.
+    for (const { el, from } of jobs) {
+      el.classList.add("v2-doc-tab--width-animating");
+      setLockedWidth(el, from);
     }
 
     setAnimating(true);
@@ -200,10 +212,9 @@ export function useTabStripLayoutAnimation({
     runBatchAnimation(jobs, () => {
       setAnimating(false);
       snapshotRef.current = captureWidths(tabIds, tabElsRef.current);
-      prevCountRef.current = tabIds.length;
       onAnimationEndRef.current?.();
     });
-  }, [tabIds, tabElsRef, scrollRef, addBtnRef, enabled]);
+  }, [tabIds, tabElsRef, scrollRef, animEnabled]);
 
   return { isLayoutAnimatingRef };
 }

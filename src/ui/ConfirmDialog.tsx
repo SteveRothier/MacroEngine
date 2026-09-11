@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AlertTriangle } from "lucide-react";
 
 export type ConfirmOptions = {
   title: string;
@@ -26,23 +27,6 @@ export function confirmAction(opts: ConfirmOptions): Promise<boolean> {
 export function confirmChoice(opts: ConfirmOptions): Promise<ConfirmOutcome> {
   if (!askFn) return Promise.resolve("cancel");
   return askFn(opts);
-}
-
-function WarningIcon() {
-  return (
-    <svg
-      className="confirm-dialog-icon"
-      viewBox="0 0 24 24"
-      width="28"
-      height="28"
-      aria-hidden
-    >
-      <path
-        fill="currentColor"
-        d="M12 3.2 22 20.5H2L12 3.2zm0 5.3c-.5 0-.8.4-.8.9v4.2c0 .5.3.9.8.9s.8-.4.8-.9V9.4c0-.5-.3-.9-.8-.9zm0 8.3c.6 0 1 .4 1 1s-.4 1-1 1-1-.4-1-1 .4-1 1-1z"
-      />
-    </svg>
-  );
 }
 
 export function ConfirmHost() {
@@ -86,29 +70,37 @@ export function ConfirmHost() {
 
   return (
     <div
-      className="confirm-overlay"
+      className="v2-dialog-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close("cancel");
       }}
     >
       <div
-        className="confirm-dialog"
+        className="v2-dialog"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-msg"
       >
-        <h2 id="confirm-dialog-title" className="confirm-dialog-title">
+        <h2 id="confirm-dialog-title" className="v2-dialog-title">
           {current.title}
         </h2>
-        <div className="confirm-dialog-body">
-          <WarningIcon />
+        <div className="v2-dialog-body">
+          <AlertTriangle
+            className={
+              danger ? "v2-dialog-icon v2-dialog-icon--danger" : "v2-dialog-icon"
+            }
+            size={22}
+            aria-hidden
+          />
           <p id="confirm-dialog-msg">{current.message}</p>
         </div>
-        <div className="confirm-dialog-actions">
+        <div className="v2-dialog-actions">
           <button
             type="button"
-            className={danger ? "danger" : "primary"}
+            className={
+              danger ? "v2-btn v2-btn-danger" : "v2-btn v2-btn-primary"
+            }
             autoFocus
             onClick={() => close("confirm")}
           >
@@ -117,13 +109,17 @@ export function ConfirmHost() {
           {discardLabel ? (
             <button
               type="button"
-              className="ghost"
+              className="v2-btn v2-btn-ghost"
               onClick={() => close("discard")}
             >
               {discardLabel}
             </button>
           ) : null}
-          <button type="button" className="ghost" onClick={() => close("cancel")}>
+          <button
+            type="button"
+            className="v2-btn v2-btn-ghost"
+            onClick={() => close("cancel")}
+          >
             {cancelLabel}
           </button>
         </div>

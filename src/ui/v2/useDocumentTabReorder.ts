@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from "react";
 import type { DocumentTabItem } from "./DocumentTabBar";
+import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 const DRAG_THRESHOLD_PX = 6;
 const EDGE_SCROLL_PX = 24;
@@ -122,8 +123,13 @@ function playFlip(
   tabEls: Map<string, HTMLDivElement>,
   firstRects: Map<string, number>,
   skipId: string | null,
+  reducedMotion = false,
 ): void {
   if (firstRects.size === 0) return;
+  if (reducedMotion) {
+    tabEls.forEach((el) => clearFlipStyles(el));
+    return;
+  }
 
   firstRects.forEach((firstLeft, id) => {
     if (id === skipId) return;
@@ -189,6 +195,7 @@ export function useDocumentTabReorder({
   onTabReorder?: TabReorderHandler;
   enabled?: boolean;
 }) {
+  const reducedMotion = usePrefersReducedMotion();
   const [dragUi, setDragUi] = useState<TabDragUi>({
     isDragging: false,
     draggingId: null,
@@ -209,9 +216,11 @@ export function useDocumentTabReorder({
   const suppressClickRef = useRef(false);
   const onTabReorderRef = useRef(onTabReorder);
   const tabsRef = useRef(tabs);
+  const reducedMotionRef = useRef(reducedMotion);
   onTabReorderRef.current = onTabReorder;
   tabsRef.current = tabs;
   previewOrderRef.current = previewOrder;
+  reducedMotionRef.current = reducedMotion;
 
   const canDragTab = useCallback(
     (tab: DocumentTabItem) =>
@@ -253,7 +262,7 @@ export function useDocumentTabReorder({
     const skipId = sessionRef.current?.tabId ?? null;
     pendingFlipRef.current = false;
     firstRectsRef.current = null;
-    playFlip(tabElsRef.current, first, skipId);
+    playFlip(tabElsRef.current, first, skipId, reducedMotionRef.current);
   }, [previewOrder, tabElsRef]);
 
   const tryAdjacentSwap = useCallback(

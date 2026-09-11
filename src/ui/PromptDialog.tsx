@@ -59,25 +59,25 @@ export function PromptHost() {
 
   return (
     <div
-      className="confirm-overlay"
+      className="v2-dialog-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close(null);
       }}
     >
       <div
-        className="confirm-dialog"
+        className="v2-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="prompt-dialog-title"
       >
-        <h2 id="prompt-dialog-title" className="confirm-dialog-title">
+        <h2 id="prompt-dialog-title" className="v2-dialog-title">
           {current.title}
         </h2>
-        <div className="confirm-dialog-body prompt-dialog-body">
+        <div className="v2-dialog-body v2-dialog-body--stack">
           {current.message ? <p>{current.message}</p> : null}
           <input
             type="text"
-            className="prompt-dialog-input"
+            className="v2-dialog-input"
             value={value}
             placeholder={current.placeholder}
             autoFocus
@@ -91,10 +91,10 @@ export function PromptHost() {
             }}
           />
         </div>
-        <div className="confirm-dialog-actions">
+        <div className="v2-dialog-actions">
           <button
             type="button"
-            className="primary"
+            className="v2-btn v2-btn-primary"
             onClick={() => {
               const trimmed = value.trim();
               if (trimmed) close(trimmed);
@@ -102,7 +102,11 @@ export function PromptHost() {
           >
             {current.confirmLabel ?? "OK"}
           </button>
-          <button type="button" className="ghost" onClick={() => close(null)}>
+          <button
+            type="button"
+            className="v2-btn v2-btn-ghost"
+            onClick={() => close(null)}
+          >
             {current.cancelLabel ?? "Annuler"}
           </button>
         </div>
