@@ -9,6 +9,7 @@ import type {
   RateUnit,
   TimingMode,
 } from "../clickerTypes";
+import { Select } from "../../ui/v2";
 import { ClickerProcessFilterRow } from "./ClickerProcessFilterRow";
 import { ClickerTriggerRow } from "./ClickerTriggerRow";
 
@@ -95,14 +96,16 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                 <span>Type de clic</span>
               </div>
               <div className="v2-settings-row-control">
-                <select
+                <Select
+                  className="v2-select"
                   value={e.clickKind}
                   disabled={e.editDisabled}
-                  onChange={(ev) => e.setClickKind(ev.target.value as ClickKind)}
-                >
-                  <option value="single">Simple</option>
-                  <option value="double">Double</option>
-                </select>
+                  options={[
+                    { value: "single", label: "Simple" },
+                    { value: "double", label: "Double" },
+                  ]}
+                  onChange={(v) => e.setClickKind(v as ClickKind)}
+                />
               </div>
             </div>
           </>
@@ -139,14 +142,16 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
             <span>Mode hotkey</span>
           </div>
           <div className="v2-settings-row-control">
-            <select
+            <Select
+              className="v2-select"
               value={e.mode}
               disabled={e.editDisabled}
-              onChange={(ev) => e.setMode(ev.target.value as ClickMode)}
-            >
-              <option value="toggle">Basculer</option>
-              <option value="hold">Maintenir</option>
-            </select>
+              options={[
+                { value: "toggle", label: "Basculer" },
+                { value: "hold", label: "Maintenir" },
+              ]}
+              onChange={(v) => e.setMode(v as ClickMode)}
+            />
           </div>
         </div>
         <ClickerTriggerRow editor={e} />
@@ -208,16 +213,18 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
             </div>
             <label className="v2-field">
               <span>Unité</span>
-              <select
+              <Select
+                className="v2-select"
                 value={e.rateUnit}
                 disabled={e.editDisabled}
-                onChange={(ev) => e.setRateUnit(ev.target.value as RateUnit)}
-              >
-                <option value="perSecond">/ seconde</option>
-                <option value="perMinute">/ minute</option>
-                <option value="perHour">/ heure</option>
-                <option value="perDay">/ jour</option>
-              </select>
+                options={[
+                  { value: "perSecond", label: "/ seconde" },
+                  { value: "perMinute", label: "/ minute" },
+                  { value: "perHour", label: "/ heure" },
+                  { value: "perDay", label: "/ jour" },
+                ]}
+                onChange={(v) => e.setRateUnit(v as RateUnit)}
+              />
             </label>
           </>
         ) : (
@@ -355,14 +362,16 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           <summary>Duty (avancé)</summary>
           <label className="v2-field">
             <span>Mode duty</span>
-            <select
+            <Select
+              className="v2-select"
               value={e.dutyMode}
               disabled={e.editDisabled}
-              onChange={(ev) => e.setDutyMode(ev.target.value as DutyMode)}
-            >
-              <option value="pulse">Impulsion</option>
-              <option value="holdPct">Maintien %</option>
-            </select>
+              options={[
+                { value: "pulse", label: "Impulsion" },
+                { value: "holdPct", label: "Maintien %" },
+              ]}
+              onChange={(v) => e.setDutyMode(v as DutyMode)}
+            />
           </label>
           <div className="v2-settings-row">
             <div className="v2-settings-row-label">

@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { Switch } from "../ui";
+import { Select } from "../ui/v2";
 import { ZoneMap } from "./ZoneMap";
 import type { ClickerEditor } from "./useClickerEditor";
 
@@ -11,24 +12,24 @@ export function ClickerZonePreview({ editor: e }: Props) {
     "--preview-h": e.screenGeom.height,
   } as CSSProperties;
 
+  const displayValue =
+    e.activeDisplayId ?? e.displays.find((d) => d.isPrimary)?.id ?? "";
+
   return (
     <div className="v2-clicker-zone-stage">
       <div className="v2-clicker-zone-toolbar v2-clicker-zone-toolbar--full">
         {e.displays.length > 0 ? (
-          <select
+          <Select
             className="v2-clicker-zone-select"
-            value={e.activeDisplayId ?? e.displays.find((d) => d.isPrimary)?.id ?? ""}
+            value={displayValue}
             disabled={e.editDisabled}
-            aria-label="Écran cible"
-            onChange={(ev) => void e.onSelectDisplay(ev.target.value)}
-          >
-            {e.displays.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.label}
-                {d.isPrimary ? " (principal)" : ""}
-              </option>
-            ))}
-          </select>
+            ariaLabel="Écran cible"
+            options={e.displays.map((d) => ({
+              value: d.id,
+              label: `${d.label}${d.isPrimary ? " (principal)" : ""}`,
+            }))}
+            onChange={(v) => void e.onSelectDisplay(v)}
+          />
         ) : (
           <span className="v2-clicker-hint-inline">
             {e.screenGeom.width}×{e.screenGeom.height}

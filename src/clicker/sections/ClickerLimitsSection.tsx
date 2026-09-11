@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Select } from "../../ui/v2";
 import type { ClickerEditor } from "../useClickerEditor";
 import {
   DEFAULT_PIXEL_CONDITION,
@@ -153,21 +154,16 @@ export function ClickerLimitsSection({ editor: e }: Props) {
           </p>
         </div>
         <div className="v2-settings-row-control v2-settings-row-control--full">
-          <select
+          <Select
             className="v2-select"
             disabled={e.editDisabled}
             value={e.onCompleteMacro ?? ""}
-            onChange={(ev) =>
-              e.setOnCompleteMacro(ev.target.value || null)
-            }
-          >
-            <option value="">Aucune</option>
-            {macros.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: "Aucune" },
+              ...macros.map((name) => ({ value: name, label: name })),
+            ]}
+            onChange={(v) => e.setOnCompleteMacro(v || null)}
+          />
         </div>
       </div>
 
