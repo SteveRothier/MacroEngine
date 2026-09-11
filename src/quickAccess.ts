@@ -1,4 +1,4 @@
-export type QuickKind = "clicker" | "macro";
+export type QuickKind = "clicker" | "macro" | "script";
 
 export type RecentEntry = {
   kind: QuickKind;

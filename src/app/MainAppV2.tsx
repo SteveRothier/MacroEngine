@@ -5,7 +5,8 @@ import { AutomationsTable } from "../automations/AutomationsTable";
 import { useAutomationsPageState } from "../automations/useAutomationsPageState";
 import { ClickerStudio } from "../clicker/ClickerStudio";
 import { MacroEditorView } from "../macros/graph/MacroEditorView";
-import { HomeHub } from "./HomeHub";
+import { ScriptEditorView, newScriptId } from "../scripts/ScriptEditorView";
+import type { ScriptDoc } from "../scripts/types";
 import {
   type EngineStatus,
   type HotkeyBindings,
@@ -15,10 +16,12 @@ import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
 import {
   AppShell,
+  CommandPalette,
   ToastProvider,
   useToast,
   WindowTitleBar,
   type BarContextAction,
+  type CommandItem,
   type DocumentTabItem,
   type StatusKind,
   type TabContextAction,
@@ -27,7 +30,7 @@ import { TitleBarProvider, useTitleBarContext } from "../ui/v2/TitleBarContext";
 import { ConfirmHost, confirmAction, PromptHost, promptAction } from "../ui";
 import { applyTheme, readStoredTheme, subscribeSystemTheme, type ThemeMode } from "../theme";
 import { stateLabelFr, sessionLabelFr } from "../ui/labels";
-import { pushRecent, loadLastStudio, saveLastStudio, clearLastStudio } from "./recent";
+import { loadRecent, pushRecent, saveLastStudio } from "./recent";
 import type { SettingsSection } from "./types";
 import type { AppSettings } from "../clicker/clickerTypes";
 import { DEFAULT_CLICKER } from "../clicker/clickerTypes";
@@ -38,6 +41,7 @@ import {
   closeDocTab,
   closeDocTabsToRight,
   closeOtherDocTabs,
+  docTabId,
   loadWorkspace,
   nextDocTabId,
   openDocTab,
@@ -48,7 +52,6 @@ import {
   reorderDocTabs,
   selectDocTab,
   selectHome,
-  selectLibrary,
   setTabDirty,
   setTabLabel,
   sortTabsForDisplay,
@@ -114,6 +117,7 @@ function MainAppV2Inner() {
   const [refreshKey, setRefreshKey] = useState(0);
   const { lines: journalLines, clear: clearJournal } = useEngineLog();
   const [journalOpen, setJournalOpen] = useState(readJournalOpen);
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const running = status.state === "running" || status.state === "paused";
   const activeDoc = activeDocTab(workspace);
@@ -196,8 +200,10 @@ function MainAppV2Inner() {
   const openDoc = useCallback((kind: DocTabKind, resourceId: string, label?: string) => {
     setWorkspace((ws) => {
       const next = openDocTab(ws, kind, resourceId, label ?? resourceId);
-      pushRecent({ id: resourceId, kind, label: label ?? resourceId });
-      saveLastStudio({ id: resourceId, kind });
+      if (kind === "macro" || kind === "clicker") {
+        pushRecent({ id: resourceId, kind, label: label ?? resourceId });
+        saveLastStudio({ id: resourceId, kind });
+      }
       return next;
     });
   }, []);
@@ -291,13 +297,26 @@ function MainAppV2Inner() {
               bumpRefresh();
               toast.success(`Macro dupliquée · ${copy.name}`);
               openDoc("macro", copy.name);
-            } else {
+            } else if (tab.kind === "clicker") {
               const copy = await invoke<{ name: string }>("duplicate_clicker_preset", {
                 name: tab.resourceId,
               });
               bumpRefresh();
               toast.success(`Preset dupliqué · ${copy.name}`);
               openDoc("clicker", copy.name);
+            } else {
+              const src = await invoke<ScriptDoc>("load_script_cmd", {
+                id: tab.resourceId,
+              });
+              const copy: ScriptDoc = {
+                ...src,
+                id: newScriptId(),
+                name: `${src.name} (copie)`,
+              };
+              await invoke("save_script_cmd", { doc: copy });
+              bumpRefresh();
+              toast.success(`Script dupliqué · ${copy.name}`);
+              openDoc("script", copy.id, copy.name);
             }
           } catch (e) {
             toast.error(launchErr(e, "Duplication impossible"));
@@ -314,11 +333,11 @@ function MainAppV2Inner() {
           }
           const nextName = await promptAction({
             title: "Renommer",
-            defaultValue: tab.resourceId,
+            defaultValue: tab.kind === "script" ? tab.label : tab.resourceId,
             confirmLabel: "Renommer",
             placeholder: "Nouveau nom",
           });
-          if (!nextName || nextName === tab.resourceId) return;
+          if (!nextName || nextName === tab.resourceId || nextName === tab.label) return;
           try {
             if (tab.kind === "macro") {
               const doc = await invoke<{ name: string }>("rename_saved_macro", {
@@ -328,7 +347,7 @@ function MainAppV2Inner() {
               bumpRefresh();
               setWorkspace((ws) => renameDocTab(ws, tabId, doc.name, doc.name));
               toast.success(`Macro renommée · ${doc.name}`);
-            } else {
+            } else if (tab.kind === "clicker") {
               const preset = await invoke<{ name: string }>("rename_clicker_preset", {
                 from: tab.resourceId,
                 to: nextName,
@@ -336,6 +355,15 @@ function MainAppV2Inner() {
               bumpRefresh();
               setWorkspace((ws) => renameDocTab(ws, tabId, preset.name, preset.name));
               toast.success(`Preset renommé · ${preset.name}`);
+            } else {
+              const src = await invoke<ScriptDoc>("load_script_cmd", {
+                id: tab.resourceId,
+              });
+              const updated = { ...src, name: nextName };
+              await invoke("save_script_cmd", { doc: updated });
+              bumpRefresh();
+              setWorkspace((ws) => setTabLabel(ws, tabId, nextName));
+              toast.success(`Script renommé · ${nextName}`);
             }
           } catch (e) {
             toast.error(launchErr(e, "Renommage impossible"));
@@ -344,6 +372,10 @@ function MainAppV2Inner() {
         }
         case "reveal":
           try {
+            if (tab.kind === "script") {
+              toast.info("Les scripts sont dans le dossier config / scripts");
+              return;
+            }
             await invoke("reveal_library_entry", {
               kind: tab.kind,
               name: tab.resourceId,
@@ -374,37 +406,6 @@ function MainAppV2Inner() {
     },
     [activeDocTabId],
   );
-
-  useEffect(() => {
-    const last = loadLastStudio();
-    if (!last) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        if (last.kind === "macro") {
-          const macros = await invoke<{ name: string }[]>("list_macro_library");
-          if (cancelled) return;
-          if (macros.some((m) => m.name === last.id)) {
-            openDoc("macro", last.id);
-            return;
-          }
-        } else {
-          const clickers = await invoke<{ name: string }[]>("list_clicker_library");
-          if (cancelled) return;
-          if (clickers.some((c) => c.name === last.id)) {
-            openDoc("clicker", last.id);
-            return;
-          }
-        }
-        clearLastStudio();
-      } catch {
-        /* keep home */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [openDoc]);
 
   const activeDocId = activeDoc?.id;
   const activeDocLabel = activeDoc?.label;
@@ -471,35 +472,28 @@ function MainAppV2Inner() {
     }
   }, [bumpRefresh, openDoc, toast]);
 
-  const onOpenClickerFromHub = useCallback(async () => {
-    const last = loadLastStudio();
-    if (last?.kind === "clicker") {
-      try {
-        const clickers = await invoke<{ name: string }[]>("list_clicker_library");
-        if (clickers.some((c) => c.name === last.id)) {
-          openDoc("clicker", last.id);
-          return;
-        }
-      } catch {
-        /* fall through */
-      }
-    }
-    const openClickerTab = workspace.tabs.find((t) => t.kind === "clicker");
-    if (openClickerTab) {
-      openDoc("clicker", openClickerTab.resourceId);
-      return;
-    }
+  const onCreateScript = useCallback(async () => {
     try {
-      const clickers = await invoke<{ name: string }[]>("list_clicker_library");
-      if (clickers[0]) {
-        openDoc("clicker", clickers[0].name);
-        return;
-      }
-    } catch {
-      /* create below */
+      const id = newScriptId();
+      const doc: ScriptDoc = {
+        id,
+        name: "Nouveau script",
+        source:
+          "//@param label string world\ncaster.log('hello ' + caster.get('label'));\n",
+        allowNetwork: false,
+        allowClipboard: false,
+        allowFs: false,
+        allowMacroControl: false,
+        paramValues: {},
+      };
+      await invoke("save_script_cmd", { doc });
+      bumpRefresh();
+      toast.success("Script créé");
+      openDoc("script", id, doc.name);
+    } catch (e) {
+      toast.error(launchErr(e, "Impossible de créer le script"));
     }
-    await onCreateClicker();
-  }, [onCreateClicker, openDoc, workspace.tabs]);
+  }, [bumpRefresh, openDoc, toast]);
 
   const onBarContextAction = useCallback(
     async (action: BarContextAction) => {
@@ -510,18 +504,27 @@ function MainAppV2Inner() {
         case "createClicker":
           await onCreateClicker();
           return;
+        case "createScript":
+          await onCreateScript();
+          return;
         case "closeAll":
           await applyBatchTabClose(closeAllDocTabs);
           return;
       }
     },
-    [applyBatchTabClose, onCreateClicker, onCreateMacro],
+    [applyBatchTabClose, onCreateClicker, onCreateMacro, onCreateScript],
   );
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
+
+      if (e.key === "k" && !e.shiftKey) {
+        e.preventDefault();
+        setPaletteOpen((o) => !o);
+        return;
+      }
 
       if (e.key === "w" && !e.shiftKey) {
         if (workspace.shellView.type !== "doc") return;
@@ -552,6 +555,91 @@ function MainAppV2Inner() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onCreateMacro, onTabClose, workspace]);
+
+  const commandItems = useMemo((): CommandItem[] => {
+    const nav: CommandItem[] = [
+      {
+        id: "nav-home",
+        label: "Accueil",
+        hint: "Liste des automations",
+        group: "Navigation",
+        onSelect: () => goHome(),
+      },
+      {
+        id: "nav-settings",
+        label: "Paramètres",
+        hint: "Ctrl+,",
+        group: "Navigation",
+        onSelect: () => goSettings("general"),
+      },
+      {
+        id: "nav-journal",
+        label: journalOpen ? "Masquer le journal" : "Afficher le journal",
+        group: "Navigation",
+        onSelect: () => {
+          setJournalOpen((o) => {
+            const next = !o;
+            void persistShell({ journalOpen: next });
+            return next;
+          });
+        },
+      },
+    ];
+
+    const create: CommandItem[] = [
+      {
+        id: "create-macro",
+        label: "Nouvelle macro",
+        hint: "Ctrl+T",
+        group: "Créer",
+        onSelect: () => void onCreateMacro(),
+      },
+      {
+        id: "create-clicker",
+        label: "Nouveau clicker",
+        group: "Créer",
+        onSelect: () => void onCreateClicker(),
+      },
+      {
+        id: "create-script",
+        label: "Nouveau script",
+        group: "Créer",
+        onSelect: () => void onCreateScript(),
+      },
+    ];
+
+    const tabs: CommandItem[] = sortTabsForDisplay(workspace.tabs).map((t) => ({
+      id: `tab-${t.id}`,
+      label: t.label,
+      hint: t.kind,
+      group: "Onglets ouverts",
+      onSelect: () => setWorkspace((ws) => selectDocTab(ws, t.id)),
+    }));
+
+    const session: CommandItem[] = running
+      ? [
+          {
+            id: "stop-session",
+            label: "Arrêter la session",
+            group: "Session",
+            onSelect: () => onEmergencyStop(),
+          },
+        ]
+      : [];
+
+    return [...nav, ...create, ...tabs, ...session];
+  }, [
+    goHome,
+    goSettings,
+    journalOpen,
+    onCreateClicker,
+    onCreateMacro,
+    onCreateScript,
+    onEmergencyStop,
+    persistShell,
+    running,
+    workspace.tabs,
+  ]);
 
   const sessionPill = useMemo((): { kind: StatusKind; label: string } | null => {
     if (!running && status.state === "idle") return null;
@@ -615,8 +703,27 @@ function MainAppV2Inner() {
             macroId={activeDoc.resourceId}
             onBack={goHome}
             onDirtyChange={onActiveDocDirtyChange}
+            onRenamed={(_from, to) => {
+              if (!activeDocTabId) return;
+              setWorkspace((ws) => renameDocTab(ws, activeDocTabId, to, to));
+              bumpRefresh();
+            }}
             engineState={status.state}
             onStatus={setStatus}
+            onOpenScript={(id, label) => openDoc("script", id, label ?? id)}
+          />
+        );
+      }
+      if (activeDoc.kind === "script") {
+        return (
+          <ScriptEditorView
+            scriptId={activeDoc.resourceId}
+            onBack={goHome}
+            onDirtyChange={onActiveDocDirtyChange}
+            onLabelChange={(name) => {
+              if (!activeDocTabId) return;
+              setWorkspace((ws) => setTabLabel(ws, activeDocTabId, name));
+            }}
           />
         );
       }
@@ -636,16 +743,20 @@ function MainAppV2Inner() {
       );
     }
 
-    if (workspace.shellView.type === "library") {
+    if (
+      workspace.shellView.type === "home" ||
+      workspace.shellView.type === "library"
+    ) {
       return (
         <AutomationsTable
           onNavigate={(r) => {
             if (r.name === "automation") {
-              openDoc(r.kind, r.id);
+              openDoc(r.kind, r.id, r.label ?? r.id);
             }
           }}
           onCreateMacro={() => void onCreateMacro()}
           onCreateClicker={() => void onCreateClicker()}
+          onCreateScript={() => void onCreateScript()}
           onLaunchClicker={(n) => void onLaunchClicker(n)}
           onLaunchMacro={(n) => void onLaunchMacro(n)}
           dirtyMacroId={
@@ -654,34 +765,37 @@ function MainAppV2Inner() {
           dirtyClickerId={
             workspace.tabs.find((t) => t.kind === "clicker" && t.dirty)?.resourceId ?? null
           }
+          dirtyScriptId={
+            workspace.tabs.find((t) => t.kind === "script" && t.dirty)?.resourceId ?? null
+          }
           refreshKey={refreshKey}
           query={automationsPage.query}
           onQueryChange={automationsPage.setQuery}
           filter={automationsPage.filter}
+          folderKey={automationsPage.folderKey}
+          onFolderKeyChange={automationsPage.setFolderKey}
           display={automationsPage.display}
           onDisplayChange={automationsPage.setDisplay}
           onFilterChange={automationsPage.setFilter}
           onRefresh={bumpRefresh}
+          onResourceRenamed={(kind, fromId, toId, label) => {
+            const tabId = docTabId(kind, fromId);
+            setWorkspace((ws) => {
+              if (!ws.tabs.some((t) => t.id === tabId)) return ws;
+              if (kind === "script") return setTabLabel(ws, tabId, label);
+              return renameDocTab(ws, tabId, toId, label);
+            });
+          }}
+          runningScriptName={
+            running && status.sessionKind === "script"
+              ? status.sessionName ?? null
+              : null
+          }
         />
       );
     }
 
-    const last = loadLastStudio();
-    const presetLabel =
-      status.sessionKind === "clicker" && status.sessionName
-        ? status.sessionName
-        : last?.kind === "clicker"
-          ? last.id
-          : null;
-
-    return (
-      <HomeHub
-        status={status}
-        presetLabel={presetLabel}
-        onOpenLibrary={() => setWorkspace((ws) => selectLibrary(ws))}
-        onOpenClicker={() => void onOpenClickerFromHub()}
-      />
-    );
+    return null;
   })();
 
   return (
@@ -695,6 +809,7 @@ function MainAppV2Inner() {
             onTabClose={(id) => void onTabClose(id)}
             onCreateMacro={() => void onCreateMacro()}
             onCreateClicker={() => void onCreateClicker()}
+            onCreateScript={() => void onCreateScript()}
             onTabContextAction={(tabId, action) => void onTabContextAction(tabId, action)}
             onBarContextAction={(action) => void onBarContextAction(action)}
             onTabReorder={onTabReorder}
@@ -714,6 +829,11 @@ function MainAppV2Inner() {
             sessionStatus={sessionPill}
             showStop={running}
             onStop={onEmergencyStop}
+            recentItems={loadRecent().map((r) => ({
+              id: `${r.kind}:${r.id}`,
+              label: r.label,
+              onSelect: () => openDoc(r.kind, r.id, r.label),
+            }))}
           />
         }
       >
@@ -730,6 +850,11 @@ function MainAppV2Inner() {
       />
       <ConfirmHost />
       <PromptHost />
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        items={commandItems}
+      />
     </>
   );
 }

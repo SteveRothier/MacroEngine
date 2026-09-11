@@ -1,7 +1,12 @@
 import type { AutomationRow, AutomationStatus } from "./types";
 
 export function kindTooltip(row: AutomationRow): string {
-  const kind = row.kind === "macro" ? "Macro" : "Clicker preset";
+  const kind =
+    row.kind === "macro"
+      ? "Macro"
+      : row.kind === "clicker"
+        ? "Clicker preset"
+        : "Script";
   if (row.folderLabel && row.folderLabel !== "—") {
     return `${kind} · Dossier : ${row.folderLabel}`;
   }
@@ -58,4 +63,25 @@ export function filterPillTooltip(
     case "scripts":
       return "Scripts JavaScript réutilisables";
   }
+}
+
+/** Secondary line under the name (Linear-style) — never repeats the type badge. */
+export function rowSubtitle(
+  row: AutomationRow,
+  opts?: { running?: boolean },
+): string | null {
+  if (opts?.running) return "En cours";
+  if (row.kind === "script") {
+    const n = row.permLabels?.length ?? 0;
+    if (n > 0) return `${n} accès`;
+    if (row.lastRunLabel !== "—") return row.lastRunLabel;
+    return null;
+  }
+  const parts: string[] = [];
+  if (row.meta?.trim()) parts.push(row.meta.trim());
+  if (row.folderLabel && row.folderLabel !== "—") parts.push(row.folderLabel);
+  if (parts.length > 0) return parts.join(" · ");
+  if (row.lastRunLabel !== "—") return row.lastRunLabel;
+  if (row.triggerLabel && row.triggerLabel !== "Manuel") return row.triggerLabel;
+  return null;
 }

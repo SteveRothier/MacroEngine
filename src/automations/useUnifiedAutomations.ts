@@ -7,7 +7,15 @@ import {
 } from "../macros/types";
 import type { LibraryFolder, LibraryIndexDto } from "../library/types";
 import type { QuickAccess } from "../quickAccess";
-import type { AutomationFilter, AutomationRow } from "./types";
+import type { ScriptDoc } from "../scripts/types";
+import { activePermissionLabels } from "../scripts/ScriptPermissionsMenu";
+import type {
+  AutomationFilter,
+  AutomationFolderOption,
+  AutomationRow,
+  FilterCounts,
+} from "./types";
+import { folderOptionKey } from "./types";
 import { lastRunLabelMap, rowKey } from "./relativeTime";
 
 type MacroSummary = {
@@ -28,6 +36,13 @@ type ClickerSummary = {
 function folderName(folders: LibraryFolder[], id: string | null): string {
   if (!id) return "—";
   return folders.find((f) => f.id === id)?.name ?? "—";
+}
+
+function toFolderOptions(
+  kind: "macro" | "clicker",
+  folders: LibraryFolder[],
+): AutomationFolderOption[] {
+  return folders.map((f) => ({ id: f.id, name: f.name, kind }));
 }
 
 function macroTriggerLabel(m: MacroSummary): string {
@@ -52,52 +67,59 @@ function clickerTriggerLabel(hotkeys: HotkeyBindings): string {
 export function useUnifiedAutomations(options: {
   dirtyMacroId?: string | null;
   dirtyClickerId?: string | null;
+  dirtyScriptId?: string | null;
   refreshKey?: number;
   query?: string;
   filter?: AutomationFilter;
+  folderKey?: string | null;
   setQuery?: (q: string) => void;
 }) {
   const [rows, setRows] = useState<AutomationRow[]>([]);
   const [recentOrder, setRecentOrder] = useState<string[]>([]);
-  const [folders, setFolders] = useState<LibraryFolder[]>([]);
+  const [folders, setFolders] = useState<AutomationFolderOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [internalQuery, setInternalQuery] = useState("");
   const query = options.query ?? internalQuery;
   const filter = options.filter ?? "all";
+  const folderKey = options.folderKey ?? null;
   const setQuery = options.setQuery ?? setInternalQuery;
   const [hotkeys, setHotkeys] = useState<HotkeyBindings | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [macroIndex, clickerIndex, macros, clickers, qa, hk] = await Promise.all([
-        invoke<LibraryIndexDto>("list_library_items_cmd", {
-          kind: "macro",
-          folderId: null,
-          query: null,
-          includeTrash: false,
-          favoritesOnly: false,
-          favoriteIds: [],
-        }),
-        invoke<LibraryIndexDto>("list_library_items_cmd", {
-          kind: "clicker",
-          folderId: null,
-          query: null,
-          includeTrash: false,
-          favoritesOnly: false,
-          favoriteIds: [],
-        }),
-        invoke<MacroSummary[]>("list_macro_library"),
-        invoke<ClickerSummary[]>("list_clicker_library"),
-        invoke<QuickAccess>("get_quick_access"),
-        invoke<HotkeyBindings>("get_hotkey_bindings"),
-      ]);
+      const [macroIndex, clickerIndex, macros, clickers, scripts, qa, hk] =
+        await Promise.all([
+          invoke<LibraryIndexDto>("list_library_items_cmd", {
+            kind: "macro",
+            folderId: null,
+            query: null,
+            includeTrash: false,
+            favoritesOnly: false,
+            favoriteIds: [],
+          }),
+          invoke<LibraryIndexDto>("list_library_items_cmd", {
+            kind: "clicker",
+            folderId: null,
+            query: null,
+            includeTrash: false,
+            favoritesOnly: false,
+            favoriteIds: [],
+          }),
+          invoke<MacroSummary[]>("list_macro_library"),
+          invoke<ClickerSummary[]>("list_clicker_library"),
+          invoke<ScriptDoc[]>("list_scripts_cmd").catch(() => [] as ScriptDoc[]),
+          invoke<QuickAccess>("get_quick_access"),
+          invoke<HotkeyBindings>("get_hotkey_bindings"),
+        ]);
       setHotkeys(hk);
       const favMacros = qa.favorites.macros ?? [];
       const favClickers = qa.favorites.clickerPresets ?? [];
       setRecentOrder(qa.recent.map((r) => rowKey(r.kind, r.id)));
       const runLabels = lastRunLabelMap(qa.recent);
-      const allFolders = [...macroIndex.folders, ...clickerIndex.folders];
-      setFolders(allFolders);
+      setFolders([
+        ...toFolderOptions("macro", macroIndex.folders),
+        ...toFolderOptions("clicker", clickerIndex.folders),
+      ]);
 
       const macroMap = new Map(macros.map((m) => [m.name, m]));
       const clickerMap = new Map(clickers.map((c) => [c.name, c]));
@@ -150,6 +172,25 @@ export function useUnifiedAutomations(options: {
         });
       }
 
+      for (const s of scripts) {
+        const permLabels = activePermissionLabels(s);
+        next.push({
+          id: s.id,
+          name: s.name,
+          kind: "script",
+          triggerLabel: "Script",
+          folderLabel: "—",
+          folderId: null,
+          status: options.dirtyScriptId === s.id ? "attention" : "healthy",
+          lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? "—",
+          favorite: false,
+          locked: false,
+          dirty: options.dirtyScriptId === s.id,
+          meta: undefined,
+          permLabels,
+        });
+      }
+
       setRows(next);
     } catch {
       setRows([]);
@@ -157,11 +198,21 @@ export function useUnifiedAutomations(options: {
     } finally {
       setLoading(false);
     }
-  }, [options.dirtyMacroId, options.dirtyClickerId]);
+  }, [options.dirtyMacroId, options.dirtyClickerId, options.dirtyScriptId]);
 
   useEffect(() => {
     void refresh();
   }, [refresh, options.refreshKey]);
+
+  const counts: FilterCounts = useMemo(() => {
+    const recentSet = new Set(recentOrder);
+    return {
+      all: rows.length,
+      favorites: rows.filter((r) => r.favorite).length,
+      recent: rows.filter((r) => recentSet.has(rowKey(r.kind, r.id))).length,
+      scripts: rows.filter((r) => r.kind === "script").length,
+    };
+  }, [rows, recentOrder]);
 
   const filtered = useMemo(() => {
     let list = rows;
@@ -176,6 +227,14 @@ export function useUnifiedAutomations(options: {
             (order.get(rowKey(a.kind, a.id)) ?? 0) -
             (order.get(rowKey(b.kind, b.id)) ?? 0),
         );
+    } else if (filter === "scripts") {
+      list = list.filter((r) => r.kind === "script");
+    }
+    if (folderKey) {
+      list = list.filter((r) => {
+        if (r.kind === "script" || !r.folderId) return false;
+        return folderOptionKey({ kind: r.kind, id: r.folderId }) === folderKey;
+      });
     }
     const q = query.trim().toLowerCase();
     if (!q) return list;
@@ -183,14 +242,16 @@ export function useUnifiedAutomations(options: {
       (r) =>
         r.name.toLowerCase().includes(q) ||
         r.triggerLabel.toLowerCase().includes(q) ||
-        r.folderLabel.toLowerCase().includes(q),
+        r.folderLabel.toLowerCase().includes(q) ||
+        (r.meta?.toLowerCase().includes(q) ?? false),
     );
-  }, [rows, query, filter, recentOrder]);
+  }, [rows, query, filter, folderKey, recentOrder]);
 
   return {
     rows: filtered,
     allRows: rows,
     folders,
+    counts,
     loading,
     query,
     filter,

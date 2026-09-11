@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Trash2, X } from "lucide-react";
+import { EmptyState } from "../ui/v2";
 
 type Filter = "all" | "macro" | "clicker" | "system";
 
@@ -65,7 +66,7 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
       </div>
       <div className="v2-journal-body">
         {filtered.length === 0 ? (
-          <p className="v2-journal-empty">Aucune entrée</p>
+          <EmptyState title="Aucune entrée" lead="Les logs d’exécution apparaîtront ici." />
         ) : (
           filtered.map((line, i) => (
             <div

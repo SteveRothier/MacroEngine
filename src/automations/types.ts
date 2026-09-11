@@ -18,9 +18,14 @@ export type AutomationRow = {
   locked: boolean;
   dirty: boolean;
   meta?: string;
+  /** Active script permissions (Accueil badge). */
+  permLabels?: string[];
 };
 
-export function statusToPill(status: AutomationStatus): { kind: StatusKind; label: string } {
+export function statusToPill(status: AutomationStatus): {
+  kind: StatusKind;
+  label: string;
+} {
   switch (status) {
     case "healthy":
       return { kind: "healthy", label: "OK" };
@@ -35,10 +40,34 @@ export function statusToPill(status: AutomationStatus): { kind: StatusKind; labe
 
 export type DisplayOptions = {
   sortBy: "name" | "type" | "status";
+  sortDir: "asc" | "desc";
 };
 
 export type AutomationFilter = "all" | "favorites" | "recent" | "scripts";
 
+/** Folder option for Accueil filter / bulk move (`kind` scopes library index). */
+export type AutomationFolderOption = {
+  id: string;
+  name: string;
+  kind: "macro" | "clicker";
+};
+
+export function folderOptionKey(
+  f: Pick<AutomationFolderOption, "kind" | "id">,
+): string {
+  return `${f.kind}:${f.id}`;
+}
+
+export type FilterCounts = {
+  all: number;
+  favorites: number;
+  recent: number;
+  scripts: number;
+};
+
 export const DEFAULT_DISPLAY: DisplayOptions = {
   sortBy: "name",
+  sortDir: "asc",
 };
+
+export const COLLAPSED_SECTIONS_KEY = "caster.accueil.collapsedSections";

@@ -10,7 +10,7 @@ import {
   type ProcessFilter,
 } from "../clicker/clickerTypes";
 import { useClickerSettingsApi } from "../clicker/useClickerSettings";
-import { InspectorSection, useToast } from "../ui/v2";
+import { InspectorSection, Select, useToast } from "../ui/v2";
 import { confirmChoice } from "../ui";
 import type { HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
@@ -575,45 +575,44 @@ export function SettingsView({
                     </p>
                   </div>
                   <div className="v2-settings-row-control">
-                    <select
+                    <Select
+                      className="v2-select"
                       value={processFilter.mode}
                       disabled={running || !processFilter.enabled}
-                      onChange={(e) =>
+                      options={[
+                        { value: "deny", label: "Bloquer la liste" },
+                        { value: "allow", label: "Autoriser seulement" },
+                      ]}
+                      onChange={(v) =>
                         persistProcess({
                           ...processFilter,
-                          mode: e.target.value as ProcessFilter["mode"],
+                          mode: v as ProcessFilter["mode"],
                         })
                       }
-                    >
-                      <option value="deny">Bloquer la liste</option>
-                      <option value="allow">Autoriser seulement</option>
-                    </select>
+                    />
                   </div>
                 </div>
                 {liveExes.length > 0 ? (
                   <label className="v2-field">
                     <span>Ajouter depuis processus visibles</span>
-                    <select
+                    <Select
+                      className="v2-select"
                       value=""
                       disabled={running || !processFilter.enabled}
-                      onChange={(e) => {
-                        const name = e.target.value;
+                      options={[
+                        { value: "", label: "Choisir…" },
+                        ...liveExes
+                          .filter((x) => !processFilter.names.includes(x))
+                          .map((x) => ({ value: x, label: x })),
+                      ]}
+                      onChange={(name) => {
                         if (!name || processFilter.names.includes(name)) return;
                         persistProcess({
                           ...processFilter,
                           names: [...processFilter.names, name],
                         });
                       }}
-                    >
-                      <option value="">Choisir…</option>
-                      {liveExes
-                        .filter((x) => !processFilter.names.includes(x))
-                        .map((x) => (
-                          <option key={x} value={x}>
-                            {x}
-                          </option>
-                        ))}
-                    </select>
+                    />
                   </label>
                 ) : null}
                 <label className="v2-field">
@@ -686,22 +685,23 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row-control v2-settings-row-control--grow">
                     <div className="v2-field-row">
-                      <select
+                      <Select
+                        className="v2-select"
                         value={displayId ?? ""}
-                        onChange={(e) => {
-                          const id = e.target.value || null;
+                        options={[
+                          { value: "", label: "Principal (défaut)" },
+                          ...displays.map((d) => ({
+                            value: d.id,
+                            label: displayOptionLabel(d),
+                          })),
+                        ]}
+                        onChange={(v) => {
+                          const id = v || null;
                           setDisplayId(id);
                           void invoke("set_active_display", { displayId: id });
                           void persist({ displayId: id });
                         }}
-                      >
-                        <option value="">Principal (défaut)</option>
-                        {displays.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {displayOptionLabel(d)}
-                          </option>
-                        ))}
-                      </select>
+                      />
                       <button
                         type="button"
                         className="v2-btn v2-btn-ghost"

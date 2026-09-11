@@ -18,8 +18,13 @@ export function useEngineLog() {
 
   useEffect(() => {
     let un: (() => void) | undefined;
-    void listen<string>("engine://log", (e) => {
-      if (typeof e.payload === "string") push(e.payload);
+    void listen<{ message?: string | null } | string>("engine://log", (e) => {
+      const payload = e.payload;
+      const msg =
+        typeof payload === "string"
+          ? payload
+          : payload?.message?.trim() ?? "";
+      if (msg) push(msg);
     }).then((fn) => {
       un = fn;
     });
