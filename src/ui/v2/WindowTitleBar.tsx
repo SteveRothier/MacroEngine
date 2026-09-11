@@ -9,6 +9,7 @@ import {
   type TabContextAction,
 } from "./DocumentTabBar";
 import { ContextMenu } from "./ContextMenu";
+import { RecentMenu, type RecentMenuItem } from "./RecentMenu";
 import { StatusPill, type StatusKind } from "./StatusPill";
 
 type Props = {
@@ -18,6 +19,7 @@ type Props = {
   onTabClose?: (id: string) => void;
   onCreateMacro?: () => void;
   onCreateClicker?: () => void;
+  onCreateScript?: () => void;
   onTabContextAction?: (tabId: string, action: TabContextAction) => void;
   onBarContextAction?: (action: BarContextAction) => void;
   onTabReorder?: (fromTabId: string, insertBeforeTabId: string | null) => void;
@@ -29,6 +31,7 @@ type Props = {
   sessionStatus?: { kind: StatusKind; label: string } | null;
   showStop?: boolean;
   onStop?: () => void;
+  recentItems?: RecentMenuItem[];
 };
 
 export function WindowTitleBar({
@@ -38,6 +41,7 @@ export function WindowTitleBar({
   onTabClose,
   onCreateMacro,
   onCreateClicker,
+  onCreateScript,
   onTabContextAction,
   onBarContextAction,
   onTabReorder,
@@ -49,6 +53,7 @@ export function WindowTitleBar({
   sessionStatus,
   showStop,
   onStop,
+  recentItems,
 }: Props) {
   const [dragMenu, setDragMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -68,6 +73,7 @@ export function WindowTitleBar({
           onClose={onTabClose}
           onCreateMacro={onCreateMacro}
           onCreateClicker={onCreateClicker}
+          onCreateScript={onCreateScript}
           onTabContextAction={onTabContextAction}
           onBarContextAction={onBarContextAction}
           onTabReorder={onTabReorder}
@@ -80,6 +86,7 @@ export function WindowTitleBar({
         onContextMenu={openDragMenu}
       />
       <div className="v2-titlebar-actions">
+        {recentItems ? <RecentMenu items={recentItems} /> : null}
         {onSettingsClick ? (
           <button
             type="button"
@@ -146,7 +153,10 @@ export function WindowTitleBar({
         onSelect={(id) => {
           if (
             onBarContextAction &&
-            (id === "createMacro" || id === "createClicker" || id === "closeAll")
+            (id === "createMacro" ||
+              id === "createClicker" ||
+              id === "createScript" ||
+              id === "closeAll")
           ) {
             onBarContextAction(id);
           }

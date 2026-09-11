@@ -9,6 +9,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  Code2,
   Copy,
   FolderOpen,
   ListMinus,
@@ -32,7 +33,7 @@ import { CasterLogo } from "./CasterLogo";
 export type DocumentTabItem = {
   id: string;
   label: string;
-  kind: "home" | "macro" | "clicker";
+  kind: "home" | "macro" | "clicker" | "script";
   dirty?: boolean;
   closable?: boolean;
   pinned?: boolean;
@@ -48,7 +49,11 @@ export type TabContextAction =
   | "rename"
   | "reveal";
 
-export type BarContextAction = "createMacro" | "createClicker" | "closeAll";
+export type BarContextAction =
+  | "createMacro"
+  | "createClicker"
+  | "createScript"
+  | "closeAll";
 
 type Props = {
   tabs: DocumentTabItem[];
@@ -57,6 +62,7 @@ type Props = {
   onClose?: (id: string) => void;
   onCreateMacro?: () => void;
   onCreateClicker?: () => void;
+  onCreateScript?: () => void;
   onTabContextAction?: (tabId: string, action: TabContextAction) => void;
   onBarContextAction?: (action: BarContextAction) => void;
   onTabReorder?: (fromTabId: string, insertBeforeTabId: string | null) => void;
@@ -66,6 +72,7 @@ type Props = {
 function TabKindIcon({ kind }: { kind: DocumentTabItem["kind"] }) {
   if (kind === "home") return <CasterLogo size={14} variant="glyph" />;
   if (kind === "macro") return <Workflow size={14} aria-hidden />;
+  if (kind === "script") return <Code2 size={14} aria-hidden />;
   return <MousePointer2 size={14} aria-hidden />;
 }
 
@@ -115,6 +122,11 @@ const HOME_CONTEXT_ITEMS: ContextMenuItem[] = [
     label: "Nouveau preset clicker",
     icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
   },
+  {
+    id: "createScript",
+    label: "Nouveau script",
+    icon: <Code2 size={MENU_ICON} aria-hidden />,
+  },
 ];
 
 function docTabContextItems(tab: DocumentTabItem): ContextMenuItem[] {
@@ -162,6 +174,11 @@ const barContextItems: ContextMenuItem[] = [
     label: "Nouveau preset clicker",
     icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
   },
+  {
+    id: "createScript",
+    label: "Nouveau script",
+    icon: <Code2 size={MENU_ICON} aria-hidden />,
+  },
   { id: "sep1", label: "", separator: true },
   {
     id: "closeAll",
@@ -183,6 +200,11 @@ const CREATE_MENU_ITEMS: ContextMenuItem[] = [
     label: "Preset clicker",
     icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
   },
+  {
+    id: "script",
+    label: "Script",
+    icon: <Code2 size={MENU_ICON} aria-hidden />,
+  },
 ];
 
 const TAB_CTX_ACTIONS = new Set<string>([
@@ -203,6 +225,7 @@ export function DocumentTabBar({
   onClose,
   onCreateMacro,
   onCreateClicker,
+  onCreateScript,
   onTabContextAction,
   onBarContextAction,
   onTabReorder,
@@ -345,6 +368,7 @@ export function DocumentTabBar({
     if (menu.kind === "home") {
       if (id === "createMacro") onCreateMacro?.();
       if (id === "createClicker") onCreateClicker?.();
+      if (id === "createScript") onCreateScript?.();
       return;
     }
     if (menu.kind === "tab" && menu.tabId && onTabContextAction) {
@@ -354,7 +378,12 @@ export function DocumentTabBar({
       return;
     }
     if (menu.kind === "bar" && onBarContextAction) {
-      if (id === "createMacro" || id === "createClicker" || id === "closeAll") {
+      if (
+        id === "createMacro" ||
+        id === "createClicker" ||
+        id === "createScript" ||
+        id === "closeAll"
+      ) {
         onBarContextAction(id);
       }
     }
@@ -363,6 +392,7 @@ export function DocumentTabBar({
   const onCreateMenuSelect = (id: string) => {
     if (id === "macro") onCreateMacro?.();
     if (id === "clicker") onCreateClicker?.();
+    if (id === "script") onCreateScript?.();
   };
 
   const ghost = dragUi.ghost;
@@ -458,6 +488,7 @@ export function DocumentTabBar({
           tab.kind === "home" ? "v2-doc-tab--home" : "",
           tab.kind === "macro" ? "v2-doc-tab--macro" : "",
           tab.kind === "clicker" ? "v2-doc-tab--clicker" : "",
+          tab.kind === "script" ? "v2-doc-tab--script" : "",
           tab.pinned ? "v2-doc-tab--pinned" : "",
           compact ? "v2-doc-tab--compact" : "",
           isDragSource ? "v2-doc-tab--drag-source" : "",
@@ -550,6 +581,7 @@ export function DocumentTabBar({
                 "v2-doc-tab-ghost",
                 ghost.tab.kind === "macro" ? "v2-doc-tab--macro" : "",
                 ghost.tab.kind === "clicker" ? "v2-doc-tab--clicker" : "",
+                ghost.tab.kind === "script" ? "v2-doc-tab--script" : "",
                 ghost.tab.pinned ? "v2-doc-tab--pinned" : "",
                 ghostCompact ? "v2-doc-tab--compact" : "",
                 ghostActive ? "active" : "",

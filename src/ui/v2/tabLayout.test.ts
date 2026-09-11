@@ -8,14 +8,27 @@ describe("tabLayout", () => {
     expect(clampTabWidth(100)).toBe(100);
   });
 
-  it("computeTargetTabWidth divides available strip space", () => {
+  it("computeTargetTabWidth divides available strip space up to max", () => {
     const scroll = {
-      clientWidth: 400,
+      clientWidth: 900,
+    } as HTMLElement;
+    const addBtn = { offsetWidth: 36 } as HTMLElement;
+    const target = computeTargetTabWidth(scroll, addBtn, 2);
+    expect(target).toBe(TAB_LAYOUT.MAX_W);
+  });
+
+  it("computeTargetTabWidth shrinks when strip is crowded", () => {
+    const scroll = {
+      clientWidth: 200,
     } as HTMLElement;
     const addBtn = { offsetWidth: 36 } as HTMLElement;
     const target = computeTargetTabWidth(scroll, addBtn, 4);
     const gaps = 4 * TAB_LAYOUT.STRIP_GAP_PX;
-    expect(target).toBe(Math.floor((400 - 36 - gaps) / 4));
+    const chrome = 36 + TAB_LAYOUT.DRAG_FILL_W;
+    expect(target).toBe(
+      Math.max(TAB_LAYOUT.MIN_W, Math.floor((200 - chrome - gaps) / 4)),
+    );
+    expect(target).toBeLessThan(TAB_LAYOUT.MAX_W);
   });
 
   it("computeTargetTabWidth returns max when empty", () => {

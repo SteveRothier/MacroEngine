@@ -1,14 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { MenuItemsList, type MenuItemDef } from "./MenuItemsList";
 
-export type ContextMenuItem = {
-  id: string;
-  label: string;
-  icon?: ReactNode;
-  danger?: boolean;
-  disabled?: boolean;
-  separator?: boolean;
-};
+export type ContextMenuItem = MenuItemDef;
 
 type Props = {
   open: boolean;
@@ -73,7 +67,6 @@ export function ContextMenu({
     };
     const id = window.setTimeout(() => {
       document.addEventListener("mousedown", onDoc);
-      document.addEventListener("keydown", onKey);
     }, 0);
     return () => {
       window.clearTimeout(id);
@@ -93,32 +86,14 @@ export function ContextMenu({
       style={{ left: x, top: y, visibility: "hidden" }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {items.map((item) =>
-        item.separator ? (
-          <div key={item.id} className="v2-menu-separator" role="separator" />
-        ) : (
-          <button
-            key={item.id}
-            type="button"
-            role="menuitem"
-            className={[
-              "v2-menu-item",
-              item.danger ? "v2-menu-item--danger" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            disabled={item.disabled}
-            onClick={() => {
-              if (item.disabled) return;
-              onSelect(item.id);
-              onClose();
-            }}
-          >
-            {item.icon ? <span className="v2-menu-item-icon">{item.icon}</span> : null}
-            <span className="v2-menu-item-label">{item.label}</span>
-          </button>
-        ),
-      )}
+      <MenuItemsList
+        items={items}
+        onItemSelect={(item) => {
+          if (item.submenu && item.submenu.length > 0) return;
+          onSelect(item.id);
+          onClose();
+        }}
+      />
     </div>,
     document.body,
   );

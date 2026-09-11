@@ -39,6 +39,9 @@ export function sessionLabelFr(status: EngineStatus): string | null {
   if (kind === "record") {
     return name ? `Enregistrement « ${name} »` : "Enregistrement";
   }
+  if (kind === "script") {
+    return name ? `Script « ${name} »` : "Script";
+  }
   return null;
 }
 
