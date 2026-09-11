@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, Circle, Pause, Play, Square } from "lucide-react";
+import { ArrowLeft, Circle, Pause, Play, Redo2, Square, Undo2 } from "lucide-react";
 import { EditorToolbar } from "../../ui/v2";
 
 type Props = {
@@ -10,10 +10,16 @@ type Props = {
   recordPaused: boolean;
   recordCount: number;
   onPlay: () => void;
+  /** When set, shows a secondary play-from-selection control. */
+  onPlayFrom?: () => void;
   onStartRecord: () => void;
   onPauseRecord: () => void;
   onResumeRecord: () => void;
   onStopRecord: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
   /** Nom / répétitions / raccourci — fused into this bar. */
   meta?: ReactNode;
 };
@@ -26,10 +32,15 @@ export function MacroTitleBarTools({
   recordPaused,
   recordCount,
   onPlay,
+  onPlayFrom,
   onStartRecord,
   onPauseRecord,
   onResumeRecord,
   onStopRecord,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
   meta,
 }: Props) {
   const running = engineState === "running" || engineState === "paused";
@@ -52,6 +63,26 @@ export function MacroTitleBarTools({
       }
       end={
         <>
+          <button
+            type="button"
+            className="v2-titlebar-btn v2-titlebar-icon-btn"
+            disabled={locked || busy || !canUndo || !onUndo}
+            onClick={onUndo}
+            title="Retour en arrière (Ctrl+Z)"
+            aria-label="Retour en arrière"
+          >
+            <Undo2 size={14} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="v2-titlebar-btn v2-titlebar-icon-btn"
+            disabled={locked || busy || !canRedo || !onRedo}
+            onClick={onRedo}
+            title="Retour en avant (Ctrl+Y)"
+            aria-label="Retour en avant"
+          >
+            <Redo2 size={14} aria-hidden />
+          </button>
           {recording ? (
             <span className="v2-titlebar-record-status" role="status">
               Capture{recordPaused ? " en pause" : ""} · {recordCount}
@@ -102,6 +133,18 @@ export function MacroTitleBarTools({
               </button>
             </>
           )}
+          {onPlayFrom ? (
+            <button
+              type="button"
+              className="v2-titlebar-btn v2-btn v2-btn-ghost"
+              disabled={locked || busy}
+              onClick={onPlayFrom}
+              title="Tester depuis l’étape sélectionnée"
+            >
+              <Play size={14} aria-hidden />
+              Depuis ici
+            </button>
+          ) : null}
           <button
             type="button"
             className="v2-titlebar-btn v2-btn v2-btn-primary"
