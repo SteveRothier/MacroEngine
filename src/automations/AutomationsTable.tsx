@@ -6,6 +6,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -39,6 +40,19 @@ import { confirmAction, promptAction } from "../ui";
 import type { AppRoute } from "../app/types";
 import type { ScriptDoc } from "../scripts/types";
 import { newScriptId } from "../scripts/ScriptEditorView";
+import {
+  canReorderAccueilRows,
+  resolveAccueilReorderDrop,
+  type AccueilDropEdge,
+} from "./accueilDrop";
+import {
+  applyAccueilOrder,
+  loadAccueilOrder,
+  mergeAccueilOrder,
+  reorderAccueilKeys,
+  rowOrderKey,
+  saveAccueilOrder,
+} from "./accueilOrder";
 import { AutomationRowMenu } from "./AutomationRowMenu";
 import { AutomationsToolbar } from "./AutomationsToolbar";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
@@ -59,6 +73,23 @@ import {
   type DisplayOptions,
 } from "./types";
 import { useUnifiedAutomations } from "./useUnifiedAutomations";
+
+const FOLDER_DRAG_THRESHOLD_PX = 6;
+const EDGE_HYSTERESIS_PX = 6;
+const AUTO_SCROLL_EDGE_PX = 48;
+const AUTO_SCROLL_MAX_PX = 18;
+
+type RowDropEdge = {
+  key: string;
+  edge: AccueilDropEdge;
+};
+
+type DragGhost = {
+  name: string;
+  kind: AutomationRow["kind"];
+  x: number;
+  y: number;
+};
 
 type Props = {
   onNavigate: (route: AppRoute) => void;
@@ -199,22 +230,97 @@ export function AutomationsTable({
   const emptyCtx = useContextMenuState();
   const [dragRow, setDragRow] = useState<AutomationRow | null>(null);
   const [dropFolderKey, setDropFolderKey] = useState<string | null>(null);
+  const [dropEdge, setDropEdge] = useState<RowDropEdge | null>(null);
+  const [dragGhost, setDragGhost] = useState<DragGhost | null>(null);
   /** True once folder-move drag has passed the threshold (sync for click race). */
   const folderDragArmedRef = useRef(false);
+  /** Swallow the click that follows a completed drag (pointerup → click). */
+  const suppressClickAfterDragRef = useRef(false);
   const folderDragSessionRef = useRef<{
     row: AutomationRow;
     pointerId: number;
     startX: number;
     startY: number;
   } | null>(null);
+  const dropEdgeRef = useRef<RowDropEdge | null>(null);
+  const dropFolderKeyRef = useRef<string | null>(null);
+  const listScrollRef = useRef<HTMLDivElement | null>(null);
+  const sortedRef = useRef<AutomationRow[]>([]);
+  const displayRef = useRef(display);
+  displayRef.current = display;
+  dropFolderKeyRef.current = dropFolderKey;
 
-  const FOLDER_DRAG_THRESHOLD_PX = 6;
-
-  function clearFolderDrag() {
+  function clearFolderDrag(opts?: { suppressClick?: boolean }) {
+    const suppress =
+      opts?.suppressClick === true || folderDragArmedRef.current;
     folderDragSessionRef.current = null;
     folderDragArmedRef.current = false;
+    dropEdgeRef.current = null;
     setDragRow(null);
     setDropFolderKey(null);
+    setDropEdge(null);
+    setDragGhost(null);
+    if (suppress) {
+      suppressClickAfterDragRef.current = true;
+      const swallow = (ev: Event) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        suppressClickAfterDragRef.current = false;
+        window.removeEventListener("click", swallow, true);
+      };
+      window.addEventListener("click", swallow, true);
+      window.setTimeout(() => {
+        window.removeEventListener("click", swallow, true);
+        suppressClickAfterDragRef.current = false;
+      }, 400);
+    }
+  }
+
+  function autoScrollNearEdges(clientY: number) {
+    const list = listScrollRef.current;
+    if (!list) return;
+    const rect = list.getBoundingClientRect();
+    if (clientY < rect.top + AUTO_SCROLL_EDGE_PX) {
+      const t = 1 - (clientY - rect.top) / AUTO_SCROLL_EDGE_PX;
+      list.scrollTop -= Math.ceil(
+        AUTO_SCROLL_MAX_PX * Math.min(1, Math.max(0, t)),
+      );
+    } else if (clientY > rect.bottom - AUTO_SCROLL_EDGE_PX) {
+      const t = 1 - (rect.bottom - clientY) / AUTO_SCROLL_EDGE_PX;
+      list.scrollTop += Math.ceil(
+        AUTO_SCROLL_MAX_PX * Math.min(1, Math.max(0, t)),
+      );
+    }
+  }
+
+  function hitTestRowDrop(
+    x: number,
+    y: number,
+    drag: AutomationRow,
+    prev: RowDropEdge | null,
+  ): RowDropEdge | null {
+    if (displayRef.current.sortBy !== "order") return null;
+    const el = document.elementFromPoint(x, y);
+    if (!el || !(el instanceof Element)) return null;
+    if (el.closest(".v2-auto-folder-chip, .v2-auto-folder-drop-chip")) {
+      return null;
+    }
+    const rowEl = el.closest(".v2-auto-row[data-row-key]");
+    if (!(rowEl instanceof HTMLElement)) return null;
+    const key = rowEl.getAttribute("data-row-key");
+    if (!key || key === rowKey(drag)) return null;
+    const target = sortedRef.current.find((r) => rowKey(r) === key);
+    if (!target || !canReorderAccueilRows(drag, target)) return null;
+    const rect = rowEl.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    const prevEdge = prev?.key === key ? prev.edge : null;
+    let edge: AccueilDropEdge;
+    if (prevEdge && Math.abs(y - mid) < EDGE_HYSTERESIS_PX) {
+      edge = prevEdge;
+    } else {
+      edge = y < mid ? "before" : "after";
+    }
+    return { key, edge };
   }
 
   useEffect(() => {
@@ -288,10 +394,27 @@ export function AutomationsTable({
     }
   }
 
+  const [manualOrder, setManualOrder] = useState<string[]>(() =>
+    loadAccueilOrder(),
+  );
+  const manualOrderRef = useRef(manualOrder);
+  manualOrderRef.current = manualOrder;
+
   const sorted = useMemo(() => {
     if (filter === "recent") return rows;
     const list = [...rows];
     const dir = display.sortDir === "desc" ? -1 : 1;
+    const kindRank = (k: AutomationRow["kind"]) =>
+      k === "macro" ? 0 : k === "clicker" ? 1 : 2;
+
+    if (display.sortBy === "order") {
+      const presentKeys = list.map(rowOrderKey);
+      const merged = mergeAccueilOrder(manualOrder, presentKeys);
+      const ordered = applyAccueilOrder(list, merged);
+      if (dir < 0) ordered.reverse();
+      return ordered;
+    }
+
     list.sort((a, b) => {
       if (filter === "all" || filter === "favorites") {
         if (a.favorite !== b.favorite) return a.favorite ? -1 : 1;
@@ -301,15 +424,21 @@ export function AutomationsTable({
       else if (display.sortBy === "status")
         cmp = a.status.localeCompare(b.status);
       else cmp = a.name.localeCompare(b.name, "fr");
+      if (cmp === 0) {
+        const kr = kindRank(a.kind) - kindRank(b.kind);
+        if (kr !== 0) return kr;
+        return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+      }
       return cmp * dir;
     });
     return list;
-  }, [rows, display.sortBy, display.sortDir, filter]);
+  }, [rows, display.sortBy, display.sortDir, filter, manualOrder]);
+  sortedRef.current = sorted;
 
   const flatKeys = useMemo(() => sorted.map(rowKey), [sorted]);
 
   const sections = useMemo(() => {
-    if (filter !== "all") {
+    if (filter !== "all" || display.sortBy === "order") {
       return [
         {
           id: "all",
@@ -347,7 +476,7 @@ export function AutomationsTable({
       });
     }
     return out;
-  }, [sorted, filter]);
+  }, [sorted, filter, display.sortBy]);
 
   const selectedRows = useMemo(() => {
     return sorted.filter((r) => selected.has(rowKey(r)));
@@ -582,6 +711,19 @@ export function AutomationsTable({
     } catch (e) {
       toast.error(errMessage(e, "Impossible de déplacer"));
     }
+  }
+
+  function reorderRow(from: AutomationRow, beforeKey: string | null) {
+    const presentKeys = sortedRef.current.map(rowOrderKey);
+    const base = mergeAccueilOrder(manualOrderRef.current, presentKeys);
+    const next = reorderAccueilKeys(base, rowOrderKey(from), beforeKey);
+    if (!next) return;
+    saveAccueilOrder(next);
+    setManualOrder(next);
+    if (display.sortBy !== "order") {
+      onDisplayChange({ ...display, sortBy: "order", sortDir: "asc" });
+    }
+    toast.success("Ordre mis à jour");
   }
 
   async function onCreateFolder(kind: "macro" | "clicker") {
@@ -1127,7 +1269,10 @@ export function AutomationsTable({
         onCreateOpenChange={setCreateOpen}
       />
 
-      <div className="v2-page-body v2-automations-list-body">
+      <div
+        className="v2-page-body v2-automations-list-body"
+        ref={listScrollRef}
+      >
         {loading ? (
           <div
             className="v2-skeleton-page"
@@ -1165,6 +1310,33 @@ export function AutomationsTable({
               <span className="v2-auto-colhead-check" aria-hidden />
               <div className="v2-auto-colhead-identity">
                 <span className="v2-auto-colhead-kind" aria-hidden />
+                <button
+                  type="button"
+                  role="columnheader"
+                  className={[
+                    "v2-auto-colhead-label",
+                    "v2-auto-colhead-order",
+                    display.sortBy === "order" ? "is-active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-sort={ariaSortFor("order")}
+                  title="Ordre manuel (glisser-déposer)"
+                  onClick={() => setSortBy("order")}
+                >
+                  #
+                  {display.sortBy === "order" ? (
+                    <ChevronDown
+                      size={12}
+                      aria-hidden
+                      className={
+                        display.sortDir === "desc"
+                          ? "v2-auto-colhead-sort-icon is-desc"
+                          : "v2-auto-colhead-sort-icon"
+                      }
+                    />
+                  ) : null}
+                </button>
                 <button
                   type="button"
                   role="columnheader"
@@ -1293,6 +1465,10 @@ export function AutomationsTable({
                         const subtitle = rowSubtitle(r, {
                           running: scriptRunning,
                         });
+                        const dropBefore =
+                          dropEdge?.key === key && dropEdge.edge === "before";
+                        const dropAfter =
+                          dropEdge?.key === key && dropEdge.edge === "after";
                         return (
                           <div
                             key={key}
@@ -1304,10 +1480,21 @@ export function AutomationsTable({
                               menuKey === key ? "is-menu-open" : "",
                               scriptRunning ? "is-running" : "",
                               focusKey === key ? "is-focused" : "",
+                              dragRow && rowKey(dragRow) === key
+                                ? "is-drag-source"
+                                : "",
+                              dropBefore ? "drop-before" : "",
+                              dropAfter ? "drop-after" : "",
                             ]
                               .filter(Boolean)
                               .join(" ")}
                             onClick={(e) => {
+                              if (suppressClickAfterDragRef.current) {
+                                suppressClickAfterDragRef.current = false;
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return;
+                              }
                               if (dragRow || folderDragArmedRef.current) return;
                               if (e.shiftKey || e.metaKey || e.ctrlKey) {
                                 e.preventDefault();
@@ -1356,7 +1543,7 @@ export function AutomationsTable({
                             <div
                               className="v2-auto-row-identity"
                               onPointerDown={(e) => {
-                                if (r.kind === "script" || e.button !== 0) return;
+                                if (e.button !== 0) return;
                                 if (folderDragArmedRef.current) return;
                                 const pointerId = e.pointerId;
                                 folderDragSessionRef.current = {
@@ -1369,16 +1556,47 @@ export function AutomationsTable({
                                 const onMove = (ev: PointerEvent) => {
                                   const s = folderDragSessionRef.current;
                                   if (!s || ev.pointerId !== s.pointerId) return;
-                                  if (folderDragArmedRef.current) return;
-                                  const dx = ev.clientX - s.startX;
-                                  const dy = ev.clientY - s.startY;
-                                  if (
-                                    Math.hypot(dx, dy) < FOLDER_DRAG_THRESHOLD_PX
-                                  ) {
+                                  if (!folderDragArmedRef.current) {
+                                    const dx = ev.clientX - s.startX;
+                                    const dy = ev.clientY - s.startY;
+                                    if (
+                                      Math.hypot(dx, dy) <
+                                      FOLDER_DRAG_THRESHOLD_PX
+                                    ) {
+                                      return;
+                                    }
+                                    folderDragArmedRef.current = true;
+                                    setDragRow(s.row);
+                                    setDragGhost({
+                                      name: s.row.name,
+                                      kind: s.row.kind,
+                                      x: ev.clientX,
+                                      y: ev.clientY,
+                                    });
+                                  }
+                                  autoScrollNearEdges(ev.clientY);
+                                  setDragGhost((g) =>
+                                    g
+                                      ? {
+                                          ...g,
+                                          x: ev.clientX,
+                                          y: ev.clientY,
+                                        }
+                                      : g,
+                                  );
+                                  if (dropFolderKeyRef.current) {
+                                    dropEdgeRef.current = null;
+                                    setDropEdge(null);
                                     return;
                                   }
-                                  folderDragArmedRef.current = true;
-                                  setDragRow(s.row);
+                                  const hit = hitTestRowDrop(
+                                    ev.clientX,
+                                    ev.clientY,
+                                    s.row,
+                                    dropEdgeRef.current,
+                                  );
+                                  dropEdgeRef.current = hit;
+                                  setDropEdge(hit);
                                 };
 
                                 const onUp = (ev: PointerEvent) => {
@@ -1389,9 +1607,46 @@ export function AutomationsTable({
                                     "pointercancel",
                                     onUp,
                                   );
-                                  if (!folderDragArmedRef.current) {
-                                    folderDragSessionRef.current = null;
+                                  const s = folderDragSessionRef.current;
+                                  const armed = folderDragArmedRef.current;
+                                  const edge = dropEdgeRef.current;
+                                  const overFolder = dropFolderKeyRef.current;
+                                  if (!armed || !s) {
+                                    clearFolderDrag();
+                                    return;
                                   }
+                                  // Always suppress the synthetic click after an armed drag.
+                                  suppressClickAfterDragRef.current = true;
+                                  if (overFolder) {
+                                    // Folder chip/strip handles the move on its pointerUp.
+                                    clearFolderDrag({ suppressClick: true });
+                                    return;
+                                  }
+                                  if (
+                                    edge &&
+                                    displayRef.current.sortBy === "order"
+                                  ) {
+                                    const target = sortedRef.current.find(
+                                      (row) => rowKey(row) === edge.key,
+                                    );
+                                    if (target) {
+                                      const resolved = resolveAccueilReorderDrop(
+                                        s.row,
+                                        target,
+                                        edge.edge,
+                                        sortedRef.current,
+                                      );
+                                      clearFolderDrag({ suppressClick: true });
+                                      if (resolved) {
+                                        reorderRow(
+                                          s.row,
+                                          resolved.beforeKey,
+                                        );
+                                      }
+                                      return;
+                                    }
+                                  }
+                                  clearFolderDrag({ suppressClick: true });
                                 };
 
                                 window.addEventListener("pointermove", onMove);
@@ -1840,6 +2095,26 @@ export function AutomationsTable({
         }}
         ariaLabel="Actions Accueil"
       />
+
+      {dragGhost
+        ? createPortal(
+            <div
+              className="v2-auto-drag-ghost"
+              style={{
+                transform: `translate(${dragGhost.x + 12}px, ${dragGhost.y + 12}px)`,
+              }}
+              aria-hidden
+            >
+              <span
+                className={`v2-auto-type-badge v2-auto-type-badge--${dragGhost.kind}`}
+              >
+                {kindLabel(dragGhost.kind)}
+              </span>
+              <span className="v2-auto-drag-ghost-name">{dragGhost.name}</span>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

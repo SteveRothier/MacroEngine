@@ -4727,6 +4727,50 @@ button.v2-auto-colhead-label:focus-visible {
   background: color-mix(in srgb, var(--v2-accent) 22%, transparent);
 }
 
+.v2-auto-row.is-drag-source {
+  opacity: 0.45;
+}
+
+.v2-auto-row.drop-before {
+  box-shadow: inset 0 2px 0 0 color-mix(in srgb, var(--v2-accent) 70%, transparent);
+}
+
+.v2-auto-row.drop-after {
+  box-shadow: inset 0 -2px 0 0 color-mix(in srgb, var(--v2-accent) 70%, transparent);
+}
+
+.v2-auto-colhead-order {
+  min-width: 28px;
+  padding-inline: 4px;
+  margin-right: 4px;
+}
+
+.v2-auto-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 80;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  pointer-events: none;
+  border-radius: var(--v2-radius-md);
+  border: 1px solid var(--v2-border-strong);
+  background: color-mix(in srgb, var(--v2-bg-elevated) 94%, transparent);
+  box-shadow: var(--v2-shadow-float);
+  max-width: 240px;
+}
+
+.v2-auto-drag-ghost-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--v2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .v2-auto-row-check {
   display: flex;
   align-items: center;

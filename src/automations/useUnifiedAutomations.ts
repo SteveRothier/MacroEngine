@@ -148,6 +148,7 @@ export function useUnifiedAutomations(options: {
           locked: it.locked,
           dirty: options.dirtyMacroId === it.id,
           meta: m ? `${m.actionCount} actions` : undefined,
+          sortOrder: it.sortOrder ?? 0,
         });
       }
 
@@ -172,6 +173,7 @@ export function useUnifiedAutomations(options: {
           locked: it.locked,
           dirty: options.dirtyClickerId === it.id,
           meta: c ? `${c.cps.toFixed(0)} CPS` : undefined,
+          sortOrder: it.sortOrder ?? 0,
         });
       }
 
@@ -191,6 +193,7 @@ export function useUnifiedAutomations(options: {
           locked: false,
           dirty: options.dirtyScriptId === s.id,
           meta: undefined,
+          sortOrder: 0,
           permLabels,
         });
       }
