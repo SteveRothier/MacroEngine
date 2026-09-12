@@ -19,6 +19,8 @@ export type AutomationRow = {
   locked: boolean;
   dirty: boolean;
   meta?: string;
+  /** Library index order within kind+folder. */
+  sortOrder?: number;
   /** Active script permissions (Accueil badge). */
   permLabels?: string[];
 };
@@ -40,7 +42,7 @@ export function statusToPill(status: AutomationStatus): {
 }
 
 export type DisplayOptions = {
-  sortBy: "name" | "type" | "status";
+  sortBy: "order" | "name" | "type" | "status";
   sortDir: "asc" | "desc";
 };
 
@@ -67,7 +69,7 @@ export type FilterCounts = {
 };
 
 export const DEFAULT_DISPLAY: DisplayOptions = {
-  sortBy: "name",
+  sortBy: "order",
   sortDir: "asc",
 };
 
