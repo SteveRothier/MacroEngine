@@ -6,7 +6,6 @@ export type AppRoute =
 
 export type SettingsSection =
   | "general"
-  | "accueil"
   | "appearance"
   | "hotkeys"
   | "process"

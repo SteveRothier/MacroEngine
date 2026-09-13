@@ -1,5 +1,25 @@
 import type { SettingsSection } from "./types";
 
+const SETTINGS_SECTIONS: SettingsSection[] = [
+  "general",
+  "appearance",
+  "hotkeys",
+  "process",
+  "displays",
+  "maintenance",
+];
+
+export function normalizeSettingsSection(section: unknown): SettingsSection {
+  if (section === "accueil") return "general";
+  if (
+    typeof section === "string" &&
+    (SETTINGS_SECTIONS as string[]).includes(section)
+  ) {
+    return section as SettingsSection;
+  }
+  return "general";
+}
+
 export const HOME_TAB_ID = "home";
 
 export type DocTabKind = "macro" | "clicker" | "script";
@@ -75,7 +95,7 @@ export function loadWorkspace(): WorkspaceState {
         tabs,
         shellView: {
           type: "settings",
-          section: data.settingsSection ?? "general",
+          section: normalizeSettingsSection(data.settingsSection),
           returnTabId,
         },
       };
@@ -166,7 +186,7 @@ export function openSettings(
     ...state,
     shellView: {
       type: "settings",
-      section,
+      section: normalizeSettingsSection(section),
       returnTabId: titleBarActiveTabId(state),
     },
   };
