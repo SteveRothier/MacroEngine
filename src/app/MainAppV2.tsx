@@ -627,8 +627,76 @@ function MainAppV2Inner() {
         ]
       : [];
 
-    return [...nav, ...create, ...tabs, ...session];
+    const actions: CommandItem[] = [
+      {
+        id: "home-order",
+        label: "Accueil · tri ordre manuel (#)",
+        group: "Actions",
+        onSelect: () => {
+          goHome();
+          automationsPage.setDisplay({
+            ...automationsPage.display,
+            sortBy: "order",
+            sortDir: "asc",
+          });
+        },
+      },
+      {
+        id: "launch-focused",
+        label: "Lancer l’automation sélectionnée",
+        group: "Actions",
+        onSelect: () => {
+          const key = automationsPage.focusKey;
+          if (!key) {
+            const tabId =
+              workspace.shellView.type === "doc"
+                ? workspace.shellView.tabId
+                : null;
+            const tab = tabId
+              ? workspace.tabs.find((t) => t.id === tabId)
+              : null;
+            if (tab?.resourceId) {
+              if (tab.kind === "macro") void onLaunchMacro(tab.resourceId);
+              else if (tab.kind === "clicker") void onLaunchClicker(tab.resourceId);
+              else if (tab.kind === "script") {
+                void invoke("run_script_session_cmd", { id: tab.resourceId })
+                  .then(() => {
+                    bumpRefresh();
+                    toast.success(`Script lancé · ${tab.label}`);
+                  })
+                  .catch((e) =>
+                    toast.error(launchErr(e, "Échec du lancement script")),
+                  );
+              }
+              return;
+            }
+            toast.info("Sélectionnez une automation sur l’Accueil");
+            return;
+          }
+          const colon = key.indexOf(":");
+          if (colon < 0) return;
+          const kind = key.slice(0, colon);
+          const id = key.slice(colon + 1);
+          if (kind === "macro") void onLaunchMacro(id);
+          else if (kind === "clicker") void onLaunchClicker(id);
+          else if (kind === "script") {
+            void invoke("run_script_session_cmd", { id })
+              .then(() => {
+                bumpRefresh();
+                toast.success(`Script lancé · ${id}`);
+              })
+              .catch((e) =>
+                toast.error(launchErr(e, "Échec du lancement script")),
+              );
+          }
+        },
+      },
+    ];
+
+    return [...nav, ...create, ...tabs, ...session, ...actions];
   }, [
+    automationsPage,
+    bumpRefresh,
     goHome,
     goSettings,
     journalOpen,
@@ -636,8 +704,12 @@ function MainAppV2Inner() {
     onCreateMacro,
     onCreateScript,
     onEmergencyStop,
+    onLaunchClicker,
+    onLaunchMacro,
     persistShell,
     running,
+    toast,
+    workspace.shellView,
     workspace.tabs,
   ]);
 
@@ -796,6 +868,7 @@ function MainAppV2Inner() {
               ? status.sessionName ?? null
               : null
           }
+          onFocusKeyChange={automationsPage.setFocusKey}
         />
       );
     }

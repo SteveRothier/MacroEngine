@@ -10,6 +10,7 @@ export function useAutomationsPageState() {
   const [filter, setFilter] = useState<AutomationFilter>("all");
   const [folderKey, setFolderKey] = useState<string | null>(null);
   const [display, setDisplay] = useState<DisplayOptions>(DEFAULT_DISPLAY);
+  const [focusKey, setFocusKey] = useState<string | null>(null);
   return {
     query,
     setQuery,
@@ -19,5 +20,7 @@ export function useAutomationsPageState() {
     setFolderKey,
     display,
     setDisplay,
+    focusKey,
+    setFocusKey,
   };
 }

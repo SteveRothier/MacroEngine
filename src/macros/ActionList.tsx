@@ -386,6 +386,7 @@ export function ActionList({
       {
         id: "run-from",
         label: "Tester depuis ici",
+        shortcut: "Ctrl+Shift+Entrée",
         icon: <Play size={14} />,
         disabled: !onRunFrom,
         onSelect: () => onRunFrom?.(ctxPath),
