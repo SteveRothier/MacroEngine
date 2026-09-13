@@ -12,12 +12,13 @@ use caster_engine::{
     prune_orphans, purge_library_trash, remove_library_entry, rename_library_entry_key,
     rename_library_folder, rename_macro, rename_preset, restore_library_item, save_macro_checked,
     save_preset, save_preset_with_trigger, save_quick_access, save_script, save_settings,
-    save_accueil_order, set_favorite, set_library_item_locked, trash_library_item, AppSettings,
-    AppState, ClickerConfig,
-    ClickerMetrics, ClickerPreset, ClickerPresetSummary, DrawnRect, EngineEvent, EngineState,
-    HotkeyBindings, LibraryFolder, LibraryIndexDto, LibraryKind, ListLibraryQuery, MacroDocument,
-    MacroSummary, NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind,
-    RecordOptions, ScreenGeom, ScreenGeomDto, ScriptDoc, StopZone, ThemeMode, Trigger,
+    save_accueil_order, set_favorite, set_library_item_locked, trash_library_item,
+    normalize_app_settings, AccueilPrefs, AppearancePrefs, AppSettings, AppState, AutomationPrefs,
+    ClickerConfig, ClickerMetrics, ClickerPreset, ClickerPresetSummary, ConfirmationsPrefs,
+    DrawnRect, EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto,
+    LibraryKind, ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs,
+    NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind, RecordOptions,
+    ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptsPrefs, ShellPrefs, StopZone, ThemeMode, Trigger,
     clamp_overlay_opacity, settings_path,
 };
 use serde::{Deserialize, Serialize};
@@ -42,6 +43,13 @@ struct UiPrefs {
     journal_open: bool,
     close_to_tray: bool,
     start_with_windows: bool,
+    accueil: AccueilPrefs,
+    shell: ShellPrefs,
+    automation: AutomationPrefs,
+    confirmations: ConfirmationsPrefs,
+    scripts: ScriptsPrefs,
+    appearance: AppearancePrefs,
+    maintenance: MaintenancePrefs,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -699,7 +707,7 @@ fn status_of(engine: &AppState, message: Option<String>) -> EngineStatusPayload 
 }
 
 fn prefs_to_settings(engine: &AppState, p: &UiPrefs) -> AppSettings {
-    AppSettings {
+    let mut s = AppSettings {
         clicker: engine.clicker_config(),
         advanced_ui: p.advanced_ui,
         overlay_visible: p.overlay_visible,
@@ -712,7 +720,16 @@ fn prefs_to_settings(engine: &AppState, p: &UiPrefs) -> AppSettings {
         journal_open: p.journal_open,
         close_to_tray: p.close_to_tray,
         start_with_windows: p.start_with_windows,
-    }
+        accueil: p.accueil.clone(),
+        shell: p.shell.clone(),
+        automation: p.automation.clone(),
+        confirmations: p.confirmations.clone(),
+        scripts: p.scripts.clone(),
+        appearance: p.appearance.clone(),
+        maintenance: p.maintenance.clone(),
+    };
+    normalize_app_settings(&mut s);
+    s
 }
 
 fn apply_prefs(p: &mut UiPrefs, settings: &AppSettings) {
@@ -726,6 +743,13 @@ fn apply_prefs(p: &mut UiPrefs, settings: &AppSettings) {
     p.journal_open = settings.journal_open;
     p.close_to_tray = settings.close_to_tray;
     p.start_with_windows = settings.start_with_windows;
+    p.accueil = settings.accueil.clone();
+    p.shell = settings.shell.clone();
+    p.automation = settings.automation.clone();
+    p.confirmations = settings.confirmations.clone();
+    p.scripts = settings.scripts.clone();
+    p.appearance = settings.appearance.clone();
+    p.maintenance = settings.maintenance.clone();
 }
 
 fn apply_overlay_opacity(app: &AppHandle, opacity: f32) {
@@ -1641,6 +1665,13 @@ pub fn run() {
             journal_open: false,
             close_to_tray: false,
             start_with_windows: false,
+            accueil: AccueilPrefs::default(),
+            shell: ShellPrefs::default(),
+            automation: AutomationPrefs::default(),
+            confirmations: ConfirmationsPrefs::default(),
+            scripts: ScriptsPrefs::default(),
+            appearance: AppearancePrefs::default(),
+            maintenance: MaintenancePrefs::default(),
         }))
         .manage(Mutex::new(ZoneOverlaySnap::default()))
         .manage(Arc::new(NativeZoneOverlay::new()))
