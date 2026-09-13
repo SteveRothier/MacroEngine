@@ -121,6 +121,8 @@ type Props = {
   ) => void;
   /** Active script session name (from engine status). */
   runningScriptName?: string | null;
+  /** Notify parent of focused Accueil row (`kind:id`). */
+  onFocusKeyChange?: (key: string | null) => void;
 };
 
 function rowKey(r: AutomationRow): string {
@@ -200,6 +202,7 @@ export function AutomationsTable({
   onRefresh,
   onResourceRenamed,
   runningScriptName = null,
+  onFocusKeyChange,
 }: Props) {
   const toast = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -223,7 +226,11 @@ export function AutomationsTable({
   );
   const [createOpen, setCreateOpen] = useState(false);
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
-  const [focusKey, setFocusKey] = useState<string | null>(null);
+  const [focusKey, setFocusKeyState] = useState<string | null>(null);
+  const setFocusKey = (key: string | null) => {
+    setFocusKeyState(key);
+    onFocusKeyChange?.(key);
+  };
   const ctxMenu = useContextMenuState();
   const [ctxRow, setCtxRow] = useState<AutomationRow | null>(null);
   const emptyCtx = useContextMenuState();

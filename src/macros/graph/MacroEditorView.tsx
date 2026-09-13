@@ -430,6 +430,10 @@ export function MacroEditorView({
   const onRunFrom = useCallback(
     async (path: ActionPath) => {
       if (locked || recording || editorLocked) return;
+      if (!path.length) {
+        toast.error("Sélectionnez une étape pour tester depuis ici");
+        return;
+      }
       try {
         await flushAutosave();
         const st = await invoke<EngineStatus>("launch_saved_macro", {
@@ -439,11 +443,44 @@ export function MacroEditorView({
         onStatus(st);
         toast.success("Test depuis l’étape lancé");
       } catch (e) {
-        toast.error(errMessage(e, "Échec du test depuis l’étape"));
+        const msg = errMessage(e, "Échec du test depuis l’étape");
+        if (/from_path|hors limites|branche manquante/i.test(msg)) {
+          toast.error(
+            "Chemin d’étape invalide — resélectionnez l’action puis réessayez",
+          );
+        } else {
+          toast.error(msg);
+        }
       }
     },
     [editorLocked, flushAutosave, locked, onStatus, recording, toast],
   );
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (lockedRef.current || recording || editorLocked) return;
+      if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
+      if (e.key !== "Enter" && e.code !== "Enter") return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      const path = selectedPathRef.current;
+      if (!path) {
+        toast.info("Sélectionnez une étape (Ctrl+Shift+Entrée)");
+        return;
+      }
+      e.preventDefault();
+      void onRunFrom(path);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editorLocked, onRunFrom, recording, toast]);
 
   const onStartRecord = useCallback(async () => {
     if (locked || recording) return;

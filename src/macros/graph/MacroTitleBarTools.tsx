@@ -139,7 +139,7 @@ export function MacroTitleBarTools({
               className="v2-titlebar-btn v2-btn v2-btn-ghost"
               disabled={locked || busy}
               onClick={onPlayFrom}
-              title="Tester depuis l’étape sélectionnée"
+              title="Tester depuis l’étape sélectionnée (Ctrl+Shift+Entrée)"
             >
               <Play size={14} aria-hidden />
               Depuis ici
