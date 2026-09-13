@@ -25,10 +25,7 @@ import {
 import type { MacroUiLayout } from "./macroToGraph";
 import { MacroTitleBarTools } from "./MacroTitleBarTools";
 import { useTitleBarSlot } from "../../ui/v2/TitleBarContext";
-import {
-  mergeAutomationPrefs,
-  type AutomationPrefs,
-} from "../../settings/settingsTypes";
+import { mergeAutomationPrefs } from "../../settings/settingsTypes";
 
 const AUTOSAVE_MS = 400;
 const HISTORY_MAX = 50;
@@ -51,7 +48,6 @@ type Props = {
   engineState: string;
   onStatus: (s: EngineStatus) => void;
   onOpenScript?: (scriptId: string, label?: string) => void;
-  automationPrefs?: AutomationPrefs;
 };
 
 function saveErrorMessage(e: unknown): string {
@@ -80,9 +76,8 @@ export function MacroEditorView({
   onStatus,
   engineState,
   onOpenScript,
-  automationPrefs: automationPrefsProp,
 }: Props) {
-  const automationPrefs = mergeAutomationPrefs(automationPrefsProp);
+  const automationPrefs = mergeAutomationPrefs();
   const toast = useToast();
   const [doc, setDoc] = useState<MacroDocument>(() => emptyMacro(macroId));
   const [dirty, setDirty] = useState(false);

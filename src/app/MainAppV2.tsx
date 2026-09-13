@@ -12,20 +12,7 @@ import {
   type HotkeyBindings,
 } from "../macros/types";
 import { SettingsView } from "../settings/SettingsView";
-import {
-  mergeAccueilPrefs,
-  mergeAppearancePrefs,
-  mergeAutomationPrefs,
-  mergeConfirmationsPrefs,
-  mergeScriptsPrefs,
-  mergeShellPrefs,
-  type AccueilPrefs,
-  type AppearancePrefs,
-  type AutomationPrefs,
-  type ConfirmationsPrefs,
-  type ScriptsPrefs,
-  type ShellPrefs,
-} from "../settings/settingsTypes";
+import { mergeShellPrefs } from "../settings/settingsTypes";
 import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
 import {
@@ -118,24 +105,6 @@ function MainAppV2Inner() {
   const toast = useToast();
   const titleBarCtx = useTitleBarContext();
   const automationsPage = useAutomationsPageState();
-  const [accueilPrefs, setAccueilPrefs] = useState<AccueilPrefs>(() =>
-    mergeAccueilPrefs(),
-  );
-  const [shellPrefs, setShellPrefs] = useState<ShellPrefs>(() =>
-    mergeShellPrefs(),
-  );
-  const [appearancePrefs, setAppearancePrefs] = useState<AppearancePrefs>(() =>
-    mergeAppearancePrefs(),
-  );
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [automationPrefs, setAutomationPrefs] = useState<AutomationPrefs>(() =>
-    mergeAutomationPrefs(),
-  );
-  const [confirmationsPrefs, setConfirmationsPrefs] =
-    useState<ConfirmationsPrefs>(() => mergeConfirmationsPrefs());
-  const [scriptsPrefs, setScriptsPrefs] = useState<ScriptsPrefs>(() =>
-    mergeScriptsPrefs(),
-  );
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => loadWorkspace());
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
   const [advanced, setAdvanced] = useState(false);
@@ -197,15 +166,6 @@ function MainAppV2Inner() {
           onThemeChange(s.theme);
         }
         if (typeof s.journalOpen === "boolean") setJournalOpen(s.journalOpen);
-        setAccueilPrefs(mergeAccueilPrefs(s.accueil));
-        setShellPrefs(mergeShellPrefs(s.shell));
-        setAppearancePrefs(mergeAppearancePrefs(s.appearance));
-        setAutomationPrefs(mergeAutomationPrefs(s.automation));
-        setConfirmationsPrefs(mergeConfirmationsPrefs(s.confirmations));
-        setScriptsPrefs(mergeScriptsPrefs(s.scripts));
-        if (typeof s.sidebarCollapsed === "boolean") {
-          setSidebarCollapsed(s.sidebarCollapsed);
-        }
         const sh = mergeShellPrefs(s.shell);
         if (!sh.restoreWorkspaceTabs) {
           setWorkspace((ws) => selectHome({ ...ws, tabs: [] }));
@@ -234,15 +194,6 @@ function MainAppV2Inner() {
   }, []);
 
   const onEmergencyStop = useCallback(async () => {
-    if (automationPrefs.confirmStopSession) {
-      const ok = await confirmAction({
-        title: "Arrêter la session",
-        message: "Interrompre l’exécution en cours ?",
-        confirmLabel: "Arrêter",
-        danger: true,
-      });
-      if (!ok) return;
-    }
     void invoke<EngineStatus>("emergency_stop")
       .then((s) => {
         setStatus(s);
@@ -256,7 +207,7 @@ function MainAppV2Inner() {
           })
           .catch((e) => toast.error(launchErr(e, "Impossible d’arrêter"))),
       );
-  }, [automationPrefs.confirmStopSession, toast]);
+  }, [toast]);
 
   const openDoc = useCallback((kind: DocTabKind, resourceId: string, label?: string) => {
     setWorkspace((ws) => {
@@ -294,7 +245,7 @@ function MainAppV2Inner() {
         toast.info("Onglet épinglé — désépinglez-le pour le fermer");
         return;
       }
-      if (tab.dirty && confirmationsPrefs.closeDirtyTab) {
+      if (tab.dirty) {
         const ok = await confirmAction({
           title: "Fermer",
           message: `« ${tab.label} » a des modifications non enregistrées. Fermer quand même ?`,
@@ -305,7 +256,7 @@ function MainAppV2Inner() {
       }
       setWorkspace((ws) => closeDocTab(ws, tabId));
     },
-    [confirmationsPrefs.closeDirtyTab, toast, workspace.tabs],
+    [toast, workspace.tabs],
   );
 
   const applyBatchTabClose = useCallback(
@@ -582,7 +533,6 @@ function MainAppV2Inner() {
       if (!mod) return;
 
       if (e.key === "k" && !e.shiftKey) {
-        if (!shellPrefs.commandPaletteEnabled) return;
         e.preventDefault();
         setPaletteOpen((o) => !o);
         return;
@@ -616,7 +566,7 @@ function MainAppV2Inner() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCreateMacro, onTabClose, shellPrefs.commandPaletteEnabled, workspace]);
+  }, [onCreateMacro, onTabClose, workspace]);
 
   const commandItems = useMemo((): CommandItem[] => {
     const nav: CommandItem[] = [
@@ -826,17 +776,6 @@ function MainAppV2Inner() {
             setJournalOpen(v);
             void persistShell({ journalOpen: v });
           }}
-          onAccueilPrefsChange={(prefs) => {
-            setAccueilPrefs(prefs);
-            automationsPage.applyAccueilDefaults(prefs);
-          }}
-          onShellPrefsChange={setShellPrefs}
-          onAppearancePrefsChange={setAppearancePrefs}
-          onAutomationPrefsChange={setAutomationPrefs}
-          onConfirmationsPrefsChange={setConfirmationsPrefs}
-          onScriptsPrefsChange={setScriptsPrefs}
-          sidebarCollapsed={sidebarCollapsed}
-          onSidebarCollapsedChange={setSidebarCollapsed}
         />
       );
     }
@@ -856,7 +795,6 @@ function MainAppV2Inner() {
             engineState={status.state}
             onStatus={setStatus}
             onOpenScript={(id, label) => openDoc("script", id, label ?? id)}
-            automationPrefs={automationPrefs}
           />
         );
       }
@@ -870,7 +808,6 @@ function MainAppV2Inner() {
               if (!activeDocTabId) return;
               setWorkspace((ws) => setTabLabel(ws, activeDocTabId, name));
             }}
-            clearConsoleOnRun={scriptsPrefs.clearConsoleOnRun}
           />
         );
       }
@@ -944,17 +881,6 @@ function MainAppV2Inner() {
               : null
           }
           onFocusKeyChange={automationsPage.setFocusKey}
-          accueilPrefs={accueilPrefs}
-          automationPrefs={automationPrefs}
-          scriptsPrefs={scriptsPrefs}
-          onLaunchFocusJournal={
-            automationPrefs.focusFollowsRun
-              ? () => {
-                  setJournalOpen(true);
-                  void persistShell({ journalOpen: true });
-                }
-              : undefined
-          }
         />
       );
     }
@@ -965,11 +891,6 @@ function MainAppV2Inner() {
   return (
     <>
       <AppShell
-        density={appearancePrefs.density}
-        fontScale={appearancePrefs.fontScale}
-        accent={appearancePrefs.accent}
-        reduceMotion={appearancePrefs.reduceMotion}
-        rootClassName={sidebarCollapsed ? "v2-root--sidebar-collapsed" : undefined}
         titleBar={
           <WindowTitleBar
             tabs={documentTabs}
@@ -995,11 +916,11 @@ function MainAppV2Inner() {
               });
             }}
             journalOpen={journalOpen}
-            sessionStatus={shellPrefs.showSessionPill ? sessionPill : null}
+            sessionStatus={sessionPill}
             showStop={running}
             onStop={onEmergencyStop}
             recentItems={loadRecent()
-              .slice(0, shellPrefs.recentListMax)
+              .slice(0, 12)
               .map((r) => ({
                 id: `${r.kind}:${r.id}`,
                 label: r.label,

@@ -16,32 +16,13 @@ import type { HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import type { SettingsSection } from "../app/types";
 import {
-  mergeAccueilPrefs,
-  mergeAppearancePrefs,
-  mergeAutomationPrefs,
-  mergeConfirmationsPrefs,
-  mergeMaintenancePrefs,
-  mergeScriptsPrefs,
   mergeShellPrefs,
-  type AccueilPrefs,
-  type AccueilFilter,
-  type AccueilSortBy,
-  type AccueilSortDir,
-  type AppearancePrefs,
-  type AccentTheme,
-  type AutomationPrefs,
-  type ConfirmationsPrefs,
-  type MaintenancePrefs,
-  type ScriptsPrefs,
   type ShellPrefs,
   type StartupView,
-  type UiDensity,
 } from "./settingsTypes";
-import { COLLAPSED_SECTIONS_KEY } from "../automations/types";
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: "general", label: "Général" },
-  { id: "accueil", label: "Accueil" },
   { id: "appearance", label: "Apparence" },
   { id: "hotkeys", label: "Raccourcis" },
   { id: "process", label: "Processus" },
@@ -54,9 +35,6 @@ type AppPaths = {
   settingsPath: string;
   logDir: string;
   version: string;
-  accueilOrderPath?: string;
-  libraryPath?: string;
-  quickAccessPath?: string;
 };
 
 type Props = {
@@ -70,14 +48,7 @@ type Props = {
   running?: boolean;
   journalOpen: boolean;
   onJournalOpenChange: (v: boolean) => void;
-  onAccueilPrefsChange?: (prefs: AccueilPrefs) => void;
   onShellPrefsChange?: (prefs: ShellPrefs) => void;
-  onAppearancePrefsChange?: (prefs: AppearancePrefs) => void;
-  onAutomationPrefsChange?: (prefs: AutomationPrefs) => void;
-  onConfirmationsPrefsChange?: (prefs: ConfirmationsPrefs) => void;
-  onScriptsPrefsChange?: (prefs: ScriptsPrefs) => void;
-  sidebarCollapsed?: boolean;
-  onSidebarCollapsedChange?: (v: boolean) => void;
 };
 
 function displayOptionLabel(d: DisplayDto): string {
@@ -97,14 +68,7 @@ export function SettingsView({
   running = false,
   journalOpen,
   onJournalOpenChange,
-  onAccueilPrefsChange,
   onShellPrefsChange,
-  onAppearancePrefsChange,
-  onAutomationPrefsChange,
-  onConfirmationsPrefsChange,
-  onScriptsPrefsChange,
-  sidebarCollapsed = false,
-  onSidebarCollapsedChange,
 }: Props) {
   const toast = useToast();
   const { loadSettings, saveBundle } = useClickerSettingsApi();
@@ -113,28 +77,12 @@ export function SettingsView({
   const [overlayOpacity, setOverlayOpacity] = useState(1);
   const [closeToTray, setCloseToTray] = useState(false);
   const [startWithWindows, setStartWithWindows] = useState(false);
+  const [shell, setShell] = useState<ShellPrefs>(() => mergeShellPrefs());
   const [liveExes, setLiveExes] = useState<string[]>([]);
   const [foregroundExe, setForegroundExe] = useState<string | null>(null);
   const [processDraft, setProcessDraft] = useState("");
   const [displays, setDisplays] = useState<DisplayDto[]>([]);
   const [displayId, setDisplayId] = useState<string | null>(null);
-  const [accueil, setAccueil] = useState<AccueilPrefs>(() => mergeAccueilPrefs());
-  const [shell, setShell] = useState<ShellPrefs>(() => mergeShellPrefs());
-  const [appearanceExtra, setAppearanceExtra] = useState<AppearancePrefs>(() =>
-    mergeAppearancePrefs(),
-  );
-  const [automation, setAutomation] = useState<AutomationPrefs>(() =>
-    mergeAutomationPrefs(),
-  );
-  const [confirmations, setConfirmations] = useState<ConfirmationsPrefs>(() =>
-    mergeConfirmationsPrefs(),
-  );
-  const [scriptsPrefs, setScriptsPrefs] = useState<ScriptsPrefs>(() =>
-    mergeScriptsPrefs(),
-  );
-  const [maintenance, setMaintenance] = useState<MaintenancePrefs>(() =>
-    mergeMaintenancePrefs(),
-  );
   const [paths, setPaths] = useState<AppPaths | null>(null);
   const [metrics, setMetrics] = useState<{
     measuredCps: number;
@@ -162,44 +110,15 @@ export function SettingsView({
       setDisplayId(s.displayId ?? null);
       setCloseToTray(!!s.closeToTray);
       setStartWithWindows(!!s.startWithWindows);
-      const a = mergeAccueilPrefs(s.accueil);
-      setAccueil(a);
-      onAccueilPrefsChange?.(a);
       const sh = mergeShellPrefs(s.shell);
       setShell(sh);
       onShellPrefsChange?.(sh);
-      const ap = mergeAppearancePrefs(s.appearance);
-      setAppearanceExtra(ap);
-      onAppearancePrefsChange?.(ap);
-      const au = mergeAutomationPrefs(s.automation);
-      setAutomation(au);
-      onAutomationPrefsChange?.(au);
-      const cf = mergeConfirmationsPrefs(s.confirmations);
-      setConfirmations(cf);
-      onConfirmationsPrefsChange?.(cf);
-      const sc = mergeScriptsPrefs(s.scripts);
-      setScriptsPrefs(sc);
-      onScriptsPrefsChange?.(sc);
-      setMaintenance(mergeMaintenancePrefs(s.maintenance));
-      if (typeof s.sidebarCollapsed === "boolean") {
-        onSidebarCollapsedChange?.(s.sidebarCollapsed);
-      }
     });
     refreshDisplays();
     void invoke<AppPaths>("get_paths")
       .then(setPaths)
       .catch(() => setPaths(null));
-  }, [
-    loadSettings,
-    refreshDisplays,
-    onAccueilPrefsChange,
-    onShellPrefsChange,
-    onAppearancePrefsChange,
-    onAutomationPrefsChange,
-    onConfirmationsPrefsChange,
-    onScriptsPrefsChange,
-    onSidebarCollapsedChange,
-  ]);
+  }, [loadSettings, refreshDisplays, onShellPrefsChange]);
 
   useEffect(() => {
     void invoke<{ measuredCps: number; clicksEmitted: number }>("get_clicker_metrics")
@@ -231,14 +150,7 @@ export function SettingsView({
       journalOpen?: boolean;
       closeToTray?: boolean;
       startWithWindows?: boolean;
-      sidebarCollapsed?: boolean;
-      accueil?: AccueilPrefs;
       shell?: ShellPrefs;
-      appearance?: AppearancePrefs;
-      automation?: AutomationPrefs;
-      confirmations?: ConfirmationsPrefs;
-      scripts?: ScriptsPrefs;
-      maintenance?: MaintenancePrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
@@ -253,65 +165,17 @@ export function SettingsView({
         journalOpen: partial.journalOpen ?? current.journalOpen,
         closeToTray: partial.closeToTray ?? current.closeToTray,
         startWithWindows: partial.startWithWindows ?? current.startWithWindows,
-        sidebarCollapsed: partial.sidebarCollapsed ?? current.sidebarCollapsed,
-        accueil: partial.accueil,
         shell: partial.shell,
-        appearance: partial.appearance,
-        automation: partial.automation,
-        confirmations: partial.confirmations,
-        scripts: partial.scripts,
-        maintenance: partial.maintenance,
       });
     },
     [loadSettings, saveBundle, theme],
   );
 
-  const persistAccueil = (patch: Partial<AccueilPrefs>) => {
-    const next = mergeAccueilPrefs({ ...accueil, ...patch });
-    setAccueil(next);
-    onAccueilPrefsChange?.(next);
-    void persist({ accueil: next });
-  };
-
-  const persistShellPrefs = (patch: Partial<ShellPrefs>) => {
+  const persistShellPrefs = (patch: Partial<Pick<ShellPrefs, "startupView" | "restoreWorkspaceTabs">>) => {
     const next = mergeShellPrefs({ ...shell, ...patch });
     setShell(next);
     onShellPrefsChange?.(next);
     void persist({ shell: next });
-  };
-
-  const persistAppearanceExtra = (patch: Partial<AppearancePrefs>) => {
-    const next = mergeAppearancePrefs({ ...appearanceExtra, ...patch });
-    setAppearanceExtra(next);
-    onAppearancePrefsChange?.(next);
-    void persist({ appearance: next });
-  };
-
-  const persistAutomation = (patch: Partial<AutomationPrefs>) => {
-    const next = mergeAutomationPrefs({ ...automation, ...patch });
-    setAutomation(next);
-    onAutomationPrefsChange?.(next);
-    void persist({ automation: next });
-  };
-
-  const persistConfirmations = (patch: Partial<ConfirmationsPrefs>) => {
-    const next = mergeConfirmationsPrefs({ ...confirmations, ...patch });
-    setConfirmations(next);
-    onConfirmationsPrefsChange?.(next);
-    void persist({ confirmations: next });
-  };
-
-  const persistScriptsPrefs = (patch: Partial<ScriptsPrefs>) => {
-    const next = mergeScriptsPrefs({ ...scriptsPrefs, ...patch });
-    setScriptsPrefs(next);
-    onScriptsPrefsChange?.(next);
-    void persist({ scripts: next });
-  };
-
-  const persistMaintenance = (patch: Partial<MaintenancePrefs>) => {
-    const next = mergeMaintenancePrefs({ ...maintenance, ...patch });
-    setMaintenance(next);
-    void persist({ maintenance: next });
   };
 
   const setAdvanced = (next: boolean) => {
@@ -330,16 +194,14 @@ export function SettingsView({
   };
 
   const resetClicker = async () => {
-    if (confirmations.resetClicker) {
-      const ok = await confirmChoice({
-        title: "Réinitialiser le clicker",
-        message: "Restaurer la configuration clicker par défaut ?",
-        confirmLabel: "Réinitialiser",
-        cancelLabel: "Annuler",
-        danger: true,
-      });
-      if (ok !== "confirm") return;
-    }
+    const ok = await confirmChoice({
+      title: "Réinitialiser le clicker",
+      message: "Restaurer la configuration clicker par défaut ?",
+      confirmLabel: "Réinitialiser",
+      cancelLabel: "Annuler",
+      danger: true,
+    });
+    if (ok !== "confirm") return;
     try {
       const s = await loadSettings();
       if (!s) return;
@@ -409,16 +271,14 @@ export function SettingsView({
   };
 
   const purgeTrash = async () => {
-    if (confirmations.purgeTrash) {
-      const ok = await confirmChoice({
-        title: "Vider la corbeille",
-        message: "Les automations en corbeille seront supprimées définitivement.",
-        confirmLabel: "Vider",
-        cancelLabel: "Annuler",
-        danger: true,
-      });
-      if (ok !== "confirm") return;
-    }
+    const ok = await confirmChoice({
+      title: "Vider la corbeille",
+      message: "Les automations en corbeille seront supprimées définitivement.",
+      confirmLabel: "Vider",
+      cancelLabel: "Annuler",
+      danger: true,
+    });
+    if (ok !== "confirm") return;
     try {
       const n = await invoke<number>("purge_library_trash_cmd");
       toast.success(n > 0 ? `${n} élément(s) supprimé(s)` : "Corbeille déjà vide");
@@ -514,216 +374,7 @@ export function SettingsView({
                   </div>
                 </div>
               </InspectorSection>
-              <InspectorSection title="Exécution et confirmations">
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Confirmer lancement depuis Accueil</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={automation.confirmLaunchFromHome}
-                      onChange={(e) =>
-                        persistAutomation({
-                          confirmLaunchFromHome: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Confirmer arrêt d’urgence</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={automation.confirmStopSession}
-                      onChange={(e) =>
-                        persistAutomation({
-                          confirmStopSession: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Enregistrer avant test / run-from</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={automation.autoSaveBeforeRun}
-                      onChange={(e) =>
-                        persistAutomation({
-                          autoSaveBeforeRun: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Run-from exige une sélection</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={automation.runFromRequiresSelection}
-                      onChange={(e) =>
-                        persistAutomation({
-                          runFromRequiresSelection: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Ouvrir le journal au lancement</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={automation.focusFollowsRun}
-                      onChange={(e) =>
-                        persistAutomation({
-                          focusFollowsRun: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Son en fin de session</span>
-                    <p>Réservé (stub) — pas de bip OS pour l’instant.</p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={automation.soundOnFinish}
-                      onChange={(e) =>
-                        persistAutomation({ soundOnFinish: e.target.checked })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Confirmer fermeture onglet dirty</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={confirmations.closeDirtyTab}
-                      onChange={(e) =>
-                        persistConfirmations({
-                          closeDirtyTab: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Confirmer suppression d’action</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={confirmations.deleteAction}
-                      onChange={(e) =>
-                        persistConfirmations({
-                          deleteAction: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Confirmer vidage corbeille</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={confirmations.purgeTrash}
-                      onChange={(e) =>
-                        persistConfirmations({ purgeTrash: e.target.checked })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Confirmer reset clicker</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={confirmations.resetClicker}
-                      onChange={(e) =>
-                        persistConfirmations({ resetClicker: e.target.checked })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Badges permissions scripts (Accueil)</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={scriptsPrefs.showPermBadgesOnHome}
-                      onChange={(e) =>
-                        persistScriptsPrefs({
-                          showPermBadgesOnHome: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Vider console script à l’exécution</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={scriptsPrefs.clearConsoleOnRun}
-                      onChange={(e) =>
-                        persistScriptsPrefs({
-                          clearConsoleOnRun: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Timeout script (ms)</span>
-                    <p>0 = illimité (hint UI ; plafond engine non branché).</p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="number"
-                      className="v2-input"
-                      min={0}
-                      step={1000}
-                      value={scriptsPrefs.defaultTimeoutMs}
-                      onChange={(e) =>
-                        persistScriptsPrefs({
-                          defaultTimeoutMs: Number(e.target.value) || 0,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </InspectorSection>
-              <InspectorSection title="Fenêtre">
+              <InspectorSection title="Démarrage & fenêtre">
                 <div className="v2-settings-row">
                   <div className="v2-settings-row-label">
                     <span>Journal ouvert au démarrage</span>
@@ -809,329 +460,6 @@ export function SettingsView({
                     />
                   </div>
                 </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Palette de commandes (Ctrl+K)</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={shell.commandPaletteEnabled}
-                      onChange={(e) =>
-                        persistShellPrefs({
-                          commandPaletteEnabled: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Afficher la pilule de session</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={shell.showSessionPill}
-                      onChange={(e) =>
-                        persistShellPrefs({ showSessionPill: e.target.checked })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Réduire vers le tray</span>
-                    <p>Distinct de « Fermer vers tray ».</p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={shell.minimizeToTray}
-                      onChange={(e) =>
-                        persistShellPrefs({ minimizeToTray: e.target.checked })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Max. récents</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="number"
-                      className="v2-input"
-                      min={4}
-                      max={50}
-                      value={shell.recentListMax}
-                      onChange={(e) =>
-                        persistShellPrefs({
-                          recentListMax: Number(e.target.value) || 12,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Avertir si modifications non enregistrées</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={shell.warnOnUnsavedQuit}
-                      onChange={(e) =>
-                        persistShellPrefs({
-                          warnOnUnsavedQuit: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Barre latérale repliée</span>
-                    <p>Mémorisé pour les surfaces qui exposent une sidebar.</p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={sidebarCollapsed}
-                      onChange={(e) => {
-                        onSidebarCollapsedChange?.(e.target.checked);
-                        void persist({ sidebarCollapsed: e.target.checked });
-                      }}
-                    />
-                  </div>
-                </div>
-              </InspectorSection>
-            </>
-          ) : null}
-
-          {section === "accueil" ? (
-            <>
-              <h2 className="v2-settings-pane-title">Accueil</h2>
-              <p className="v2-settings-pane-hint">
-                Tri, filtres et comportements de la liste des automations.
-              </p>
-              <InspectorSection title="Affichage par défaut">
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Tri</span>
-                    <p>Ordre manuel (#), nom, type ou statut.</p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <Select
-                      className="v2-select"
-                      value={accueil.defaultSortBy}
-                      ariaLabel="Tri Accueil par défaut"
-                      options={[
-                        { value: "order", label: "Ordre manuel (#)" },
-                        { value: "name", label: "Nom" },
-                        { value: "type", label: "Type" },
-                        { value: "status", label: "Statut" },
-                      ]}
-                      onChange={(v) =>
-                        persistAccueil({ defaultSortBy: v as AccueilSortBy })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Direction</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <Select
-                      className="v2-select"
-                      value={accueil.defaultSortDir}
-                      ariaLabel="Direction du tri"
-                      options={[
-                        { value: "asc", label: "Croissant" },
-                        { value: "desc", label: "Décroissant" },
-                      ]}
-                      onChange={(v) =>
-                        persistAccueil({ defaultSortDir: v as AccueilSortDir })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Filtre</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <Select
-                      className="v2-select"
-                      value={accueil.defaultFilter}
-                      ariaLabel="Filtre Accueil par défaut"
-                      options={[
-                        { value: "all", label: "Tous" },
-                        { value: "favorites", label: "Favoris" },
-                        { value: "recent", label: "Récents" },
-                        { value: "scripts", label: "Scripts" },
-                      ]}
-                      onChange={(v) =>
-                        persistAccueil({ defaultFilter: v as AccueilFilter })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Mémoriser sections repliées</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <label className="v2-switch">
-                      <input
-                        type="checkbox"
-                        checked={accueil.rememberCollapsedSections}
-                        onChange={(e) =>
-                          persistAccueil({
-                            rememberCollapsedSections: e.target.checked,
-                          })
-                        }
-                      />
-                      <span />
-                    </label>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Scripts dans « Tous »</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <label className="v2-switch">
-                      <input
-                        type="checkbox"
-                        checked={accueil.showScriptsInAll}
-                        onChange={(e) =>
-                          persistAccueil({ showScriptsInAll: e.target.checked })
-                        }
-                      />
-                      <span />
-                    </label>
-                  </div>
-                </div>
-              </InspectorSection>
-              <InspectorSection title="Interactions">
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Ouvrir au simple clic</span>
-                    <p>Sinon double-clic ou Entrée.</p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <label className="v2-switch">
-                      <input
-                        type="checkbox"
-                        checked={accueil.openOnSingleClick}
-                        onChange={(e) =>
-                          persistAccueil({ openOnSingleClick: e.target.checked })
-                        }
-                      />
-                      <span />
-                    </label>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Confirmer corbeille</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <label className="v2-switch">
-                      <input
-                        type="checkbox"
-                        checked={accueil.confirmTrash}
-                        onChange={(e) =>
-                          persistAccueil({ confirmTrash: e.target.checked })
-                        }
-                      />
-                      <span />
-                    </label>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Confirmer suppression dossier</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <label className="v2-switch">
-                      <input
-                        type="checkbox"
-                        checked={accueil.confirmDeleteFolder}
-                        onChange={(e) =>
-                          persistAccueil({
-                            confirmDeleteFolder: e.target.checked,
-                          })
-                        }
-                      />
-                      <span />
-                    </label>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Sync ordre bibliothèque (même type)</span>
-                    <p>
-                      Lors d’un réordonnancement Accueil entre deux macros ou
-                      deux clickers.
-                    </p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <label className="v2-switch">
-                      <input
-                        type="checkbox"
-                        checked={accueil.syncLibrarySortOnReorder}
-                        onChange={(e) =>
-                          persistAccueil({
-                            syncLibrarySortOnReorder: e.target.checked,
-                          })
-                        }
-                      />
-                      <span />
-                    </label>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Seuil double-clic (ms)</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="number"
-                      className="v2-input"
-                      min={150}
-                      max={800}
-                      step={50}
-                      value={accueil.doubleClickDelayMs}
-                      onChange={(e) =>
-                        persistAccueil({
-                          doubleClickDelayMs: Number(e.target.value) || 300,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Seuil drag (px)</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="number"
-                      className="v2-input"
-                      min={2}
-                      max={24}
-                      value={accueil.dragThresholdPx}
-                      onChange={(e) =>
-                        persistAccueil({
-                          dragThresholdPx: Number(e.target.value) || 6,
-                        })
-                      }
-                    />
-                  </div>
-                </div>
               </InspectorSection>
             </>
           ) : null}
@@ -1196,83 +524,6 @@ export function SettingsView({
                     aria-label="Thème clair"
                     onClick={() => setTheme("light")}
                   />
-                </div>
-              </InspectorSection>
-              <InspectorSection title="Densité et accent">
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Densité</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <Select
-                      className="v2-select"
-                      value={appearanceExtra.density}
-                      ariaLabel="Densité UI"
-                      options={[
-                        { value: "comfortable", label: "Confortable" },
-                        { value: "compact", label: "Compacte" },
-                      ]}
-                      onChange={(v) =>
-                        persistAppearanceExtra({ density: v as UiDensity })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Échelle de police</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <Select
-                      className="v2-select"
-                      value={String(appearanceExtra.fontScale)}
-                      ariaLabel="Échelle de police"
-                      options={[
-                        { value: "0.9", label: "90 %" },
-                        { value: "1", label: "100 %" },
-                        { value: "1.1", label: "110 %" },
-                      ]}
-                      onChange={(v) =>
-                        persistAppearanceExtra({ fontScale: Number(v) || 1 })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Accent</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <Select
-                      className="v2-select"
-                      value={appearanceExtra.accent}
-                      ariaLabel="Accent"
-                      options={[
-                        { value: "default", label: "Défaut" },
-                        { value: "blue", label: "Bleu" },
-                        { value: "teal", label: "Sarcelle" },
-                      ]}
-                      onChange={(v) =>
-                        persistAppearanceExtra({ accent: v as AccentTheme })
-                      }
-                    />
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Réduire les animations</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="checkbox"
-                      checked={appearanceExtra.reduceMotion}
-                      onChange={(e) =>
-                        persistAppearanceExtra({
-                          reduceMotion: e.target.checked,
-                        })
-                      }
-                    />
-                  </div>
                 </div>
               </InspectorSection>
               <InspectorSection title="Overlay">
@@ -1594,89 +845,6 @@ export function SettingsView({
                     >
                       Importer
                     </button>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Fichiers liés</span>
-                    <p>
-                      <code className="v2-settings-mono">
-                        {paths?.accueilOrderPath ?? "accueil-order.json"}
-                      </code>
-                      <br />
-                      <code className="v2-settings-mono">
-                        {paths?.libraryPath ?? "library.json"}
-                      </code>
-                      <br />
-                      <code className="v2-settings-mono">
-                        {paths?.quickAccessPath ?? "quick-access.json"}
-                      </code>
-                    </p>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Réinitialiser ordre Accueil</span>
-                    <p>Efface l’ordre manuel (#) sans toucher à la bibliothèque.</p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <button
-                      type="button"
-                      className="v2-btn v2-btn-ghost"
-                      onClick={() => {
-                        void (async () => {
-                          try {
-                            await invoke("reset_accueil_order_cmd");
-                            toast.success("Ordre Accueil réinitialisé");
-                          } catch {
-                            toast.error("Échec de la réinitialisation");
-                          }
-                        })();
-                      }}
-                    >
-                      Réinitialiser
-                    </button>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Réinitialiser sections repliées</span>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <button
-                      type="button"
-                      className="v2-btn v2-btn-ghost"
-                      onClick={() => {
-                        try {
-                          localStorage.removeItem(COLLAPSED_SECTIONS_KEY);
-                          toast.success("Sections Accueil réinitialisées");
-                        } catch {
-                          toast.error("Impossible d’effacer le stockage local");
-                        }
-                      }}
-                    >
-                      Réinitialiser
-                    </button>
-                  </div>
-                </div>
-                <div className="v2-settings-row">
-                  <div className="v2-settings-row-label">
-                    <span>Rappel purge corbeille (jours)</span>
-                    <p>0 = désactivé. Hint seulement — pas de purge automatique OS.</p>
-                  </div>
-                  <div className="v2-settings-row-control">
-                    <input
-                      type="number"
-                      className="v2-input"
-                      min={0}
-                      max={365}
-                      value={maintenance.autoPurgeTrashDays}
-                      onChange={(e) =>
-                        persistMaintenance({
-                          autoPurgeTrashDays: Number(e.target.value) || 0,
-                        })
-                      }
-                    />
                   </div>
                 </div>
                 <div className="v2-settings-row">

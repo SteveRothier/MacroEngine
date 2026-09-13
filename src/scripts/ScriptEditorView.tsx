@@ -47,7 +47,6 @@ type Props = {
   onBack: () => void;
   onDirtyChange?: (id: string, dirty: boolean) => void;
   onLabelChange?: (name: string) => void;
-  clearConsoleOnRun?: boolean;
 };
 
 function normalizeDoc(doc: ScriptDoc): ScriptDoc {
@@ -76,7 +75,6 @@ export function ScriptEditorView({
   onBack,
   onDirtyChange,
   onLabelChange,
-  clearConsoleOnRun = false,
 }: Props) {
   const toast = useToast();
   const [draft, setDraft] = useState<ScriptDoc | null>(null);
@@ -362,9 +360,6 @@ export function ScriptEditorView({
   async function onRun() {
     try {
       await flushAutosave();
-      if (clearConsoleOnRun) {
-        setConsoleLines([]);
-      }
       pushConsole("Session · démarrage", "session");
       await invoke("run_script_session_cmd", { id: scriptId });
       setRunning(true);
