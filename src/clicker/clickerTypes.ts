@@ -193,9 +193,17 @@ export type AppSettings = {
   processFilter?: ProcessFilter;
   theme?: ThemeMode;
   displayId?: string | null;
+  sidebarCollapsed?: boolean;
   journalOpen?: boolean;
   closeToTray?: boolean;
   startWithWindows?: boolean;
+  accueil?: import("../settings/settingsTypes").AccueilPrefs;
+  shell?: import("../settings/settingsTypes").ShellPrefs;
+  automation?: import("../settings/settingsTypes").AutomationPrefs;
+  confirmations?: import("../settings/settingsTypes").ConfirmationsPrefs;
+  scripts?: import("../settings/settingsTypes").ScriptsPrefs;
+  appearance?: import("../settings/settingsTypes").AppearancePrefs;
+  maintenance?: import("../settings/settingsTypes").MaintenancePrefs;
   hotkeys: {
     actionVk: number;
     actionCtrl?: boolean;

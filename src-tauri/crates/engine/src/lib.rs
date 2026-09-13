@@ -91,8 +91,10 @@ pub use script_library::{
 };
 pub use script_params::{parse_param_defs, ScriptParamDef};
 pub use settings::{
-    clamp_overlay_opacity, load_settings, save_settings, settings_path, AppSettings, ProcessFilter,
-    ProcessFilterMode, SettingsError, ThemeMode,
+    clamp_overlay_opacity, load_settings, normalize_app_settings, save_settings, settings_path,
+    AccentTheme, AccueilFilter, AccueilPrefs, AccueilSortBy, AccueilSortDir, AppearancePrefs,
+    AppSettings, AutomationPrefs, ConfirmationsPrefs, MaintenancePrefs, ProcessFilter,
+    ProcessFilterMode, ScriptsPrefs, SettingsError, ShellPrefs, StartupView, ThemeMode, UiDensity,
 };
 pub use state::{EngineError, EngineState, StateTransitionError};
 pub use stop_zones::{

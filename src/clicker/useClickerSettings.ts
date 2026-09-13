@@ -7,6 +7,24 @@ import {
   type ProcessFilter,
   DEFAULT_PROCESS_FILTER,
 } from "./clickerTypes";
+import type {
+  AccueilPrefs,
+  AppearancePrefs,
+  AutomationPrefs,
+  ConfirmationsPrefs,
+  MaintenancePrefs,
+  ScriptsPrefs,
+  ShellPrefs,
+} from "../settings/settingsTypes";
+import {
+  mergeAccueilPrefs,
+  mergeAppearancePrefs,
+  mergeAutomationPrefs,
+  mergeConfirmationsPrefs,
+  mergeMaintenancePrefs,
+  mergeScriptsPrefs,
+  mergeShellPrefs,
+} from "../settings/settingsTypes";
 
 export type PersistBundle = {
   clicker: ClickerConfigPayload;
@@ -19,6 +37,14 @@ export type PersistBundle = {
   journalOpen?: boolean;
   closeToTray?: boolean;
   startWithWindows?: boolean;
+  sidebarCollapsed?: boolean;
+  accueil?: Partial<AccueilPrefs>;
+  shell?: Partial<ShellPrefs>;
+  automation?: Partial<AutomationPrefs>;
+  confirmations?: Partial<ConfirmationsPrefs>;
+  scripts?: Partial<ScriptsPrefs>;
+  appearance?: Partial<AppearancePrefs>;
+  maintenance?: Partial<MaintenancePrefs>;
 };
 
 function mergeSettings(current: AppSettings, bundle: PersistBundle): AppSettings {
@@ -34,6 +60,35 @@ function mergeSettings(current: AppSettings, bundle: PersistBundle): AppSettings
     journalOpen: bundle.journalOpen ?? current.journalOpen,
     closeToTray: bundle.closeToTray ?? current.closeToTray,
     startWithWindows: bundle.startWithWindows ?? current.startWithWindows,
+    sidebarCollapsed: bundle.sidebarCollapsed ?? current.sidebarCollapsed,
+    accueil: mergeAccueilPrefs({
+      ...current.accueil,
+      ...bundle.accueil,
+    }),
+    shell: mergeShellPrefs({
+      ...current.shell,
+      ...bundle.shell,
+    }),
+    automation: mergeAutomationPrefs({
+      ...current.automation,
+      ...bundle.automation,
+    }),
+    confirmations: mergeConfirmationsPrefs({
+      ...current.confirmations,
+      ...bundle.confirmations,
+    }),
+    scripts: mergeScriptsPrefs({
+      ...current.scripts,
+      ...bundle.scripts,
+    }),
+    appearance: mergeAppearancePrefs({
+      ...current.appearance,
+      ...bundle.appearance,
+    }),
+    maintenance: mergeMaintenancePrefs({
+      ...current.maintenance,
+      ...bundle.maintenance,
+    }),
     hotkeys: current.hotkeys,
   };
 }
