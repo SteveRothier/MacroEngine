@@ -163,10 +163,8 @@ function KindIcon({ row }: { row: AutomationRow }) {
 }
 
 async function deleteRow(r: AutomationRow): Promise<void> {
-  if (r.kind === "macro") {
-    await invoke("delete_saved_macro", { name: r.id });
-  } else if (r.kind === "clicker") {
-    await invoke("delete_clicker_preset", { name: r.id });
+  if (r.kind === "macro" || r.kind === "clicker") {
+    await invoke("trash_library_item_cmd", { kind: r.kind, id: r.id });
   } else {
     await invoke("delete_script_cmd", { id: r.id });
   }
@@ -618,10 +616,15 @@ export function AutomationsTable({
 
   async function onDeleteSelected() {
     if (selectedRows.length === 0) return;
+    const hasLibrary = selectedRows.some(
+      (r) => r.kind === "macro" || r.kind === "clicker",
+    );
     const ok = await confirmAction({
-      title: "Supprimer",
-      message: `Supprimer ${selectedRows.length} automation${selectedRows.length > 1 ? "s" : ""} ?`,
-      confirmLabel: "Supprimer",
+      title: hasLibrary ? "Mettre à la corbeille" : "Supprimer",
+      message: hasLibrary
+        ? `Mettre ${selectedRows.length} automation${selectedRows.length > 1 ? "s" : ""} à la corbeille ?`
+        : `Supprimer ${selectedRows.length} automation${selectedRows.length > 1 ? "s" : ""} ?`,
+      confirmLabel: hasLibrary ? "Corbeille" : "Supprimer",
       danger: true,
     });
     if (!ok) return;
@@ -630,8 +633,9 @@ export function AutomationsTable({
         await deleteRow(r);
       }
       setSelected(new Set());
+      await refresh();
       onRefresh?.();
-      toast.success("Suppression effectuée");
+      toast.success(hasLibrary ? "Mis à la corbeille" : "Suppression effectuée");
     } catch (e) {
       toast.error(errMessage(e, "Échec de la suppression"));
     }
@@ -871,20 +875,52 @@ export function AutomationsTable({
   }
 
   async function onDeleteOne(r: AutomationRow) {
+    const toTrash = r.kind === "macro" || r.kind === "clicker";
     const ok = await confirmAction({
-      title: "Supprimer",
-      message: `Supprimer « ${r.name} » ?`,
-      confirmLabel: "Supprimer",
+      title: toTrash ? "Mettre à la corbeille" : "Supprimer",
+      message: toTrash
+        ? `Mettre « ${r.name} » à la corbeille ?`
+        : `Supprimer « ${r.name} » ?`,
+      confirmLabel: toTrash ? "Corbeille" : "Supprimer",
       danger: true,
     });
     if (!ok) return;
     try {
       await deleteRow(r);
       setMenuKey(null);
+      await refresh();
       onRefresh?.();
-      toast.success("Suppression effectuée");
+      toast.success(toTrash ? "Mis à la corbeille" : "Suppression effectuée");
     } catch (e) {
       toast.error(errMessage(e, "Échec de la suppression"));
+    }
+  }
+
+  async function onDeleteFolder() {
+    if (!folderKey) {
+      toast.info("Filtrez d’abord un dossier à supprimer");
+      return;
+    }
+    const folder = folders.find((f) => folderOptionKey(f) === folderKey);
+    if (!folder) return;
+    const ok = await confirmAction({
+      title: "Supprimer le dossier",
+      message: `Supprimer le dossier « ${folder.name} » ? Les automations qu’il contient resteront disponibles (hors dossier).`,
+      confirmLabel: "Supprimer",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await invoke("delete_library_folder_cmd", {
+        kind: folder.kind,
+        id: folder.id,
+      });
+      onFolderKeyChange(null);
+      await refresh();
+      onRefresh?.();
+      toast.success(`Dossier supprimé · ${folder.name}`);
+    } catch (e) {
+      toast.error(errMessage(e, "Impossible de supprimer le dossier"));
     }
   }
 
@@ -1282,6 +1318,7 @@ export function AutomationsTable({
         onCreateScript={onCreateScript}
         onCreateFolder={(kind) => void onCreateFolder(kind)}
         onRenameFolder={() => void onRenameFolder()}
+        onDeleteFolder={() => void onDeleteFolder()}
         dragRow={dragRow}
         dropFolderKey={dropFolderKey}
         onDropFolderKeyChange={setDropFolderKey}
@@ -2015,7 +2052,7 @@ export function AutomationsTable({
               className="v2-btn v2-btn-danger-ghost"
               onClick={() => void onDeleteSelected()}
             >
-              Supprimer
+              Corbeille
             </button>
             <button
               type="button"

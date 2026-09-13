@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   Star,
+  Trash2,
   Workflow,
 } from "lucide-react";
 import { DropdownMenu, Select, Tooltip } from "../ui/v2";
@@ -37,6 +38,7 @@ type Props = {
   onCreateScript: () => void;
   onCreateFolder?: (kind: "macro" | "clicker") => void;
   onRenameFolder?: () => void;
+  onDeleteFolder?: () => void;
   dragRow?: AutomationRow | null;
   dropFolderKey?: string | null;
   onDropFolderKeyChange?: (key: string | null) => void;
@@ -77,6 +79,7 @@ export function AutomationsToolbar({
   onCreateScript,
   onCreateFolder,
   onRenameFolder,
+  onDeleteFolder,
   dragRow = null,
   dropFolderKey = null,
   onDropFolderKeyChange,
@@ -125,6 +128,17 @@ export function AutomationsToolbar({
             label: "Renommer le dossier filtré",
             icon: <PenLine size={14} />,
             onSelect: () => onRenameFolder(),
+          },
+        ]
+      : []),
+    ...(folderKey && onDeleteFolder
+      ? [
+          {
+            id: "delete-folder",
+            label: "Supprimer le dossier",
+            icon: <Trash2 size={14} />,
+            danger: true as const,
+            onSelect: () => onDeleteFolder(),
           },
         ]
       : []),
