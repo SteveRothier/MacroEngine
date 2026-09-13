@@ -17,10 +17,17 @@ import type { ThemeMode } from "../theme";
 import type { SettingsSection } from "../app/types";
 import {
   mergeAccueilPrefs,
+  mergeAppearancePrefs,
+  mergeShellPrefs,
   type AccueilPrefs,
   type AccueilFilter,
   type AccueilSortBy,
   type AccueilSortDir,
+  type AppearancePrefs,
+  type AccentTheme,
+  type ShellPrefs,
+  type StartupView,
+  type UiDensity,
 } from "./settingsTypes";
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
@@ -52,6 +59,10 @@ type Props = {
   journalOpen: boolean;
   onJournalOpenChange: (v: boolean) => void;
   onAccueilPrefsChange?: (prefs: AccueilPrefs) => void;
+  onShellPrefsChange?: (prefs: ShellPrefs) => void;
+  onAppearancePrefsChange?: (prefs: AppearancePrefs) => void;
+  sidebarCollapsed?: boolean;
+  onSidebarCollapsedChange?: (v: boolean) => void;
 };
 
 function displayOptionLabel(d: DisplayDto): string {
@@ -72,6 +83,10 @@ export function SettingsView({
   journalOpen,
   onJournalOpenChange,
   onAccueilPrefsChange,
+  onShellPrefsChange,
+  onAppearancePrefsChange,
+  sidebarCollapsed = false,
+  onSidebarCollapsedChange,
 }: Props) {
   const toast = useToast();
   const { loadSettings, saveBundle } = useClickerSettingsApi();
@@ -86,6 +101,10 @@ export function SettingsView({
   const [displays, setDisplays] = useState<DisplayDto[]>([]);
   const [displayId, setDisplayId] = useState<string | null>(null);
   const [accueil, setAccueil] = useState<AccueilPrefs>(() => mergeAccueilPrefs());
+  const [shell, setShell] = useState<ShellPrefs>(() => mergeShellPrefs());
+  const [appearanceExtra, setAppearanceExtra] = useState<AppearancePrefs>(() =>
+    mergeAppearancePrefs(),
+  );
   const [paths, setPaths] = useState<AppPaths | null>(null);
   const [metrics, setMetrics] = useState<{
     measuredCps: number;
@@ -116,12 +135,28 @@ export function SettingsView({
       const a = mergeAccueilPrefs(s.accueil);
       setAccueil(a);
       onAccueilPrefsChange?.(a);
+      const sh = mergeShellPrefs(s.shell);
+      setShell(sh);
+      onShellPrefsChange?.(sh);
+      const ap = mergeAppearancePrefs(s.appearance);
+      setAppearanceExtra(ap);
+      onAppearancePrefsChange?.(ap);
+      if (typeof s.sidebarCollapsed === "boolean") {
+        onSidebarCollapsedChange?.(s.sidebarCollapsed);
+      }
     });
     refreshDisplays();
     void invoke<AppPaths>("get_paths")
       .then(setPaths)
       .catch(() => setPaths(null));
-  }, [loadSettings, refreshDisplays, onAccueilPrefsChange]);
+  }, [
+    loadSettings,
+    refreshDisplays,
+    onAccueilPrefsChange,
+    onShellPrefsChange,
+    onAppearancePrefsChange,
+    onSidebarCollapsedChange,
+  ]);
 
   useEffect(() => {
     void invoke<{ measuredCps: number; clicksEmitted: number }>("get_clicker_metrics")
@@ -155,6 +190,8 @@ export function SettingsView({
       startWithWindows?: boolean;
       sidebarCollapsed?: boolean;
       accueil?: AccueilPrefs;
+      shell?: ShellPrefs;
+      appearance?: AppearancePrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
@@ -171,6 +208,8 @@ export function SettingsView({
         startWithWindows: partial.startWithWindows ?? current.startWithWindows,
         sidebarCollapsed: partial.sidebarCollapsed ?? current.sidebarCollapsed,
         accueil: partial.accueil,
+        shell: partial.shell,
+        appearance: partial.appearance,
       });
     },
     [loadSettings, saveBundle, theme],
@@ -181,6 +220,20 @@ export function SettingsView({
     setAccueil(next);
     onAccueilPrefsChange?.(next);
     void persist({ accueil: next });
+  };
+
+  const persistShellPrefs = (patch: Partial<ShellPrefs>) => {
+    const next = mergeShellPrefs({ ...shell, ...patch });
+    setShell(next);
+    onShellPrefsChange?.(next);
+    void persist({ shell: next });
+  };
+
+  const persistAppearanceExtra = (patch: Partial<AppearancePrefs>) => {
+    const next = mergeAppearancePrefs({ ...appearanceExtra, ...patch });
+    setAppearanceExtra(next);
+    onAppearancePrefsChange?.(next);
+    void persist({ appearance: next });
   };
 
   const setAdvanced = (next: boolean) => {
@@ -418,6 +471,137 @@ export function SettingsView({
                       onChange={(e) => {
                         setStartWithWindows(e.target.checked);
                         void persist({ startWithWindows: e.target.checked });
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Vue au démarrage</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <Select
+                      className="v2-select"
+                      value={shell.startupView}
+                      ariaLabel="Vue au démarrage"
+                      options={[
+                        { value: "home", label: "Accueil" },
+                        { value: "lastDocument", label: "Dernier document" },
+                      ]}
+                      onChange={(v) =>
+                        persistShellPrefs({ startupView: v as StartupView })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Restaurer les onglets</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="checkbox"
+                      checked={shell.restoreWorkspaceTabs}
+                      onChange={(e) =>
+                        persistShellPrefs({
+                          restoreWorkspaceTabs: e.target.checked,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Palette de commandes (Ctrl+K)</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="checkbox"
+                      checked={shell.commandPaletteEnabled}
+                      onChange={(e) =>
+                        persistShellPrefs({
+                          commandPaletteEnabled: e.target.checked,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Afficher la pilule de session</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="checkbox"
+                      checked={shell.showSessionPill}
+                      onChange={(e) =>
+                        persistShellPrefs({ showSessionPill: e.target.checked })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Réduire vers le tray</span>
+                    <p>Distinct de « Fermer vers tray ».</p>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="checkbox"
+                      checked={shell.minimizeToTray}
+                      onChange={(e) =>
+                        persistShellPrefs({ minimizeToTray: e.target.checked })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Max. récents</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="number"
+                      className="v2-input"
+                      min={4}
+                      max={50}
+                      value={shell.recentListMax}
+                      onChange={(e) =>
+                        persistShellPrefs({
+                          recentListMax: Number(e.target.value) || 12,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Avertir si modifications non enregistrées</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="checkbox"
+                      checked={shell.warnOnUnsavedQuit}
+                      onChange={(e) =>
+                        persistShellPrefs({
+                          warnOnUnsavedQuit: e.target.checked,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Barre latérale repliée</span>
+                    <p>Mémorisé pour les surfaces qui exposent une sidebar.</p>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="checkbox"
+                      checked={sidebarCollapsed}
+                      onChange={(e) => {
+                        onSidebarCollapsedChange?.(e.target.checked);
+                        void persist({ sidebarCollapsed: e.target.checked });
                       }}
                     />
                   </div>
@@ -713,6 +897,83 @@ export function SettingsView({
                     aria-label="Thème clair"
                     onClick={() => setTheme("light")}
                   />
+                </div>
+              </InspectorSection>
+              <InspectorSection title="Densité et accent">
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Densité</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <Select
+                      className="v2-select"
+                      value={appearanceExtra.density}
+                      ariaLabel="Densité UI"
+                      options={[
+                        { value: "comfortable", label: "Confortable" },
+                        { value: "compact", label: "Compacte" },
+                      ]}
+                      onChange={(v) =>
+                        persistAppearanceExtra({ density: v as UiDensity })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Échelle de police</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <Select
+                      className="v2-select"
+                      value={String(appearanceExtra.fontScale)}
+                      ariaLabel="Échelle de police"
+                      options={[
+                        { value: "0.9", label: "90 %" },
+                        { value: "1", label: "100 %" },
+                        { value: "1.1", label: "110 %" },
+                      ]}
+                      onChange={(v) =>
+                        persistAppearanceExtra({ fontScale: Number(v) || 1 })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Accent</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <Select
+                      className="v2-select"
+                      value={appearanceExtra.accent}
+                      ariaLabel="Accent"
+                      options={[
+                        { value: "default", label: "Défaut" },
+                        { value: "blue", label: "Bleu" },
+                        { value: "teal", label: "Sarcelle" },
+                      ]}
+                      onChange={(v) =>
+                        persistAppearanceExtra({ accent: v as AccentTheme })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Réduire les animations</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="checkbox"
+                      checked={appearanceExtra.reduceMotion}
+                      onChange={(e) =>
+                        persistAppearanceExtra({
+                          reduceMotion: e.target.checked,
+                        })
+                      }
+                    />
+                  </div>
                 </div>
               </InspectorSection>
               <InspectorSection title="Overlay">

@@ -14,7 +14,11 @@ import {
 import { SettingsView } from "../settings/SettingsView";
 import {
   mergeAccueilPrefs,
+  mergeAppearancePrefs,
+  mergeShellPrefs,
   type AccueilPrefs,
+  type AppearancePrefs,
+  type ShellPrefs,
 } from "../settings/settingsTypes";
 import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
@@ -34,7 +38,7 @@ import { TitleBarProvider, useTitleBarContext } from "../ui/v2/TitleBarContext";
 import { ConfirmHost, confirmAction, PromptHost, promptAction } from "../ui";
 import { applyTheme, readStoredTheme, subscribeSystemTheme, type ThemeMode } from "../theme";
 import { stateLabelFr, sessionLabelFr } from "../ui/labels";
-import { loadRecent, pushRecent, saveLastStudio } from "./recent";
+import { loadRecent, loadLastStudio, pushRecent, saveLastStudio } from "./recent";
 import type { SettingsSection } from "./types";
 import type { AppSettings } from "../clicker/clickerTypes";
 import { DEFAULT_CLICKER } from "../clicker/clickerTypes";
@@ -111,6 +115,13 @@ function MainAppV2Inner() {
   const [accueilPrefs, setAccueilPrefs] = useState<AccueilPrefs>(() =>
     mergeAccueilPrefs(),
   );
+  const [shellPrefs, setShellPrefs] = useState<ShellPrefs>(() =>
+    mergeShellPrefs(),
+  );
+  const [appearancePrefs, setAppearancePrefs] = useState<AppearancePrefs>(() =>
+    mergeAppearancePrefs(),
+  );
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => loadWorkspace());
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
   const [advanced, setAdvanced] = useState(false);
@@ -173,6 +184,22 @@ function MainAppV2Inner() {
         }
         if (typeof s.journalOpen === "boolean") setJournalOpen(s.journalOpen);
         setAccueilPrefs(mergeAccueilPrefs(s.accueil));
+        setShellPrefs(mergeShellPrefs(s.shell));
+        setAppearancePrefs(mergeAppearancePrefs(s.appearance));
+        if (typeof s.sidebarCollapsed === "boolean") {
+          setSidebarCollapsed(s.sidebarCollapsed);
+        }
+        const sh = mergeShellPrefs(s.shell);
+        if (!sh.restoreWorkspaceTabs) {
+          setWorkspace((ws) => selectHome({ ...ws, tabs: [] }));
+        } else if (sh.startupView === "lastDocument") {
+          const last = loadLastStudio();
+          if (last) {
+            setWorkspace((ws) =>
+              openDocTab(ws, last.kind, last.id, last.id),
+            );
+          }
+        }
       })
       .catch(() => undefined);
     void invoke<HotkeyBindings>("get_hotkey_bindings")
@@ -529,6 +556,7 @@ function MainAppV2Inner() {
       if (!mod) return;
 
       if (e.key === "k" && !e.shiftKey) {
+        if (!shellPrefs.commandPaletteEnabled) return;
         e.preventDefault();
         setPaletteOpen((o) => !o);
         return;
@@ -562,7 +590,7 @@ function MainAppV2Inner() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCreateMacro, onTabClose, workspace]);
+  }, [onCreateMacro, onTabClose, shellPrefs.commandPaletteEnabled, workspace]);
 
   const commandItems = useMemo((): CommandItem[] => {
     const nav: CommandItem[] = [
@@ -776,6 +804,10 @@ function MainAppV2Inner() {
             setAccueilPrefs(prefs);
             automationsPage.applyAccueilDefaults(prefs);
           }}
+          onShellPrefsChange={setShellPrefs}
+          onAppearancePrefsChange={setAppearancePrefs}
+          sidebarCollapsed={sidebarCollapsed}
+          onSidebarCollapsedChange={setSidebarCollapsed}
         />
       );
     }
@@ -892,6 +924,11 @@ function MainAppV2Inner() {
   return (
     <>
       <AppShell
+        density={appearancePrefs.density}
+        fontScale={appearancePrefs.fontScale}
+        accent={appearancePrefs.accent}
+        reduceMotion={appearancePrefs.reduceMotion}
+        rootClassName={sidebarCollapsed ? "v2-root--sidebar-collapsed" : undefined}
         titleBar={
           <WindowTitleBar
             tabs={documentTabs}
@@ -917,14 +954,16 @@ function MainAppV2Inner() {
               });
             }}
             journalOpen={journalOpen}
-            sessionStatus={sessionPill}
+            sessionStatus={shellPrefs.showSessionPill ? sessionPill : null}
             showStop={running}
             onStop={onEmergencyStop}
-            recentItems={loadRecent().map((r) => ({
-              id: `${r.kind}:${r.id}`,
-              label: r.label,
-              onSelect: () => openDoc(r.kind, r.id, r.label),
-            }))}
+            recentItems={loadRecent()
+              .slice(0, shellPrefs.recentListMax)
+              .map((r) => ({
+                id: `${r.kind}:${r.id}`,
+                label: r.label,
+                onSelect: () => openDoc(r.kind, r.id, r.label),
+              }))}
           />
         }
       >

@@ -71,6 +71,28 @@
   font-size: 13px;
 }
 
+.v2-root[data-density="compact"] {
+  --v2-text-md: 12px;
+  --v2-titlebar-h: 36px;
+}
+
+.v2-root[data-accent="blue"] {
+  --v2-accent: #2f6fed;
+}
+
+.v2-root[data-accent="teal"] {
+  --v2-accent: #0d9488;
+}
+
+.v2-root[data-reduce-motion="true"] *,
+.v2-root[data-reduce-motion="true"] *::before,
+.v2-root[data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 .v2-fatal-error {
   display: flex;
   flex-direction: column;
