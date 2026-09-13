@@ -66,6 +66,13 @@ export function buildAutomationRowMenuItems(
       icon: actions.icons?.launch,
       onSelect: actions.onLaunch,
     });
+  } else {
+    items.push({
+      id: "launch",
+      label: "Exécuter",
+      icon: actions.icons?.launch,
+      onSelect: actions.onLaunch,
+    });
   }
 
   items.push({ id: "sep-mid", label: "", separator: true });
