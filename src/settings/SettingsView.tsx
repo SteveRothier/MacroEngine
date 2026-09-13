@@ -20,6 +20,7 @@ import {
   mergeAppearancePrefs,
   mergeAutomationPrefs,
   mergeConfirmationsPrefs,
+  mergeMaintenancePrefs,
   mergeScriptsPrefs,
   mergeShellPrefs,
   type AccueilPrefs,
@@ -30,11 +31,13 @@ import {
   type AccentTheme,
   type AutomationPrefs,
   type ConfirmationsPrefs,
+  type MaintenancePrefs,
   type ScriptsPrefs,
   type ShellPrefs,
   type StartupView,
   type UiDensity,
 } from "./settingsTypes";
+import { COLLAPSED_SECTIONS_KEY } from "../automations/types";
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: "general", label: "Général" },
@@ -51,6 +54,9 @@ type AppPaths = {
   settingsPath: string;
   logDir: string;
   version: string;
+  accueilOrderPath?: string;
+  libraryPath?: string;
+  quickAccessPath?: string;
 };
 
 type Props = {
@@ -126,6 +132,9 @@ export function SettingsView({
   const [scriptsPrefs, setScriptsPrefs] = useState<ScriptsPrefs>(() =>
     mergeScriptsPrefs(),
   );
+  const [maintenance, setMaintenance] = useState<MaintenancePrefs>(() =>
+    mergeMaintenancePrefs(),
+  );
   const [paths, setPaths] = useState<AppPaths | null>(null);
   const [metrics, setMetrics] = useState<{
     measuredCps: number;
@@ -171,6 +180,7 @@ export function SettingsView({
       const sc = mergeScriptsPrefs(s.scripts);
       setScriptsPrefs(sc);
       onScriptsPrefsChange?.(sc);
+      setMaintenance(mergeMaintenancePrefs(s.maintenance));
       if (typeof s.sidebarCollapsed === "boolean") {
         onSidebarCollapsedChange?.(s.sidebarCollapsed);
       }
@@ -228,6 +238,7 @@ export function SettingsView({
       automation?: AutomationPrefs;
       confirmations?: ConfirmationsPrefs;
       scripts?: ScriptsPrefs;
+      maintenance?: MaintenancePrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
@@ -249,6 +260,7 @@ export function SettingsView({
         automation: partial.automation,
         confirmations: partial.confirmations,
         scripts: partial.scripts,
+        maintenance: partial.maintenance,
       });
     },
     [loadSettings, saveBundle, theme],
@@ -294,6 +306,12 @@ export function SettingsView({
     setScriptsPrefs(next);
     onScriptsPrefsChange?.(next);
     void persist({ scripts: next });
+  };
+
+  const persistMaintenance = (patch: Partial<MaintenancePrefs>) => {
+    const next = mergeMaintenancePrefs({ ...maintenance, ...patch });
+    setMaintenance(next);
+    void persist({ maintenance: next });
   };
 
   const setAdvanced = (next: boolean) => {
@@ -1560,7 +1578,10 @@ export function SettingsView({
                 <div className="v2-settings-row">
                   <div className="v2-settings-row-label">
                     <span>Export / import</span>
-                    <p>Fichier JSON complet (clicker inclus).</p>
+                    <p>
+                      Uniquement <code className="v2-settings-mono">settings.json</code>{" "}
+                      (pas la bibliothèque ni l’ordre Accueil).
+                    </p>
                   </div>
                   <div className="v2-settings-row-control">
                     <button type="button" className="v2-btn" onClick={() => void exportSettings()}>
@@ -1573,6 +1594,89 @@ export function SettingsView({
                     >
                       Importer
                     </button>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Fichiers liés</span>
+                    <p>
+                      <code className="v2-settings-mono">
+                        {paths?.accueilOrderPath ?? "accueil-order.json"}
+                      </code>
+                      <br />
+                      <code className="v2-settings-mono">
+                        {paths?.libraryPath ?? "library.json"}
+                      </code>
+                      <br />
+                      <code className="v2-settings-mono">
+                        {paths?.quickAccessPath ?? "quick-access.json"}
+                      </code>
+                    </p>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Réinitialiser ordre Accueil</span>
+                    <p>Efface l’ordre manuel (#) sans toucher à la bibliothèque.</p>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <button
+                      type="button"
+                      className="v2-btn v2-btn-ghost"
+                      onClick={() => {
+                        void (async () => {
+                          try {
+                            await invoke("reset_accueil_order_cmd");
+                            toast.success("Ordre Accueil réinitialisé");
+                          } catch {
+                            toast.error("Échec de la réinitialisation");
+                          }
+                        })();
+                      }}
+                    >
+                      Réinitialiser
+                    </button>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Réinitialiser sections repliées</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <button
+                      type="button"
+                      className="v2-btn v2-btn-ghost"
+                      onClick={() => {
+                        try {
+                          localStorage.removeItem(COLLAPSED_SECTIONS_KEY);
+                          toast.success("Sections Accueil réinitialisées");
+                        } catch {
+                          toast.error("Impossible d’effacer le stockage local");
+                        }
+                      }}
+                    >
+                      Réinitialiser
+                    </button>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Rappel purge corbeille (jours)</span>
+                    <p>0 = désactivé. Hint seulement — pas de purge automatique OS.</p>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="number"
+                      className="v2-input"
+                      min={0}
+                      max={365}
+                      value={maintenance.autoPurgeTrashDays}
+                      onChange={(e) =>
+                        persistMaintenance({
+                          autoPurgeTrashDays: Number(e.target.value) || 0,
+                        })
+                      }
+                    />
                   </div>
                 </div>
                 <div className="v2-settings-row">
