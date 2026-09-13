@@ -59,6 +59,9 @@ struct AppPathsDto {
     settings_path: String,
     log_dir: String,
     version: String,
+    accueil_order_path: String,
+    library_path: String,
+    quick_access_path: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -902,7 +905,23 @@ fn get_paths(app: AppHandle, dir: State<'_, SettingsDir>) -> Result<AppPathsDto,
         settings_path: settings_path(&dir.0).to_string_lossy().into_owned(),
         log_dir: log_dir.to_string_lossy().into_owned(),
         version: env!("CARGO_PKG_VERSION").into(),
+        accueil_order_path: dir
+            .0
+            .join("accueil-order.json")
+            .to_string_lossy()
+            .into_owned(),
+        library_path: dir.0.join("library.json").to_string_lossy().into_owned(),
+        quick_access_path: dir
+            .0
+            .join("quick-access.json")
+            .to_string_lossy()
+            .into_owned(),
     })
+}
+
+#[tauri::command]
+fn reset_accueil_order_cmd(dir: State<'_, SettingsDir>) -> Result<(), String> {
+    save_accueil_order(&dir.0, &[]).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1872,6 +1891,7 @@ pub fn run() {
             get_quick_access,
             get_accueil_order_cmd,
             set_accueil_order_cmd,
+            reset_accueil_order_cmd,
             get_automations_home_cmd,
             list_process_exes,
             set_quick_favorite,
