@@ -59,6 +59,22 @@ describe("resolveAccueilReorderDrop (cross-kind)", () => {
     ).toBeNull();
   });
 
+  it("append after last item uses beforeKey null", () => {
+    const r = resolveAccueilReorderDrop(
+      visible[0]!,
+      visible[2]!,
+      "after",
+      visible,
+    );
+    expect(r).toEqual({
+      kind: "reorder",
+      fromKey: "macro:a",
+      beforeKey: null,
+      targetKey: "script:c",
+      edge: "after",
+    });
+  });
+
   it("canReorderAccueilRows accepts mixed kinds", () => {
     expect(canReorderAccueilRows(visible[0]!, visible[1]!)).toBe(true);
     expect(canReorderAccueilRows(visible[0]!, visible[0]!)).toBe(false);
