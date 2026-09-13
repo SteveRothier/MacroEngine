@@ -87,30 +87,22 @@ export function useUnifiedAutomations(options: {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [macroIndex, clickerIndex, macros, clickers, scripts, qa, hk] =
-        await Promise.all([
-          invoke<LibraryIndexDto>("list_library_items_cmd", {
-            kind: "macro",
-            folderId: null,
-            query: null,
-            includeTrash: false,
-            favoritesOnly: false,
-            favoriteIds: [],
-          }),
-          invoke<LibraryIndexDto>("list_library_items_cmd", {
-            kind: "clicker",
-            folderId: null,
-            query: null,
-            includeTrash: false,
-            favoritesOnly: false,
-            favoriteIds: [],
-          }),
-          invoke<MacroSummary[]>("list_macro_library"),
-          invoke<ClickerSummary[]>("list_clicker_library"),
-          invoke<ScriptDoc[]>("list_scripts_cmd").catch(() => [] as ScriptDoc[]),
-          invoke<QuickAccess>("get_quick_access"),
-          invoke<HotkeyBindings>("get_hotkey_bindings"),
-        ]);
+      const home = await invoke<{
+        macros: LibraryIndexDto;
+        clickers: LibraryIndexDto;
+        macroSummaries: MacroSummary[];
+        clickerSummaries: ClickerSummary[];
+        scripts: ScriptDoc[];
+        quickAccess: QuickAccess;
+        hotkeys: HotkeyBindings;
+      }>("get_automations_home_cmd");
+      const macroIndex = home.macros;
+      const clickerIndex = home.clickers;
+      const macros = home.macroSummaries;
+      const clickers = home.clickerSummaries;
+      const scripts = home.scripts ?? [];
+      const qa = home.quickAccess;
+      const hk = home.hotkeys;
       setHotkeys(hk);
       const favMacros = qa.favorites.macros ?? [];
       const favClickers = qa.favorites.clickerPresets ?? [];

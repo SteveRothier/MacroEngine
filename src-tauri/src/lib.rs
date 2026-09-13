@@ -534,6 +534,56 @@ fn set_accueil_order_cmd(dir: State<'_, SettingsDir>, keys: Vec<String>) -> Resu
     save_accueil_order(&dir.0, &keys).map_err(|e| e.to_string())
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AutomationsHomeDto {
+    macros: LibraryIndexDto,
+    clickers: LibraryIndexDto,
+    macro_summaries: Vec<MacroSummary>,
+    clicker_summaries: Vec<ClickerPresetSummary>,
+    scripts: Vec<ScriptDoc>,
+    quick_access: QuickAccess,
+    hotkeys: HotkeyBindings,
+}
+
+#[tauri::command]
+fn get_automations_home_cmd(
+    dir: State<'_, SettingsDir>,
+    engine: State<'_, AppState>,
+) -> Result<AutomationsHomeDto, String> {
+    let empty_q = ListLibraryQuery {
+        folder_id: None,
+        query: None,
+        include_trash: false,
+        favorites_only: false,
+        favorite_ids: Vec::new(),
+    };
+    let macros = list_library_items(&dir.0, LibraryKind::Macro, empty_q.clone())
+        .map_err(|e| e.to_string())?;
+    let clickers = list_library_items(&dir.0, LibraryKind::Clicker, empty_q)
+        .map_err(|e| e.to_string())?;
+    let macro_summaries = enrich_macro_summaries_cmd(&dir.0)?;
+    let clicker_summaries = list_preset_summaries(&dir.0).map_err(|e| e.to_string())?;
+    let scripts = list_scripts(&dir.0).unwrap_or_default();
+    let mut qa = load_quick_access(&dir.0).map_err(|e| e.to_string())?;
+    let clicker_ids = list_presets(&dir.0).unwrap_or_default();
+    let macro_ids = list_macros(&dir.0).unwrap_or_default();
+    let script_ids: Vec<String> = scripts.iter().map(|s| s.id.clone()).collect();
+    if prune_orphans(&mut qa, &clicker_ids, &macro_ids, &script_ids) {
+        let _ = save_quick_access(&dir.0, &qa);
+    }
+    let hotkeys = engine.hotkey_bindings();
+    Ok(AutomationsHomeDto {
+        macros,
+        clickers,
+        macro_summaries,
+        clicker_summaries,
+        scripts,
+        quick_access: qa,
+        hotkeys,
+    })
+}
+
 #[tauri::command]
 fn list_process_exes() -> Vec<String> {
     list_visible_process_exes()
@@ -1791,6 +1841,7 @@ pub fn run() {
             get_quick_access,
             get_accueil_order_cmd,
             set_accueil_order_cmd,
+            get_automations_home_cmd,
             list_process_exes,
             set_quick_favorite,
             launch_clicker_preset,
