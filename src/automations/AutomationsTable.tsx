@@ -58,7 +58,11 @@ import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import {
   mergeAccueilPrefs,
+  mergeAutomationPrefs,
+  mergeScriptsPrefs,
   type AccueilPrefs,
+  type AutomationPrefs,
+  type ScriptsPrefs,
 } from "../settings/settingsTypes";
 import {
   favoriteTooltip,
@@ -127,6 +131,9 @@ type Props = {
   onFocusKeyChange?: (key: string | null) => void;
   /** Accueil preferences from settings.json */
   accueilPrefs?: AccueilPrefs;
+  automationPrefs?: AutomationPrefs;
+  scriptsPrefs?: ScriptsPrefs;
+  onLaunchFocusJournal?: () => void;
 };
 
 function rowKey(r: AutomationRow): string {
@@ -208,8 +215,13 @@ export function AutomationsTable({
   runningScriptName = null,
   onFocusKeyChange,
   accueilPrefs: accueilPrefsProp,
+  automationPrefs: automationPrefsProp,
+  scriptsPrefs: scriptsPrefsProp,
+  onLaunchFocusJournal,
 }: Props) {
   const accueilPrefs = mergeAccueilPrefs(accueilPrefsProp);
+  const automationPrefs = mergeAutomationPrefs(automationPrefsProp);
+  const scriptsPrefs = mergeScriptsPrefs(scriptsPrefsProp);
   const toast = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -398,17 +410,28 @@ export function AutomationsTable({
   }
 
   async function launchRow(r: AutomationRow) {
+    if (automationPrefs.confirmLaunchFromHome) {
+      const ok = await confirmAction({
+        title: "Lancer",
+        message: `Lancer « ${r.name} » ?`,
+        confirmLabel: "Lancer",
+      });
+      if (!ok) return;
+    }
     if (r.kind === "macro") {
       onLaunchMacro?.(r.id);
+      onLaunchFocusJournal?.();
       return;
     }
     if (r.kind === "clicker") {
       onLaunchClicker?.(r.id);
+      onLaunchFocusJournal?.();
       return;
     }
     try {
       await invoke("run_script_session_cmd", { id: r.id });
       toast.success(`Script lancé · ${r.name}`);
+      onLaunchFocusJournal?.();
       await refresh();
       onRefresh?.();
     } catch (e) {
@@ -1807,7 +1830,9 @@ export function AutomationsTable({
                                   <Play size={11} aria-hidden />
                                   En cours
                                 </span>
-                              ) : r.kind === "script" && permCount > 0 ? (
+                              ) : r.kind === "script" &&
+                                scriptsPrefs.showPermBadgesOnHome &&
+                                permCount > 0 ? (
                                 <Tooltip
                                   content={`Ce script utilise : ${(r.permLabels ?? []).join(", ")}`}
                                 >
