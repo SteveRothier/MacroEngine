@@ -25,6 +25,10 @@ import {
 import type { MacroUiLayout } from "./macroToGraph";
 import { MacroTitleBarTools } from "./MacroTitleBarTools";
 import { useTitleBarSlot } from "../../ui/v2/TitleBarContext";
+import {
+  mergeAutomationPrefs,
+  type AutomationPrefs,
+} from "../../settings/settingsTypes";
 
 const AUTOSAVE_MS = 400;
 const HISTORY_MAX = 50;
@@ -47,6 +51,7 @@ type Props = {
   engineState: string;
   onStatus: (s: EngineStatus) => void;
   onOpenScript?: (scriptId: string, label?: string) => void;
+  automationPrefs?: AutomationPrefs;
 };
 
 function saveErrorMessage(e: unknown): string {
@@ -75,7 +80,9 @@ export function MacroEditorView({
   onStatus,
   engineState,
   onOpenScript,
+  automationPrefs: automationPrefsProp,
 }: Props) {
+  const automationPrefs = mergeAutomationPrefs(automationPrefsProp);
   const toast = useToast();
   const [doc, setDoc] = useState<MacroDocument>(() => emptyMacro(macroId));
   const [dirty, setDirty] = useState(false);
@@ -416,7 +423,9 @@ export function MacroEditorView({
   const onPlay = useCallback(async () => {
     if (locked || recording) return;
     try {
-      await flushAutosave();
+      if (automationPrefs.autoSaveBeforeRun) {
+        await flushAutosave();
+      }
       const st = await invoke<EngineStatus>("launch_saved_macro", {
         name: macroIdRef.current,
       });
@@ -425,17 +434,21 @@ export function MacroEditorView({
     } catch (e) {
       toast.error(errMessage(e, "Échec du test"));
     }
-  }, [flushAutosave, locked, onStatus, recording, toast]);
+  }, [automationPrefs.autoSaveBeforeRun, flushAutosave, locked, onStatus, recording, toast]);
 
   const onRunFrom = useCallback(
     async (path: ActionPath) => {
       if (locked || recording || editorLocked) return;
       if (!path.length) {
-        toast.error("Sélectionnez une étape pour tester depuis ici");
+        if (automationPrefs.runFromRequiresSelection) {
+          toast.error("Sélectionnez une étape pour tester depuis ici");
+        }
         return;
       }
       try {
-        await flushAutosave();
+        if (automationPrefs.autoSaveBeforeRun) {
+          await flushAutosave();
+        }
         const st = await invoke<EngineStatus>("launch_saved_macro", {
           name: macroIdRef.current,
           fromPath: path,
@@ -453,7 +466,16 @@ export function MacroEditorView({
         }
       }
     },
-    [editorLocked, flushAutosave, locked, onStatus, recording, toast],
+    [
+      automationPrefs.autoSaveBeforeRun,
+      automationPrefs.runFromRequiresSelection,
+      editorLocked,
+      flushAutosave,
+      locked,
+      onStatus,
+      recording,
+      toast,
+    ],
   );
 
   useEffect(() => {
