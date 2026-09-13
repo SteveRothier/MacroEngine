@@ -20,7 +20,8 @@ type Options<T> = {
 
 /**
  * Flat-list pointer reorder (seuil + Escape cancel).
- * Used by library / Accueil folder targets / simple lists.
+ * Used by simple flat lists (e.g. clicker zones). Accueil / Library keep
+ * custom drag sessions (folder targets + key-based reorder).
  */
 export function usePointerReorder<T>({
   items,

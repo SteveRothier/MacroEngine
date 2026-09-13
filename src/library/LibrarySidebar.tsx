@@ -20,9 +20,9 @@ import { Icons } from "../ui";
 import {
   ContextMenu,
   useContextMenuState,
-  type MenuItemDef,
 } from "../ui/v2";
 import type { LibraryItemView, LibraryKind } from "./types";
+import { buildLibraryItemMenuItems } from "./libraryItemMenuItems";
 import { useLibraryIndex } from "./useLibraryIndex";
 import "./library.css";
 
@@ -153,76 +153,6 @@ function isNoOpPlacement(
   return placement.beforeId === nextId;
 }
 
-function buildLibraryItemMenuItems({
-  item,
-  folders,
-  trashed,
-  onMove,
-  onDuplicate,
-  onRename,
-  onToggleLock,
-  onTrash,
-  onRestore,
-  onDelete,
-}: {
-  item: LibraryItemView;
-  folders: { id: string; name: string }[];
-  trashed: boolean;
-  onMove: (folderId: string | null) => void;
-  onDuplicate?: () => void;
-  onRename?: () => void;
-  onToggleLock: () => void;
-  onTrash: () => void;
-  onRestore: () => void;
-  onDelete?: () => void;
-}): MenuItemDef[] {
-  const items: MenuItemDef[] = [];
-  if (onRename && !item.locked) {
-    items.push({ id: "rename", label: "Renommer", onSelect: onRename });
-  }
-  if (onDuplicate) {
-    items.push({ id: "duplicate", label: "Dupliquer", onSelect: onDuplicate });
-  }
-  items.push({
-    id: "lock",
-    label: item.locked ? "Déverrouiller" : "Verrouiller",
-    onSelect: onToggleLock,
-  });
-  if (folders.length > 0 && !item.locked) {
-    items.push({
-      id: "move-root",
-      label: "Déplacer → Racine",
-      onSelect: () => onMove(null),
-    });
-    for (const f of folders) {
-      items.push({
-        id: `move-${f.id}`,
-        label: `Déplacer → ${f.name}`,
-        onSelect: () => onMove(f.id),
-      });
-    }
-  }
-  if (trashed) {
-    items.push({ id: "restore", label: "Restaurer", onSelect: onRestore });
-    if (onDelete && !item.locked) {
-      items.push({
-        id: "delete",
-        label: "Supprimer définitivement",
-        danger: true,
-        onSelect: onDelete,
-      });
-    }
-  } else if (!item.locked) {
-    items.push({
-      id: "trash",
-      label: "Mettre à la corbeille",
-      danger: true,
-      onSelect: onTrash,
-    });
-  }
-  return items;
-}
-
 function ItemMenu({
   item,
   folders,
@@ -248,8 +178,7 @@ function ItemMenu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const items = buildLibraryItemMenuItems({
-    item,
+  const items = buildLibraryItemMenuItems(item, {
     folders,
     trashed,
     onMove,
@@ -348,8 +277,7 @@ function LibraryItemRow({
   suppressClickRef: MutableRefObject<boolean>;
 }) {
   const ctxMenu = useContextMenuState();
-  const menuItems = buildLibraryItemMenuItems({
-    item,
+  const menuItems = buildLibraryItemMenuItems(item, {
     folders,
     trashed: item.trashed,
     onMove,

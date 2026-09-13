@@ -1,17 +1,7 @@
-import {
-  Copy,
-  Folder,
-  FolderOpen,
-  Lock,
-  LockOpen,
-  MoreHorizontal,
-  PenLine,
-  Play,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { DropdownMenu, Tooltip } from "../ui/v2";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
+import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import type { AutomationFolderOption, AutomationRow } from "./types";
 
 type Props = {
@@ -59,18 +49,7 @@ export function AutomationRowMenu({
     onReveal,
     moveFolders,
     onMoveToFolder,
-    icons: {
-      open: <FolderOpen size={14} />,
-      launch: <Play size={14} />,
-      rename: <PenLine size={14} />,
-      duplicate: <Copy size={14} />,
-      favorite: <Star size={14} />,
-      lock: <Lock size={14} />,
-      unlock: <LockOpen size={14} />,
-      move: <Folder size={14} />,
-      reveal: <FolderOpen size={14} />,
-      delete: <Trash2 size={14} />,
-    },
+    icons: automationRowMenuIcons(),
   });
 
   return (
@@ -79,12 +58,10 @@ export function AutomationRowMenu({
         <DropdownMenu
           label="Plus d'actions"
           ariaLabel={`Actions pour ${row.name}`}
-          align="end"
           open={open}
           onOpenChange={onOpenChange}
-          stopTriggerPropagation
+          align="end"
           triggerClassName="v2-auto-row-menu-btn"
-          menuClassName="v2-auto-row-menu"
           items={items}
         >
           <MoreHorizontal size={16} aria-hidden />
