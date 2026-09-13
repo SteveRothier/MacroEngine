@@ -57,6 +57,10 @@ import { AutomationsToolbar } from "./AutomationsToolbar";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import {
+  mergeAccueilPrefs,
+  type AccueilPrefs,
+} from "../settings/settingsTypes";
+import {
   favoriteTooltip,
   kindTooltip,
   metaTooltip,
@@ -74,7 +78,6 @@ import {
 } from "./types";
 import { useUnifiedAutomations } from "./useUnifiedAutomations";
 
-const FOLDER_DRAG_THRESHOLD_PX = 6;
 const EDGE_HYSTERESIS_PX = 6;
 const AUTO_SCROLL_EDGE_PX = 48;
 const AUTO_SCROLL_MAX_PX = 18;
@@ -122,6 +125,8 @@ type Props = {
   runningScriptName?: string | null;
   /** Notify parent of focused Accueil row (`kind:id`). */
   onFocusKeyChange?: (key: string | null) => void;
+  /** Accueil preferences from settings.json */
+  accueilPrefs?: AccueilPrefs;
 };
 
 function rowKey(r: AutomationRow): string {
@@ -202,7 +207,9 @@ export function AutomationsTable({
   onResourceRenamed,
   runningScriptName = null,
   onFocusKeyChange,
+  accueilPrefs: accueilPrefsProp,
 }: Props) {
+  const accueilPrefs = mergeAccueilPrefs(accueilPrefsProp);
   const toast = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -218,7 +225,10 @@ export function AutomationsTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
-    loadCollapsedSections,
+    () =>
+      accueilPrefs.rememberCollapsedSections
+        ? loadCollapsedSections()
+        : new Set(),
   );
   const [liveScriptName, setLiveScriptName] = useState<string | null>(
     runningScriptName,
@@ -329,6 +339,7 @@ export function AutomationsTable({
   }
 
   useEffect(() => {
+    if (!accueilPrefs.rememberCollapsedSections) return;
     try {
       localStorage.setItem(
         COLLAPSED_SECTIONS_KEY,
@@ -337,7 +348,7 @@ export function AutomationsTable({
     } catch {
       /* ignore quota */
     }
-  }, [collapsedSections]);
+  }, [collapsedSections, accueilPrefs.rememberCollapsedSections]);
 
   useEffect(() => {
     setLiveScriptName(runningScriptName);
@@ -420,8 +431,12 @@ export function AutomationsTable({
   }, []);
 
   const sorted = useMemo(() => {
-    if (filter === "recent") return rows;
-    const list = [...rows];
+    let baseRows = rows;
+    if (filter === "all" && !accueilPrefs.showScriptsInAll) {
+      baseRows = rows.filter((r) => r.kind !== "script");
+    }
+    if (filter === "recent") return baseRows;
+    const list = [...baseRows];
     const dir = display.sortDir === "desc" ? -1 : 1;
     const kindRank = (k: AutomationRow["kind"]) =>
       k === "macro" ? 0 : k === "clicker" ? 1 : 2;
@@ -451,7 +466,14 @@ export function AutomationsTable({
       return cmp * dir;
     });
     return list;
-  }, [rows, display.sortBy, display.sortDir, filter, manualOrder]);
+  }, [
+    rows,
+    display.sortBy,
+    display.sortDir,
+    filter,
+    manualOrder,
+    accueilPrefs.showScriptsInAll,
+  ]);
   sortedRef.current = sorted;
 
   const flatKeys = useMemo(() => sorted.map(rowKey), [sorted]);
@@ -750,7 +772,10 @@ export function AutomationsTable({
       onDisplayChange({ ...display, sortBy: "order", sortDir: "asc" });
     }
     // Same-kind: also sync library sort_order via nearest same-kind sibling
-    if (from.kind === "macro" || from.kind === "clicker") {
+    if (
+      accueilPrefs.syncLibrarySortOnReorder &&
+      (from.kind === "macro" || from.kind === "clicker")
+    ) {
       const beforeId = nearestSameKindBeforeId(next, fromKey, from.kind);
       try {
         await invoke("move_library_item_cmd", {
@@ -888,6 +913,18 @@ export function AutomationsTable({
 
   async function onDeleteOne(r: AutomationRow) {
     const toTrash = r.kind === "macro" || r.kind === "clicker";
+    if (toTrash && !accueilPrefs.confirmTrash) {
+      try {
+        await deleteRow(r);
+        setMenuKey(null);
+        await refresh();
+        onRefresh?.();
+        toast.success("Mis à la corbeille");
+      } catch (e) {
+        toast.error(errMessage(e, "Échec de la suppression"));
+      }
+      return;
+    }
     const ok = await confirmAction({
       title: toTrash ? "Mettre à la corbeille" : "Supprimer",
       message: toTrash
@@ -915,13 +952,15 @@ export function AutomationsTable({
     }
     const folder = folders.find((f) => folderOptionKey(f) === folderKey);
     if (!folder) return;
-    const ok = await confirmAction({
-      title: "Supprimer le dossier",
-      message: `Supprimer le dossier « ${folder.name} » ? Les automations qu’il contient resteront disponibles (hors dossier).`,
-      confirmLabel: "Supprimer",
-      danger: true,
-    });
-    if (!ok) return;
+    if (accueilPrefs.confirmDeleteFolder) {
+      const ok = await confirmAction({
+        title: "Supprimer le dossier",
+        message: `Supprimer le dossier « ${folder.name} » ? Les automations qu’il contient resteront disponibles (hors dossier).`,
+        confirmLabel: "Supprimer",
+        danger: true,
+      });
+      if (!ok) return;
+    }
     try {
       await invoke("delete_library_folder_cmd", {
         kind: folder.kind,
@@ -1568,6 +1607,16 @@ export function AutomationsTable({
                                 });
                                 return;
                               }
+                              if (accueilPrefs.openOnSingleClick) {
+                                openRow(r);
+                              } else {
+                                setFocusKey(key);
+                                toggleSelect(key, { multi: false, range: false });
+                              }
+                            }}
+                            onDoubleClick={(e) => {
+                              if (suppressClickAfterDragRef.current) return;
+                              e.preventDefault();
                               openRow(r);
                             }}
                             onContextMenu={(e) => {
@@ -1625,7 +1674,7 @@ export function AutomationsTable({
                                     const dy = ev.clientY - s.startY;
                                     if (
                                       Math.hypot(dx, dy) <
-                                      FOLDER_DRAG_THRESHOLD_PX
+                                      accueilPrefs.dragThresholdPx
                                     ) {
                                       return;
                                     }

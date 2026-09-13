@@ -12,6 +12,10 @@ import {
   type HotkeyBindings,
 } from "../macros/types";
 import { SettingsView } from "../settings/SettingsView";
+import {
+  mergeAccueilPrefs,
+  type AccueilPrefs,
+} from "../settings/settingsTypes";
 import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
 import {
@@ -104,6 +108,9 @@ function MainAppV2Inner() {
   const toast = useToast();
   const titleBarCtx = useTitleBarContext();
   const automationsPage = useAutomationsPageState();
+  const [accueilPrefs, setAccueilPrefs] = useState<AccueilPrefs>(() =>
+    mergeAccueilPrefs(),
+  );
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => loadWorkspace());
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
   const [advanced, setAdvanced] = useState(false);
@@ -165,6 +172,7 @@ function MainAppV2Inner() {
           onThemeChange(s.theme);
         }
         if (typeof s.journalOpen === "boolean") setJournalOpen(s.journalOpen);
+        setAccueilPrefs(mergeAccueilPrefs(s.accueil));
       })
       .catch(() => undefined);
     void invoke<HotkeyBindings>("get_hotkey_bindings")
@@ -764,6 +772,10 @@ function MainAppV2Inner() {
             setJournalOpen(v);
             void persistShell({ journalOpen: v });
           }}
+          onAccueilPrefsChange={(prefs) => {
+            setAccueilPrefs(prefs);
+            automationsPage.applyAccueilDefaults(prefs);
+          }}
         />
       );
     }
@@ -869,6 +881,7 @@ function MainAppV2Inner() {
               : null
           }
           onFocusKeyChange={automationsPage.setFocusKey}
+          accueilPrefs={accueilPrefs}
         />
       );
     }

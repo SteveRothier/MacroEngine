@@ -15,9 +15,17 @@ import { confirmChoice } from "../ui";
 import type { HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import type { SettingsSection } from "../app/types";
+import {
+  mergeAccueilPrefs,
+  type AccueilPrefs,
+  type AccueilFilter,
+  type AccueilSortBy,
+  type AccueilSortDir,
+} from "./settingsTypes";
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: "general", label: "Général" },
+  { id: "accueil", label: "Accueil" },
   { id: "appearance", label: "Apparence" },
   { id: "hotkeys", label: "Raccourcis" },
   { id: "process", label: "Processus" },
@@ -43,6 +51,7 @@ type Props = {
   running?: boolean;
   journalOpen: boolean;
   onJournalOpenChange: (v: boolean) => void;
+  onAccueilPrefsChange?: (prefs: AccueilPrefs) => void;
 };
 
 function displayOptionLabel(d: DisplayDto): string {
@@ -62,6 +71,7 @@ export function SettingsView({
   running = false,
   journalOpen,
   onJournalOpenChange,
+  onAccueilPrefsChange,
 }: Props) {
   const toast = useToast();
   const { loadSettings, saveBundle } = useClickerSettingsApi();
@@ -75,6 +85,7 @@ export function SettingsView({
   const [processDraft, setProcessDraft] = useState("");
   const [displays, setDisplays] = useState<DisplayDto[]>([]);
   const [displayId, setDisplayId] = useState<string | null>(null);
+  const [accueil, setAccueil] = useState<AccueilPrefs>(() => mergeAccueilPrefs());
   const [paths, setPaths] = useState<AppPaths | null>(null);
   const [metrics, setMetrics] = useState<{
     measuredCps: number;
@@ -102,12 +113,15 @@ export function SettingsView({
       setDisplayId(s.displayId ?? null);
       setCloseToTray(!!s.closeToTray);
       setStartWithWindows(!!s.startWithWindows);
+      const a = mergeAccueilPrefs(s.accueil);
+      setAccueil(a);
+      onAccueilPrefsChange?.(a);
     });
     refreshDisplays();
     void invoke<AppPaths>("get_paths")
       .then(setPaths)
       .catch(() => setPaths(null));
-  }, [loadSettings, refreshDisplays]);
+  }, [loadSettings, refreshDisplays, onAccueilPrefsChange]);
 
   useEffect(() => {
     void invoke<{ measuredCps: number; clicksEmitted: number }>("get_clicker_metrics")
@@ -139,6 +153,8 @@ export function SettingsView({
       journalOpen?: boolean;
       closeToTray?: boolean;
       startWithWindows?: boolean;
+      sidebarCollapsed?: boolean;
+      accueil?: AccueilPrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
@@ -153,10 +169,19 @@ export function SettingsView({
         journalOpen: partial.journalOpen ?? current.journalOpen,
         closeToTray: partial.closeToTray ?? current.closeToTray,
         startWithWindows: partial.startWithWindows ?? current.startWithWindows,
+        sidebarCollapsed: partial.sidebarCollapsed ?? current.sidebarCollapsed,
+        accueil: partial.accueil,
       });
     },
     [loadSettings, saveBundle, theme],
   );
+
+  const persistAccueil = (patch: Partial<AccueilPrefs>) => {
+    const next = mergeAccueilPrefs({ ...accueil, ...patch });
+    setAccueil(next);
+    onAccueilPrefsChange?.(next);
+    void persist({ accueil: next });
+  };
 
   const setAdvanced = (next: boolean) => {
     onAdvancedChange(next);
@@ -394,6 +419,233 @@ export function SettingsView({
                         setStartWithWindows(e.target.checked);
                         void persist({ startWithWindows: e.target.checked });
                       }}
+                    />
+                  </div>
+                </div>
+              </InspectorSection>
+            </>
+          ) : null}
+
+          {section === "accueil" ? (
+            <>
+              <h2 className="v2-settings-pane-title">Accueil</h2>
+              <p className="v2-settings-pane-hint">
+                Tri, filtres et comportements de la liste des automations.
+              </p>
+              <InspectorSection title="Affichage par défaut">
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Tri</span>
+                    <p>Ordre manuel (#), nom, type ou statut.</p>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <Select
+                      className="v2-select"
+                      value={accueil.defaultSortBy}
+                      ariaLabel="Tri Accueil par défaut"
+                      options={[
+                        { value: "order", label: "Ordre manuel (#)" },
+                        { value: "name", label: "Nom" },
+                        { value: "type", label: "Type" },
+                        { value: "status", label: "Statut" },
+                      ]}
+                      onChange={(v) =>
+                        persistAccueil({ defaultSortBy: v as AccueilSortBy })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Direction</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <Select
+                      className="v2-select"
+                      value={accueil.defaultSortDir}
+                      ariaLabel="Direction du tri"
+                      options={[
+                        { value: "asc", label: "Croissant" },
+                        { value: "desc", label: "Décroissant" },
+                      ]}
+                      onChange={(v) =>
+                        persistAccueil({ defaultSortDir: v as AccueilSortDir })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Filtre</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <Select
+                      className="v2-select"
+                      value={accueil.defaultFilter}
+                      ariaLabel="Filtre Accueil par défaut"
+                      options={[
+                        { value: "all", label: "Tous" },
+                        { value: "favorites", label: "Favoris" },
+                        { value: "recent", label: "Récents" },
+                        { value: "scripts", label: "Scripts" },
+                      ]}
+                      onChange={(v) =>
+                        persistAccueil({ defaultFilter: v as AccueilFilter })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Mémoriser sections repliées</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <label className="v2-switch">
+                      <input
+                        type="checkbox"
+                        checked={accueil.rememberCollapsedSections}
+                        onChange={(e) =>
+                          persistAccueil({
+                            rememberCollapsedSections: e.target.checked,
+                          })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Scripts dans « Tous »</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <label className="v2-switch">
+                      <input
+                        type="checkbox"
+                        checked={accueil.showScriptsInAll}
+                        onChange={(e) =>
+                          persistAccueil({ showScriptsInAll: e.target.checked })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </div>
+                </div>
+              </InspectorSection>
+              <InspectorSection title="Interactions">
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Ouvrir au simple clic</span>
+                    <p>Sinon double-clic ou Entrée.</p>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <label className="v2-switch">
+                      <input
+                        type="checkbox"
+                        checked={accueil.openOnSingleClick}
+                        onChange={(e) =>
+                          persistAccueil({ openOnSingleClick: e.target.checked })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Confirmer corbeille</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <label className="v2-switch">
+                      <input
+                        type="checkbox"
+                        checked={accueil.confirmTrash}
+                        onChange={(e) =>
+                          persistAccueil({ confirmTrash: e.target.checked })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Confirmer suppression dossier</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <label className="v2-switch">
+                      <input
+                        type="checkbox"
+                        checked={accueil.confirmDeleteFolder}
+                        onChange={(e) =>
+                          persistAccueil({
+                            confirmDeleteFolder: e.target.checked,
+                          })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Sync ordre bibliothèque (même type)</span>
+                    <p>
+                      Lors d’un réordonnancement Accueil entre deux macros ou
+                      deux clickers.
+                    </p>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <label className="v2-switch">
+                      <input
+                        type="checkbox"
+                        checked={accueil.syncLibrarySortOnReorder}
+                        onChange={(e) =>
+                          persistAccueil({
+                            syncLibrarySortOnReorder: e.target.checked,
+                          })
+                        }
+                      />
+                      <span />
+                    </label>
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Seuil double-clic (ms)</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="number"
+                      className="v2-input"
+                      min={150}
+                      max={800}
+                      step={50}
+                      value={accueil.doubleClickDelayMs}
+                      onChange={(e) =>
+                        persistAccueil({
+                          doubleClickDelayMs: Number(e.target.value) || 300,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="v2-settings-row">
+                  <div className="v2-settings-row-label">
+                    <span>Seuil drag (px)</span>
+                  </div>
+                  <div className="v2-settings-row-control">
+                    <input
+                      type="number"
+                      className="v2-input"
+                      min={2}
+                      max={24}
+                      value={accueil.dragThresholdPx}
+                      onChange={(e) =>
+                        persistAccueil({
+                          dragThresholdPx: Number(e.target.value) || 6,
+                        })
+                      }
                     />
                   </div>
                 </div>
