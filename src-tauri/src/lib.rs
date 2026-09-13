@@ -7,12 +7,13 @@ use caster_engine::{
     delete_preset, delete_script, duplicate_macro, duplicate_preset, enrich_macro_summaries,
     export_preset_to_path, get_library_index, import_preset_from_path, list_library_items,
     list_macro_summaries, list_macros, list_preset_summaries, list_presets, list_scripts,
-    load_macro, load_preset, load_quick_access, load_script, load_settings,
+    load_macro, load_preset, load_quick_access, load_script, load_settings, load_accueil_order,
     list_visible_process_exes, macro_to_json, move_library_item, overlay_bands, parse_macro_json,
     prune_orphans, purge_library_trash, remove_library_entry, rename_library_entry_key,
     rename_library_folder, rename_macro, rename_preset, restore_library_item, save_macro_checked,
     save_preset, save_preset_with_trigger, save_quick_access, save_script, save_settings,
-    set_favorite, set_library_item_locked, trash_library_item, AppSettings, AppState, ClickerConfig,
+    save_accueil_order, set_favorite, set_library_item_locked, trash_library_item, AppSettings,
+    AppState, ClickerConfig,
     ClickerMetrics, ClickerPreset, ClickerPresetSummary, DrawnRect, EngineEvent, EngineState,
     HotkeyBindings, LibraryFolder, LibraryIndexDto, LibraryKind, ListLibraryQuery, MacroDocument,
     MacroSummary, NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind,
@@ -521,6 +522,16 @@ fn get_quick_access(dir: State<'_, SettingsDir>) -> Result<QuickAccess, String> 
         let _ = save_quick_access(&dir.0, &qa);
     }
     Ok(qa)
+}
+
+#[tauri::command]
+fn get_accueil_order_cmd(dir: State<'_, SettingsDir>) -> Result<Vec<String>, String> {
+    load_accueil_order(&dir.0).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_accueil_order_cmd(dir: State<'_, SettingsDir>, keys: Vec<String>) -> Result<(), String> {
+    save_accueil_order(&dir.0, &keys).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1778,6 +1789,8 @@ pub fn run() {
             load_clicker_preset,
             delete_clicker_preset,
             get_quick_access,
+            get_accueil_order_cmd,
+            set_accueil_order_cmd,
             list_process_exes,
             set_quick_favorite,
             launch_clicker_preset,

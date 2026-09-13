@@ -3,6 +3,7 @@
 //! React must never own timing, hooks, input injection, or critical run state.
 //! This crate holds those contracts; the Tauri shell only asks and observes.
 
+pub mod accueil_order;
 pub mod actions;
 pub mod app_state;
 pub mod cancel;
@@ -33,6 +34,9 @@ pub mod zone_native_overlay;
 
 pub use actions::{
     ActionContext, ActionError, ActionHandler, ActionRegistry, LogHandler, NoopHandler,
+};
+pub use accueil_order::{
+    load_accueil_order, save_accueil_order, AccueilOrderError,
 };
 pub use app_state::AppState;
 pub use cancel::CancellationToken;
