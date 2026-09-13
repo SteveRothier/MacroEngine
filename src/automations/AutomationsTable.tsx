@@ -12,9 +12,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   ChevronDown,
   Code2,
-  Copy,
   Folder,
-  FolderOpen,
   FolderPlus,
   Lock,
   LockOpen,
@@ -23,7 +21,6 @@ import {
   Play,
   RefreshCw,
   Star,
-  Trash2,
   Workflow,
 } from "lucide-react";
 import {
@@ -57,6 +54,7 @@ import {
 import { AutomationRowMenu } from "./AutomationRowMenu";
 import { AutomationsToolbar } from "./AutomationsToolbar";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
+import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import {
   favoriteTooltip,
   kindTooltip,
@@ -126,7 +124,7 @@ type Props = {
 };
 
 function rowKey(r: AutomationRow): string {
-  return `${r.kind}:${r.id}`;
+  return rowOrderKey(r);
 }
 
 function kindLabel(kind: AutomationRow["kind"]): string {
@@ -1204,18 +1202,7 @@ export function AutomationsTable({
       moveFolders: rowFolders,
       onMoveToFolder: (folder) => void moveRowToFolder(ctxRow, folder),
       onDelete: () => void onDeleteOne(ctxRow),
-      icons: {
-        open: <FolderOpen size={14} />,
-        launch: <Play size={14} />,
-        rename: <PenLine size={14} />,
-        duplicate: <Copy size={14} />,
-        favorite: <Star size={14} />,
-        lock: <Lock size={14} />,
-        unlock: <LockOpen size={14} />,
-        move: <Folder size={14} />,
-        reveal: <FolderOpen size={14} />,
-        delete: <Trash2 size={14} />,
-      },
+      icons: automationRowMenuIcons(),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close over latest row
   }, [ctxRow, folders]);
