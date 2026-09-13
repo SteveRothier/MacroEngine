@@ -768,4 +768,26 @@ mod tests {
         assert_eq!(ids, vec!["C", "A", "B"]);
         let _ = fs::remove_dir_all(&dir);
     }
+
+    #[test]
+    fn delete_library_folder_unassigns_items() {
+        let dir = temp_dir();
+        create_macro(&dir, Some("Demo")).unwrap();
+        let folder =
+            create_library_folder(&dir, LibraryKind::Macro, "Pack".into(), None).unwrap();
+        move_library_item(
+            &dir,
+            LibraryKind::Macro,
+            "Demo".into(),
+            Some(folder.id.clone()),
+            None,
+        )
+        .unwrap();
+        delete_library_folder(&dir, LibraryKind::Macro, folder.id.clone()).unwrap();
+        let dto = get_library_index(&dir, LibraryKind::Macro).unwrap();
+        assert!(dto.folders.iter().all(|f| f.id != folder.id));
+        let item = dto.items.iter().find(|i| i.id == "Demo").unwrap();
+        assert!(item.folder_id.is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

@@ -132,7 +132,10 @@ export function buildAutomationRowMenuItems(
     { id: "sep-del", label: "", separator: true },
     {
       id: "delete",
-      label: "Supprimer",
+      label:
+        row.kind === "macro" || row.kind === "clicker"
+          ? "Mettre à la corbeille"
+          : "Supprimer",
       icon: actions.icons?.delete,
       danger: true,
       onSelect: actions.onDelete,
