@@ -49,6 +49,7 @@ import {
   applyAccueilOrder,
   loadAccueilOrder,
   mergeAccueilOrder,
+  nearestSameKindBeforeId,
   reorderAccueilKeys,
   rowOrderKey,
   saveAccueilOrder,
@@ -394,11 +395,19 @@ export function AutomationsTable({
     }
   }
 
-  const [manualOrder, setManualOrder] = useState<string[]>(() =>
-    loadAccueilOrder(),
-  );
+  const [manualOrder, setManualOrder] = useState<string[]>([]);
   const manualOrderRef = useRef(manualOrder);
   manualOrderRef.current = manualOrder;
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAccueilOrder().then((keys) => {
+      if (!cancelled) setManualOrder(keys);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const sorted = useMemo(() => {
     if (filter === "recent") return rows;
@@ -713,15 +722,32 @@ export function AutomationsTable({
     }
   }
 
-  function reorderRow(from: AutomationRow, beforeKey: string | null) {
+  async function reorderRow(from: AutomationRow, beforeKey: string | null) {
     const presentKeys = sortedRef.current.map(rowOrderKey);
     const base = mergeAccueilOrder(manualOrderRef.current, presentKeys);
-    const next = reorderAccueilKeys(base, rowOrderKey(from), beforeKey);
+    const fromKey = rowOrderKey(from);
+    const next = reorderAccueilKeys(base, fromKey, beforeKey);
     if (!next) return;
-    saveAccueilOrder(next);
     setManualOrder(next);
+    void saveAccueilOrder(next);
     if (display.sortBy !== "order") {
       onDisplayChange({ ...display, sortBy: "order", sortDir: "asc" });
+    }
+    // Same-kind: also sync library sort_order via nearest same-kind sibling
+    if (from.kind === "macro" || from.kind === "clicker") {
+      const beforeId = nearestSameKindBeforeId(next, fromKey, from.kind);
+      try {
+        await invoke("move_library_item_cmd", {
+          kind: from.kind,
+          id: from.id,
+          folderId: from.folderId ?? null,
+          beforeId,
+        });
+        await refresh();
+        onRefresh?.();
+      } catch {
+        /* Accueil order already saved; library sync best-effort */
+      }
     }
     toast.success("Ordre mis à jour");
   }

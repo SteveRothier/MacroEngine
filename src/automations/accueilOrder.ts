@@ -1,5 +1,7 @@
+import { invoke } from "@tauri-apps/api/core";
 import type { AutomationRow } from "./types";
 
+/** @deprecated localStorage key — migrated to engine `accueil-order.json` */
 export const ACCUEIL_ORDER_KEY = "caster.accueil.manualOrder";
 
 export function rowOrderKey(
@@ -8,7 +10,30 @@ export function rowOrderKey(
   return `${r.kind}:${r.id}`;
 }
 
-export function loadAccueilOrder(): string[] {
+export async function loadAccueilOrder(): Promise<string[]> {
+  try {
+    const keys = await invoke<string[]>("get_accueil_order_cmd");
+    if (Array.isArray(keys) && keys.length > 0) {
+      return keys.filter((x): x is string => typeof x === "string");
+    }
+    // One-shot migrate from localStorage if engine file is empty
+    const legacy = loadLegacyLocalOrder();
+    if (legacy.length > 0) {
+      await saveAccueilOrder(legacy);
+      try {
+        localStorage.removeItem(ACCUEIL_ORDER_KEY);
+      } catch {
+        /* ignore */
+      }
+      return legacy;
+    }
+    return [];
+  } catch {
+    return loadLegacyLocalOrder();
+  }
+}
+
+function loadLegacyLocalOrder(): string[] {
   try {
     const raw = localStorage.getItem(ACCUEIL_ORDER_KEY);
     if (!raw) return [];
@@ -20,11 +45,15 @@ export function loadAccueilOrder(): string[] {
   }
 }
 
-export function saveAccueilOrder(keys: string[]): void {
+export async function saveAccueilOrder(keys: string[]): Promise<void> {
   try {
-    localStorage.setItem(ACCUEIL_ORDER_KEY, JSON.stringify(keys));
+    await invoke("set_accueil_order_cmd", { keys });
   } catch {
-    /* ignore quota */
+    try {
+      localStorage.setItem(ACCUEIL_ORDER_KEY, JSON.stringify(keys));
+    } catch {
+      /* ignore quota */
+    }
   }
 }
 
@@ -87,4 +116,22 @@ export function reorderAccueilKeys(
   }
   next.splice(insertAt, 0, fromKey);
   return next;
+}
+
+/** Nearest same-kind sibling that should become `beforeId` for library move. */
+export function nearestSameKindBeforeId(
+  orderedKeys: string[],
+  fromKey: string,
+  kind: AutomationRow["kind"],
+): string | null {
+  const fromIdx = orderedKeys.indexOf(fromKey);
+  if (fromIdx < 0) return null;
+  const prefix = `${kind}:`;
+  for (let i = fromIdx + 1; i < orderedKeys.length; i++) {
+    const k = orderedKeys[i]!;
+    if (k.startsWith(prefix) && k !== fromKey) {
+      return k.slice(prefix.length);
+    }
+  }
+  return null;
 }
