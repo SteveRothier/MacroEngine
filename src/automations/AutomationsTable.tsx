@@ -380,16 +380,22 @@ export function AutomationsTable({
     }
   }
 
-  function launchRow(r: AutomationRow) {
-    if (r.kind === "macro") onLaunchMacro?.(r.id);
-    else if (r.kind === "clicker") onLaunchClicker?.(r.id);
-    else {
-      onNavigate({
-        name: "automation",
-        id: r.id,
-        kind: "script",
-        label: r.name,
-      });
+  async function launchRow(r: AutomationRow) {
+    if (r.kind === "macro") {
+      onLaunchMacro?.(r.id);
+      return;
+    }
+    if (r.kind === "clicker") {
+      onLaunchClicker?.(r.id);
+      return;
+    }
+    try {
+      await invoke("run_script_session_cmd", { id: r.id });
+      toast.success(`Script lancé · ${r.name}`);
+      await refresh();
+      onRefresh?.();
+    } catch (e) {
+      toast.error(errMessage(e, "Échec du lancement script"));
     }
   }
 
@@ -833,7 +839,7 @@ export function AutomationsTable({
   function onLaunchSelected() {
     const first = selectedRows[0];
     if (!first) return;
-    launchRow(first);
+    void launchRow(first);
   }
 
   function onOpenSelected() {
@@ -1181,7 +1187,7 @@ export function AutomationsTable({
         : folders.filter((f) => f.kind === ctxRow.kind);
     return buildAutomationRowMenuItems(ctxRow, {
       onOpen: () => openRow(ctxRow),
-      onLaunch: () => launchRow(ctxRow),
+      onLaunch: () => void launchRow(ctxRow),
       onRename: () => void onRenameOne(ctxRow),
       onDuplicate: () => void onDuplicateOne(ctxRow),
       onToggleFavorite: () => void onToggleFavorite(ctxRow),
@@ -1886,18 +1892,24 @@ export function AutomationsTable({
                               onClick={(e) => e.stopPropagation()}
                               onDoubleClick={(e) => e.stopPropagation()}
                             >
-                              {r.kind !== "script" ? (
-                                <Tooltip content="Lancer">
+                              <Tooltip
+                                content={
+                                  r.kind === "script" ? "Exécuter" : "Lancer"
+                                }
+                              >
                                   <button
                                     type="button"
                                     className="v2-auto-row-play-btn"
-                                    aria-label={`Lancer ${r.name}`}
-                                    onClick={() => launchRow(r)}
+                                    aria-label={
+                                      r.kind === "script"
+                                        ? `Exécuter ${r.name}`
+                                        : `Lancer ${r.name}`
+                                    }
+                                    onClick={() => void launchRow(r)}
                                   >
                                     <Play size={14} aria-hidden />
                                   </button>
                                 </Tooltip>
-                              ) : null}
                               {r.kind !== "script" ? (
                                 <Tooltip content={favoriteTooltip(r.favorite)}>
                                   <button
@@ -1927,7 +1939,7 @@ export function AutomationsTable({
                                   setMenuKey(open ? key : null)
                                 }
                                 onOpen={() => openRow(r)}
-                                onLaunch={() => launchRow(r)}
+                                onLaunch={() => void launchRow(r)}
                                 onRename={() => void onRenameOne(r)}
                                 onDuplicate={() => void onDuplicateOne(r)}
                                 onDelete={() => void onDeleteOne(r)}
