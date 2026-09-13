@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  memo,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
 } from "react";
@@ -145,7 +146,7 @@ function loadCollapsedSections(): Set<string> {
   }
 }
 
-function KindIcon({ row }: { row: AutomationRow }) {
+const KindIcon = memo(function KindIcon({ row }: { row: AutomationRow }) {
   const tip = kindTooltip(row);
   const Icon =
     row.kind === "macro"
@@ -160,7 +161,7 @@ function KindIcon({ row }: { row: AutomationRow }) {
       </span>
     </Tooltip>
   );
-}
+});
 
 async function deleteRow(r: AutomationRow): Promise<void> {
   if (r.kind === "macro" || r.kind === "clicker") {
