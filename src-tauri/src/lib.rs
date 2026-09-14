@@ -24,7 +24,7 @@ use caster_engine::{
 use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
-    tray::TrayIconBuilder,
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
     AppHandle, Emitter, Manager, State, WindowEvent,
 };
@@ -823,6 +823,14 @@ fn update_tray_tooltip(app: &AppHandle, engine: &AppState) {
     }
 }
 
+fn show_main_window(app: &AppHandle) {
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.unminimize();
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+}
+
 fn refresh_tray_for_locale(app: &AppHandle, engine: &AppState, pref: UiLocale) {
     let locale = resolve_ui_locale(pref);
     if let Some(tray) = app.tray_by_id("main") {
@@ -930,6 +938,10 @@ fn persist_main_window_bounds(app: &AppHandle, engine: &AppState) {
     let Some(main) = app.get_webview_window("main") else {
         return;
     };
+    // Avoid persisting garbage geometry while the window is hidden (close-to-tray).
+    if !main.is_visible().unwrap_or(false) {
+        return;
+    }
     let Some(prefs) = app.try_state::<Mutex<UiPrefs>>() else {
         return;
     };
@@ -969,10 +981,7 @@ fn request_app_exit(app: &AppHandle, engine: &AppState) {
         .and_then(|p| p.lock().ok().map(|g| g.shell.confirm_quit_if_running))
         .unwrap_or(true);
     if confirm && session_is_active(engine) {
-        if let Some(main) = app.get_webview_window("main") {
-            let _ = main.show();
-            let _ = main.set_focus();
-        }
+        show_main_window(app);
         let _ = app.emit("app://confirm-quit", ());
         return;
     }
@@ -1084,6 +1093,11 @@ fn apply_loaded_settings(
     prefs: &Mutex<UiPrefs>,
     settings: AppSettings,
 ) -> Result<AppSettings, String> {
+    let prev_locale = prefs
+        .lock()
+        .ok()
+        .map(|p| p.shell.ui_locale)
+        .unwrap_or(UiLocale::System);
     engine.set_clicker_config(settings.clicker.clone());
     engine.set_hotkey_bindings(settings.hotkeys);
     engine.set_process_filter(settings.process_filter.clone());
@@ -1102,7 +1116,9 @@ fn apply_loaded_settings(
     apply_overlay_opacity(app, settings.overlay_opacity);
     set_overlay_visible_inner(app, settings.overlay_visible)?;
     persist(app, engine);
-    refresh_tray_for_locale(app, engine, settings.shell.ui_locale);
+    if settings.shell.ui_locale != prev_locale {
+        refresh_tray_for_locale(app, engine, settings.shell.ui_locale);
+    }
     let p = prefs.lock().map_err(|e| e.to_string())?;
     Ok(prefs_to_settings(engine, &p))
 }
@@ -2000,7 +2016,19 @@ pub fn run() {
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
+                // Left-click opens the app; right-click keeps the context menu.
+                .show_menu_on_left_click(false)
                 .tooltip(tray_tooltip(&engine, tray_locale))
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        show_main_window(tray.app_handle());
+                    }
+                })
                 .on_menu_event(|app, event| {
                     let id = event.id.as_ref();
                     let Some(engine) = app.try_state::<AppState>() else {
@@ -2087,10 +2115,7 @@ pub fn run() {
                             update_tray_tooltip(app, &engine);
                         }
                         "show" => {
-                            if let Some(main) = app.get_webview_window("main") {
-                                let _ = main.show();
-                                let _ = main.set_focus();
-                            }
+                            show_main_window(app);
                         }
                         "overlay" => {
                             if let Some(prefs) = app.try_state::<Mutex<UiPrefs>>() {
