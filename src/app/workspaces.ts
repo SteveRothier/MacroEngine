@@ -1,23 +1,27 @@
 import type { SettingsSection } from "./types";
 
 const SETTINGS_SECTIONS: SettingsSection[] = [
-  "general",
-  "appearance",
+  "application",
   "hotkeys",
-  "process",
-  "displays",
-  "maintenance",
+  "security",
+  "data",
 ];
 
+const LEGACY_SETTINGS_SECTIONS: Record<string, SettingsSection> = {
+  accueil: "application",
+  general: "application",
+  appearance: "application",
+  process: "security",
+  displays: "security",
+  maintenance: "data",
+};
+
 export function normalizeSettingsSection(section: unknown): SettingsSection {
-  if (section === "accueil") return "general";
-  if (
-    typeof section === "string" &&
-    (SETTINGS_SECTIONS as string[]).includes(section)
-  ) {
+  if (typeof section !== "string") return "application";
+  if ((SETTINGS_SECTIONS as string[]).includes(section)) {
     return section as SettingsSection;
   }
-  return "general";
+  return LEGACY_SETTINGS_SECTIONS[section] ?? "application";
 }
 
 export const HOME_TAB_ID = "home";
@@ -180,7 +184,7 @@ export function selectDocTab(state: WorkspaceState, tabId: string): WorkspaceSta
 
 export function openSettings(
   state: WorkspaceState,
-  section: SettingsSection = "general",
+  section: SettingsSection = "application",
 ): WorkspaceState {
   return {
     ...state,

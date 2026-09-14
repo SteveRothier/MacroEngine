@@ -10,6 +10,7 @@ import {
   nextDocTabId,
   openDocTab,
   openSettings,
+  normalizeSettingsSection,
   prevDocTabId,
   reorderDocTabs,
   renameDocTab,
@@ -52,15 +53,32 @@ describe("workspaces", () => {
     let ws = initialWorkspace();
     ws = openDocTab(ws, "macro", "A", "A");
     const tabId = docTabId("macro", "A");
-    ws = openSettings(ws, "general");
+    ws = openSettings(ws, "application");
     expect(titleBarHighlightTabId(ws)).toBe(tabId);
     expect(ws.shellView).toMatchObject({ type: "settings", returnTabId: tabId });
   });
 
   it("titleBarHighlightTabId falls back to home in settings from home", () => {
     let ws = selectHome(initialWorkspace());
-    ws = openSettings(ws, "general");
+    ws = openSettings(ws, "application");
     expect(titleBarHighlightTabId(ws)).toBe(HOME_TAB_ID);
+  });
+
+  it("normalizeSettingsSection maps legacy section ids", () => {
+    expect(normalizeSettingsSection("general")).toBe("application");
+    expect(normalizeSettingsSection("appearance")).toBe("application");
+    expect(normalizeSettingsSection("accueil")).toBe("application");
+    expect(normalizeSettingsSection("process")).toBe("security");
+    expect(normalizeSettingsSection("displays")).toBe("security");
+    expect(normalizeSettingsSection("maintenance")).toBe("data");
+    expect(normalizeSettingsSection("hotkeys")).toBe("hotkeys");
+    expect(normalizeSettingsSection("security")).toBe("security");
+    expect(normalizeSettingsSection("unknown")).toBe("application");
+  });
+
+  it("openSettings normalizes legacy section ids", () => {
+    const ws = openSettings(initialWorkspace(), "process" as never);
+    expect(ws.shellView).toMatchObject({ type: "settings", section: "security" });
   });
 
   it("closeOtherDocTabs keeps pinned tabs", () => {
