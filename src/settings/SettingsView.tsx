@@ -1,7 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { RefreshCw } from "lucide-react";
+import {
+  AppWindow,
+  Database,
+  Keyboard,
+  RefreshCw,
+  Shield,
+  type LucideIcon,
+} from "lucide-react";
 import { HotkeySettings } from "./HotkeySettings";
 import {
   DEFAULT_CLICKER,
@@ -10,7 +17,7 @@ import {
   type ProcessFilter,
 } from "../clicker/clickerTypes";
 import { useClickerSettingsApi } from "../clicker/useClickerSettings";
-import { InspectorSection, Select, useToast } from "../ui/v2";
+import { Select, useToast } from "../ui/v2";
 import { confirmChoice } from "../ui";
 import type { HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
@@ -21,11 +28,15 @@ import {
   type StartupView,
 } from "./settingsTypes";
 
-const SECTIONS: { id: SettingsSection; label: string }[] = [
-  { id: "application", label: "Application" },
-  { id: "hotkeys", label: "Raccourcis" },
-  { id: "security", label: "Sécurité" },
-  { id: "data", label: "Données" },
+const SECTIONS: {
+  id: SettingsSection;
+  label: string;
+  icon: LucideIcon;
+}[] = [
+  { id: "application", label: "Application", icon: AppWindow },
+  { id: "hotkeys", label: "Raccourcis", icon: Keyboard },
+  { id: "security", label: "Sécurité", icon: Shield },
+  { id: "data", label: "Données", icon: Database },
 ];
 
 type AppPaths = {
@@ -53,6 +64,47 @@ function displayOptionLabel(d: DisplayDto): string {
   const scale = Math.round(d.scaleFactor * 100);
   const primary = d.isPrimary ? " · primaire" : "";
   return `${d.width}×${d.height} · ${scale} %${primary}`;
+}
+
+function SettingsGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="v2-settings-group">
+      <h3 className="v2-settings-group-title">{title}</h3>
+      <div className="v2-settings-group-body">{children}</div>
+    </section>
+  );
+}
+
+function SettingsToggle({
+  checked,
+  onChange,
+  disabled,
+  ariaLabel,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled?: boolean;
+  ariaLabel: string;
+}) {
+  return (
+    <label className={["v2-switch", disabled ? "is-disabled" : ""].filter(Boolean).join(" ")}>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span className="v2-switch-track" aria-hidden />
+    </label>
+  );
 }
 
 export function SettingsView({
@@ -291,21 +343,25 @@ export function SettingsView({
     <div className="v2-page">
       <div className="v2-settings-layout">
         <nav className="v2-settings-rail" aria-label="Sections paramètres">
-          {SECTIONS.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              className={[
-                "v2-settings-rail-item",
-                section === s.id ? "active" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => onSectionChange(s.id)}
-            >
-              {s.label}
-            </button>
-          ))}
+          {SECTIONS.map((s) => {
+            const Icon = s.icon;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                className={[
+                  "v2-settings-rail-item",
+                  section === s.id ? "active" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => onSectionChange(s.id)}
+              >
+                <Icon size={16} aria-hidden className="v2-settings-rail-icon" />
+                <span>{s.label}</span>
+              </button>
+            );
+          })}
         </nav>
         <div className="v2-settings-pane">
           <div className="v2-settings-pane-inner">
@@ -315,19 +371,19 @@ export function SettingsView({
                 <p className="v2-settings-pane-hint">
                   Démarrage, fenêtre et apparence de Caster.
                 </p>
-                <InspectorSection title="Démarrage & fenêtre">
+                <SettingsGroup title="Démarrage & fenêtre">
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
                       <span>Démarrer avec Windows</span>
                       <p>Lance Caster à la connexion de votre compte.</p>
                     </div>
                     <div className="v2-settings-row-control">
-                      <input
-                        type="checkbox"
+                      <SettingsToggle
                         checked={startWithWindows}
-                        onChange={(e) => {
-                          setStartWithWindows(e.target.checked);
-                          void persist({ startWithWindows: e.target.checked });
+                        ariaLabel="Démarrer avec Windows"
+                        onChange={(checked) => {
+                          setStartWithWindows(checked);
+                          void persist({ startWithWindows: checked });
                         }}
                       />
                     </div>
@@ -335,17 +391,15 @@ export function SettingsView({
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
                       <span>Fermer vers la barre d’état</span>
-                      <p>
-                        La croix cache la fenêtre ; quitter via l’icône tray.
-                      </p>
+                      <p>La croix cache la fenêtre ; quitter via l’icône tray.</p>
                     </div>
                     <div className="v2-settings-row-control">
-                      <input
-                        type="checkbox"
+                      <SettingsToggle
                         checked={closeToTray}
-                        onChange={(e) => {
-                          setCloseToTray(e.target.checked);
-                          void persist({ closeToTray: e.target.checked });
+                        ariaLabel="Fermer vers la barre d’état"
+                        onChange={(checked) => {
+                          setCloseToTray(checked);
+                          void persist({ closeToTray: checked });
                         }}
                       />
                     </div>
@@ -356,12 +410,12 @@ export function SettingsView({
                       <p>Ouvre le journal d’exécution au lancement.</p>
                     </div>
                     <div className="v2-settings-row-control">
-                      <input
-                        type="checkbox"
+                      <SettingsToggle
                         checked={journalOpen}
-                        onChange={(e) => {
-                          onJournalOpenChange(e.target.checked);
-                          void persist({ journalOpen: e.target.checked });
+                        ariaLabel="Journal au démarrage"
+                        onChange={(checked) => {
+                          onJournalOpenChange(checked);
+                          void persist({ journalOpen: checked });
                         }}
                       />
                     </div>
@@ -392,19 +446,17 @@ export function SettingsView({
                       <p>Rouvre les documents ouverts à la fermeture précédente.</p>
                     </div>
                     <div className="v2-settings-row-control">
-                      <input
-                        type="checkbox"
+                      <SettingsToggle
                         checked={shell.restoreWorkspaceTabs}
-                        onChange={(e) =>
-                          persistShellPrefs({
-                            restoreWorkspaceTabs: e.target.checked,
-                          })
+                        ariaLabel="Restaurer les onglets"
+                        onChange={(checked) =>
+                          persistShellPrefs({ restoreWorkspaceTabs: checked })
                         }
                       />
                     </div>
                   </div>
-                </InspectorSection>
-                <InspectorSection title="Apparence">
+                </SettingsGroup>
+                <SettingsGroup title="Apparence">
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
                       <span>Thème</span>
@@ -436,31 +488,33 @@ export function SettingsView({
                       </div>
                     </div>
                   </div>
-                  <div className="v2-theme-preview">
-                    <button
-                      type="button"
-                      className={[
-                        "v2-theme-swatch",
-                        "v2-theme-swatch--dark",
-                        theme === "dark" ? "selected" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      aria-label="Thème sombre"
-                      onClick={() => setTheme("dark")}
-                    />
-                    <button
-                      type="button"
-                      className={[
-                        "v2-theme-swatch",
-                        "v2-theme-swatch--light",
-                        theme === "light" ? "selected" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ")}
-                      aria-label="Thème clair"
-                      onClick={() => setTheme("light")}
-                    />
+                  <div className="v2-settings-row v2-settings-row--swatches">
+                    <div className="v2-theme-preview">
+                      <button
+                        type="button"
+                        className={[
+                          "v2-theme-swatch",
+                          "v2-theme-swatch--dark",
+                          theme === "dark" ? "selected" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        aria-label="Thème sombre"
+                        onClick={() => setTheme("dark")}
+                      />
+                      <button
+                        type="button"
+                        className={[
+                          "v2-theme-swatch",
+                          "v2-theme-swatch--light",
+                          theme === "light" ? "selected" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        aria-label="Thème clair"
+                        onClick={() => setTheme("light")}
+                      />
+                    </div>
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
@@ -471,20 +525,15 @@ export function SettingsView({
                       </p>
                     </div>
                     <div className="v2-settings-row-control">
-                      <label className="v2-switch">
-                        <input
-                          type="checkbox"
-                          checked={overlayVisible}
-                          onChange={(e) => {
-                            setOverlayVisible(e.target.checked);
-                            void invoke("set_overlay_visible", {
-                              visible: e.target.checked,
-                            });
-                            void persist({ overlayVisible: e.target.checked });
-                          }}
-                        />
-                        <span>{overlayVisible ? "Affiché" : "Masqué"}</span>
-                      </label>
+                      <SettingsToggle
+                        checked={overlayVisible}
+                        ariaLabel="Indicateur flottant HUD"
+                        onChange={(checked) => {
+                          setOverlayVisible(checked);
+                          void invoke("set_overlay_visible", { visible: checked });
+                          void persist({ overlayVisible: checked });
+                        }}
+                      />
                     </div>
                   </div>
                   <div className="v2-settings-row">
@@ -508,8 +557,8 @@ export function SettingsView({
                       </label>
                     </div>
                   </div>
-                </InspectorSection>
-                <InspectorSection title="Clicker">
+                </SettingsGroup>
+                <SettingsGroup title="Clicker">
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
                       <span>Mode interface</span>
@@ -543,7 +592,9 @@ export function SettingsView({
                       <span>État</span>
                     </div>
                     <div className="v2-settings-row-control">
-                      <strong>{running ? "En cours" : "Inactif"}</strong>
+                      <strong className="v2-settings-status">
+                        {running ? "En cours" : "Inactif"}
+                      </strong>
                     </div>
                   </div>
                   <div className="v2-settings-row">
@@ -558,7 +609,7 @@ export function SettingsView({
                       </code>
                     </div>
                   </div>
-                </InspectorSection>
+                </SettingsGroup>
               </>
             ) : null}
 
@@ -568,7 +619,9 @@ export function SettingsView({
                 <p className="v2-settings-pane-hint">
                   Valables hors focus. Défauts : clicker F6 · macro F9 · urgence F8.
                 </p>
-                <HotkeySettings onBindingsChange={onHotkeysChange} />
+                <SettingsGroup title="Raccourcis globaux">
+                  <HotkeySettings onBindingsChange={onHotkeysChange} />
+                </SettingsGroup>
               </>
             ) : null}
 
@@ -579,8 +632,8 @@ export function SettingsView({
                   Limite où Caster peut agir, et quel écran utiliser.
                   {running ? " Filtre désactivé pendant une session en cours." : ""}
                 </p>
-                <InspectorSection title="Filtre applications">
-                  <p className="v2-settings-pane-hint">
+                <SettingsGroup title="Filtre applications">
+                  <p className="v2-settings-group-hint">
                     Selon l’application au premier plan (
                     <code className="v2-settings-mono">nom.exe</code>
                     ). La session continue même si un clic est ignoré.
@@ -606,14 +659,14 @@ export function SettingsView({
                       <span>Activer le filtre</span>
                     </div>
                     <div className="v2-settings-row-control">
-                      <input
-                        type="checkbox"
+                      <SettingsToggle
                         checked={processFilter.enabled}
                         disabled={running}
-                        onChange={(e) =>
+                        ariaLabel="Activer le filtre"
+                        onChange={(checked) =>
                           persistProcess({
                             ...processFilter,
-                            enabled: e.target.checked,
+                            enabled: checked,
                           })
                         }
                       />
@@ -651,61 +704,69 @@ export function SettingsView({
                     </div>
                   </div>
                   {liveExes.length > 0 ? (
-                    <label className="v2-field">
-                      <span>Ajouter depuis processus visibles</span>
-                      <Select
-                        className="v2-select"
-                        value=""
-                        disabled={running || !processFilter.enabled}
-                        options={[
-                          { value: "", label: "Choisir…" },
-                          ...liveExes
-                            .filter((x) => !processFilter.names.includes(x))
-                            .map((x) => ({ value: x, label: x })),
-                        ]}
-                        onChange={(name) => {
-                          if (!name || processFilter.names.includes(name)) return;
-                          persistProcess({
-                            ...processFilter,
-                            names: [...processFilter.names, name],
-                          });
-                        }}
-                      />
-                    </label>
-                  ) : null}
-                  <label className="v2-field">
-                    <span>Ajouter manuellement</span>
-                    <div className="v2-field-row">
-                      <input
-                        value={processDraft}
-                        disabled={running || !processFilter.enabled}
-                        onChange={(e) => setProcessDraft(e.target.value)}
-                        placeholder="chrome.exe"
-                      />
-                      <button
-                        type="button"
-                        className="v2-btn"
-                        disabled={
-                          running ||
-                          !processFilter.enabled ||
-                          !processDraft.trim()
-                        }
-                        onClick={() => {
-                          const n = processDraft.trim().toLowerCase();
-                          if (!n || processFilter.names.includes(n)) return;
-                          setProcessDraft("");
-                          persistProcess({
-                            ...processFilter,
-                            names: [...processFilter.names, n],
-                          });
-                        }}
-                      >
-                        Ajouter
-                      </button>
+                    <div className="v2-settings-row v2-settings-row--stack">
+                      <div className="v2-settings-row-label">
+                        <span>Ajouter depuis processus visibles</span>
+                      </div>
+                      <div className="v2-settings-row-control v2-settings-row-control--full">
+                        <Select
+                          className="v2-select"
+                          value=""
+                          disabled={running || !processFilter.enabled}
+                          options={[
+                            { value: "", label: "Choisir…" },
+                            ...liveExes
+                              .filter((x) => !processFilter.names.includes(x))
+                              .map((x) => ({ value: x, label: x })),
+                          ]}
+                          onChange={(name) => {
+                            if (!name || processFilter.names.includes(name)) return;
+                            persistProcess({
+                              ...processFilter,
+                              names: [...processFilter.names, name],
+                            });
+                          }}
+                        />
+                      </div>
                     </div>
-                  </label>
+                  ) : null}
+                  <div className="v2-settings-row v2-settings-row--stack">
+                    <div className="v2-settings-row-label">
+                      <span>Ajouter manuellement</span>
+                    </div>
+                    <div className="v2-settings-row-control v2-settings-row-control--full">
+                      <div className="v2-field-row">
+                        <input
+                          value={processDraft}
+                          disabled={running || !processFilter.enabled}
+                          onChange={(e) => setProcessDraft(e.target.value)}
+                          placeholder="chrome.exe"
+                        />
+                        <button
+                          type="button"
+                          className="v2-btn"
+                          disabled={
+                            running ||
+                            !processFilter.enabled ||
+                            !processDraft.trim()
+                          }
+                          onClick={() => {
+                            const n = processDraft.trim().toLowerCase();
+                            if (!n || processFilter.names.includes(n)) return;
+                            setProcessDraft("");
+                            persistProcess({
+                              ...processFilter,
+                              names: [...processFilter.names, n],
+                            });
+                          }}
+                        >
+                          Ajouter
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                   {processFilter.names.length === 0 ? (
-                    <p className="v2-settings-pane-hint">Aucun processus listé.</p>
+                    <p className="v2-settings-group-hint">Aucun processus listé.</p>
                   ) : (
                     <ul className="v2-settings-process-list">
                       {processFilter.names.map((n) => (
@@ -728,8 +789,8 @@ export function SettingsView({
                       ))}
                     </ul>
                   )}
-                </InspectorSection>
-                <InspectorSection title="Écran">
+                </SettingsGroup>
+                <SettingsGroup title="Écran">
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
                       <span>Moniteur pour overlays et coordonnées</span>
@@ -764,7 +825,7 @@ export function SettingsView({
                       </div>
                     </div>
                   </div>
-                </InspectorSection>
+                </SettingsGroup>
               </>
             ) : null}
 
@@ -774,7 +835,7 @@ export function SettingsView({
                 <p className="v2-settings-pane-hint">
                   Fichiers locaux, sauvegarde des préférences, nettoyage.
                 </p>
-                <InspectorSection title="Actions">
+                <SettingsGroup title="Actions">
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
                       <span>Ouvrir les fichiers de config</span>
@@ -887,8 +948,8 @@ export function SettingsView({
                       </button>
                     </div>
                   </div>
-                </InspectorSection>
-                <InspectorSection title="À propos">
+                </SettingsGroup>
+                <SettingsGroup title="À propos">
                   <div className="v2-settings-about">
                     <strong>Caster</strong>
                     <p>Automatisation Windows — clicker et macros, 100 % local.</p>
@@ -906,12 +967,12 @@ export function SettingsView({
                         <dd>Windows</dd>
                       </div>
                     </dl>
-                    <p className="v2-settings-pane-hint">
+                    <p className="v2-settings-group-hint">
                       Aucune télémétrie · données locales. Hotkeys globales, capture et
                       injection d’entrée : Windows uniquement pour l’instant.
                     </p>
                   </div>
-                </InspectorSection>
+                </SettingsGroup>
               </>
             ) : null}
           </div>
