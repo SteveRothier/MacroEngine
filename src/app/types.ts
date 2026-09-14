@@ -5,12 +5,10 @@ export type AppRoute =
   | { name: "settings"; section?: SettingsSection };
 
 export type SettingsSection =
-  | "general"
-  | "appearance"
+  | "application"
   | "hotkeys"
-  | "process"
-  | "displays"
-  | "maintenance";
+  | "security"
+  | "data";
 
 export type NavId = "automations" | "runs" | "settings";
 

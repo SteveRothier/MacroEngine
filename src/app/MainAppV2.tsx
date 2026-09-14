@@ -114,7 +114,7 @@ function MainAppV2Inner() {
     cancelled: false,
     message: null,
   });
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>("general");
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>("application");
   const [refreshKey, setRefreshKey] = useState(0);
   const { lines: journalLines, clear: clearJournal } = useEngineLog();
   const [journalOpen, setJournalOpen] = useState(readJournalOpen);
@@ -224,7 +224,7 @@ function MainAppV2Inner() {
     setWorkspace((ws) => selectHome(ws));
   }, []);
 
-  const goSettings = useCallback((section: SettingsSection = "general") => {
+  const goSettings = useCallback((section: SettingsSection = "application") => {
     setSettingsSection(section);
     setWorkspace((ws) => openSettings(ws, section));
   }, []);
@@ -582,7 +582,7 @@ function MainAppV2Inner() {
         label: "Paramètres",
         hint: "Ctrl+,",
         group: "Navigation",
-        onSelect: () => goSettings("general"),
+        onSelect: () => goSettings("application"),
       },
       {
         id: "nav-journal",
@@ -827,7 +827,7 @@ function MainAppV2Inner() {
             bumpRefresh();
           }}
           hotkeys={hotkeys}
-          onOpenProcessSettings={() => goSettings("process")}
+          onOpenProcessSettings={() => goSettings("security")}
         />
       );
     }
