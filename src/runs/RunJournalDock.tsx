@@ -1,15 +1,9 @@
 import { useState } from "react";
 import { Trash2, X } from "lucide-react";
 import { EmptyState } from "../ui/v2";
+import { useT } from "../i18n";
 
 type Filter = "all" | "macro" | "clicker" | "system";
-
-const FILTER_LABELS: Record<Filter, string> = {
-  all: "Tout",
-  macro: "Macros",
-  clicker: "Clicker",
-  system: "Système",
-};
 
 type Props = {
   lines: string[];
@@ -19,9 +13,17 @@ type Props = {
 };
 
 export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
+  const t = useT();
   const [filter, setFilter] = useState<Filter>("all");
 
   if (!open) return null;
+
+  const filterLabels: Record<Filter, string> = {
+    all: t("runs.filterAll"),
+    macro: t("runs.filterMacros"),
+    clicker: t("runs.filterClicker"),
+    system: t("runs.filterSystem"),
+  };
 
   const filtered = lines.filter((l) => {
     if (filter === "all") return true;
@@ -31,9 +33,9 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
   });
 
   return (
-    <div className="v2-journal-overlay" role="region" aria-label="Journal">
+    <div className="v2-journal-overlay" role="region" aria-label={t("runs.aria")}>
       <div className="v2-journal-head">
-        <span className="v2-journal-title">Journal</span>
+        <span className="v2-journal-title">{t("runs.title")}</span>
         <div className="v2-journal-filters">
           {(["all", "macro", "clicker", "system"] as Filter[]).map((f) => (
             <button
@@ -43,13 +45,13 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
               style={{ fontSize: 11, padding: "2px 8px" }}
               onClick={() => setFilter(f)}
             >
-              {FILTER_LABELS[f]}
+              {filterLabels[f]}
             </button>
           ))}
           <button
             type="button"
             className="v2-btn v2-btn-ghost"
-            title="Vider"
+            title={t("runs.clear")}
             onClick={onClear}
           >
             <Trash2 size={12} />
@@ -57,7 +59,7 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
           <button
             type="button"
             className="v2-btn v2-btn-ghost"
-            title="Fermer"
+            title={t("runs.close")}
             onClick={() => onOpenChange(false)}
           >
             <X size={14} />
@@ -66,7 +68,7 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
       </div>
       <div className="v2-journal-body">
         {filtered.length === 0 ? (
-          <EmptyState title="Aucune entrée" lead="Les logs d’exécution apparaîtront ici." />
+          <EmptyState title={t("runs.emptyTitle")} lead={t("runs.emptyLead")} />
         ) : (
           filtered.map((line, i) => (
             <div
