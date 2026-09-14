@@ -1,3 +1,5 @@
+import type { TFunction } from "../i18n";
+
 /** Catalog of example scripts (UI presets — not auto-seeded to disk). */
 
 export type ScriptPreset = {
@@ -11,11 +13,19 @@ export type ScriptPreset = {
   allowMacroControl?: boolean;
 };
 
-export const SCRIPT_PRESETS: ScriptPreset[] = [
+type ScriptPresetDef = Omit<ScriptPreset, "name" | "description"> & {
+  catalogKey:
+    | "helloParam"
+    | "httpGet"
+    | "clipRoundtrip"
+    | "fsNote"
+    | "runMacro";
+};
+
+const SCRIPT_PRESET_DEFS: ScriptPresetDef[] = [
   {
     id: "hello-param",
-    name: "Hello + @param",
-    description: "Découverte des paramètres et de caster.return",
+    catalogKey: "helloParam",
     source: `//@param label string world
 caster.log("hello " + caster.get("label"));
 caster.return(caster.get("label"));
@@ -23,8 +33,7 @@ caster.return(caster.get("label"));
   },
   {
     id: "http-get",
-    name: "HTTP GET JSON",
-    description: "caster.fetch → variables status / body",
+    catalogKey: "httpGet",
     allowNetwork: true,
     source: `//@param url string https://httpbin.org/get
 const res = caster.fetch({
@@ -40,8 +49,7 @@ caster.return(res.status);
   },
   {
     id: "clip-roundtrip",
-    name: "Presse-papiers",
-    description: "Lire puis réécrire le presse-papiers",
+    catalogKey: "clipRoundtrip",
     allowClipboard: true,
     source: `const prev = caster.clipboardRead();
 caster.log("clip: " + prev);
@@ -51,8 +59,7 @@ caster.return(prev);
   },
   {
     id: "fs-note",
-    name: "Note sandbox",
-    description: "Lire/écrire notes.txt sous script-data/",
+    catalogKey: "fsNote",
     allowFs: true,
     source: `//@param note string Bonjour depuis Caster
 const path = "notes.txt";
@@ -69,8 +76,7 @@ caster.return(caster.get("note"));
   },
   {
     id: "run-macro",
-    name: "Lancer une macro",
-    description: "caster.runMacro (profondeur max 3)",
+    catalogKey: "runMacro",
     allowMacroControl: true,
     source: `//@param macroId string
 const id = String(caster.get("macroId") || "").trim();
@@ -87,8 +93,24 @@ if (!id) {
   },
 ];
 
-export function findScriptPreset(id: string): ScriptPreset | undefined {
-  return SCRIPT_PRESETS.find((p) => p.id === id);
+export function getScriptPresets(t: TFunction): ScriptPreset[] {
+  return SCRIPT_PRESET_DEFS.map((def) => ({
+    id: def.id,
+    name: t(`scripts.presets.${def.catalogKey}.name`),
+    description: t(`scripts.presets.${def.catalogKey}.description`),
+    source: def.source,
+    allowNetwork: def.allowNetwork,
+    allowClipboard: def.allowClipboard,
+    allowFs: def.allowFs,
+    allowMacroControl: def.allowMacroControl,
+  }));
+}
+
+export function findScriptPreset(
+  id: string,
+  t: TFunction,
+): ScriptPreset | undefined {
+  return getScriptPresets(t).find((p) => p.id === id);
 }
 
 /** Permissions partial from a preset (only defined flags). */

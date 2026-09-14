@@ -1,4 +1,5 @@
 import { ArrowLeft, Play, Square } from "lucide-react";
+import { useT, type TFunction } from "../i18n";
 import { EditorToolbar, Tooltip } from "../ui/v2";
 import {
   ScriptPermissionsMenu,
@@ -21,16 +22,16 @@ type Props = {
   onRetrySave?: () => void;
 };
 
-function busyTooltip(kind: EngineBusyKind): string {
+function busyTooltip(kind: EngineBusyKind, t: TFunction): string {
   const label =
     kind === "clicker"
-      ? "un clicker"
+      ? t("scripts.toolbar.busyClicker")
       : kind === "record"
-        ? "un enregistrement"
+        ? t("scripts.toolbar.busyRecord")
         : kind === "script"
-          ? "un autre script"
-          : "une macro";
-  return `Impossible de lancer le script : ${label} est déjà en cours. Arrêtez (F8) avant de continuer.`;
+          ? t("scripts.toolbar.busyScript")
+          : t("scripts.toolbar.busyMacro");
+  return t("scripts.toolbar.busyTip", { label });
 }
 
 export function ScriptTitleBarTools({
@@ -46,13 +47,14 @@ export function ScriptTitleBarTools({
   saveStatus,
   onRetrySave,
 }: Props) {
+  const t = useT();
   const statusLabel =
     saveStatus === "saving"
-      ? "● Enregistrement…"
+      ? t("scripts.toolbar.saving")
       : saveStatus === "saved"
-        ? "● Enregistré"
+        ? t("scripts.toolbar.saved")
         : saveStatus === "error"
-          ? "● Erreur d’enregistrement"
+          ? t("scripts.toolbar.saveError")
           : null;
 
   const runBlocked = !running && engineBusy != null && engineBusy !== "script";
@@ -66,15 +68,15 @@ export function ScriptTitleBarTools({
             type="button"
             className="v2-titlebar-btn v2-btn v2-btn-ghost"
             onClick={onBack}
-            title="Retour aux automations"
+            title={t("scripts.toolbar.back")}
           >
             <ArrowLeft size={14} aria-hidden />
           </button>
           <input
             className="v2-titlebar-name-input v2-titlebar-name-input--wide"
             value={name}
-            placeholder="Nom du script"
-            aria-label="Nom du script"
+            placeholder={t("scripts.toolbar.namePlaceholder")}
+            aria-label={t("scripts.toolbar.nameAria")}
             onChange={(e) => onNameChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
@@ -86,7 +88,7 @@ export function ScriptTitleBarTools({
           />
           {statusLabel ? (
             saveStatus === "error" ? (
-              <Tooltip content="Échec de l’enregistrement. Nouvelle tentative en cours…">
+              <Tooltip content={t("scripts.toolbar.saveErrorTip")}>
                 <button
                   type="button"
                   className="v2-script-save-status is-error"
@@ -110,31 +112,31 @@ export function ScriptTitleBarTools({
             )
           ) : (
             <span className="v2-script-save-status is-placeholder" aria-hidden>
-              ● Enregistré
+              {t("scripts.toolbar.saved")}
             </span>
           )}
         </>
       }
       end={
         running ? (
-          <Tooltip content="Arrêter (F8)">
+          <Tooltip content={t("scripts.toolbar.stopTip")}>
             <button
               type="button"
               className="v2-btn v2-script-run-btn is-stop"
               onClick={onStop}
               aria-pressed={true}
-              aria-label="Arrêter (F8)"
+              aria-label={t("scripts.toolbar.stop")}
             >
               <Square size={14} aria-hidden />
-              Arrêter (F8)
+              {t("scripts.toolbar.stop")}
             </button>
           </Tooltip>
         ) : (
           <Tooltip
             content={
               runBlocked && engineBusy
-                ? busyTooltip(engineBusy)
-                : "Exécuter le script"
+                ? busyTooltip(engineBusy, t)
+                : t("scripts.toolbar.runTip")
             }
           >
             <button
@@ -143,10 +145,10 @@ export function ScriptTitleBarTools({
               onClick={onRun}
               disabled={runBlocked}
               aria-pressed={false}
-              aria-label="Exécuter"
+              aria-label={t("scripts.toolbar.run")}
             >
               <Play size={14} aria-hidden />
-              Exécuter
+              {t("scripts.toolbar.run")}
             </button>
           </Tooltip>
         )

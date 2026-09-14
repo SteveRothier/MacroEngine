@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useT, type TFunction } from "../i18n";
 import { Tooltip } from "../ui/v2";
 
 export type ScriptPermissions = {
@@ -25,10 +26,14 @@ function countActive(v: ScriptPermissions): number {
 }
 
 export function ScriptPermissionsMenu({ value, onChange, disabled }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const n = countActive(value);
-  const label = n > 0 ? `Permissions ·${n}` : "Permissions";
+  const label =
+    n > 0
+      ? t("scripts.permissions.labelCount", { count: n })
+      : t("scripts.permissions.label");
 
   useEffect(() => {
     if (!open) return;
@@ -60,29 +65,29 @@ export function ScriptPermissionsMenu({ value, onChange, disabled }: Props) {
       {open ? (
         <div className="v2-menu-popover v2-script-perms-popover" role="menu">
           <PermRow
-            label="Réseau"
-            tip="Autorise caster.fetch — le script peut envoyer des requêtes réseau."
+            label={t("scripts.permissions.network")}
+            tip={t("scripts.permissions.networkTip")}
             checked={value.allowNetwork}
             onChange={(allowNetwork) => onChange({ allowNetwork })}
           />
           <PermRow
-            label="Presse-papiers"
-            tip="Le script peut lire et écrire le presse-papiers système."
+            label={t("scripts.permissions.clipboard")}
+            tip={t("scripts.permissions.clipboardTip")}
             checked={value.allowClipboard}
             onChange={(allowClipboard) => onChange({ allowClipboard })}
           />
           <div className="v2-script-perms-sep" role="separator">
-            Avancé
+            {t("scripts.permissions.advanced")}
           </div>
           <PermRow
-            label="Fichiers (sandbox)"
-            tip="Lecture/écriture limitée au dossier script-data/ de Caster — aucun autre accès disque."
+            label={t("scripts.permissions.fs")}
+            tip={t("scripts.permissions.fsTip")}
             checked={value.allowFs}
             onChange={(allowFs) => onChange({ allowFs })}
           />
           <PermRow
-            label="Macros (profondeur 3)"
-            tip="Le script peut lancer d’autres macros via runMacro (profondeur max 3)."
+            label={t("scripts.permissions.macros")}
+            tip={t("scripts.permissions.macrosTip")}
             checked={value.allowMacroControl}
             onChange={(allowMacroControl) => onChange({ allowMacroControl })}
           />
@@ -121,16 +126,19 @@ function PermRow({
   );
 }
 
-export function activePermissionLabels(doc: {
-  allowNetwork?: boolean;
-  allowClipboard?: boolean;
-  allowFs?: boolean;
-  allowMacroControl?: boolean;
-}): string[] {
+export function activePermissionLabels(
+  doc: {
+    allowNetwork?: boolean;
+    allowClipboard?: boolean;
+    allowFs?: boolean;
+    allowMacroControl?: boolean;
+  },
+  t: TFunction,
+): string[] {
   const out: string[] = [];
-  if (doc.allowNetwork) out.push("Réseau");
-  if (doc.allowClipboard) out.push("Presse-papiers");
-  if (doc.allowFs) out.push("Fichiers");
-  if (doc.allowMacroControl) out.push("Macros");
+  if (doc.allowNetwork) out.push(t("scripts.permissions.network"));
+  if (doc.allowClipboard) out.push(t("scripts.permissions.clipboard"));
+  if (doc.allowFs) out.push(t("scripts.permissions.fsShort"));
+  if (doc.allowMacroControl) out.push(t("scripts.permissions.macrosShort"));
   return out;
 }
