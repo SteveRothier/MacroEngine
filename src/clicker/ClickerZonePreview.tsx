@@ -1,12 +1,14 @@
 import type { CSSProperties } from "react";
 import { Switch } from "../ui";
 import { Select } from "../ui/v2";
+import { useT } from "../i18n";
 import { ZoneMap } from "./ZoneMap";
 import type { ClickerEditor } from "./useClickerEditor";
 
 type Props = { editor: ClickerEditor };
 
 export function ClickerZonePreview({ editor: e }: Props) {
+  const t = useT();
   const previewAspectStyle = {
     "--preview-w": e.screenGeom.width,
     "--preview-h": e.screenGeom.height,
@@ -23,10 +25,10 @@ export function ClickerZonePreview({ editor: e }: Props) {
             className="v2-clicker-zone-select"
             value={displayValue}
             disabled={e.editDisabled}
-            ariaLabel="Écran cible"
+            ariaLabel={t("clicker.zones.displayAria")}
             options={e.displays.map((d) => ({
               value: d.id,
-              label: `${d.label}${d.isPrimary ? " (principal)" : ""}`,
+              label: `${d.label}${d.isPrimary ? t("clicker.zones.primarySuffix") : ""}`,
             }))}
             onChange={(v) => void e.onSelectDisplay(v)}
           />
@@ -38,7 +40,7 @@ export function ClickerZonePreview({ editor: e }: Props) {
         <Switch
           checked={e.zoneOverlayVisible}
           disabled={e.editDisabled}
-          label="Overlay"
+          label={t("clicker.zones.overlay")}
           onChange={e.setZoneOverlayVisible}
         />
         <span className="v2-clicker-zone-toolbar-spacer" />
@@ -48,7 +50,7 @@ export function ClickerZonePreview({ editor: e }: Props) {
           disabled={e.editDisabled || e.drawing}
           onClick={() => void e.onDrawZone("safety")}
         >
-          {e.drawing ? "Glisse LMB…" : "Zone sécurité"}
+          {e.drawing ? t("clicker.zones.drawing") : t("clicker.zones.drawSafety")}
         </button>
         <button
           type="button"
@@ -56,7 +58,7 @@ export function ClickerZonePreview({ editor: e }: Props) {
           disabled={e.editDisabled || e.drawing}
           onClick={() => void e.onDrawZone("click")}
         >
-          Zone clic
+          {t("clicker.zones.drawClick")}
         </button>
       </div>
       <div className="screen-preview-frame v2-clicker-zone-frame v2-bg-canvas">

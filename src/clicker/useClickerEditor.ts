@@ -5,6 +5,7 @@ import type { EngineStatus } from "../macros/types";
 import { normalizeHotkeyTrigger } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import { confirmChoice } from "../ui";
+import { useT } from "../i18n";
 import {
   DEFAULT_PROCESS_FILTER,
   FALLBACK_SCREEN_GEOM,
@@ -67,6 +68,7 @@ export type UseClickerEditorOptions = {
 export function useClickerEditor(opts: UseClickerEditorOptions) {
   const { presetId, status, onStatus, refresh, onDirtyChange, onRenamed, theme } =
     opts;
+  const t = useT();
   const { loadSettings, saveBundle } = useClickerSettingsApi();
   const onDirtyChangeRef = useRef(onDirtyChange);
   onDirtyChangeRef.current = onDirtyChange;
@@ -301,10 +303,12 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       if (nextName && nextName === selectedPreset) return true;
       if (locked) {
         const outcome = await confirmChoice({
-          title: "Preset verrouillé modifié",
-          message: `« ${selectedPreset} » est verrouillé. Abandonner les changements locaux ?`,
-          confirmLabel: "Abandonner",
-          cancelLabel: "Annuler",
+          title: t("clicker.confirms.lockedTitle"),
+          message: t("clicker.confirms.lockedMessage", {
+            name: selectedPreset,
+          }),
+          confirmLabel: t("clicker.confirms.discard"),
+          cancelLabel: t("common.cancel"),
           danger: true,
         });
         return outcome === "confirm";
@@ -320,11 +324,13 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         return true;
       } catch {
         const outcome = await confirmChoice({
-          title: "Échec de l’enregistrement",
-          message: `Impossible de sauver « ${selectedPreset} ». Abandonner les changements ?`,
-          confirmLabel: "Sauver",
-          discardLabel: "Abandonner",
-          cancelLabel: "Annuler",
+          title: t("clicker.confirms.saveFailedTitle"),
+          message: t("clicker.confirms.saveFailedMessage", {
+            name: selectedPreset,
+          }),
+          confirmLabel: t("common.save"),
+          discardLabel: t("clicker.confirms.discard"),
+          cancelLabel: t("common.cancel"),
           danger: false,
         });
         if (outcome === "cancel") return false;
@@ -344,7 +350,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         return true;
       }
     },
-    [buildConfig, dirty, locked, selectedPreset, trigger],
+    [buildConfig, dirty, locked, selectedPreset, t, trigger],
   );
 
   const onLoadPreset = useCallback(
@@ -634,7 +640,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       if (!ok) return;
       const path = await open({
         multiple: false,
-        filters: [{ name: "Preset clicker", extensions: ["json"] }],
+        filters: [{ name: t("clicker.fileFilter"), extensions: ["json"] }],
       });
       if (!path || Array.isArray(path)) return;
       const preset = await invoke<{
@@ -645,7 +651,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     } catch (e) {
       console.error(e);
     }
-  }, [onLoadPreset, resolveDirtyBeforeSwitch]);
+  }, [onLoadPreset, resolveDirtyBeforeSwitch, t]);
 
   const onExportPreset = useCallback(async () => {
     if (!selectedPreset) return;
@@ -660,7 +666,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         clearHistory();
       }
       const path = await save({
-        filters: [{ name: "Preset clicker", extensions: ["json"] }],
+        filters: [{ name: t("clicker.fileFilter"), extensions: ["json"] }],
         defaultPath: `${selectedPreset.replace(/\s+/g, "-").toLowerCase()}.json`,
       });
       if (!path) return;
@@ -671,7 +677,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     } catch (e) {
       console.error(e);
     }
-  }, [buildConfig, clearHistory, dirty, locked, selectedPreset]);
+  }, [buildConfig, clearHistory, dirty, locked, selectedPreset, t]);
 
   useEffect(() => {
     void (async () => {

@@ -18,7 +18,11 @@ import {
   vkLabel,
   type HotkeyBindings,
 } from "../macros/types";
-import { CLICKER_TEMPLATES } from "./clickerTemplates";
+import { useT } from "../i18n";
+import {
+  CLICKER_TEMPLATES,
+  clickerTemplateLabel,
+} from "./clickerTemplates";
 import type { ClickerEditor } from "./useClickerEditor";
 
 type Props = {
@@ -28,16 +32,24 @@ type Props = {
 };
 
 export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
+  const t = useT();
   const toast = useToast();
+  const modeLabel =
+    editor.mode === "toggle"
+      ? t("clicker.toolbar.toggle")
+      : t("clicker.toolbar.hold");
   const presetTriggerHint =
     editor.trigger.type === "hotkey"
-      ? `Déclencheur ${triggerHotkeyLabel(editor.trigger)}`
+      ? t("clicker.toolbar.triggerHint", {
+          label: triggerHotkeyLabel(editor.trigger),
+        })
       : null;
   const hotkeyHint =
     presetTriggerHint ??
-    `Raccourci ${chordLabel(hotkeys)} · ${
-      editor.mode === "toggle" ? "Basculer" : "Maintenir"
-    }`;
+    t("clicker.toolbar.hotkeyHint", {
+      chord: chordLabel(hotkeys),
+      mode: modeLabel,
+    });
   const sessionPaused = editor.sessionPaused;
   const pauseHint = hotkeys.pauseVk
     ? ` (${vkLabel(hotkeys.pauseVk)})`
@@ -46,18 +58,18 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
   const moreItems: DropdownEntry[] = [
     {
       id: "save-now",
-      label: "Enregistrer maintenant",
+      label: t("clicker.toolbar.saveNow"),
       icon: <Save size={14} />,
       onSelect: () => {
         void editor.onSavePreset().then(
-          () => toast.success("Preset enregistré"),
+          () => toast.success(t("clicker.toasts.presetSaved")),
           (e: unknown) => {
             const msg =
               typeof e === "string"
                 ? e
                 : e && typeof e === "object" && "message" in e
                   ? String((e as { message?: unknown }).message)
-                  : "Échec de l’enregistrement";
+                  : t("clicker.toasts.saveFailed");
             toast.error(msg);
           },
         );
@@ -65,27 +77,30 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
     },
     {
       id: "templates",
-      label: "Modèles",
-      items: CLICKER_TEMPLATES.map((t) => ({
-        id: `tpl-${t.id}`,
-        label: t.label,
-        icon: <LayoutTemplate size={14} />,
-        onSelect: () => {
-          editor.applyTemplate(t.build());
-          toast.success(`Modèle appliqué · ${t.label}`);
-        },
-      })),
+      label: t("clicker.toolbar.templates"),
+      items: CLICKER_TEMPLATES.map((tpl) => {
+        const label = clickerTemplateLabel(t, tpl.id);
+        return {
+          id: `tpl-${tpl.id}`,
+          label,
+          icon: <LayoutTemplate size={14} />,
+          onSelect: () => {
+            editor.applyTemplate(tpl.build());
+            toast.success(t("clicker.toasts.templateApplied", { label }));
+          },
+        };
+      }),
     },
     { id: "sep-io", label: "", separator: true },
     {
       id: "import",
-      label: "Importer…",
+      label: t("clicker.toolbar.import"),
       icon: <Upload size={14} />,
       onSelect: () => void editor.onImportPreset(),
     },
     {
       id: "export",
-      label: "Exporter…",
+      label: t("clicker.toolbar.export"),
       icon: <Download size={14} />,
       onSelect: () => void editor.onExportPreset(),
     },
@@ -99,7 +114,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
             type="button"
             className="v2-titlebar-btn v2-btn v2-btn-ghost"
             onClick={onBack}
-            title="Retour aux automations"
+            title={t("clicker.toolbar.back")}
           >
             <ArrowLeft size={14} aria-hidden />
           </button>
@@ -107,8 +122,8 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
             className="v2-titlebar-name-input"
             value={editor.presetName}
             disabled={editor.editDisabled || !editor.selectedPreset}
-            placeholder="Nom du preset"
-            aria-label="Nom du preset"
+            placeholder={t("clicker.toolbar.presetName")}
+            aria-label={t("clicker.toolbar.presetName")}
             onChange={(e) => editor.setPresetName(e.target.value)}
             onBlur={(e) => void editor.onRenamePreset(e.target.value)}
             onKeyDown={(e) => {
@@ -116,8 +131,11 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
             }}
           />
           {editor.locked ? (
-            <span className="v2-clicker-lock" title="Preset verrouillé">
-              Verrouillé
+            <span
+              className="v2-clicker-lock"
+              title={t("clicker.toolbar.lockedTitle")}
+            >
+              {t("clicker.toolbar.locked")}
             </span>
           ) : null}
         </>
@@ -128,7 +146,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
             type="button"
             className="v2-titlebar-btn v2-btn v2-btn-ghost"
             disabled={!editor.canUndo || editor.editDisabled}
-            title="Annuler (Ctrl+Z)"
+            title={t("clicker.toolbar.undo")}
             onClick={() => editor.undoConfig()}
           >
             <Undo2 size={14} aria-hidden />
@@ -137,7 +155,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
             type="button"
             className="v2-titlebar-btn v2-btn v2-btn-ghost"
             disabled={!editor.canRedo || editor.editDisabled}
-            title="Rétablir (Ctrl+Y)"
+            title={t("clicker.toolbar.redo")}
             onClick={() => editor.redoConfig()}
           >
             <Redo2 size={14} aria-hidden />
@@ -145,7 +163,9 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           {editor.metrics ? (
             <span
               className="v2-clicker-title-metrics"
-              title={`Cible : ${editor.metrics.targetCps.toFixed(1)} CPS`}
+              title={t("clicker.toolbar.targetCps", {
+                cps: editor.metrics.targetCps.toFixed(1),
+              })}
             >
               <strong>{editor.metrics.measuredCps.toFixed(1)}</strong> cps
               <span aria-hidden> · </span>
@@ -159,7 +179,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
             title={hotkeyHint}
             onClick={() => void editor.onStart()}
           >
-            Démarrer
+            {t("clicker.toolbar.start")}
           </button>
           {editor.running ? (
             <button
@@ -167,8 +187,8 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
               className="v2-titlebar-btn v2-btn v2-btn-ghost"
               title={
                 sessionPaused
-                  ? "Reprendre la session"
-                  : `Pause session${pauseHint}`
+                  ? t("clicker.toolbar.resumeSession")
+                  : t("clicker.toolbar.pauseSession", { hint: pauseHint })
               }
               onClick={() =>
                 void (sessionPaused ? editor.onResume() : editor.onPause())
@@ -179,7 +199,9 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
               ) : (
                 <Pause size={14} aria-hidden />
               )}
-              {sessionPaused ? " Reprendre" : " Pause"}
+              {sessionPaused
+                ? t("clicker.toolbar.resume")
+                : t("clicker.toolbar.pause")}
             </button>
           ) : null}
           <button
@@ -187,11 +209,11 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
             className="v2-titlebar-btn v2-btn v2-btn-danger-ghost"
             onClick={() => void editor.onStop()}
           >
-            Arrêter
+            {t("clicker.toolbar.stop")}
           </button>
           <DropdownMenu
-            label="Plus d’actions"
-            ariaLabel="Plus d’actions"
+            label={t("clicker.toolbar.moreActions")}
+            ariaLabel={t("clicker.toolbar.moreActions")}
             align="end"
             disabled={editor.running || editor.editDisabled}
             triggerClassName="v2-titlebar-btn v2-btn v2-btn-ghost"

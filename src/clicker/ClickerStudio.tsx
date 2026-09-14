@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useTitleBarSlot } from "../ui/v2/TitleBarContext";
 import type { EngineStatus, HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
+import { useT } from "../i18n";
 import { ClickerSessionStats } from "./ClickerSessionStats";
 import { ClickerTitleBarTools } from "./ClickerTitleBarTools";
 import { ClickerZonePreview } from "./ClickerZonePreview";
@@ -27,13 +28,6 @@ type Props = {
 
 type InspectorTab = "entry" | "target" | "zones" | "limits";
 
-const TABS: { id: InspectorTab; label: string }[] = [
-  { id: "entry", label: "Entrée" },
-  { id: "target", label: "Cible" },
-  { id: "zones", label: "Zones" },
-  { id: "limits", label: "Limites" },
-];
-
 export function ClickerStudio({
   presetId,
   onBack,
@@ -46,7 +40,15 @@ export function ClickerStudio({
   hotkeys,
   onOpenProcessSettings,
 }: Props) {
+  const t = useT();
   const [tab, setTab] = useState<InspectorTab>("entry");
+
+  const tabs: { id: InspectorTab; label: string }[] = [
+    { id: "entry", label: t("clicker.tabs.entry") },
+    { id: "target", label: t("clicker.tabs.target") },
+    { id: "zones", label: t("clicker.tabs.zones") },
+    { id: "limits", label: t("clicker.tabs.limits") },
+  ];
 
   const handleDirtyChange = useCallback(
     (dirty: boolean) => onDirtyChange?.(presetId, dirty),
@@ -80,16 +82,16 @@ export function ClickerStudio({
       <div className="v2-clicker-center">
         <div className="v2-settings-pane-inner v2-clicker-settings">
           <div className="v2-tabs v2-clicker-tabs" role="tablist">
-            {TABS.map((t) => (
+            {tabs.map((item) => (
               <button
-                key={t.id}
+                key={item.id}
                 type="button"
                 role="tab"
-                aria-selected={tab === t.id}
-                className={["v2-tab", tab === t.id ? "active" : ""].join(" ")}
-                onClick={() => setTab(t.id)}
+                aria-selected={tab === item.id}
+                className={["v2-tab", tab === item.id ? "active" : ""].join(" ")}
+                onClick={() => setTab(item.id)}
               >
-                {t.label}
+                {item.label}
               </button>
             ))}
           </div>

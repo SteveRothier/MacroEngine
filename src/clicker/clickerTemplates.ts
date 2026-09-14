@@ -4,6 +4,7 @@ import {
   type ClickPoint,
   type StopZone,
 } from "./clickerTypes";
+import type { TFunction } from "../i18n";
 
 export type ClickerTemplateId =
   | "cps-cursor"
@@ -12,8 +13,6 @@ export type ClickerTemplateId =
 
 export type ClickerTemplate = {
   id: ClickerTemplateId;
-  label: string;
-  description: string;
   build: () => ClickerConfigPayload;
 };
 
@@ -34,12 +33,10 @@ function edgeSafetyZones(): StopZone[] {
   ];
 }
 
-/** Local front patches — no new file format. */
+/** Local front patches — no new file format. Labels via clicker.templates.* */
 export const CLICKER_TEMPLATES: readonly ClickerTemplate[] = [
   {
     id: "cps-cursor",
-    label: "CPS fixe · curseur",
-    description: "10 CPS, bouton gauche, cible curseur, sans zones.",
     build: () => ({
       ...DEFAULT_CLICKER,
       cps: 10,
@@ -53,8 +50,6 @@ export const CLICKER_TEMPLATES: readonly ClickerTemplate[] = [
   },
   {
     id: "grid-3-points",
-    label: "Grille 3 points",
-    description: "Séquence de 3 points fixes, arrêt à la fin.",
     build: () => ({
       ...DEFAULT_CLICKER,
       cps: 8,
@@ -68,8 +63,6 @@ export const CLICKER_TEMPLATES: readonly ClickerTemplate[] = [
   },
   {
     id: "edge-zones",
-    label: "Zones bords seuls",
-    description: "Curseur + bords écran en zone d’arrêt (sécurité).",
     build: () => ({
       ...DEFAULT_CLICKER,
       cps: 10,
@@ -83,3 +76,17 @@ export const CLICKER_TEMPLATES: readonly ClickerTemplate[] = [
     }),
   },
 ] as const;
+
+export function clickerTemplateLabel(
+  t: TFunction,
+  id: ClickerTemplateId,
+): string {
+  return t(`clicker.templates.${id}.label`);
+}
+
+export function clickerTemplateDescription(
+  t: TFunction,
+  id: ClickerTemplateId,
+): string {
+  return t(`clicker.templates.${id}.description`);
+}

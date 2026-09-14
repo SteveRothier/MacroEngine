@@ -7,6 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import type { Corner, CustomZone, Edge, ScreenGeomDto } from "./clickerTypes";
+import { useT } from "../i18n";
 import {
   buildZoneBands,
   clamp,
@@ -91,6 +92,7 @@ export function ZoneMap({
   onResizeCustom,
   onLiveModel,
 }: Props) {
+  const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const dragged = useRef(false);
   const drag = useRef<DragState | null>(null);
@@ -414,10 +416,16 @@ export function ZoneMap({
             tabIndex={canEdit ? 0 : undefined}
             aria-label={
               band.kind === "corner"
-                ? `Zone coin ${band.id}${showFill ? " active" : ""}`
+                ? t("clicker.zones.cornerAria", {
+                    id: band.id,
+                    active: showFill ? t("clicker.zones.activeSuffix") : "",
+                  })
                 : band.kind === "edge"
-                  ? `Zone bord ${band.id}${showFill ? " active" : ""}`
-                  : `Zone personnalisée ${band.id}`
+                  ? t("clicker.zones.edgeAria", {
+                      id: band.id,
+                      active: showFill ? t("clicker.zones.activeSuffix") : "",
+                    })
+                  : t("clicker.zones.customAria", { id: band.id })
             }
             aria-pressed={
               canEdit && (band.kind === "corner" || band.kind === "edge")
@@ -562,7 +570,7 @@ export function ZoneMap({
             type="number"
             min={1}
             value={pxDraft}
-            aria-label="Taille en pixels"
+            aria-label={t("clicker.zones.resizeAria")}
             onChange={(e) => {
               setPxDraft(e.target.value);
               applyPxValue(e.target.value);
@@ -626,6 +634,7 @@ function HandleBtn({
   onPointerUp: (e: ReactPointerEvent<HTMLElement>) => void;
   onDoubleClick: (e: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
@@ -636,7 +645,7 @@ function HandleBtn({
       ]
         .filter(Boolean)
         .join(" ")}
-      aria-label={`Redimensionner ${handle}`}
+      aria-label={t("clicker.zones.resizeHandle", { handle })}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
