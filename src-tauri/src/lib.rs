@@ -19,7 +19,7 @@ use caster_engine::{
     LibraryKind, ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs,
     NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind, RecordOptions,
     ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptsPrefs, ShellPrefs, StopZone, ThemeMode, Trigger,
-    WindowBounds, clamp_overlay_opacity, settings_path,
+    UiLocale, WindowBounds, clamp_overlay_opacity, settings_path,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -664,7 +664,114 @@ fn set_overlay_visible(app: AppHandle, prefs: State<'_, Mutex<UiPrefs>>, visible
     set_overlay_visible_inner(&app, visible)
 }
 
-fn tray_tooltip(engine: &AppState) -> String {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResolvedLocale {
+    Fr,
+    En,
+}
+
+struct TrayStrings {
+    relaunch_clicker: &'static str,
+    relaunch_macro: &'static str,
+    stop: &'static str,
+    overlay: &'static str,
+    open: &'static str,
+    quit: &'static str,
+    recording: &'static str,
+    active: &'static str,
+}
+
+const TRAY_FR: TrayStrings = TrayStrings {
+    relaunch_clicker: "Relancer le dernier clicker",
+    relaunch_macro: "Relancer la dernière macro",
+    stop: "Arrêter",
+    overlay: "Afficher/Masquer overlay",
+    open: "Ouvrir Caster",
+    quit: "Quitter",
+    recording: "enregistrement",
+    active: "actif",
+};
+
+const TRAY_EN: TrayStrings = TrayStrings {
+    relaunch_clicker: "Relaunch last clicker",
+    relaunch_macro: "Relaunch last macro",
+    stop: "Stop",
+    overlay: "Show/Hide overlay",
+    open: "Open Caster",
+    quit: "Quit",
+    recording: "recording",
+    active: "active",
+};
+
+impl ResolvedLocale {
+    fn tray(self) -> &'static TrayStrings {
+        match self {
+            Self::Fr => &TRAY_FR,
+            Self::En => &TRAY_EN,
+        }
+    }
+}
+
+fn os_locale_tag() -> Option<String> {
+    for key in ["LC_ALL", "LC_MESSAGES", "LANG"] {
+        if let Ok(v) = std::env::var(key) {
+            let t = v.trim();
+            if !t.is_empty() {
+                // Strip encoding suffix (e.g. fr_FR.UTF-8).
+                let base = t.split('.').next().unwrap_or(t);
+                return Some(base.replace('_', "-"));
+            }
+        }
+    }
+    #[cfg(windows)]
+    {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetUserDefaultLocaleName(lpLocaleName: *mut u16, cchLocaleName: i32) -> i32;
+        }
+        let mut buf = [0u16; 85];
+        let len = unsafe { GetUserDefaultLocaleName(buf.as_mut_ptr(), buf.len() as i32) };
+        if len > 1 {
+            return Some(String::from_utf16_lossy(&buf[..(len as usize - 1)]));
+        }
+    }
+    None
+}
+
+fn resolve_ui_locale(pref: UiLocale) -> ResolvedLocale {
+    match pref {
+        UiLocale::Fr => ResolvedLocale::Fr,
+        UiLocale::En => ResolvedLocale::En,
+        UiLocale::System => {
+            let tag = os_locale_tag().unwrap_or_default();
+            let lower = tag.to_ascii_lowercase();
+            if lower == "fr" || lower.starts_with("fr-") {
+                ResolvedLocale::Fr
+            } else if lower == "en" || lower.starts_with("en-") {
+                ResolvedLocale::En
+            } else {
+                // Match front-end FALLBACK_LOCALE.
+                ResolvedLocale::Fr
+            }
+        }
+    }
+}
+
+fn prefs_resolved_locale(app: &AppHandle) -> ResolvedLocale {
+    app.try_state::<Mutex<UiPrefs>>()
+        .and_then(|p| p.lock().ok().map(|g| resolve_ui_locale(g.shell.ui_locale)))
+        .unwrap_or(ResolvedLocale::Fr)
+}
+
+fn format_macro_label(locale: ResolvedLocale, name: &str) -> String {
+    match locale {
+        ResolvedLocale::Fr => format!("macro « {name} »"),
+        ResolvedLocale::En => format!("macro \"{name}\""),
+    }
+}
+
+fn tray_tooltip(engine: &AppState, locale: ResolvedLocale) -> String {
+    let strings = locale.tray();
     let running = matches!(
         engine.state(),
         EngineState::Running | EngineState::Paused | EngineState::Stopping
@@ -677,23 +784,55 @@ fn tray_tooltip(engine: &AppState) -> String {
                 None => "clicker".into(),
             },
             Some("macro") => match name {
-                Some(n) => format!("macro « {n} »"),
+                Some(n) => format_macro_label(locale, &n),
                 None => "macro".into(),
             },
-            Some("record") => "enregistrement".into(),
-            _ => "actif".into(),
+            Some("record") => strings.recording.into(),
+            _ => strings.active.into(),
         };
         return format!("Caster — {detail}");
     }
     if let Some(doc) = engine.loaded_macro() {
-        return format!("Caster — macro « {} »", doc.name);
+        return format!("Caster — {}", format_macro_label(locale, &doc.name));
     }
     "Caster".into()
 }
 
+fn build_tray_menu(
+    app: &AppHandle,
+    locale: ResolvedLocale,
+) -> tauri::Result<Menu<tauri::Wry>> {
+    let s = locale.tray();
+    let start = MenuItem::with_id(app, "start", s.relaunch_clicker, true, None::<&str>)?;
+    let start_macro =
+        MenuItem::with_id(app, "start_macro", s.relaunch_macro, true, None::<&str>)?;
+    let stop = MenuItem::with_id(app, "stop", s.stop, true, None::<&str>)?;
+    let overlay_item = MenuItem::with_id(app, "overlay", s.overlay, true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", s.open, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", s.quit, true, None::<&str>)?;
+    Menu::with_items(
+        app,
+        &[&start, &start_macro, &stop, &overlay_item, &show, &quit],
+    )
+}
+
 fn update_tray_tooltip(app: &AppHandle, engine: &AppState) {
+    let locale = prefs_resolved_locale(app);
     if let Some(tray) = app.tray_by_id("main") {
-        let _ = tray.set_tooltip(Some(tray_tooltip(engine)));
+        let _ = tray.set_tooltip(Some(tray_tooltip(engine, locale)));
+    }
+}
+
+fn refresh_tray_for_locale(app: &AppHandle, engine: &AppState, pref: UiLocale) {
+    let locale = resolve_ui_locale(pref);
+    if let Some(tray) = app.tray_by_id("main") {
+        match build_tray_menu(app, locale) {
+            Ok(menu) => {
+                let _ = tray.set_menu(Some(menu));
+            }
+            Err(e) => log::warn!("tray menu rebuild failed: {e}"),
+        }
+        let _ = tray.set_tooltip(Some(tray_tooltip(engine, locale)));
     }
 }
 
@@ -963,6 +1102,7 @@ fn apply_loaded_settings(
     apply_overlay_opacity(app, settings.overlay_opacity);
     set_overlay_visible_inner(app, settings.overlay_visible)?;
     persist(app, engine);
+    refresh_tray_for_locale(app, engine, settings.shell.ui_locale);
     let p = prefs.lock().map_err(|e| e.to_string())?;
     Ok(prefs_to_settings(engine, &p))
 }
@@ -1855,28 +1995,12 @@ pub fn run() {
                 let _ = zones.hide();
             }
 
-            let start =
-                MenuItem::with_id(app, "start", "Relancer le dernier clicker", true, None::<&str>)?;
-            let start_macro = MenuItem::with_id(
-                app,
-                "start_macro",
-                "Relancer la dernière macro",
-                true,
-                None::<&str>,
-            )?;
-            let stop = MenuItem::with_id(app, "stop", "Arrêter", true, None::<&str>)?;
-            let overlay_item =
-                MenuItem::with_id(app, "overlay", "Afficher/Masquer overlay", true, None::<&str>)?;
-            let show = MenuItem::with_id(app, "show", "Ouvrir Caster", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quitter", true, None::<&str>)?;
-            let menu = Menu::with_items(
-                app,
-                &[&start, &start_macro, &stop, &overlay_item, &show, &quit],
-            )?;
+            let tray_locale = resolve_ui_locale(settings.shell.ui_locale);
+            let menu = build_tray_menu(app.handle(), tray_locale)?;
             let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
-                .tooltip(tray_tooltip(&engine))
+                .tooltip(tray_tooltip(&engine, tray_locale))
                 .on_menu_event(|app, event| {
                     let id = event.id.as_ref();
                     let Some(engine) = app.try_state::<AppState>() else {
