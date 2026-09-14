@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AutomationsTable } from "../automations/AutomationsTable";
@@ -12,7 +12,12 @@ import {
   type HotkeyBindings,
 } from "../macros/types";
 import { SettingsView } from "../settings/SettingsView";
-import { mergeShellPrefs } from "../settings/settingsTypes";
+import {
+  mergeAutomationPrefs,
+  mergeShellPrefs,
+  type AutomationPrefs,
+  type ShellPrefs,
+} from "../settings/settingsTypes";
 import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
 import {
@@ -91,6 +96,24 @@ function launchErr(e: unknown, fallback: string): string {
   return fallback;
 }
 
+function playFinishBeep() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.value = 0.04;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+    window.setTimeout(() => void ctx.close(), 200);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function MainAppV2() {
   return (
     <TitleBarProvider>
@@ -105,6 +128,10 @@ function MainAppV2Inner() {
   const toast = useToast();
   const titleBarCtx = useTitleBarContext();
   const automationsPage = useAutomationsPageState();
+  const [shellPrefs, setShellPrefs] = useState<ShellPrefs>(() => mergeShellPrefs());
+  const [automationPrefs, setAutomationPrefs] = useState<AutomationPrefs>(() =>
+    mergeAutomationPrefs(),
+  );
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => loadWorkspace());
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
   const [advanced, setAdvanced] = useState(false);
@@ -114,6 +141,7 @@ function MainAppV2Inner() {
     cancelled: false,
     message: null,
   });
+  const prevEngineState = useRef(status.state);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("application");
   const [refreshKey, setRefreshKey] = useState(0);
   const { lines: journalLines, clear: clearJournal } = useEngineLog();
@@ -167,6 +195,8 @@ function MainAppV2Inner() {
         }
         if (typeof s.journalOpen === "boolean") setJournalOpen(s.journalOpen);
         const sh = mergeShellPrefs(s.shell);
+        setShellPrefs(sh);
+        setAutomationPrefs(mergeAutomationPrefs(s.automation));
         if (!sh.restoreWorkspaceTabs) {
           setWorkspace((ws) => selectHome({ ...ws, tabs: [] }));
         } else if (sh.startupView === "lastDocument") {
@@ -193,32 +223,110 @@ function MainAppV2Inner() {
     }
   }, []);
 
+  useEffect(() => {
+    const prev = prevEngineState.current;
+    prevEngineState.current = status.state;
+    const wasActive = prev === "running" || prev === "paused";
+    if (wasActive && status.state === "idle") {
+      if (shellPrefs.toastOnFinish) {
+        toast.success("Session terminée");
+      }
+      if (automationPrefs.soundOnFinish) {
+        playFinishBeep();
+      }
+    }
+    if (prev !== "running" && status.state === "running" && automationPrefs.focusFollowsRun) {
+      setJournalOpen(true);
+      void persistShell({ journalOpen: true });
+    }
+  }, [
+    automationPrefs.focusFollowsRun,
+    automationPrefs.soundOnFinish,
+    persistShell,
+    shellPrefs.toastOnFinish,
+    status.state,
+    toast,
+  ]);
+
+  useEffect(() => {
+    let un: (() => void) | undefined;
+    void listen("app://confirm-quit", () => {
+      void (async () => {
+        const ok = await confirmAction({
+          title: "Quitter Caster",
+          message: "Une session est encore active. Quitter quand même ?",
+          confirmLabel: "Quitter",
+          danger: true,
+        });
+        if (ok) void invoke("confirm_app_exit");
+      })();
+    }).then((fn) => {
+      un = fn;
+    });
+    return () => un?.();
+  }, []);
+
+  const rememberLastRun = useCallback(
+    async (kind: "macro" | "clicker", id: string) => {
+      try {
+        const current = await invoke<AppSettings>("get_settings");
+        const nextShell = mergeShellPrefs({
+          ...current.shell,
+          ...(kind === "clicker" ? { lastClickerId: id } : { lastMacroId: id }),
+        });
+        setShellPrefs(nextShell);
+        await invoke("save_app_settings", {
+          settings: { ...current, shell: nextShell },
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
+
+  const openJournalOnRun = useCallback(() => {
+    if (!automationPrefs.focusFollowsRun) return;
+    setJournalOpen(true);
+    void persistShell({ journalOpen: true });
+  }, [automationPrefs.focusFollowsRun, persistShell]);
+
   const onEmergencyStop = useCallback(async () => {
     void invoke<EngineStatus>("emergency_stop")
       .then((s) => {
         setStatus(s);
         toast.info("Session arrêtée");
+        if (shellPrefs.goHomeAfterEmergency) {
+          setWorkspace((ws) => selectHome(ws));
+        }
       })
       .catch(() =>
         void invoke<EngineStatus>("request_cancel")
           .then((s) => {
             setStatus(s);
             toast.info("Annulation demandée");
+            if (shellPrefs.goHomeAfterEmergency) {
+              setWorkspace((ws) => selectHome(ws));
+            }
           })
           .catch((e) => toast.error(launchErr(e, "Impossible d’arrêter"))),
       );
-  }, [toast]);
+  }, [shellPrefs.goHomeAfterEmergency, toast]);
 
-  const openDoc = useCallback((kind: DocTabKind, resourceId: string, label?: string) => {
-    setWorkspace((ws) => {
-      const next = openDocTab(ws, kind, resourceId, label ?? resourceId);
-      if (kind === "macro" || kind === "clicker") {
-        pushRecent({ id: resourceId, kind, label: label ?? resourceId });
-        saveLastStudio({ id: resourceId, kind });
-      }
-      return next;
-    });
-  }, []);
+  const openDoc = useCallback(
+    (kind: DocTabKind, resourceId: string, label?: string) => {
+      setWorkspace((ws) => {
+        const next = openDocTab(ws, kind, resourceId, label ?? resourceId);
+        if (kind === "macro" || kind === "clicker") {
+          pushRecent({ id: resourceId, kind, label: label ?? resourceId });
+          saveLastStudio({ id: resourceId, kind });
+          void rememberLastRun(kind, resourceId);
+        }
+        return next;
+      });
+    },
+    [rememberLastRun],
+  );
 
   const goHome = useCallback(() => {
     setWorkspace((ws) => selectHome(ws));
@@ -437,11 +545,13 @@ function MainAppV2Inner() {
         setStatus(next);
         bumpRefresh();
         toast.success(`Clicker lancé · ${name}`);
+        openJournalOnRun();
+        void rememberLastRun("clicker", name);
       } catch (e) {
         toast.error(launchErr(e, "Échec du lancement clicker"));
       }
     },
-    [bumpRefresh, toast],
+    [bumpRefresh, openJournalOnRun, rememberLastRun, toast],
   );
 
   const onLaunchMacro = useCallback(
@@ -451,11 +561,13 @@ function MainAppV2Inner() {
         setStatus(next);
         bumpRefresh();
         toast.success(`Macro lancée · ${name}`);
+        openJournalOnRun();
+        void rememberLastRun("macro", name);
       } catch (e) {
         toast.error(launchErr(e, "Échec du lancement macro"));
       }
     },
-    [bumpRefresh, toast],
+    [bumpRefresh, openJournalOnRun, rememberLastRun, toast],
   );
 
   const onCreateMacro = useCallback(async () => {
@@ -776,6 +888,8 @@ function MainAppV2Inner() {
             setJournalOpen(v);
             void persistShell({ journalOpen: v });
           }}
+          onShellPrefsChange={setShellPrefs}
+          onAutomationPrefsChange={setAutomationPrefs}
         />
       );
     }

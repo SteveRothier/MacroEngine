@@ -30,6 +30,15 @@ describe("settingsTypes defaults", () => {
     expect(mergeShellPrefs({}).startupView).toBe(
       DEFAULT_SHELL_PREFS.startupView,
     );
+    expect(mergeShellPrefs(undefined).confirmQuitIfRunning).toBe(true);
+    expect(mergeShellPrefs(undefined).toastOnFinish).toBe(true);
+    expect(mergeShellPrefs({ alwaysOnTop: true }).alwaysOnTop).toBe(true);
+    expect(mergeShellPrefs({ uiLocale: "en" }).uiLocale).toBe("en");
+    expect(
+      mergeShellPrefs({
+        windowBounds: { x: 10, y: 20, width: 800, height: 600 },
+      }).windowBounds,
+    ).toEqual({ x: 10, y: 20, width: 800, height: 600 });
   });
 
   it("mergeAutomationPrefs and confirmations", () => {

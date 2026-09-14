@@ -19,7 +19,7 @@ use caster_engine::{
     LibraryKind, ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs,
     NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind, RecordOptions,
     ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptsPrefs, ShellPrefs, StopZone, ThemeMode, Trigger,
-    clamp_overlay_opacity, settings_path,
+    WindowBounds, clamp_overlay_opacity, settings_path,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -760,6 +760,91 @@ fn apply_overlay_opacity(app: &AppHandle, opacity: f32) {
     let _ = app.emit("overlay://opacity", o);
 }
 
+fn is_autostart_launch() -> bool {
+    std::env::args().any(|a| a == "--autostart")
+}
+
+fn session_is_active(engine: &AppState) -> bool {
+    matches!(
+        engine.state(),
+        EngineState::Running | EngineState::Paused | EngineState::Stopping
+    )
+}
+
+fn apply_main_window_shell(app: &AppHandle, shell: &ShellPrefs, hide_for_autostart: bool) {
+    let Some(main) = app.get_webview_window("main") else {
+        return;
+    };
+    let _ = main.set_always_on_top(shell.always_on_top);
+    if shell.remember_window_bounds {
+        if let Some(b) = &shell.window_bounds {
+            let _ = main.set_position(tauri::PhysicalPosition::new(b.x, b.y));
+            let _ = main.set_size(tauri::PhysicalSize::new(b.width.max(400), b.height.max(300)));
+        }
+    }
+    if hide_for_autostart && shell.minimize_to_tray {
+        let _ = main.hide();
+    }
+}
+
+fn persist_main_window_bounds(app: &AppHandle, engine: &AppState) {
+    let Some(main) = app.get_webview_window("main") else {
+        return;
+    };
+    let Some(prefs) = app.try_state::<Mutex<UiPrefs>>() else {
+        return;
+    };
+    let Ok(mut p) = prefs.lock() else {
+        return;
+    };
+    if !p.shell.remember_window_bounds {
+        return;
+    }
+    let Ok(pos) = main.outer_position() else {
+        return;
+    };
+    let Ok(size) = main.outer_size() else {
+        return;
+    };
+    p.shell.window_bounds = Some(WindowBounds {
+        x: pos.x,
+        y: pos.y,
+        width: size.width,
+        height: size.height,
+    });
+    drop(p);
+    persist(app, engine);
+}
+
+fn force_app_exit(app: &AppHandle, engine: &AppState) {
+    persist(app, engine);
+    sync_native_overlay(app, false, false);
+    engine.shutdown_hotkeys();
+    engine.stop_clicker();
+    app.exit(0);
+}
+
+fn request_app_exit(app: &AppHandle, engine: &AppState) {
+    let confirm = app
+        .try_state::<Mutex<UiPrefs>>()
+        .and_then(|p| p.lock().ok().map(|g| g.shell.confirm_quit_if_running))
+        .unwrap_or(true);
+    if confirm && session_is_active(engine) {
+        if let Some(main) = app.get_webview_window("main") {
+            let _ = main.show();
+            let _ = main.set_focus();
+        }
+        let _ = app.emit("app://confirm-quit", ());
+        return;
+    }
+    force_app_exit(app, engine);
+}
+
+#[tauri::command]
+fn confirm_app_exit(app: AppHandle, engine: State<'_, AppState>) {
+    force_app_exit(&app, &engine);
+}
+
 fn startup_cmd_path() -> Option<PathBuf> {
     let appdata = std::env::var_os("APPDATA")?;
     Some(
@@ -787,7 +872,10 @@ fn set_start_with_windows(enable: bool) -> Result<(), String> {
                 std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
             let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-            let body = format!("@echo off\r\nstart \"\" \"{}\"\r\n", exe.display());
+            let body = format!(
+                "@echo off\r\nstart \"\" \"{}\" --autostart\r\n",
+                exe.display()
+            );
             std::fs::write(&path, body).map_err(|e| e.to_string())?;
         } else if path.exists() {
             std::fs::remove_file(&path).map_err(|e| e.to_string())?;
@@ -868,6 +956,7 @@ fn apply_loaded_settings(
     if let Err(e) = set_start_with_windows(settings.start_with_windows) {
         log::warn!("start with windows: {e}");
     }
+    apply_main_window_shell(app, &settings.shell, false);
     if let Ok(display) = resolve_display(app, kept_display.as_deref()) {
         apply_display(engine, &display);
     }
@@ -1713,6 +1802,11 @@ pub fn run() {
             if settings.start_with_windows {
                 let _ = set_start_with_windows(true);
             }
+            apply_main_window_shell(
+                app.handle(),
+                &settings.shell,
+                is_autostart_launch(),
+            );
             app.manage(SettingsDir(config_dir.clone()));
             // So macro VM can resolve scriptId from the same config dir.
             std::env::set_var("CASTER_CONFIG_DIR", &config_dir);
@@ -1761,9 +1855,15 @@ pub fn run() {
                 let _ = zones.hide();
             }
 
-            let start = MenuItem::with_id(app, "start", "Démarrer le clicker", true, None::<&str>)?;
-            let start_macro =
-                MenuItem::with_id(app, "start_macro", "Lancer la macro", true, None::<&str>)?;
+            let start =
+                MenuItem::with_id(app, "start", "Relancer le dernier clicker", true, None::<&str>)?;
+            let start_macro = MenuItem::with_id(
+                app,
+                "start_macro",
+                "Relancer la dernière macro",
+                true,
+                None::<&str>,
+            )?;
             let stop = MenuItem::with_id(app, "stop", "Arrêter", true, None::<&str>)?;
             let overlay_item =
                 MenuItem::with_id(app, "overlay", "Afficher/Masquer overlay", true, None::<&str>)?;
@@ -1784,24 +1884,75 @@ pub fn run() {
                     };
                     match id {
                         "quit" => {
-                            persist(app, &engine);
-                            sync_native_overlay(app, false, false);
-                            engine.shutdown_hotkeys();
-                            engine.stop_clicker();
-                        app.exit(0);
+                            request_app_exit(app, &engine);
                         }
                         "start" => {
-                            let cfg = engine.clicker_config();
-                            if let Err(e) = engine.start_clicker(cfg) {
-                                log::warn!("tray start failed: {e}");
-                            } else {
-                                persist(app, &engine);
+                            let shell = app
+                                .try_state::<Mutex<UiPrefs>>()
+                                .and_then(|p| p.lock().ok().map(|g| g.shell.clone()));
+                            let mut started = false;
+                            if let Some(shell) = shell.as_ref() {
+                                if shell.tray_relaunch_last {
+                                    if let (Some(id), Some(dir)) = (
+                                        shell.last_clicker_id.as_ref(),
+                                        app.try_state::<SettingsDir>(),
+                                    ) {
+                                        match load_preset(&dir.0, id) {
+                                            Ok(preset) => {
+                                                engine.set_active_clicker_preset(Some(
+                                                    preset.name.clone(),
+                                                ));
+                                                if let Err(e) = engine.start_clicker(preset.config)
+                                                {
+                                                    log::warn!("tray start preset failed: {e}");
+                                                } else {
+                                                    started = true;
+                                                    persist(app, &engine);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log::warn!("tray load preset failed: {e}");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if !started {
+                                let cfg = engine.clicker_config();
+                                if let Err(e) = engine.start_clicker(cfg) {
+                                    log::warn!("tray start failed: {e}");
+                                } else {
+                                    persist(app, &engine);
+                                }
                             }
                             update_tray_tooltip(app, &engine);
                         }
                         "start_macro" => {
-                            if let Err(e) = engine.start_macro() {
-                                log::warn!("tray macro start failed: {e}");
+                            let shell = app
+                                .try_state::<Mutex<UiPrefs>>()
+                                .and_then(|p| p.lock().ok().map(|g| g.shell.clone()));
+                            let mut started = false;
+                            if let Some(shell) = shell.as_ref() {
+                                if shell.tray_relaunch_last {
+                                    if let (Some(id), Some(dir)) = (
+                                        shell.last_macro_id.as_ref(),
+                                        app.try_state::<SettingsDir>(),
+                                    ) {
+                                        match engine.activate_macro_by_name(&dir.0, id) {
+                                            Ok(_) => {
+                                                started = true;
+                                            }
+                                            Err(e) => {
+                                                log::warn!("tray macro relaunch failed: {e}");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if !started {
+                                if let Err(e) = engine.start_macro() {
+                                    log::warn!("tray macro start failed: {e}");
+                                }
                             }
                             update_tray_tooltip(app, &engine);
                         }
@@ -1840,16 +1991,25 @@ pub fn run() {
             if window.label() != "main" {
                 return;
             }
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                let close_to_tray = window
-                    .app_handle()
-                    .try_state::<Mutex<UiPrefs>>()
-                    .and_then(|p| p.lock().ok().map(|g| g.close_to_tray))
-                    .unwrap_or(false);
-                if close_to_tray {
-                    api.prevent_close();
-                    let _ = window.hide();
+            match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    let close_to_tray = window
+                        .app_handle()
+                        .try_state::<Mutex<UiPrefs>>()
+                        .and_then(|p| p.lock().ok().map(|g| g.close_to_tray))
+                        .unwrap_or(false);
+                    if close_to_tray {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
                 }
+                WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+                    let app = window.app_handle();
+                    if let Some(engine) = app.try_state::<AppState>() {
+                        persist_main_window_bounds(app, &engine);
+                    }
+                }
+                _ => {}
             }
         })
         .invoke_handler(tauri::generate_handler![
@@ -1858,6 +2018,7 @@ pub fn run() {
             get_foreground_exe,
             get_settings,
             save_app_settings,
+            confirm_app_exit,
             get_paths,
             open_path,
             reveal_library_entry,

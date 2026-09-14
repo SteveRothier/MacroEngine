@@ -95,6 +95,7 @@ pub use settings::{
     AccentTheme, AccueilFilter, AccueilPrefs, AccueilSortBy, AccueilSortDir, AppearancePrefs,
     AppSettings, AutomationPrefs, ConfirmationsPrefs, MaintenancePrefs, ProcessFilter,
     ProcessFilterMode, ScriptsPrefs, SettingsError, ShellPrefs, StartupView, ThemeMode, UiDensity,
+    UiLocale, WindowBounds,
 };
 pub use state::{EngineError, EngineState, StateTransitionError};
 pub use stop_zones::{
