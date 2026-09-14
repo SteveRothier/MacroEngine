@@ -1,27 +1,33 @@
 import type { ProcessFilter } from "../clickerTypes";
+import { useT, type TFunction } from "../../i18n";
 
 type Props = {
   filter: ProcessFilter;
   onOpenSettings?: () => void;
 };
 
-function filterSummary(filter: ProcessFilter): string {
-  if (!filter.enabled) return "Tous les processus";
+function filterSummary(filter: ProcessFilter, t: TFunction): string {
+  if (!filter.enabled) return t("clicker.process.allProcesses");
   const names = filter.names.filter((n) => n.trim().length > 0);
   if (names.length === 0) {
-    return filter.mode === "allow" ? "Aucun processus autorisé" : "Tous autorisés";
+    return filter.mode === "allow"
+      ? t("clicker.process.noneAllowed")
+      : t("clicker.process.allAllowed");
   }
   const list = names.slice(0, 3).join(", ");
   const extra = names.length > 3 ? ` +${names.length - 3}` : "";
   return filter.mode === "allow"
-    ? `Autoriser : ${list}${extra}`
-    : `Bloquer : ${list}${extra}`;
+    ? t("clicker.process.allowList", { list: `${list}${extra}` })
+    : t("clicker.process.denyList", { list: `${list}${extra}` });
 }
 
 export function ClickerProcessFilterRow({ filter, onOpenSettings }: Props) {
+  const t = useT();
+  const summary = filterSummary(filter, t);
+
   return (
     <div className="v2-clicker-process-row">
-      <span className="v2-clicker-process-label">Processus</span>
+      <span className="v2-clicker-process-label">{t("clicker.process.label")}</span>
       <span
         className={[
           "v2-clicker-process-badge",
@@ -29,9 +35,9 @@ export function ClickerProcessFilterRow({ filter, onOpenSettings }: Props) {
         ]
           .filter(Boolean)
           .join(" ")}
-        title={filterSummary(filter)}
+        title={summary}
       >
-        {filterSummary(filter)}
+        {summary}
       </span>
       {onOpenSettings ? (
         <button
@@ -39,7 +45,7 @@ export function ClickerProcessFilterRow({ filter, onOpenSettings }: Props) {
           className="v2-btn v2-btn-ghost v2-clicker-process-link"
           onClick={onOpenSettings}
         >
-          Paramètres
+          {t("clicker.process.settings")}
         </button>
       ) : null}
     </div>

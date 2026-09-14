@@ -2,9 +2,11 @@ import { useState } from "react";
 import {
   CORNER_LABELS,
   EDGES,
-  ZONE_ACTION_HINT,
-  ZONE_ACTION_LABEL,
-  ZONE_KIND_LABEL,
+  cornerLabel,
+  edgeLabel,
+  zoneActionHint,
+  zoneActionLabel,
+  zoneKindLabel,
   type ClickSampleMode,
   type ZoneAction,
   type ZoneKind,
@@ -16,28 +18,15 @@ import {
   usePointerReorder,
   type MenuItemDef,
 } from "../../ui/v2";
+import { useT } from "../../i18n";
 import type { ClickerEditor } from "../useClickerEditor";
 
 type Props = { editor: ClickerEditor };
 
 const ZONE_ACTIONS: ZoneAction[] = ["stop", "pause", "start"];
 
-const ZONE_ACTION_OPTS = ZONE_ACTIONS.map((a) => ({
-  value: a,
-  label: ZONE_ACTION_LABEL[a],
-}));
-
-const ZONE_KIND_OPTS = (Object.keys(ZONE_KIND_LABEL) as ZoneKind[]).map((k) => ({
-  value: k,
-  label: ZONE_KIND_LABEL[k],
-}));
-
-const CLICK_MODE_OPTS = [
-  { value: "random", label: "Aléatoire" },
-  { value: "center", label: "Centre" },
-];
-
 export function ClickerZonesSection({ editor: e }: Props) {
+  const t = useT();
   const selected = e.zoneModel.customZones.find((z) => z.id === e.selectedZoneId);
   const ctxMenu = useContextMenuState();
   const [ctxZoneId, setCtxZoneId] = useState<string | null>(null);
@@ -57,11 +46,32 @@ export function ClickerZonesSection({ editor: e }: Props) {
     },
   });
 
+  const zoneActionOpts = ZONE_ACTIONS.map((a) => ({
+    value: a,
+    label: zoneActionLabel(t, a),
+  }));
+
+  const zoneKindOpts = (["safety", "click"] as ZoneKind[]).map((k) => ({
+    value: k,
+    label: zoneKindLabel(t, k),
+  }));
+
+  const clickModeOpts = [
+    { value: "random", label: t("clicker.segments.random") },
+    { value: "center", label: t("clicker.segments.center") },
+  ];
+
   const ctxItems: MenuItemDef[] = [
-    { id: "edit", label: "Éditer" },
+    { id: "edit", label: t("clicker.zones.edit") },
     ...(e.editDisabled
       ? []
-      : [{ id: "delete", label: "Supprimer", danger: true } satisfies MenuItemDef]),
+      : [
+          {
+            id: "delete",
+            label: t("clicker.zones.delete"),
+            danger: true,
+          } satisfies MenuItemDef,
+        ]),
   ];
 
   function removeZone(id: string) {
@@ -76,12 +86,12 @@ export function ClickerZonesSection({ editor: e }: Props) {
     <div className="v2-clicker-section v2-clicker-zones-panel">
       <div className="v2-clicker-zones-block">
         <div className="v2-clicker-zones-block-head">
-          <span>Coins</span>
+          <span>{t("clicker.zones.corners")}</span>
           <input
             type="color"
             value={e.zoneModel.cornerColor}
             disabled={e.editDisabled}
-            aria-label="Couleur des coins"
+            aria-label={t("clicker.zones.cornerColorAria")}
             onChange={(ev) =>
               e.setZoneModel((m) => ({ ...m, cornerColor: ev.target.value }))
             }
@@ -101,7 +111,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   }))
                 }
               />
-              <span>{c.label}</span>
+              <span>{cornerLabel(t, c.id)}</span>
             </label>
           ))}
         </div>
@@ -109,7 +119,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
 
       <div className="v2-clicker-zones-block">
         <div className="v2-clicker-zones-block-head">
-          <span>Bords</span>
+          <span>{t("clicker.zones.edges")}</span>
         </div>
         <div className="v2-clicker-zones-grid">
           {EDGES.map((edge) => (
@@ -125,7 +135,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   }))
                 }
               />
-              <span>{edge.label}</span>
+              <span>{edgeLabel(t, edge.id)}</span>
               <input
                 type="number"
                 min={1}
@@ -150,13 +160,13 @@ export function ClickerZonesSection({ editor: e }: Props) {
 
       <div className="v2-clicker-zones-block">
         <div className="v2-clicker-zones-block-head">
-          <span>Zones personnalisées</span>
+          <span>{t("clicker.zones.custom")}</span>
           <span className="v2-clicker-hint-inline">
-            {zones.length} zone(s)
+            {t("clicker.zones.zoneCount", { n: zones.length })}
           </span>
         </div>
         {zones.length === 0 ? (
-          <p className="v2-clicker-hint">Dessinez depuis l&apos;aperçu →</p>
+          <p className="v2-clicker-hint">{t("clicker.zones.drawHint")}</p>
         ) : (
           <ul className="v2-clicker-zone-list">
             {zones.map((z, index) => (
@@ -188,15 +198,15 @@ export function ClickerZonesSection({ editor: e }: Props) {
                     aria-hidden
                   />
                   <span className="v2-clicker-zone-line-meta">
-                    {z.width}×{z.height} · {ZONE_KIND_LABEL[z.kind]} ·{" "}
-                    {ZONE_ACTION_LABEL[z.action]}
+                    {z.width}×{z.height} · {zoneKindLabel(t, z.kind)} ·{" "}
+                    {zoneActionLabel(t, z.action)}
                   </span>
                 </button>
                 <button
                   type="button"
                   className="v2-clicker-zone-line-remove"
                   disabled={e.editDisabled}
-                  aria-label="Supprimer"
+                  aria-label={t("clicker.zones.delete")}
                   onClick={() => removeZone(z.id)}
                 >
                   ✕
@@ -210,13 +220,13 @@ export function ClickerZonesSection({ editor: e }: Props) {
           <div className="v2-clicker-zone-detail">
             <div className="v2-field-row">
               <label className="v2-field v2-field--compact">
-                <span>Action</span>
+                <span>{t("clicker.zones.action")}</span>
                 <Select
                   className="v2-select"
                   value={selected.action}
                   disabled={e.editDisabled}
-                  title={ZONE_ACTION_HINT[selected.action]}
-                  options={ZONE_ACTION_OPTS}
+                  title={zoneActionHint(t, selected.action)}
+                  options={zoneActionOpts}
                   onChange={(v) =>
                     e.updateCustomZone(selected.id, {
                       action: v as ZoneAction,
@@ -225,12 +235,12 @@ export function ClickerZonesSection({ editor: e }: Props) {
                 />
               </label>
               <label className="v2-field v2-field--compact">
-                <span>Type</span>
+                <span>{t("clicker.zones.kind")}</span>
                 <Select
                   className="v2-select"
                   value={selected.kind}
                   disabled={e.editDisabled}
-                  options={ZONE_KIND_OPTS}
+                  options={zoneKindOpts}
                   onChange={(v) =>
                     e.updateCustomZone(selected.id, {
                       kind: v as ZoneKind,
@@ -241,12 +251,12 @@ export function ClickerZonesSection({ editor: e }: Props) {
             </div>
             {selected.kind === "click" ? (
               <label className="v2-field v2-field--compact">
-                <span>Échantillon</span>
+                <span>{t("clicker.zones.sample")}</span>
                 <Select
                   className="v2-select"
                   value={selected.clickMode}
                   disabled={e.editDisabled}
-                  options={CLICK_MODE_OPTS}
+                  options={clickModeOpts}
                   onChange={(v) =>
                     e.updateCustomZone(selected.id, {
                       clickMode: v as ClickSampleMode,
@@ -256,7 +266,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
               </label>
             ) : null}
             <label className="v2-field v2-field--compact">
-              <span>Couleur</span>
+              <span>{t("clicker.zones.color")}</span>
               <input
                 type="color"
                 value={selected.color}
@@ -266,7 +276,9 @@ export function ClickerZonesSection({ editor: e }: Props) {
                 }
               />
             </label>
-            <p className="v2-clicker-hint">{ZONE_ACTION_HINT[selected.action]}</p>
+            <p className="v2-clicker-hint">
+              {zoneActionHint(t, selected.action)}
+            </p>
           </div>
         ) : null}
       </div>
@@ -282,7 +294,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
           if (id === "edit") e.setSelectedZoneId(ctxZoneId);
           if (id === "delete" && !e.editDisabled) removeZone(ctxZoneId);
         }}
-        ariaLabel="Actions sur la zone"
+        ariaLabel={t("clicker.zones.contextAria")}
       />
     </div>
   );

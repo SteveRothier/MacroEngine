@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useT } from "../i18n";
 import type { ClickerMetrics } from "./useClickerEditor";
 
 type Sample = { t: number; cps: number };
@@ -16,6 +17,7 @@ export function ClickerSessionStats({
   running,
   paused,
 }: Props) {
+  const t = useT();
   const [open, setOpen] = useState(true);
   const path = useMemo(() => sparklinePath(samples.map((s) => s.cps)), [samples]);
   const latest = samples.length > 0 ? samples[samples.length - 1]!.cps : 0;
@@ -30,8 +32,8 @@ export function ClickerSessionStats({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        Stats session {open ? "▾" : "▸"}
-        {paused ? " · en pause" : ""}
+        {t("clicker.session.stats")} {open ? "▾" : "▸"}
+        {paused ? t("clicker.session.paused") : ""}
       </button>
       {open ? (
         <div className="v2-clicker-session-stats-body">
@@ -48,7 +50,9 @@ export function ClickerSessionStats({
               <strong>{latest.toFixed(1)}</strong> cps
             </span>
             <span>
-              {metrics?.clicksEmitted ?? 0} clics
+              {t("clicker.session.clicks", {
+                n: metrics?.clicksEmitted ?? 0,
+              })}
             </span>
             <span>
               {formatDurationMs(metrics?.elapsedMs ?? 0)}

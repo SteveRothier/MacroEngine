@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Select } from "../../ui/v2";
+import { useT } from "../../i18n";
 import type { ClickerEditor } from "../useClickerEditor";
 import {
   DEFAULT_PIXEL_CONDITION,
@@ -21,6 +22,7 @@ function limitChoice(e: ClickerEditor): LimitChoice {
 }
 
 export function ClickerLimitsSection({ editor: e }: Props) {
+  const t = useT();
   const choice = limitChoice(e);
   const [macros, setMacros] = useState<string[]>([]);
   const pixel = e.pixelCondition ?? DEFAULT_PIXEL_CONDITION;
@@ -85,20 +87,21 @@ export function ClickerLimitsSection({ editor: e }: Props) {
     <div className="v2-clicker-limits-panel">
       <div className="v2-settings-row v2-settings-row--stack">
         <div className="v2-settings-row-label">
-          <span>Fin de session</span>
-          <p>
-            Arrêt automatique après un nombre de clics, une durée, ou le premier
-            des deux.
-          </p>
+          <span>{t("clicker.limits.sessionEnd")}</span>
+          <p>{t("clicker.limits.sessionEndHint")}</p>
         </div>
         <div className="v2-settings-row-control v2-settings-row-control--full">
-          <div className="v2-segmented v2-segmented--wide" role="group" aria-label="Mode limite">
+          <div
+            className="v2-segmented v2-segmented--wide"
+            role="group"
+            aria-label={t("clicker.limits.modeAria")}
+          >
             {(
               [
-                ["none", "Aucune"],
-                ["clicks", "Clics"],
-                ["time", "Durée"],
-                ["both", "Les deux"],
+                ["none", t("clicker.segments.none")],
+                ["clicks", t("clicker.segments.clicks")],
+                ["time", t("clicker.segments.time")],
+                ["both", t("clicker.segments.both")],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -119,7 +122,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
 
       {showClicks ? (
         <label className="v2-field v2-clicker-limits-field">
-          <span>Clics maximum</span>
+          <span>{t("clicker.limits.maxClicks")}</span>
           <input
             type="number"
             min={1}
@@ -133,7 +136,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
 
       {showTime ? (
         <label className="v2-field v2-clicker-limits-field">
-          <span>Durée (secondes)</span>
+          <span>{t("clicker.limits.durationSec")}</span>
           <input
             type="number"
             min={1}
@@ -147,11 +150,8 @@ export function ClickerLimitsSection({ editor: e }: Props) {
 
       <div className="v2-settings-row v2-settings-row--stack">
         <div className="v2-settings-row-label">
-          <span>Enchaînement → macro</span>
-          <p>
-            Après une fin naturelle (limites, séquence, zone arrêt) — pas sur
-            Arrêter manuel.
-          </p>
+          <span>{t("clicker.limits.chainMacro")}</span>
+          <p>{t("clicker.limits.chainMacroHint")}</p>
         </div>
         <div className="v2-settings-row-control v2-settings-row-control--full">
           <Select
@@ -159,7 +159,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
             disabled={e.editDisabled}
             value={e.onCompleteMacro ?? ""}
             options={[
-              { value: "", label: "Aucune" },
+              { value: "", label: t("clicker.segments.none") },
               ...macros.map((name) => ({ value: name, label: name })),
             ]}
             onChange={(v) => e.setOnCompleteMacro(v || null)}
@@ -169,11 +169,8 @@ export function ClickerLimitsSection({ editor: e }: Props) {
 
       <div className="v2-settings-row v2-settings-row--stack">
         <div className="v2-settings-row-label">
-          <span>Condition pixel</span>
-          <p>
-            Si la couleur sous le point change (hors tolérance) : arrêt ou pause
-            de session.
-          </p>
+          <span>{t("clicker.limits.pixelCondition")}</span>
+          <p>{t("clicker.limits.pixelConditionHint")}</p>
         </div>
         <div className="v2-settings-row-control v2-settings-row-control--full v2-clicker-pixel-controls">
           <label className="v2-check">
@@ -183,7 +180,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
               disabled={e.editDisabled}
               onChange={(ev) => patchPixel({ enabled: ev.target.checked })}
             />
-            Activée
+            {t("clicker.limits.enabled")}
           </label>
           <button
             type="button"
@@ -191,7 +188,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
             disabled={e.editDisabled}
             onClick={() => void onPickPixel()}
           >
-            Pick couleur
+            {t("clicker.limits.pickColor")}
           </button>
           <span
             className="v2-clicker-pixel-swatch"
@@ -199,7 +196,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
             title={`${pixel.x},${pixel.y} · ${swatch}`}
           />
           <label className="v2-field v2-clicker-limits-field">
-            <span>Tolérance</span>
+            <span>{t("clicker.limits.tolerance")}</span>
             <input
               type="number"
               min={0}
@@ -211,11 +208,15 @@ export function ClickerLimitsSection({ editor: e }: Props) {
               }
             />
           </label>
-          <div className="v2-segmented" role="group" aria-label="Action pixel">
+          <div
+            className="v2-segmented"
+            role="group"
+            aria-label={t("clicker.limits.pixelActionAria")}
+          >
             {(
               [
-                ["stop", "Arrêt"],
-                ["pause", "Pause"],
+                ["stop", t("clicker.segments.stop")],
+                ["pause", t("clicker.segments.pause")],
               ] as const
             ).map(([value, label]) => (
               <button

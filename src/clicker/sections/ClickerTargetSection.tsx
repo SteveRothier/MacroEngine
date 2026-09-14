@@ -1,4 +1,5 @@
 import type { ClickerEditor } from "../useClickerEditor";
+import { useT } from "../../i18n";
 import { TargetMiniMap } from "../TargetMiniMap";
 
 type Props = { editor: ClickerEditor };
@@ -12,6 +13,7 @@ function targetMode(e: ClickerEditor): TargetMode {
 }
 
 export function ClickerTargetSection({ editor: e }: Props) {
+  const t = useT();
   const mode = targetMode(e);
   const mouseOnly = e.inputKind === "mouse";
 
@@ -29,16 +31,18 @@ export function ClickerTargetSection({ editor: e }: Props) {
 
   return (
     <div className="v2-clicker-section v2-clicker-target-panel">
-      <p className="v2-clicker-hint">
-        Priorité : séquence de points → zones clic → point fixe / curseur.
-      </p>
+      <p className="v2-clicker-hint">{t("clicker.target.priorityHint")}</p>
 
-      <div className="v2-segmented v2-segmented--wide v2-clicker-target-modes" role="group" aria-label="Mode cible">
+      <div
+        className="v2-segmented v2-segmented--wide v2-clicker-target-modes"
+        role="group"
+        aria-label={t("clicker.target.modeAria")}
+      >
         {(
           [
-            ["cursor", "Curseur"],
-            ["fixed", "Point fixe"],
-            ["sequence", "Séquence de points"],
+            ["cursor", t("clicker.segments.cursor")],
+            ["fixed", t("clicker.segments.fixed")],
+            ["sequence", t("clicker.segments.pointSequence")],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -62,8 +66,8 @@ export function ClickerTargetSection({ editor: e }: Props) {
       {mode === "fixed" ? (
         <div className="v2-settings-row">
           <div className="v2-settings-row-label">
-            <span>Coordonnées</span>
-            <p>Délai 2 s après le clic pour placer le curseur.</p>
+            <span>{t("clicker.target.coordinates")}</span>
+            <p>{t("clicker.target.pickDelay")}</p>
           </div>
           <div className="v2-settings-row-control">
             <button
@@ -73,7 +77,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
               onClick={() => void e.onPick()}
             >
               {e.picking && e.pickingPointIndex == null
-                ? "Place le curseur…"
+                ? t("clicker.target.placeCursor")
                 : `${e.targetX}, ${e.targetY}`}
             </button>
           </div>
@@ -84,8 +88,8 @@ export function ClickerTargetSection({ editor: e }: Props) {
         <>
           <div className="v2-settings-row">
             <div className="v2-settings-row-label">
-              <span>Arrêter à la fin</span>
-              <p>Stop après le dernier point (sinon boucle).</p>
+              <span>{t("clicker.target.stopWhenComplete")}</span>
+              <p>{t("clicker.target.stopWhenCompleteHint")}</p>
             </div>
             <div className="v2-settings-row-control">
               <input
@@ -98,21 +102,26 @@ export function ClickerTargetSection({ editor: e }: Props) {
           </div>
 
           <div className="v2-clicker-points-head">
-            <span className="v2-clicker-points-title">Points</span>
+            <span className="v2-clicker-points-title">
+              {t("clicker.target.points")}
+            </span>
             <button
               type="button"
               className="v2-btn v2-btn-ghost"
               disabled={e.editDisabled}
               onClick={() =>
-                e.setPoints((prev) => [...prev, { x: 0, y: 0, clicks: 1, radius: 0 }])
+                e.setPoints((prev) => [
+                  ...prev,
+                  { x: 0, y: 0, clicks: 1, radius: 0 },
+                ])
               }
             >
-              + Point
+              {t("clicker.target.addPoint")}
             </button>
           </div>
 
           {e.points.length === 0 ? (
-            <p className="v2-clicker-hint">Aucun point — ajoutez-en ou utilisez Pick.</p>
+            <p className="v2-clicker-hint">{t("clicker.target.emptyPoints")}</p>
           ) : (
             <ul className="v2-clicker-points-list">
               {e.points.map((pt, i) => (
@@ -121,7 +130,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
                     type="button"
                     className="v2-btn v2-btn-ghost v2-clicker-point-pick"
                     disabled={e.running || e.picking || e.editDisabled}
-                    title="Choisir à l'écran"
+                    title={t("clicker.target.pickOnScreen")}
                     onClick={() => void e.onPickPoint(i)}
                   >
                     {e.picking && e.pickingPointIndex === i ? "…" : "Pick"}
@@ -156,7 +165,10 @@ export function ClickerTargetSection({ editor: e }: Props) {
                       }
                     />
                   </label>
-                  <label className="v2-clicker-point-mini" title="Clics sur ce point">
+                  <label
+                    className="v2-clicker-point-mini"
+                    title={t("clicker.target.clicksOnPoint")}
+                  >
                     <span>×</span>
                     <input
                       type="number"
@@ -168,14 +180,23 @@ export function ClickerTargetSection({ editor: e }: Props) {
                         e.setPoints((prev) =>
                           prev.map((p, j) =>
                             j === i
-                              ? { ...p, clicks: Math.max(1, Number(ev.target.value) || 1) }
+                              ? {
+                                  ...p,
+                                  clicks: Math.max(
+                                    1,
+                                    Number(ev.target.value) || 1,
+                                  ),
+                                }
                               : p,
                           ),
                         )
                       }
                     />
                   </label>
-                  <label className="v2-clicker-point-mini" title="Rayon aléatoire (px)">
+                  <label
+                    className="v2-clicker-point-mini"
+                    title={t("clicker.target.randomRadius")}
+                  >
                     <span>R</span>
                     <input
                       type="number"
@@ -187,7 +208,13 @@ export function ClickerTargetSection({ editor: e }: Props) {
                         e.setPoints((prev) =>
                           prev.map((p, j) =>
                             j === i
-                              ? { ...p, radius: Math.max(0, Number(ev.target.value) || 0) }
+                              ? {
+                                  ...p,
+                                  radius: Math.max(
+                                    0,
+                                    Number(ev.target.value) || 0,
+                                  ),
+                                }
                               : p,
                           ),
                         )
@@ -198,8 +225,10 @@ export function ClickerTargetSection({ editor: e }: Props) {
                     type="button"
                     className="v2-btn v2-btn-ghost v2-clicker-point-remove"
                     disabled={e.editDisabled}
-                    aria-label="Supprimer le point"
-                    onClick={() => e.setPoints((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label={t("clicker.target.removePoint")}
+                    onClick={() =>
+                      e.setPoints((prev) => prev.filter((_, j) => j !== i))
+                    }
                   >
                     ✕
                   </button>

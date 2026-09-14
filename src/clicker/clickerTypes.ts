@@ -1,4 +1,5 @@
 import type { ThemeMode } from "../theme";
+import type { TFunction } from "../i18n";
 
 export type ProcessFilterMode = "allow" | "deny";
 export type ProcessFilter = {
@@ -135,23 +136,26 @@ export const FALLBACK_SCREEN_GEOM: ScreenGeomDto = {
   height: 1080,
 };
 
-export const ZONE_ACTION_LABEL: Record<ZoneAction, string> = {
-  stop: "Arrêt",
-  pause: "Pause",
-  start: "Reprendre",
-};
+export function zoneActionLabel(t: TFunction, action: ZoneAction): string {
+  return t(`clicker.zones.actionLabel.${action}`);
+}
 
 /** Tooltip for zone action selects in the studio. */
-export const ZONE_ACTION_HINT: Record<ZoneAction, string> = {
-  stop: "Arrête la session clicker.",
-  pause: "Met la session en pause tant que le curseur reste dans la zone.",
-  start: "Annule la pause du tick en cours uniquement (ne démarre pas une session arrêtée).",
-};
+export function zoneActionHint(t: TFunction, action: ZoneAction): string {
+  return t(`clicker.zones.actionHint.${action}`);
+}
 
-export const ZONE_KIND_LABEL: Record<ZoneKind, string> = {
-  safety: "Sécurité",
-  click: "Clic",
-};
+export function zoneKindLabel(t: TFunction, kind: ZoneKind): string {
+  return t(`clicker.zones.kindLabel.${kind}`);
+}
+
+export function cornerLabel(t: TFunction, id: Corner): string {
+  return t(`clicker.zones.corner.${id}`);
+}
+
+export function edgeLabel(t: TFunction, id: Edge): string {
+  return t(`clicker.zones.edge.${id}`);
+}
 
 export type ClickerConfigPayload = {
   button: MouseButton;
@@ -258,18 +262,18 @@ export const DEFAULT_CLICKER: ClickerConfigPayload = {
   clickZoneOrder: "random",
 };
 
-export const CORNER_LABELS: { id: Corner; label: string; cls: string }[] = [
-  { id: "topLeft", label: "Haut gauche", cls: "tl" },
-  { id: "topRight", label: "Haut droit", cls: "tr" },
-  { id: "bottomLeft", label: "Bas gauche", cls: "bl" },
-  { id: "bottomRight", label: "Bas droit", cls: "br" },
+export const CORNER_LABELS: { id: Corner; cls: string }[] = [
+  { id: "topLeft", cls: "tl" },
+  { id: "topRight", cls: "tr" },
+  { id: "bottomLeft", cls: "bl" },
+  { id: "bottomRight", cls: "br" },
 ];
 
-export const EDGES: { id: Edge; label: string }[] = [
-  { id: "left", label: "Gauche" },
-  { id: "right", label: "Droite" },
-  { id: "top", label: "Haut" },
-  { id: "bottom", label: "Bas" },
+export const EDGES: { id: Edge }[] = [
+  { id: "left" },
+  { id: "right" },
+  { id: "top" },
+  { id: "bottom" },
 ];
 
 export function newZoneId() {

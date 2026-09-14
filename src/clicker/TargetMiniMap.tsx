@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { useT } from "../i18n";
 import {
   FALLBACK_SCREEN_GEOM,
   type ClickPoint,
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export function TargetMiniMap({ geom, mode, fixed, points = [] }: Props) {
+  const t = useT();
   const g =
     geom.width > 0 && geom.height > 0 ? geom : FALLBACK_SCREEN_GEOM;
   const aspectStyle = {
@@ -39,7 +41,7 @@ export function TargetMiniMap({ geom, mode, fixed, points = [] }: Props) {
   return (
     <div className="v2-clicker-target-minimap">
       <div className="v2-clicker-target-minimap-head">
-        <span>Aperçu</span>
+        <span>{t("clicker.target.preview")}</span>
         <span className="v2-clicker-hint-inline">
           {g.width}×{g.height}
         </span>
@@ -49,12 +51,12 @@ export function TargetMiniMap({ geom, mode, fixed, points = [] }: Props) {
           <div className="v2-clicker-target-minimap-canvas" aria-hidden>
             {mode === "cursor" && markers.length === 0 ? (
               <span className="v2-clicker-target-minimap-hint">
-                Curseur live
+                {t("clicker.target.liveCursor")}
               </span>
             ) : null}
             {markers.length === 0 && mode !== "cursor" ? (
               <span className="v2-clicker-target-minimap-hint">
-                Aucun point
+                {t("clicker.target.noPoint")}
               </span>
             ) : null}
             {markers.map((m, i) => {

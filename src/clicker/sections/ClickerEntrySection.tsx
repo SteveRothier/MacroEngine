@@ -10,6 +10,7 @@ import type {
   TimingMode,
 } from "../clickerTypes";
 import { Select } from "../../ui/v2";
+import { useT } from "../../i18n";
 import { ClickerProcessFilterRow } from "./ClickerProcessFilterRow";
 import { ClickerTriggerRow } from "./ClickerTriggerRow";
 
@@ -19,6 +20,8 @@ type Props = {
 };
 
 export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props) {
+  const t = useT();
+
   return (
     <div className="v2-clicker-section v2-clicker-entry-split">
       <ClickerProcessFilterRow
@@ -26,17 +29,21 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
         onOpenSettings={onOpenProcessSettings}
       />
       <div className="v2-clicker-entry-col">
-        <h3 className="v2-clicker-entry-col-title">Entrée</h3>
+        <h3 className="v2-clicker-entry-col-title">{t("clicker.entry.title")}</h3>
         <div className="v2-settings-row">
           <div className="v2-settings-row-label">
-            <span>Type d&apos;entrée</span>
+            <span>{t("clicker.entry.inputKind")}</span>
           </div>
           <div className="v2-settings-row-control">
-            <div className="v2-segmented" role="group" aria-label="Type d'entrée">
+            <div
+              className="v2-segmented"
+              role="group"
+              aria-label={t("clicker.entry.inputKindAria")}
+            >
               {(
                 [
-                  ["mouse", "Souris"],
-                  ["keyboard", "Clavier"],
+                  ["mouse", t("clicker.segments.mouse")],
+                  ["keyboard", t("clicker.segments.keyboard")],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -62,15 +69,19 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           <>
             <div className="v2-settings-row">
               <div className="v2-settings-row-label">
-                <span>Bouton</span>
+                <span>{t("clicker.entry.button")}</span>
               </div>
               <div className="v2-settings-row-control">
-                <div className="v2-segmented" role="group" aria-label="Bouton souris">
+                <div
+                  className="v2-segmented"
+                  role="group"
+                  aria-label={t("clicker.entry.buttonAria")}
+                >
                   {(
                     [
-                      ["left", "Gauche"],
-                      ["right", "Droit"],
-                      ["middle", "Molette"],
+                      ["left", t("clicker.segments.left")],
+                      ["right", t("clicker.segments.right")],
+                      ["middle", t("clicker.segments.middle")],
                     ] as const
                   ).map(([value, label]) => (
                     <button
@@ -93,7 +104,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
             </div>
             <div className="v2-settings-row">
               <div className="v2-settings-row-label">
-                <span>Type de clic</span>
+                <span>{t("clicker.entry.clickKind")}</span>
               </div>
               <div className="v2-settings-row-control">
                 <Select
@@ -101,8 +112,8 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                   value={e.clickKind}
                   disabled={e.editDisabled}
                   options={[
-                    { value: "single", label: "Simple" },
-                    { value: "double", label: "Double" },
+                    { value: "single", label: t("clicker.segments.single") },
+                    { value: "double", label: t("clicker.segments.double") },
                   ]}
                   onChange={(v) => e.setClickKind(v as ClickKind)}
                 />
@@ -112,7 +123,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
         ) : (
           <>
             <label className="v2-field">
-              <span>Touche</span>
+              <span>{t("clicker.entry.key")}</span>
               <input
                 type="text"
                 value={e.keyName}
@@ -123,7 +134,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
             </label>
             <div className="v2-settings-row">
               <div className="v2-settings-row-label">
-                <span>Majuscule (Shift)</span>
+                <span>{t("clicker.entry.keyShift")}</span>
               </div>
               <div className="v2-settings-row-control">
                 <input
@@ -139,7 +150,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
 
         <div className="v2-settings-row">
           <div className="v2-settings-row-label">
-            <span>Mode hotkey</span>
+            <span>{t("clicker.entry.hotkeyMode")}</span>
           </div>
           <div className="v2-settings-row-control">
             <Select
@@ -147,8 +158,8 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
               value={e.mode}
               disabled={e.editDisabled}
               options={[
-                { value: "toggle", label: "Basculer" },
-                { value: "hold", label: "Maintenir" },
+                { value: "toggle", label: t("clicker.segments.toggle") },
+                { value: "hold", label: t("clicker.segments.hold") },
               ]}
               onChange={(v) => e.setMode(v as ClickMode)}
             />
@@ -158,17 +169,23 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
       </div>
 
       <div className="v2-clicker-entry-col">
-        <h3 className="v2-clicker-entry-col-title">Timing</h3>
+        <h3 className="v2-clicker-entry-col-title">
+          {t("clicker.entry.timingTitle")}
+        </h3>
         <div className="v2-settings-row">
           <div className="v2-settings-row-label">
-            <span>Mode</span>
+            <span>{t("clicker.entry.timingMode")}</span>
           </div>
           <div className="v2-settings-row-control">
-            <div className="v2-segmented" role="group" aria-label="Timing">
+            <div
+              className="v2-segmented"
+              role="group"
+              aria-label={t("clicker.entry.timingAria")}
+            >
               {(
                 [
-                  ["rate", "Cadence"],
-                  ["interval", "Intervalle"],
+                  ["rate", t("clicker.segments.rate")],
+                  ["interval", t("clicker.segments.interval")],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -194,7 +211,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           <>
             <div className="v2-settings-row">
               <div className="v2-settings-row-label">
-                <span>Cadence</span>
+                <span>{t("clicker.entry.cadence")}</span>
                 <p>{e.cadenceDisplay}</p>
               </div>
               <div className="v2-settings-row-control v2-settings-row-control--grow">
@@ -212,16 +229,22 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
               </div>
             </div>
             <label className="v2-field">
-              <span>Unité</span>
+              <span>{t("clicker.entry.unit")}</span>
               <Select
                 className="v2-select"
                 value={e.rateUnit}
                 disabled={e.editDisabled}
                 options={[
-                  { value: "perSecond", label: "/ seconde" },
-                  { value: "perMinute", label: "/ minute" },
-                  { value: "perHour", label: "/ heure" },
-                  { value: "perDay", label: "/ jour" },
+                  {
+                    value: "perSecond",
+                    label: t("clicker.segments.perSecond"),
+                  },
+                  {
+                    value: "perMinute",
+                    label: t("clicker.segments.perMinute"),
+                  },
+                  { value: "perHour", label: t("clicker.segments.perHour") },
+                  { value: "perDay", label: t("clicker.segments.perDay") },
                 ]}
                 onChange={(v) => e.setRateUnit(v as RateUnit)}
               />
@@ -230,7 +253,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
         ) : (
           <div className="v2-settings-row">
             <div className="v2-settings-row-label">
-              <span>Intervalle</span>
+              <span>{t("clicker.entry.interval")}</span>
               <p>{e.cadenceDisplay}</p>
             </div>
             <div className="v2-settings-row-control v2-settings-row-control--grow">
@@ -251,7 +274,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
 
         <div className="v2-settings-row">
           <div className="v2-settings-row-label">
-            <span>Aléa timing</span>
+            <span>{t("clicker.entry.randomTiming")}</span>
             <p>±{e.randomPct}%</p>
           </div>
           <div className="v2-settings-row-control">
@@ -266,7 +289,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
         {e.randomEnabled ? (
           <div className="v2-settings-row">
             <div className="v2-settings-row-label">
-              <span>Pourcentage</span>
+              <span>{t("clicker.entry.percent")}</span>
             </div>
             <div className="v2-settings-row-control v2-settings-row-control--grow">
               <label className="v2-settings-range">
@@ -287,18 +310,18 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
 
         <div className="v2-settings-row">
           <div className="v2-settings-row-label">
-            <span>Cap effectif</span>
+            <span>{t("clicker.entry.effectiveCap")}</span>
           </div>
           <div className="v2-settings-row-control">
-            <strong>500 CPS</strong>
+            <strong>{t("clicker.entry.capValue")}</strong>
           </div>
         </div>
 
         <details className="v2-clicker-details">
-          <summary>Timing avancé</summary>
+          <summary>{t("clicker.entry.advancedTiming")}</summary>
           <div className="v2-settings-row">
             <div className="v2-settings-row-label">
-              <span>CPS min</span>
+              <span>{t("clicker.entry.cpsMin")}</span>
             </div>
             <div className="v2-settings-row-control">
               <input
@@ -313,7 +336,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           </div>
           <div className="v2-settings-row">
             <div className="v2-settings-row-label">
-              <span>CPS max</span>
+              <span>{t("clicker.entry.cpsMax")}</span>
             </div>
             <div className="v2-settings-row-control">
               <input
@@ -328,14 +351,18 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           </div>
           <div className="v2-settings-row">
             <div className="v2-settings-row-label">
-              <span>Ordre zones clic</span>
+              <span>{t("clicker.entry.clickZoneOrder")}</span>
             </div>
             <div className="v2-settings-row-control">
-              <div className="v2-segmented" role="group" aria-label="Ordre zones clic">
+              <div
+                className="v2-segmented"
+                role="group"
+                aria-label={t("clicker.entry.clickZoneOrderAria")}
+              >
                 {(
                   [
-                    ["random", "Aléatoire"],
-                    ["sequence", "Séquence"],
+                    ["random", t("clicker.segments.random")],
+                    ["sequence", t("clicker.segments.sequence")],
                   ] as const
                 ).map(([value, label]) => (
                   <button
@@ -359,23 +386,23 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
         </details>
 
         <details className="v2-clicker-details">
-          <summary>Duty (avancé)</summary>
+          <summary>{t("clicker.entry.dutyAdvanced")}</summary>
           <label className="v2-field">
-            <span>Mode duty</span>
+            <span>{t("clicker.entry.dutyMode")}</span>
             <Select
               className="v2-select"
               value={e.dutyMode}
               disabled={e.editDisabled}
               options={[
-                { value: "pulse", label: "Impulsion" },
-                { value: "holdPct", label: "Maintien %" },
+                { value: "pulse", label: t("clicker.segments.pulse") },
+                { value: "holdPct", label: t("clicker.segments.holdPct") },
               ]}
               onChange={(v) => e.setDutyMode(v as DutyMode)}
             />
           </label>
           <div className="v2-settings-row">
             <div className="v2-settings-row-label">
-              <span>Duty</span>
+              <span>{t("clicker.entry.duty")}</span>
             </div>
             <div className="v2-settings-row-control v2-settings-row-control--grow">
               <label className="v2-settings-range">

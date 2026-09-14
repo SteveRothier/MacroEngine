@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { KbdChip } from "../../ui";
 import { useToast } from "../../ui/v2";
+import { useT } from "../../i18n";
 import {
   eventToVk,
   hotkeyTriggerMatches,
@@ -48,6 +49,7 @@ function conflictsReserved(vk: number, mods: KeyMods, reserved: HotkeyBindings):
 }
 
 export function ClickerTriggerRow({ editor: e }: Props) {
+  const t = useT();
   const toast = useToast();
   const [capturing, setCapturing] = useState(false);
 
@@ -71,7 +73,7 @@ export function ClickerTriggerRow({ editor: e }: Props) {
         try {
           const reserved = await invoke<HotkeyBindings>("get_hotkey_bindings");
           if (conflictsReserved(vk, mods, reserved)) {
-            toast.error("Raccourci réservé (clicker global / macro / urgence).");
+            toast.error(t("clicker.toasts.shortcutReserved"));
             return;
           }
           const macros = await invoke<LibMacro[]>("list_macro_library");
@@ -87,7 +89,9 @@ export function ClickerTriggerRow({ editor: e }: Props) {
             return hotkeyTriggerMatches(other, vk, mods);
           });
           if (macroClash) {
-            toast.error(`Déjà utilisé par la macro « ${macroClash.name} ».`);
+            toast.error(
+              t("clicker.toasts.shortcutUsedByMacro", { name: macroClash.name }),
+            );
             return;
           }
           const clickers = await invoke<LibClicker[]>("list_clicker_library");
@@ -103,19 +107,23 @@ export function ClickerTriggerRow({ editor: e }: Props) {
             return hotkeyTriggerMatches(other, vk, mods);
           });
           if (clickerClash) {
-            toast.error(`Déjà utilisé par le clicker « ${clickerClash.name} ».`);
+            toast.error(
+              t("clicker.toasts.shortcutUsedByClicker", {
+                name: clickerClash.name,
+              }),
+            );
             return;
           }
           await e.setTrigger({ type: "hotkey", key: String(vk), mods });
-          toast.success("Déclencheur enregistré");
+          toast.success(t("clicker.toasts.triggerSaved"));
         } catch {
-          toast.error("Impossible d’enregistrer le déclencheur.");
+          toast.error(t("clicker.toasts.triggerSaveFailed"));
         }
       })();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [capturing, e, toast]);
+  }, [capturing, e, t, toast]);
 
   useEffect(() => {
     if (e.locked) setCapturing(false);
@@ -124,8 +132,8 @@ export function ClickerTriggerRow({ editor: e }: Props) {
   return (
     <div className="v2-settings-row">
       <div className="v2-settings-row-label">
-        <span>Déclencheur</span>
-        <p>Raccourci dédié pour démarrer / arrêter ce preset.</p>
+        <span>{t("clicker.trigger.label")}</span>
+        <p>{t("clicker.trigger.hint")}</p>
       </div>
       <div className="v2-settings-row-control">
         <button
@@ -137,19 +145,21 @@ export function ClickerTriggerRow({ editor: e }: Props) {
             .filter(Boolean)
             .join(" ")}
           disabled={e.editDisabled}
-          title="Clic pour définir, clic droit pour retirer"
+          title={t("clicker.trigger.captureTitle")}
           onClick={() => setCapturing((v) => !v)}
           onContextMenu={(ev) => {
             ev.preventDefault();
             if (e.editDisabled) return;
             setCapturing(false);
             void e.setTrigger(MANUAL_TRIGGER).then(
-              () => toast.success("Déclencheur retiré"),
-              () => toast.error("Impossible de retirer le déclencheur"),
+              () => toast.success(t("clicker.toasts.triggerRemoved")),
+              () => toast.error(t("clicker.toasts.triggerRemoveFailed")),
             );
           }}
         >
-          <KbdChip>{capturing ? "…" : triggerLabel ?? "Aucun"}</KbdChip>
+          <KbdChip>
+            {capturing ? "…" : triggerLabel ?? t("clicker.trigger.none")}
+          </KbdChip>
         </button>
       </div>
     </div>

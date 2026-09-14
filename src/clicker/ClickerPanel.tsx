@@ -5,6 +5,7 @@ import { HotkeySettings } from "../settings/HotkeySettings";
 import { applyTheme, type ThemeMode } from "../theme";
 import { Card, Icons, RadioGroup, Segmented, Switch } from "../ui";
 import { Select } from "../ui/v2";
+import { useT } from "../i18n";
 import {
   DEFAULT_CLICKER,
   DEFAULT_PROCESS_FILTER,
@@ -15,14 +16,6 @@ import { useClickerSettingsApi } from "./useClickerSettings";
 
 type AdvSection = "general" | "apparence" | "raccourcis" | "processus" | "maintenance";
 export type SettingsSectionId = AdvSection;
-
-const ADV_SECTIONS: { id: AdvSection; label: string; icon: ReactNode }[] = [
-  { id: "general", label: "Général", icon: Icons.info },
-  { id: "apparence", label: "Apparence", icon: Icons.eye },
-  { id: "raccourcis", label: "Raccourcis", icon: Icons.key },
-  { id: "processus", label: "Processus", icon: Icons.list },
-  { id: "maintenance", label: "Maintenance", icon: Icons.wrench },
-];
 
 type ClickerMetrics = {
   clicksEmitted: number;
@@ -64,6 +57,7 @@ export function ClickerPanel({
   initialPresetName: _initialPresetName = null,
   onHotkeysChange,
 }: Props) {
+  const t = useT();
   const { loadSettings, saveBundle } = useClickerSettingsApi();
   const [advSection, setAdvSection] = useState<AdvSection>(settingsSection);
   const [settingsSnap, setSettingsSnap] = useState<AppSettings | null>(null);
@@ -74,6 +68,18 @@ export function ClickerPanel({
   const [liveExes, setLiveExes] = useState<string[]>([]);
   const [resetDone, setResetDone] = useState(false);
   const running = status.state === "running" || status.state === "paused";
+
+  const advSections: { id: AdvSection; label: string; icon: ReactNode }[] = [
+    { id: "general", label: t("clicker.panel.general"), icon: Icons.info },
+    { id: "apparence", label: t("clicker.panel.appearance"), icon: Icons.eye },
+    { id: "raccourcis", label: t("clicker.panel.hotkeys"), icon: Icons.key },
+    { id: "processus", label: t("clicker.panel.process"), icon: Icons.list },
+    {
+      id: "maintenance",
+      label: t("clicker.panel.maintenance"),
+      icon: Icons.wrench,
+    },
+  ];
 
   useEffect(() => {
     setAdvSection(settingsSection);
@@ -166,8 +172,11 @@ export function ClickerPanel({
   if (variant === "operation") return null;
 
   const metricsLabel = metrics
-    ? `${metrics.measuredCps.toFixed(1)} cps · ${metrics.clicksEmitted} clics`
-    : "—";
+    ? t("clicker.panel.clicksMetric", {
+        cps: metrics.measuredCps.toFixed(1),
+        n: metrics.clicksEmitted,
+      })
+    : t("common.empty");
 
   const row = (label: string, control: ReactNode, hint?: string) => (
     <div className="settings-row">
@@ -181,39 +190,50 @@ export function ClickerPanel({
 
   const sectionContent =
     advSection === "general" ? (
-      <Card title="Clicker">
-        {row("Mode interface", <strong>{advanced ? "Avancé" : "Simple"}</strong>, "Bascule Simple / Avancé sur l’onglet Clicker.")}
-        {row("État", <strong>{running ? "En cours" : "Inactif"}</strong>)}
-        {row("Mesuré", <code>{metricsLabel}</code>)}
+      <Card title={t("clicker.panel.cardClicker")}>
+        {row(
+          t("settings.application.clickerMode"),
+          <strong>
+            {advanced ? t("common.advanced") : t("common.simple")}
+          </strong>,
+          t("clicker.panel.modeHint"),
+        )}
+        {row(
+          t("settings.application.state"),
+          <strong>
+            {running ? t("common.running") : t("common.inactive")}
+          </strong>,
+        )}
+        {row(t("clicker.panel.measured"), <code>{metricsLabel}</code>)}
       </Card>
     ) : advSection === "apparence" ? (
-      <Card title="Interface">
+      <Card title={t("clicker.panel.cardInterface")}>
         {row(
-          "Thème",
+          t("settings.application.theme"),
           <Segmented
-            ariaLabel="Thème"
+            ariaLabel={t("settings.application.themeAria")}
             value={theme}
             options={[
-              { value: "light", label: "Clair" },
-              { value: "dark", label: "Sombre" },
-              { value: "system", label: "Système" },
+              { value: "light", label: t("common.light") },
+              { value: "dark", label: t("common.dark") },
+              { value: "system", label: t("common.system") },
             ]}
             onChange={(v) => void onThemeSelect(v as ThemeMode)}
           />,
-          "Clair, sombre ou système (préférence OS).",
+          t("clicker.panel.themeHint"),
         )}
         {row(
-          "Overlay d’état",
+          t("clicker.panel.statusOverlay"),
           <Switch
             checked={overlayVisible}
-            aria-label="Afficher l’overlay d’état"
+            aria-label={t("clicker.panel.statusOverlayAria")}
             onChange={(next) => {
               setOverlayVisible(next);
               void invoke("set_overlay_visible", { visible: next });
               void persistUi(advanced, next);
             }}
           />,
-          "Fenêtre flottante hors focus.",
+          t("clicker.panel.statusOverlayHint"),
         )}
       </Card>
     ) : advSection === "raccourcis" ? (
@@ -221,37 +241,37 @@ export function ClickerPanel({
         <HotkeySettings onBindingsChange={onHotkeysChange} />
       </div>
     ) : advSection === "processus" ? (
-      <Card title="Filtre de processus">
+      <Card title={t("clicker.panel.cardProcessFilter")}>
         <Switch
           checked={processFilter.enabled}
           disabled={running}
-          label="Activer le filtre"
+          label={t("clicker.panel.enableFilter")}
           onChange={(on) => void persistProcessFilter({ ...processFilter, enabled: on })}
         />
-        <p className="hint">Mode</p>
+        <p className="hint">{t("clicker.panel.mode")}</p>
         <RadioGroup
           name="process-mode"
           value={processFilter.mode}
           disabled={running || !processFilter.enabled}
           options={[
-            { value: "deny", label: "Bloquer la liste" },
-            { value: "allow", label: "Autoriser seulement la liste" },
+            { value: "deny", label: t("clicker.panel.modeDeny") },
+            { value: "allow", label: t("clicker.panel.modeAllow") },
           ]}
           onChange={(v) =>
             void persistProcessFilter({ ...processFilter, mode: v as ProcessFilter["mode"] })
           }
         />
         <label className="field">
-          <span>Ajouter un .exe</span>
+          <span>{t("clicker.panel.addExe")}</span>
           <div className="actions wrap">
             {liveExes.length > 0 ? (
               <Select
                 className="v2-select"
                 value=""
                 disabled={running || !processFilter.enabled}
-                ariaLabel="Processus visibles"
+                ariaLabel={t("clicker.panel.visibleProcesses")}
                 options={[
-                  { value: "", label: "Choisir un processus…" },
+                  { value: "", label: t("clicker.panel.chooseProcess") },
                   ...liveExes
                     .filter((n) => !processFilter.names.includes(n))
                     .map((n) => ({ value: n, label: n })),
@@ -261,7 +281,7 @@ export function ClickerPanel({
             ) : null}
             <input
               type="text"
-              placeholder="ex. game.exe"
+              placeholder={t("clicker.panel.exePlaceholder")}
               value={processDraft}
               disabled={running || !processFilter.enabled}
               onChange={(e) => setProcessDraft(e.target.value)}
@@ -275,12 +295,12 @@ export function ClickerPanel({
                 setProcessDraft("");
               }}
             >
-              Ajouter
+              {t("clicker.panel.add")}
             </button>
           </div>
         </label>
         {processFilter.names.length === 0 ? (
-          <p className="hint">Aucun processus listé.</p>
+          <p className="hint">{t("clicker.panel.noneListed")}</p>
         ) : (
           <ul className="preset-list">
             {processFilter.names.map((n) => (
@@ -298,23 +318,21 @@ export function ClickerPanel({
                       })
                     }
                   >
-                    Retirer
+                    {t("clicker.panel.remove")}
                   </button>
                 </div>
               </li>
             ))}
           </ul>
         )}
-        <p className="hint">
-          Persisté dans settings.json. Quand le filtre est actif, le clicker ignore les clics
-          hors règle ; les macros attendent que le premier plan matche (autoriser / bloquer).
-        </p>
+        <p className="hint">{t("clicker.panel.filterPersistHint")}</p>
       </Card>
     ) : (
-      <Card title="Maintenance">
+      <Card title={t("clicker.panel.cardMaintenance")}>
         <p className="hint">
-          Fichier : <code>settings.json</code> dans le dossier config de l’app
-          (<code>com.steverothier.caster</code>).
+          {t("clicker.panel.configFileHintBefore")}{" "}
+          <code>settings.json</code> {t("clicker.panel.configFileHintMid")} (
+          <code>com.steverothier.caster</code>).
         </p>
         <button
           type="button"
@@ -322,12 +340,12 @@ export function ClickerPanel({
           disabled={running}
           onClick={() => void resetClickerDefaults()}
         >
-          Réinitialiser le clicker
+          {t("clicker.panel.resetClicker")}
         </button>
         <p className="hint">
           {resetDone
-            ? "Réglages clicker restaurés aux défauts."
-            : "Remet entrée, timing, cible, limites et zones aux valeurs par défaut. Presets et raccourcis sont conservés."}
+            ? t("clicker.panel.resetDone")
+            : t("clicker.panel.resetHint")}
         </p>
       </Card>
     );
@@ -336,8 +354,8 @@ export function ClickerPanel({
     <section className="settings-panel workspace-panel">
       <div className="clicker-scroll">
         <div className="settings-layout">
-          <nav className="settings-rail" aria-label="Sections paramètres">
-            {ADV_SECTIONS.map((s) => (
+          <nav className="settings-rail" aria-label={t("settings.railAria")}>
+            {advSections.map((s) => (
               <button
                 key={s.id}
                 type="button"
@@ -356,11 +374,9 @@ export function ClickerPanel({
           <div key={advSection} className="settings-pane clicker-section-pane">
             <header className="settings-pane-head">
               <h3 className="settings-pane-title">
-                {ADV_SECTIONS.find((s) => s.id === advSection)?.label ?? ""}
+                {advSections.find((s) => s.id === advSection)?.label ?? ""}
               </h3>
-              <p className="hint">
-                Réglages applicatifs — le comportement clicker reste dans l’onglet Clicker.
-              </p>
+              <p className="hint">{t("clicker.panel.paneHint")}</p>
             </header>
             {sectionContent}
           </div>
