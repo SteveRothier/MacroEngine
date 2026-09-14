@@ -7,11 +7,14 @@ import { macros } from "./macros";
 import { clicker } from "./clicker";
 import { scripts } from "./scripts";
 import { runs } from "./runs";
-import type { AppLocale } from "../types";
+import type { AppLocale } from "../locales";
 
 /**
  * Merged message tree by locale.
  * Tray Rust strings stay French this release — see comment in src/i18n/index.ts.
+ *
+ * When adding a locale to SUPPORTED_LOCALES, add a matching entry here
+ * (defineCatalog already forces each namespace file to include that locale).
  */
 export const catalogs = {
   fr: {
@@ -36,6 +39,19 @@ export const catalogs = {
     scripts: scripts.en,
     runs: runs.en,
   },
-} as const;
+} satisfies Record<
+  AppLocale,
+  {
+    common: (typeof common)[AppLocale];
+    shell: (typeof shell)[AppLocale];
+    settings: (typeof settings)[AppLocale];
+    labels: (typeof labels)[AppLocale];
+    automations: (typeof automations)[AppLocale];
+    macros: (typeof macros)[AppLocale];
+    clicker: (typeof clicker)[AppLocale];
+    scripts: (typeof scripts)[AppLocale];
+    runs: (typeof runs)[AppLocale];
+  }
+>;
 
 export type CatalogTree = (typeof catalogs)[AppLocale];

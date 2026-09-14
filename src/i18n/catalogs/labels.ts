@@ -1,5 +1,6 @@
+import { defineCatalog } from "../defineCatalog";
 /** Engine status labels (formerly ui/labels.ts FR-only). */
-export const labels = {
+export const labels = defineCatalog({
   fr: {
     idle: "Inactif",
     running: "En cours",
@@ -32,4 +33,4 @@ export const labels = {
     scriptNamed: "Script “{name}”",
     script: "Script",
   },
-} as const;
+});

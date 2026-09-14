@@ -1,8 +1,9 @@
+import { defineCatalog } from "../defineCatalog";
 /**
  * Settings pane strings (all sections).
  * Application keys migrated from settings/uiLocale.ts.
  */
-export const settings = {
+export const settings = defineCatalog({
   fr: {
     railAria: "Sections paramètres",
     rail: {
@@ -300,4 +301,4 @@ export const settings = {
       purgeFail: "Empty failed",
     },
   },
-} as const;
+});

@@ -2,38 +2,49 @@ import { describe, expect, it } from "vitest";
 import {
   catalogKeys,
   catalogs,
+  FALLBACK_LOCALE,
   leafPaths,
+  matchSystemLocale,
   resolveLocale,
+  SUPPORTED_LOCALES,
   tStatic,
 } from "./index";
 
 describe("resolveLocale", () => {
-  it("maps explicit prefs", () => {
-    expect(resolveLocale("fr")).toBe("fr");
-    expect(resolveLocale("en")).toBe("en");
+  it("maps explicit prefs for every supported locale", () => {
+    for (const code of SUPPORTED_LOCALES) {
+      expect(resolveLocale(code)).toBe(code);
+    }
   });
 
-  it("resolves system from Intl", () => {
+  it("resolves system from Intl to a supported locale", () => {
     const resolved = resolveLocale("system");
-    expect(resolved === "fr" || resolved === "en").toBe(true);
+    expect(SUPPORTED_LOCALES).toContain(resolved);
+  });
+
+  it("matchSystemLocale uses registry prefixes", () => {
+    expect(matchSystemLocale("fr-FR")).toBe("fr");
+    expect(matchSystemLocale("en-US")).toBe("en");
+    expect(matchSystemLocale("de-DE")).toBe(FALLBACK_LOCALE);
   });
 });
 
 describe("catalog symmetry", () => {
-  it("common FR/EN keys match", () => {
-    expect(leafPaths(catalogs.fr.common).sort()).toEqual(
-      leafPaths(catalogs.en.common).sort(),
-    );
+  it("every locale matches fallback leaf keys", () => {
+    const fallbackKeys = catalogKeys(FALLBACK_LOCALE).sort();
+    for (const code of SUPPORTED_LOCALES) {
+      if (code === FALLBACK_LOCALE) continue;
+      expect(catalogKeys(code).sort()).toEqual(fallbackKeys);
+    }
   });
 
-  it("settings FR/EN keys match", () => {
-    expect(leafPaths(catalogs.fr.settings).sort()).toEqual(
-      leafPaths(catalogs.en.settings).sort(),
-    );
-  });
-
-  it("all namespaces have matching FR/EN leaves", () => {
-    expect(catalogKeys("fr").sort()).toEqual(catalogKeys("en").sort());
+  it("common and settings remain symmetric across locales", () => {
+    const commonFallback = leafPaths(catalogs[FALLBACK_LOCALE].common).sort();
+    const settingsFallback = leafPaths(catalogs[FALLBACK_LOCALE].settings).sort();
+    for (const code of SUPPORTED_LOCALES) {
+      expect(leafPaths(catalogs[code].common).sort()).toEqual(commonFallback);
+      expect(leafPaths(catalogs[code].settings).sort()).toEqual(settingsFallback);
+    }
   });
 });
 
@@ -43,7 +54,7 @@ describe("tStatic", () => {
     expect(tStatic("en", "shell.clickerLaunched", { name: "A" })).toContain("A");
   });
 
-  it("falls back to FR then key", () => {
+  it("falls back to FALLBACK then key", () => {
     expect(tStatic("en", "common.cancel")).toBe("Cancel");
     expect(tStatic("en", "missing.key")).toBe("missing.key");
   });

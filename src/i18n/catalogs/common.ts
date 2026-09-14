@@ -1,5 +1,6 @@
+import { defineCatalog } from "../defineCatalog";
 /** Common UI chrome — cancel/confirm/open/etc. */
-export const common = {
+export const common = defineCatalog({
   fr: {
     cancel: "Annuler",
     confirm: "Confirmer",
@@ -18,8 +19,6 @@ export const common = {
     system: "Système",
     light: "Clair",
     dark: "Sombre",
-    french: "Français",
-    english: "English",
   },
   en: {
     cancel: "Cancel",
@@ -39,7 +38,5 @@ export const common = {
     system: "System",
     light: "Light",
     dark: "Dark",
-    french: "Français",
-    english: "English",
   },
-} as const;
+});
