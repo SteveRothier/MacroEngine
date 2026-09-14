@@ -26,6 +26,7 @@ import type { MacroUiLayout } from "./macroToGraph";
 import { MacroTitleBarTools } from "./MacroTitleBarTools";
 import { useTitleBarSlot } from "../../ui/v2/TitleBarContext";
 import { mergeAutomationPrefs } from "../../settings/settingsTypes";
+import { useT, type TFunction } from "../../i18n";
 
 const AUTOSAVE_MS = 400;
 const HISTORY_MAX = 50;
@@ -50,13 +51,13 @@ type Props = {
   onOpenScript?: (scriptId: string, label?: string) => void;
 };
 
-function saveErrorMessage(e: unknown): string {
+function saveErrorMessage(e: unknown, t: TFunction): string {
   if (typeof e === "string") return e;
   if (e && typeof e === "object" && "message" in e) {
     const m = (e as { message?: unknown }).message;
     if (typeof m === "string" && m.trim()) return m;
   }
-  return "Échec de l’enregistrement";
+  return t("macros.toast.saveFailed");
 }
 
 function errMessage(e: unknown, fallback: string): string {
@@ -77,6 +78,7 @@ export function MacroEditorView({
   engineState,
   onOpenScript,
 }: Props) {
+  const t = useT();
   const automationPrefs = mergeAutomationPrefs();
   const toast = useToast();
   const [doc, setDoc] = useState<MacroDocument>(() => emptyMacro(macroId));
@@ -167,11 +169,11 @@ export function MacroEditorView({
         baselineRef.current = JSON.stringify(nextDoc);
         setDirty(false);
       } catch (e) {
-        toast.error(saveErrorMessage(e));
+        toast.error(saveErrorMessage(e, t));
         throw e;
       }
     },
-    [toast],
+    [toast, t],
   );
 
   const flushAutosave = useCallback(async () => {
@@ -399,10 +401,10 @@ export function MacroEditorView({
         onRenamed?.(from, renamed.name);
       } catch (e) {
         updateDoc({ ...docRef.current, name: from });
-        toast.error(errMessage(e, "Renommage impossible"));
+        toast.error(errMessage(e, t("shell.renameFailed")));
       }
     },
-    [onRenamed, persistNow, recording, toast, updateDoc],
+    [onRenamed, persistNow, recording, t, toast, updateDoc],
   );
 
   const applyRecordedDoc = useCallback(
@@ -425,18 +427,26 @@ export function MacroEditorView({
         name: macroIdRef.current,
       });
       onStatus(st);
-      toast.success("Test lancé");
+      toast.success(t("macros.toast.testStarted"));
     } catch (e) {
-      toast.error(errMessage(e, "Échec du test"));
+      toast.error(errMessage(e, t("macros.toast.testFailed")));
     }
-  }, [automationPrefs.autoSaveBeforeRun, flushAutosave, locked, onStatus, recording, toast]);
+  }, [
+    automationPrefs.autoSaveBeforeRun,
+    flushAutosave,
+    locked,
+    onStatus,
+    recording,
+    t,
+    toast,
+  ]);
 
   const onRunFrom = useCallback(
     async (path: ActionPath) => {
       if (locked || recording || editorLocked) return;
       if (!path.length) {
         if (automationPrefs.runFromRequiresSelection) {
-          toast.error("Sélectionnez une étape pour tester depuis ici");
+          toast.error(t("macros.toast.selectStepToTest"));
         }
         return;
       }
@@ -449,13 +459,11 @@ export function MacroEditorView({
           fromPath: path,
         });
         onStatus(st);
-        toast.success("Test depuis l’étape lancé");
+        toast.success(t("macros.toast.testFromStepStarted"));
       } catch (e) {
-        const msg = errMessage(e, "Échec du test depuis l’étape");
+        const msg = errMessage(e, t("macros.toast.testFromStepFailed"));
         if (/from_path|hors limites|branche manquante/i.test(msg)) {
-          toast.error(
-            "Chemin d’étape invalide — resélectionnez l’action puis réessayez",
-          );
+          toast.error(t("macros.toast.invalidStepPath"));
         } else {
           toast.error(msg);
         }
@@ -469,6 +477,7 @@ export function MacroEditorView({
       locked,
       onStatus,
       recording,
+      t,
       toast,
     ],
   );
@@ -478,18 +487,18 @@ export function MacroEditorView({
       if (lockedRef.current || recording || editorLocked) return;
       if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
       if (e.key !== "Enter" && e.code !== "Enter") return;
-      const t = e.target as HTMLElement | null;
+      const el = e.target as HTMLElement | null;
       if (
-        t &&
-        (t.tagName === "INPUT" ||
-          t.tagName === "TEXTAREA" ||
-          t.isContentEditable)
+        el &&
+        (el.tagName === "INPUT" ||
+          el.tagName === "TEXTAREA" ||
+          el.isContentEditable)
       ) {
         return;
       }
       const path = selectedPathRef.current;
       if (!path) {
-        toast.info("Sélectionnez une étape (Ctrl+Shift+Entrée)");
+        toast.info(t("macros.toast.selectStepHint"));
         return;
       }
       e.preventDefault();
@@ -497,7 +506,7 @@ export function MacroEditorView({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editorLocked, onRunFrom, recording, toast]);
+  }, [editorLocked, onRunFrom, recording, t, toast]);
 
   const onStartRecord = useCallback(async () => {
     if (locked || recording) return;
@@ -505,11 +514,10 @@ export function MacroEditorView({
       let replace = false;
       if (docRef.current.actions.length > 0) {
         const ok = await confirmAction({
-          title: "Mode enregistrement",
-          message:
-            "Cette macro a déjà des actions. Remplacer la séquence ou ajouter à la fin ?",
-          confirmLabel: "Remplacer",
-          cancelLabel: "Ajouter",
+          title: t("macros.confirm.recordModeTitle"),
+          message: t("macros.confirm.recordModeMessage"),
+          confirmLabel: t("macros.confirm.recordModeReplace"),
+          cancelLabel: t("macros.confirm.recordModeAppend"),
           danger: false,
         });
         replace = ok;
@@ -527,13 +535,13 @@ export function MacroEditorView({
       setRecordPaused(false);
       setRecordCount(0);
       setActivePath(null);
-      toast.success("Capture démarrée");
+      toast.success(t("macros.toast.captureStarted"));
     } catch (e) {
       setRecording(false);
-      toast.error(errMessage(e, "Impossible de démarrer l’enregistrement."));
+      toast.error(errMessage(e, t("macros.toast.captureStartFailed")));
       await syncRecordState();
     }
-  }, [flushAutosave, locked, recording, syncRecordState, toast]);
+  }, [flushAutosave, locked, recording, syncRecordState, t, toast]);
 
   const onApplyPreset = useCallback(
     async (name: string) => {
@@ -550,12 +558,12 @@ export function MacroEditorView({
         };
         updateDoc(next);
         setSelectedPath(null);
-        toast.success(`Modèle « ${name} » appliqué`);
+        toast.success(t("macros.toast.presetApplied", { name }));
       } catch (e) {
-        toast.error(errMessage(e, "Preset introuvable"));
+        toast.error(errMessage(e, t("macros.toast.presetNotFound")));
       }
     },
-    [recording, toast, updateDoc],
+    [recording, t, toast, updateDoc],
   );
 
   const onPauseRecord = useCallback(async () => {
@@ -566,9 +574,9 @@ export function MacroEditorView({
       setRecordPaused(!!rec.paused);
       if (typeof rec.actionCount === "number") setRecordCount(rec.actionCount);
     } catch (e) {
-      toast.error(errMessage(e, "Pause capture impossible."));
+      toast.error(errMessage(e, t("macros.toast.capturePauseFailed")));
     }
-  }, [toast]);
+  }, [t, toast]);
 
   const onResumeRecord = useCallback(async () => {
     try {
@@ -578,9 +586,9 @@ export function MacroEditorView({
       setRecordPaused(!!rec.paused);
       if (typeof rec.actionCount === "number") setRecordCount(rec.actionCount);
     } catch (e) {
-      toast.error(errMessage(e, "Reprise capture impossible."));
+      toast.error(errMessage(e, t("macros.toast.captureResumeFailed")));
     }
-  }, [toast]);
+  }, [t, toast]);
 
   const onStopRecord = useCallback(async () => {
     try {
@@ -589,10 +597,10 @@ export function MacroEditorView({
       setRecordPaused(false);
       applyRecordedDoc(next);
       void persistNow(next, macroIdRef.current).catch(() => {});
-      toast.success("Capture appliquée");
+      toast.success(t("macros.toast.captureApplied"));
     } catch (e) {
       setRecording(false);
-      toast.error(errMessage(e, "Enregistrement déjà arrêté."));
+      toast.error(errMessage(e, t("macros.toast.captureAlreadyStopped")));
       await syncRecordState();
       try {
         const loaded = await invoke<MacroDocument | null>("get_macro");
@@ -604,17 +612,17 @@ export function MacroEditorView({
         /* ignore */
       }
     }
-  }, [applyRecordedDoc, persistNow, syncRecordState, toast]);
+  }, [applyRecordedDoc, persistNow, syncRecordState, t, toast]);
 
   const addAction = useCallback(
     (kind: MacroAction["type"]) => {
       if (editorLocked) return;
-      const action = makeAction(kind);
+      const action = makeAction(kind, t);
       const next = { ...doc, actions: [...doc.actions, action] };
       updateDoc(next);
       setSelectedPath([next.actions.length - 1]);
     },
-    [doc, editorLocked, updateDoc],
+    [doc, editorLocked, t, updateDoc],
   );
 
   const addToBranch = useCallback(
@@ -622,14 +630,14 @@ export function MacroEditorView({
       if (!selectedPath || editorLocked) return;
       const selected = getAtPath(doc.actions, selectedPath);
       if (!selected || selected.type !== "control.if") return;
-      const child = makeAction(kind);
+      const child = makeAction(kind, t);
       const actions = appendChild(doc.actions, selectedPath, branch, child);
       const branchIdx = branch === "then" ? 0 : 1;
       const list = branch === "then" ? selected.then : selected.else ?? [];
       updateDoc({ ...doc, actions });
       setSelectedPath([...selectedPath, branchIdx, list.length]);
     },
-    [doc, editorLocked, selectedPath, updateDoc],
+    [doc, editorLocked, selectedPath, t, updateDoc],
   );
 
   const onRemove = useCallback(
@@ -668,12 +676,12 @@ export function MacroEditorView({
       if (editorLocked) return;
       const leaf = path[path.length - 1]!;
       const insertPath: ActionPath = [...path.slice(0, -1), leaf + 1];
-      const action = makeAction(kind);
+      const action = makeAction(kind, t);
       const actions = insertAtPath(doc.actions, insertPath, action);
       updateDoc({ ...doc, actions });
       setSelectedPath(insertPath);
     },
-    [doc, editorLocked, updateDoc],
+    [doc, editorLocked, t, updateDoc],
   );
 
   const onInsertBefore = useCallback(
@@ -681,12 +689,12 @@ export function MacroEditorView({
       if (editorLocked) return;
       const leaf = path[path.length - 1]!;
       const insertPath: ActionPath = [...path.slice(0, -1), leaf];
-      const action = makeAction(kind);
+      const action = makeAction(kind, t);
       const actions = insertAtPath(doc.actions, insertPath, action);
       updateDoc({ ...doc, actions });
       setSelectedPath(insertPath);
     },
-    [doc, editorLocked, updateDoc],
+    [doc, editorLocked, t, updateDoc],
   );
 
   const onPasteAfter = useCallback(
@@ -745,7 +753,7 @@ export function MacroEditorView({
         <div
           className="v2-macro-loading"
           aria-busy="true"
-          aria-label="Chargement de la macro"
+          aria-label={t("macros.toolbar.loadingAria")}
         >
           <div className="v2-skeleton-page v2-skeleton-page--center">
             <div
@@ -769,9 +777,9 @@ export function MacroEditorView({
         <div className="v2-seq-panel">
           <div className="v2-seq-toolbar">
             <ActionPickerMenu
-              label="+ Ajouter"
+              label={t("macros.toolbar.add")}
               disabled={editorLocked}
-              items={buildActionAddMenu(addAction)}
+              items={buildActionAddMenu(addAction, t)}
               open={addMenuOpen}
               onOpenChange={setAddMenuOpen}
             />
@@ -834,7 +842,7 @@ export function MacroEditorView({
                 })
               }
               branchAddMenuItems={(branch) =>
-                buildActionAddMenu((kind) => addToBranch(branch, kind))
+                buildActionAddMenu((kind) => addToBranch(branch, kind), t)
               }
               onOpenScript={onOpenScript}
             />

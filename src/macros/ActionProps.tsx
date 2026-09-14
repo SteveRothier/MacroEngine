@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileCode2 } from "lucide-react";
 import { pickScreenPoint } from "../pick";
@@ -11,16 +11,19 @@ import { ScriptParamsFields } from "../scripts/ScriptParamsFields";
 import { activePermissionLabels } from "../scripts/ScriptPermissionsMenu";
 import { parseParamDefs } from "../scripts/parseParams";
 import {
-  SCRIPT_PRESETS,
+  getScriptPresets,
   type ScriptPreset,
 } from "../scripts/presets";
-import { actionTitleFr } from "./actionLabels";
+import { useT, type TFunction } from "../i18n";
+import { actionTitle } from "./actionLabels";
 
-const MOUSE_BUTTON_OPTS = [
-  { value: "left", label: "Gauche" },
-  { value: "right", label: "Droit" },
-  { value: "middle", label: "Molette" },
-];
+function mouseButtonOpts(t: TFunction) {
+  return [
+    { value: "left", label: t("macros.action.button.left") },
+    { value: "right", label: t("macros.action.button.right") },
+    { value: "middle", label: t("macros.action.button.middle") },
+  ];
+}
 
 const HTTP_METHOD_OPTS = [
   { value: "GET", label: "GET" },
@@ -29,10 +32,12 @@ const HTTP_METHOD_OPTS = [
   { value: "DELETE", label: "DELETE" },
 ];
 
-const OPERAND_MODE_OPTS = [
-  { value: "var", label: "Variable" },
-  { value: "lit", label: "Littéral" },
-];
+function operandModeOpts(t: TFunction) {
+  return [
+    { value: "var", label: t("macros.params.operandVar") },
+    { value: "lit", label: t("macros.params.operandLit") },
+  ];
+}
 
 const COMPARE_OP_OPTS = [
   { value: "eq", label: "=" },
@@ -102,6 +107,7 @@ function PointFields({
   onChangeXY,
   hint,
 }: PointFieldsProps) {
+  const t = useT();
   const mode: "cursor" | "position" =
     optional && x == null && y == null ? "cursor" : "position";
 
@@ -120,14 +126,14 @@ function PointFields({
     return (
       <>
         <div className="v2-field" style={{ gridColumn: "1 / -1" }}>
-          <span>Position</span>
+          <span>{t("macros.params.position")}</span>
           <Segmented
-            ariaLabel="Mode position"
+            ariaLabel={t("macros.params.positionModeAria")}
             value={mode}
             disabled={disabled || picking}
             options={[
-              { value: "cursor", label: "Curseur" },
-              { value: "position", label: "Position" },
+              { value: "cursor", label: t("macros.params.cursor") },
+              { value: "position", label: t("macros.params.position") },
             ]}
             onChange={(v) => {
               if (v === "cursor") {
@@ -147,7 +153,7 @@ function PointFields({
         ) : (
           <>
             <label className="v2-field">
-              <span>X</span>
+              <span>{t("macros.params.coordX")}</span>
               <input
                 type="number"
                 disabled={disabled || picking}
@@ -163,7 +169,7 @@ function PointFields({
               />
             </label>
             <label className="v2-field">
-              <span>Y</span>
+              <span>{t("macros.params.coordY")}</span>
               <input
                 type="number"
                 disabled={disabled || picking}
@@ -188,8 +194,8 @@ function PointFields({
                 onClick={() => void onPick()}
               >
                 {picking
-                  ? "Overlay actif — clique sur l’écran…"
-                  : "Choisir à l’écran"}
+                  ? t("macros.params.pickOverlay")
+                  : t("macros.params.pickScreen")}
               </button>
             </div>
           </>
@@ -201,7 +207,7 @@ function PointFields({
   return (
     <>
       <label className="v2-field">
-        <span>X</span>
+        <span>{t("macros.params.coordX")}</span>
         <input
           type="number"
           disabled={disabled || picking}
@@ -212,7 +218,7 @@ function PointFields({
         />
       </label>
       <label className="v2-field">
-        <span>Y</span>
+        <span>{t("macros.params.coordY")}</span>
         <input
           type="number"
           disabled={disabled || picking}
@@ -228,7 +234,7 @@ function PointFields({
           disabled={disabled || picking}
           onClick={() => void onPick()}
         >
-          {picking ? "Overlay actif — clique sur l’écran…" : "Choisir à l’écran"}
+          {picking ? t("macros.params.pickOverlay") : t("macros.params.pickScreen")}
         </button>
         {hint ? <p className="hint">{hint}</p> : null}
       </div>
@@ -243,6 +249,7 @@ export function ActionProps({
   branchAddMenuItems,
   onOpenScript,
 }: Props) {
+  const t = useT();
   const [picking, setPicking] = useState(false);
 
   if (!action) {
@@ -253,12 +260,12 @@ export function ActionProps({
     return (
       <div className="props-grid">
         <label className="v2-field">
-          <span>Bouton</span>
+          <span>{t("macros.params.button")}</span>
           <Select
             className="v2-select"
             value={action.button ?? "left"}
             disabled={disabled || picking}
-            options={MOUSE_BUTTON_OPTS}
+            options={mouseButtonOpts(t)}
             onChange={(v) =>
               onChange({
                 ...action,
@@ -275,7 +282,7 @@ export function ActionProps({
           picking={picking}
           setPicking={setPicking}
           onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
-          hint="Clic à la position du curseur au moment de l’exécution."
+          hint={t("macros.params.clickAtCursorHint")}
         />
       </div>
     );
@@ -307,12 +314,12 @@ export function ActionProps({
     return (
       <div className="props-grid">
         <label className="v2-field">
-          <span>Bouton</span>
+          <span>{t("macros.params.button")}</span>
           <Select
             className="v2-select"
             value={action.button ?? "left"}
             disabled={disabled || picking}
-            options={MOUSE_BUTTON_OPTS}
+            options={mouseButtonOpts(t)}
             onChange={(v) =>
               onChange({
                 ...action,
@@ -332,8 +339,8 @@ export function ActionProps({
         />
         <p className="hint" style={{ gridColumn: "1 / -1" }}>
           {kind === "mouse.down"
-            ? "Enfonce le bouton (drag / maintien)."
-            : "Relâche le bouton."}
+            ? t("macros.params.mouseDownHint")
+            : t("macros.params.mouseUpHint")}
         </p>
       </div>
     );
@@ -343,7 +350,7 @@ export function ActionProps({
     return (
       <div className="props-grid">
         <label className="v2-field">
-          <span>Delta (120 = cran)</span>
+          <span>{t("macros.params.wheelDelta")}</span>
           <input
             type="number"
             disabled={disabled || picking}
@@ -369,7 +376,7 @@ export function ActionProps({
   if (action.type === "delay") {
     return (
       <label className="v2-field">
-        <span>Durée (ms)</span>
+        <span>{t("macros.params.durationMs")}</span>
         <input
           type="number"
           min={0}
@@ -385,7 +392,7 @@ export function ActionProps({
     return (
       <div className="props-grid">
         <label className="v2-field">
-          <span>Méthode</span>
+          <span>{t("macros.params.httpMethod")}</span>
           <Select
             className="v2-select"
             value={action.method ?? "GET"}
@@ -395,7 +402,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>URL ({`{{var}}`} ok)</span>
+          <span>{t("macros.params.httpUrl")}</span>
           <input
             type="text"
             disabled={disabled}
@@ -404,7 +411,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
-          <span>Body</span>
+          <span>{t("macros.params.httpBody")}</span>
           <textarea
             rows={4}
             disabled={disabled}
@@ -419,7 +426,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Timeout (ms)</span>
+          <span>{t("macros.params.httpTimeout")}</span>
           <input
             type="number"
             min={0}
@@ -431,7 +438,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Échec si status ≥ 400</span>
+          <span>{t("macros.params.httpFailOn4xx")}</span>
           <input
             type="checkbox"
             disabled={disabled}
@@ -442,7 +449,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Variable statut</span>
+          <span>{t("macros.params.httpStatusVar")}</span>
           <input
             type="text"
             disabled={disabled}
@@ -457,7 +464,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Variable corps</span>
+          <span>{t("macros.params.httpBodyVar")}</span>
           <input
             type="text"
             disabled={disabled}
@@ -472,13 +479,13 @@ export function ActionProps({
           />
         </label>
         <div className="v2-field" style={{ gridColumn: "1 / -1" }}>
-          <span>En-têtes</span>
+          <span>{t("macros.params.httpHeaders")}</span>
           {(action.headers ?? []).map((h, i) => (
             <div key={i} className="props-grid" style={{ marginTop: 6 }}>
               <input
                 type="text"
                 disabled={disabled}
-                placeholder="Nom"
+                placeholder={t("macros.params.httpHeaderName")}
                 value={h.name}
                 onChange={(e) => {
                   const headers = [...(action.headers ?? [])];
@@ -489,7 +496,7 @@ export function ActionProps({
               <input
                 type="text"
                 disabled={disabled}
-                placeholder="Valeur"
+                placeholder={t("macros.params.httpHeaderValue")}
                 value={h.value}
                 onChange={(e) => {
                   const headers = [...(action.headers ?? [])];
@@ -506,7 +513,7 @@ export function ActionProps({
                   onChange({ ...action, headers });
                 }}
               >
-                Retirer
+                {t("macros.params.httpRemoveHeader")}
               </button>
             </div>
           ))}
@@ -522,7 +529,7 @@ export function ActionProps({
                 })
               }
             >
-              Ajouter un en-tête
+              {t("macros.params.httpAddHeader")}
             </button>
             <button
               type="button"
@@ -542,7 +549,7 @@ export function ActionProps({
                 onChange({ ...action, headers });
               }}
             >
-              + Bearer
+              {t("macros.params.httpAddBearer")}
             </button>
           </div>
         </div>
@@ -554,7 +561,7 @@ export function ActionProps({
     return (
       <div className="props-grid">
         <label className="v2-field">
-          <span>Variable source (JSON)</span>
+          <span>{t("macros.params.jsonSourceVar")}</span>
           <input
             type="text"
             disabled={disabled}
@@ -563,7 +570,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Chemin (a.b.0.c)</span>
+          <span>{t("macros.params.jsonPath")}</span>
           <input
             type="text"
             disabled={disabled}
@@ -572,7 +579,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Variable destination</span>
+          <span>{t("macros.params.jsonDestVar")}</span>
           <input
             type="text"
             disabled={disabled}
@@ -603,14 +610,16 @@ export function ActionProps({
     const mods = modsOf(action);
     const keyTitle =
       action.type === "key.down"
-        ? "Maintenir"
+        ? t("macros.menu.add.keyDown")
         : action.type === "key.up"
-          ? "Relâcher"
-          : "Touche";
+          ? t("macros.menu.add.keyUp")
+          : t("macros.params.key");
     return (
       <div className="props-grid">
         <label className="v2-field">
-          <span>{keyTitle} ({`{{var}}`} ok)</span>
+          <span>
+            {keyTitle} {t("macros.params.keyVarOk")}
+          </span>
           <input
             type="text"
             disabled={disabled}
@@ -676,7 +685,7 @@ export function ActionProps({
             window.addEventListener("keydown", onKey, true);
           }}
         >
-          Capturer
+          {t("macros.params.captureKey")}
         </button>
       </div>
     );
@@ -685,16 +694,14 @@ export function ActionProps({
   if (action.type === "clipboard.set") {
     return (
       <label className="v2-field">
-        <span>Texte</span>
+        <span>{t("macros.params.clipboardText")}</span>
         <input
           type="text"
           disabled={disabled}
           value={action.text}
           onChange={(e) => onChange({ ...action, text: e.target.value })}
         />
-        <p className="hint">
-          Texte à placer dans le presse-papiers. {`{{nom}}`} insère une variable.
-        </p>
+        <p className="hint">{t("macros.params.clipboardSetHint")}</p>
       </label>
     );
   }
@@ -702,14 +709,14 @@ export function ActionProps({
   if (action.type === "clipboard.get") {
     return (
       <label className="v2-field">
-        <span>Variable</span>
+        <span>{t("macros.params.operandVar")}</span>
         <input
           type="text"
           disabled={disabled}
           value={action.name}
           onChange={(e) => onChange({ ...action, name: e.target.value })}
         />
-        <p className="hint">Copie le presse-papiers dans cette variable.</p>
+        <p className="hint">{t("macros.params.clipboardGetHint")}</p>
       </label>
     );
   }
@@ -718,7 +725,7 @@ export function ActionProps({
     return (
       <div className="props-grid">
         <label className="v2-field">
-          <span>Nom</span>
+          <span>{t("macros.params.varName")}</span>
           <input
             type="text"
             disabled={disabled}
@@ -727,7 +734,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Valeur</span>
+          <span>{t("macros.params.varValue")}</span>
           <input
             type="text"
             disabled={disabled}
@@ -751,12 +758,12 @@ export function ActionProps({
     return (
       <div className="props-grid">
         <label className="v2-field">
-          <span>Gauche</span>
+          <span>{t("macros.params.ifLeft")}</span>
           <Select
             className="v2-select"
             disabled={disabled}
             value={operandMode(left)}
-            options={OPERAND_MODE_OPTS}
+            options={operandModeOpts(t)}
             onChange={(v) =>
               onChange({
                 ...action,
@@ -769,7 +776,11 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>{operandMode(left) === "var" ? "Var" : "Valeur"}</span>
+          <span>
+            {operandMode(left) === "var"
+              ? t("macros.params.operandVarShort")
+              : t("macros.params.varValue")}
+          </span>
           <input
             type="text"
             disabled={disabled}
@@ -789,7 +800,7 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Opérateur</span>
+          <span>{t("macros.params.ifOperator")}</span>
           <Select
             className="v2-select"
             disabled={disabled}
@@ -807,12 +818,12 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>Droite</span>
+          <span>{t("macros.params.ifRight")}</span>
           <Select
             className="v2-select"
             disabled={disabled}
             value={operandMode(right)}
-            options={OPERAND_MODE_OPTS}
+            options={operandModeOpts(t)}
             onChange={(v) =>
               onChange({
                 ...action,
@@ -825,7 +836,11 @@ export function ActionProps({
           />
         </label>
         <label className="v2-field">
-          <span>{operandMode(right) === "var" ? "Var" : "Valeur"}</span>
+          <span>
+            {operandMode(right) === "var"
+              ? t("macros.params.operandVarShort")
+              : t("macros.params.varValue")}
+          </span>
           <input
             type="text"
             disabled={disabled}
@@ -848,12 +863,12 @@ export function ActionProps({
           {branchAddMenuItems ? (
             <>
               <ActionPickerMenu
-                label="+ Alors"
+                label={t("macros.params.addThen")}
                 disabled={disabled}
                 items={branchAddMenuItems("then")}
               />
               <ActionPickerMenu
-                label="+ Sinon"
+                label={t("macros.params.addElse")}
                 disabled={disabled}
                 items={branchAddMenuItems("else")}
               />
@@ -871,7 +886,7 @@ export function ActionProps({
   return (
     <div className="props-grid">
       <label className="v2-field">
-        <span>Commande</span>
+        <span>{t("macros.params.processCommand")}</span>
         <input
           type="text"
           disabled={disabled}
@@ -880,7 +895,7 @@ export function ActionProps({
         />
       </label>
       <label className="v2-field">
-        <span>Args (espace)</span>
+        <span>{t("macros.params.processArgs")}</span>
         <input
           type="text"
           disabled={disabled}
@@ -908,6 +923,8 @@ function ScriptRunProps({
   onChange: (action: MacroAction) => void;
   onOpenScript?: (scriptId: string, label?: string) => void;
 }) {
+  const t = useT();
+  const presets = useMemo(() => getScriptPresets(t), [t]);
   const [scripts, setScripts] = useState<ScriptDoc[]>([]);
   const [libDoc, setLibDoc] = useState<ScriptDoc | null>(null);
   const [sourceOpen, setSourceOpen] = useState(true);
@@ -951,7 +968,7 @@ function ScriptRunProps({
   const paramSource = useLibrary ? (libDoc?.source ?? "") : (action.source ?? "");
   const defs = parseParamDefs(paramSource);
   const params = action.params ?? {};
-  const permLabels = libDoc ? activePermissionLabels(libDoc) : [];
+  const permLabels = libDoc ? activePermissionLabels(libDoc, t) : [];
 
   function applyPreset(preset: ScriptPreset) {
     onChange({
@@ -965,11 +982,13 @@ function ScriptRunProps({
   return (
     <div className="v2-scriptrun-props">
       <div className="v2-scriptrun-props-title">
-        {actionTitleFr("script.run")}
+        {actionTitle("script.run", t)}
         {useLibrary && libDoc ? (
           <span className="v2-scriptrun-props-sub">· {libDoc.name}</span>
         ) : !useLibrary ? (
-          <span className="v2-scriptrun-props-sub">· Inline</span>
+          <span className="v2-scriptrun-props-sub">
+            · {t("macros.library.scriptSourceInline")}
+          </span>
         ) : null}
       </div>
 
@@ -979,7 +998,7 @@ function ScriptRunProps({
           className="v2-scriptrun-section-head"
           onClick={() => setSourceOpen((v) => !v)}
         >
-          Source {sourceOpen ? "▾" : "▸"}
+          {t("macros.params.scriptSectionSource")} {sourceOpen ? "▾" : "▸"}
         </button>
         {sourceOpen ? (
           <div className="v2-scriptrun-section-body props-grid">
@@ -999,8 +1018,11 @@ function ScriptRunProps({
                   }
                 }}
                 options={[
-                  { value: "library", label: "Bibliothèque" },
-                  { value: "inline", label: "Inline" },
+                  { value: "library", label: t("macros.library.title") },
+                  {
+                    value: "inline",
+                    label: t("macros.library.scriptSourceInline"),
+                  },
                 ]}
                 disabled={disabled}
               />
@@ -1008,13 +1030,13 @@ function ScriptRunProps({
             {useLibrary ? (
               <>
                 <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
-                  <span>Script bibliothèque</span>
+                  <span>{t("macros.library.scriptSourceLibrary")}</span>
                   <Select
                     className="v2-select"
                     disabled={disabled}
                     value={action.scriptId ?? ""}
                     options={[
-                      { value: "", label: "— Choisir —" },
+                      { value: "", label: t("macros.library.scriptSourceChoose") },
                       ...scripts.map((s) => ({ value: s.id, label: s.name })),
                     ]}
                     onChange={(v) => {
@@ -1049,14 +1071,14 @@ function ScriptRunProps({
                       onOpenScript(action.scriptId!, libDoc?.name)
                     }
                   >
-                    Ouvrir dans l’éditeur
+                    {t("macros.library.openInEditor")}
                   </button>
                 ) : null}
               </>
             ) : (
               <div style={{ gridColumn: "1 / -1" }}>
                 <label className="v2-field">
-                  <span>Source JavaScript</span>
+                  <span>{t("macros.params.scriptSourceJs")}</span>
                   <textarea
                     rows={7}
                     disabled={disabled}
@@ -1069,13 +1091,13 @@ function ScriptRunProps({
                 </label>
                 <div className="v2-scriptrun-examples">
                   <DropdownMenu
-                    label="Exemples ▾"
+                    label={t("macros.params.scriptExamples")}
                     disabled={disabled}
                     triggerClassName="v2-btn v2-btn-ghost"
                     menuClassName="v2-scriptrun-examples-menu"
                     items={
                       [
-                        ...SCRIPT_PRESETS.map((p) => ({
+                        ...presets.map((p) => ({
                           id: `ex-${p.id}`,
                           label: p.name,
                           icon: <FileCode2 size={14} />,
@@ -1084,13 +1106,12 @@ function ScriptRunProps({
                         { id: "sep-min", label: "", separator: true },
                         {
                           id: "minimal",
-                          label: "Template minimal",
+                          label: t("macros.params.scriptTemplateMinimal"),
                           icon: <FileCode2 size={14} />,
                           onSelect: () => {
                             onChange({
                               ...action,
-                              source:
-                                "//@param label string world\ncaster.log(caster.get('label'));\n",
+                              source: t("macros.action.minimalScriptSource"),
                             });
                           },
                         },
@@ -1111,7 +1132,7 @@ function ScriptRunProps({
             className="v2-scriptrun-section-head"
             onClick={() => setParamsOpen((v) => !v)}
           >
-            Paramètres {paramsOpen ? "▾" : "▸"}
+            {t("macros.params.scriptSectionParams")} {paramsOpen ? "▾" : "▸"}
           </button>
           {paramsOpen ? (
             <div className="v2-scriptrun-section-body">
@@ -1138,12 +1159,12 @@ function ScriptRunProps({
           className="v2-scriptrun-section-head"
           onClick={() => setExecOpen((v) => !v)}
         >
-          Exécution {execOpen ? "▾" : "▸"}
+          {t("macros.params.scriptSectionExec")} {execOpen ? "▾" : "▸"}
         </button>
         {execOpen ? (
           <div className="v2-scriptrun-section-body props-grid">
             <label className="v2-field">
-              <span>Timeout (ms)</span>
+              <span>{t("macros.params.httpTimeout")}</span>
               <input
                 type="number"
                 min={0}
@@ -1155,12 +1176,12 @@ function ScriptRunProps({
               />
             </label>
             <label className="v2-field">
-              <span>Stocker le résultat dans</span>
-              <Tooltip content="Le résultat du script sera accessible dans la macro sous ce nom.">
+              <span>{t("macros.params.scriptResultVar")}</span>
+              <Tooltip content={t("macros.params.scriptResultVarTip")}>
                 <input
                   type="text"
                   disabled={disabled}
-                  placeholder="nomDeVariable"
+                  placeholder={t("macros.params.scriptResultPlaceholder")}
                   value={action.resultVar ?? ""}
                   onChange={(e) =>
                     onChange({

@@ -1,21 +1,26 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useT, type TFunction } from "../i18n";
 import { pickScreenPoint } from "../pick";
 import { Select, type ActionPickerEntry } from "../ui/v2";
 import { ActionProps } from "./ActionProps";
-import { actionDetailFr } from "./actionLabels";
+import { actionDetail } from "./actionLabels";
 import type { KeyMods, MacroAction } from "./types";
 
-const MOUSE_BUTTON_OPTS = [
-  { value: "left", label: "Gauche" },
-  { value: "right", label: "Droit" },
-  { value: "middle", label: "Molette" },
-];
+function mouseButtonOpts(t: TFunction) {
+  return [
+    { value: "left", label: t("macros.action.button.left") },
+    { value: "right", label: t("macros.action.button.right") },
+    { value: "middle", label: t("macros.action.button.middle") },
+  ];
+}
 
-const POSITION_OPTS = [
-  { value: "cursor", label: "Curseur" },
-  { value: "position", label: "XY" },
-];
+function positionOpts(t: TFunction) {
+  return [
+    { value: "cursor", label: t("macros.params.cursor") },
+    { value: "position", label: t("macros.params.xy") },
+  ];
+}
 
 type Props = {
   action: MacroAction;
@@ -62,6 +67,7 @@ function CompactXY({
   disabled?: boolean;
   onChangeXY: (x: number | null, y: number | null) => void;
 }) {
+  const t = useT();
   const [picking, setPicking] = useState(false);
   const isCursor = optional && x == null && y == null;
 
@@ -83,9 +89,9 @@ function CompactXY({
           className="action-cell-select"
           disabled={disabled || picking}
           value={isCursor ? "cursor" : "position"}
-          title="Position"
-          ariaLabel="Position"
-          options={POSITION_OPTS}
+          title={t("macros.params.position")}
+          ariaLabel={t("macros.params.position")}
+          options={positionOpts(t)}
           onChange={(v) => {
             if (v === "cursor") onChangeXY(null, null);
             else onChangeXY(x ?? 0, y ?? 0);
@@ -99,8 +105,8 @@ function CompactXY({
             type="number"
             disabled={disabled || picking}
             value={x ?? 0}
-            title="X"
-            aria-label="X"
+            title={t("macros.params.coordX")}
+            aria-label={t("macros.params.coordX")}
             onChange={(e) => onChangeXY(parseNum(e.target.value), y ?? 0)}
           />
           <input
@@ -108,15 +114,15 @@ function CompactXY({
             type="number"
             disabled={disabled || picking}
             value={y ?? 0}
-            title="Y"
-            aria-label="Y"
+            title={t("macros.params.coordY")}
+            aria-label={t("macros.params.coordY")}
             onChange={(e) => onChangeXY(x ?? 0, parseNum(e.target.value))}
           />
           <button
             type="button"
             className="action-cell-btn"
             disabled={disabled || picking}
-            title="Choisir à l’écran"
+            title={t("macros.params.pickScreen")}
             onClick={() => void onPick()}
           >
             {picking ? "…" : "⌖"}
@@ -144,6 +150,7 @@ function ComplexPopover({
   onClose: () => void;
   anchor: DOMRect;
 }) {
+  const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   const top = Math.min(anchor.bottom + 6, window.innerHeight - 260);
@@ -157,8 +164,8 @@ function ComplexPopover({
       }
     }
     function onPointer(e: PointerEvent) {
-      const t = e.target as Node | null;
-      if (panelRef.current?.contains(t)) return;
+      const target = e.target as Node | null;
+      if (panelRef.current?.contains(target)) return;
       onClose();
     }
     window.addEventListener("keydown", onKey, true);
@@ -178,9 +185,9 @@ function ComplexPopover({
       style={{ top, left }}
     >
       <div className="v2-action-props-pop-head">
-        <strong id={titleId}>Propriétés</strong>
+        <strong id={titleId}>{t("macros.params.panelTitle")}</strong>
         <button type="button" className="action-cell-btn" onClick={onClose}>
-          Fermer
+          {t("shell.closeConfirm")}
         </button>
       </div>
       <div className="v2-action-props-pop-body">
@@ -204,6 +211,7 @@ export function ActionParamCells({
   branchAddMenuItems,
   onOpenScript,
 }: Props) {
+  const t = useT();
   const [popOpen, setPopOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
@@ -211,15 +219,15 @@ export function ActionParamCells({
   if (isComplexAction(action.type)) {
     return (
       <div className="action-cell-edit action-cell-edit--complex">
-        <span className="action-cell-summary" title={actionDetailFr(action)}>
-          {actionDetailFr(action)}
+        <span className="action-cell-summary" title={actionDetail(action, t)}>
+          {actionDetail(action, t)}
         </span>
         <button
           ref={triggerRef}
           type="button"
           className="action-cell-btn"
           disabled={disabled}
-          title="Éditer"
+          title={t("macros.params.edit")}
           aria-expanded={popOpen}
           onClick={(e) => {
             e.stopPropagation();
@@ -254,11 +262,11 @@ export function ActionParamCells({
           min={0}
           disabled={disabled}
           value={action.ms}
-          title="Durée (ms)"
-          aria-label="Durée ms"
+          title={t("macros.params.durationMs")}
+          aria-label={t("macros.params.durationMsAria")}
           onChange={(e) => onChange({ ...action, ms: parseNum(e.target.value) })}
         />
-        <span className="action-cell-unit">ms</span>
+        <span className="action-cell-unit">{t("macros.params.unitMs")}</span>
       </div>
     );
   }
@@ -274,9 +282,9 @@ export function ActionParamCells({
           className="action-cell-select"
           disabled={disabled}
           value={action.button ?? "left"}
-          title="Bouton"
-          ariaLabel="Bouton"
-          options={MOUSE_BUTTON_OPTS}
+          title={t("macros.params.button")}
+          ariaLabel={t("macros.params.button")}
+          options={mouseButtonOpts(t)}
           onChange={(v) =>
             onChange({
               ...action,
@@ -322,8 +330,8 @@ export function ActionParamCells({
           type="number"
           disabled={disabled}
           value={action.delta}
-          title="Delta"
-          aria-label="Delta molette"
+          title={t("macros.params.wheelDeltaShort")}
+          aria-label={t("macros.params.wheelDeltaAria")}
           onChange={(e) =>
             onChange({ ...action, delta: parseNum(e.target.value) })
           }
@@ -352,8 +360,8 @@ export function ActionParamCells({
           type="text"
           disabled={disabled}
           value={action.key}
-          title="Touche"
-          aria-label="Touche"
+          title={t("macros.params.key")}
+          aria-label={t("macros.params.keyAria")}
           onChange={(e) => onChange({ ...action, key: e.target.value })}
         />
         <label className="action-cell-mod" title="Ctrl">
@@ -404,8 +412,8 @@ export function ActionParamCells({
           type="text"
           disabled={disabled}
           value={action.text}
-          title="Texte"
-          aria-label="Texte presse-papiers"
+          title={t("macros.params.clipboardText")}
+          aria-label={t("macros.params.clipboardTextAria")}
           onChange={(e) => onChange({ ...action, text: e.target.value })}
         />
       </div>
@@ -420,8 +428,8 @@ export function ActionParamCells({
           type="text"
           disabled={disabled}
           value={action.name}
-          title="Variable"
-          aria-label="Nom variable"
+          title={t("macros.params.operandVar")}
+          aria-label={t("macros.params.varNameAria")}
           onChange={(e) => onChange({ ...action, name: e.target.value })}
         />
       </div>
@@ -436,8 +444,8 @@ export function ActionParamCells({
           type="text"
           disabled={disabled}
           value={action.name}
-          title="Nom"
-          aria-label="Nom variable"
+          title={t("macros.params.varName")}
+          aria-label={t("macros.params.varNameAria")}
           onChange={(e) => onChange({ ...action, name: e.target.value })}
         />
         <input
@@ -445,8 +453,8 @@ export function ActionParamCells({
           type="text"
           disabled={disabled}
           value={String(action.value)}
-          title="Valeur"
-          aria-label="Valeur"
+          title={t("macros.params.varValue")}
+          aria-label={t("macros.params.varValue")}
           onChange={(e) => {
             const raw = e.target.value;
             let value: string | number | boolean = raw;
@@ -464,7 +472,7 @@ export function ActionParamCells({
 
   return (
     <div className="action-cell-edit">
-      <span className="action-cell-summary">{actionDetailFr(action)}</span>
+      <span className="action-cell-summary">{actionDetail(action, t)}</span>
     </div>
   );
 }

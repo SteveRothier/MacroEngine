@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useT } from "../i18n";
 import { KbdChip } from "../ui";
 import {
   eventToVk,
@@ -58,6 +59,7 @@ export function MacroMetaBar({
   onNameCommit,
   onError,
 }: Props) {
+  const t = useT();
   const [capturing, setCapturing] = useState(false);
   const docRef = useRef(doc);
   docRef.current = doc;
@@ -86,7 +88,7 @@ export function MacroMetaBar({
         try {
           const reserved = await invoke<HotkeyBindings>("get_hotkey_bindings");
           if (triggerConflictsWithReserved(vk, mods, reserved)) {
-            onError("Raccourci réservé (clicker / global / urgence).");
+            onError(t("macros.toast.hotkeyReserved"));
             return;
           }
           const lib = await invoke<LibRow[]>("list_macro_library");
@@ -102,7 +104,7 @@ export function MacroMetaBar({
             return hotkeyTriggerMatches(otherTrigger, vk, mods);
           });
           if (clash) {
-            onError(`Déjà utilisé par « ${clash.name} ».`);
+            onError(t("macros.toast.hotkeyClash", { name: clash.name }));
             return;
           }
           onChange({
@@ -110,13 +112,13 @@ export function MacroMetaBar({
             trigger: { type: "hotkey", key: String(vk), mods },
           });
         } catch {
-          onError("Impossible d’enregistrer le raccourci.");
+          onError(t("macros.toast.hotkeySaveFailed"));
         }
       })();
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [capturing, locked, macroId, onChange, onError]);
+  }, [capturing, locked, macroId, onChange, onError, t]);
 
   useEffect(() => {
     if (locked) setCapturing(false);
@@ -125,7 +127,7 @@ export function MacroMetaBar({
   return (
     <div className="v2-macro-meta">
       <label className="v2-macro-meta-row">
-        <span className="v2-macro-meta-label">Nom</span>
+        <span className="v2-macro-meta-label">{t("macros.toolbar.metaName")}</span>
         <input
           className="v2-macro-meta-input v2-macro-meta-input--name"
           value={doc.name}
@@ -141,7 +143,7 @@ export function MacroMetaBar({
         />
       </label>
       <label className="v2-macro-meta-row">
-        <span className="v2-macro-meta-label">Répét.</span>
+        <span className="v2-macro-meta-label">{t("macros.toolbar.metaRepeat")}</span>
         <input
           className="v2-macro-meta-input v2-macro-meta-input--repeat"
           type="number"
@@ -154,7 +156,7 @@ export function MacroMetaBar({
         />
       </label>
       <div className="v2-macro-meta-row v2-macro-meta-row--hotkey">
-        <span className="v2-macro-meta-label">Raccourci</span>
+        <span className="v2-macro-meta-label">{t("macros.toolbar.metaHotkey")}</span>
         <button
           type="button"
           className={[
@@ -164,13 +166,13 @@ export function MacroMetaBar({
             .filter(Boolean)
             .join(" ")}
           disabled={locked}
-          title="Lancer cette macro hors éditeur — clic pour modifier, clic droit pour retirer"
+          title={t("macros.toolbar.metaHotkeyTitle")}
           aria-label={
             capturing
-              ? "Appuyez sur une touche, Échap pour annuler"
+              ? t("macros.params.hotkeyCapturing")
               : triggerLabel
-                ? `Raccourci ${triggerLabel}`
-                : "Définir un raccourci"
+                ? t("macros.params.hotkeyValue", { label: triggerLabel })
+                : t("macros.params.hotkeySet")
           }
           onClick={() => setCapturing((v) => !v)}
           onContextMenu={(e) => {
@@ -181,7 +183,7 @@ export function MacroMetaBar({
           }}
         >
           <KbdChip className="v2-macro-hotkey-chip">
-            {capturing ? "…" : triggerLabel ?? "Aucun"}
+            {capturing ? "…" : triggerLabel ?? t("macros.toolbar.metaHotkeyNone")}
           </KbdChip>
         </button>
       </div>

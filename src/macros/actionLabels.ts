@@ -1,54 +1,42 @@
+import type { TFunction } from "../i18n";
 import { formatKeyChord, type Condition, type MacroAction } from "./types";
 
-export function actionTitleFr(type: MacroAction["type"]): string {
-  switch (type) {
-    case "mouse.click":
-      return "Clic";
-    case "mouse.move":
-      return "Déplacer";
-    case "mouse.down":
-      return "Enfoncer";
-    case "mouse.up":
-      return "Relâcher";
-    case "mouse.wheel":
-      return "Molette";
-    case "delay":
-      return "Délai";
-    case "process.run":
-      return "Processus";
-    case "http.request":
-      return "HTTP";
-    case "json.path":
-      return "JSON path";
-    case "script.run":
-      return "Script";
-    case "key.tap":
-      return "Touche";
-    case "key.down":
-      return "Maintenir";
-    case "key.up":
-      return "Relâcher touche";
-    case "clipboard.set":
-      return "Copier";
-    case "clipboard.get":
-      return "Coller depuis le presse-papiers";
-    case "var.set":
-      return "Variable";
-    case "control.if":
-      return "Si";
-    case "control.while":
-      return "Tant que";
-  }
+const TITLE_KEYS: Record<MacroAction["type"], string> = {
+  "mouse.click": "macros.action.title.mouseClick",
+  "mouse.move": "macros.action.title.mouseMove",
+  "mouse.down": "macros.action.title.mouseDown",
+  "mouse.up": "macros.action.title.mouseUp",
+  "mouse.wheel": "macros.action.title.mouseWheel",
+  delay: "macros.action.title.delay",
+  "process.run": "macros.action.title.processRun",
+  "http.request": "macros.action.title.httpRequest",
+  "json.path": "macros.action.title.jsonPath",
+  "script.run": "macros.action.title.scriptRun",
+  "key.tap": "macros.action.title.keyTap",
+  "key.down": "macros.action.title.keyDown",
+  "key.up": "macros.action.title.keyUp",
+  "clipboard.set": "macros.action.title.clipboardSet",
+  "clipboard.get": "macros.action.title.clipboardGet",
+  "var.set": "macros.action.title.varSet",
+  "control.if": "macros.action.title.controlIf",
+  "control.while": "macros.action.title.controlWhile",
+};
+
+export function actionTitle(type: MacroAction["type"], t: TFunction): string {
+  return t(TITLE_KEYS[type]);
 }
 
-export function mouseButtonFr(button?: string | null): string {
+export function mouseButtonLabel(
+  button: string | null | undefined,
+  t: TFunction,
+): string {
   switch (button) {
     case "right":
-      return "Droit";
+      return t("macros.action.button.right");
     case "middle":
-      return "Molette";
+      return t("macros.action.button.middle");
     default:
-      return "Gauche";
+      return t("macros.action.button.left");
   }
 }
 
@@ -70,12 +58,12 @@ function formatCond(condition: Condition): string {
   return `${L} ${op} ${R}`;
 }
 
-export function actionDetailFr(action: MacroAction): string {
+export function actionDetail(action: MacroAction, t: TFunction): string {
   switch (action.type) {
     case "mouse.click":
     case "mouse.down":
     case "mouse.up":
-      return `${mouseButtonFr(action.button)}${xySuffix(action.x, action.y)}`;
+      return `${mouseButtonLabel(action.button, t)}${xySuffix(action.x, action.y)}`;
     case "mouse.move":
       return `${action.x}, ${action.y}`;
     case "mouse.wheel":
@@ -94,18 +82,20 @@ export function actionDetailFr(action: MacroAction): string {
       return action.scriptId
         ? action.scriptId
         : action.source?.trim()
-          ? "Inline"
-          : "(vide)";
+          ? t("macros.action.detail.inline")
+          : t("macros.action.detail.empty");
     case "key.tap":
     case "key.down":
     case "key.up":
       return formatKeyChord(action.key, action.mods);
     case "clipboard.set": {
-      const t = action.text.trim();
-      return t ? t.slice(0, 32) : "(vide)";
+      const text = action.text.trim();
+      return text ? text.slice(0, 32) : t("macros.action.detail.empty");
     }
     case "clipboard.get":
-      return action.name ? `→ ${action.name}` : "(vide)";
+      return action.name
+        ? `→ ${action.name}`
+        : t("macros.action.detail.empty");
     case "var.set":
       return `${action.name} = ${JSON.stringify(action.value)}`;
     case "control.if":
@@ -149,8 +139,10 @@ export function actionTone(type: MacroAction["type"]): string {
   }
 }
 
-export function branchLabelFr(branch: "then" | "else"): string {
-  return branch === "then" ? "alors" : "sinon";
+export function branchLabel(branch: "then" | "else", t: TFunction): string {
+  return branch === "then"
+    ? t("macros.action.branch.then")
+    : t("macros.action.branch.else");
 }
 
 /** Index of matching `mouse.up` if `start` begins a down→moves→up drag; else null. */
@@ -162,33 +154,41 @@ export function dragGestureEndIndex(
   let i = start + 1;
   let sawMove = false;
   while (i < list.length) {
-    const t = list[i]?.type;
-    if (t === "mouse.move") {
+    const typ = list[i]?.type;
+    if (typ === "mouse.move") {
       sawMove = true;
       i += 1;
       continue;
     }
-    if (t === "delay") {
+    if (typ === "delay") {
       i += 1;
       continue;
     }
-    if (t === "mouse.up" && sawMove) return i;
+    if (typ === "mouse.up" && sawMove) return i;
     break;
   }
   return null;
 }
 
-/** Title that collapses a recorded drag into a readable geste label. */
-export function actionTitleInList(list: MacroAction[], index: number): string {
+/** Title that collapses a recorded drag into a readable gesture label. */
+export function actionTitleInList(
+  list: MacroAction[],
+  index: number,
+  t: TFunction,
+): string {
   const action = list[index];
   if (!action) return "";
   const end = dragGestureEndIndex(list, index);
-  if (end != null) return "Glisser";
+  if (end != null) return t("macros.action.title.drag");
   for (let s = 0; s < index; s++) {
     const e = dragGestureEndIndex(list, s);
     if (e == null || index > e || index <= s) continue;
-    if (index === e && action.type === "mouse.up") return "Fin glisser";
-    if (action.type === "mouse.move") return "Trajectoire";
+    if (index === e && action.type === "mouse.up") {
+      return t("macros.action.title.dragEnd");
+    }
+    if (action.type === "mouse.move") {
+      return t("macros.action.title.trajectory");
+    }
   }
-  return actionTitleFr(action.type);
+  return actionTitle(action.type, t);
 }

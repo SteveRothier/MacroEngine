@@ -7,7 +7,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Card, AddMenu, EmptyState, Icons, KbdChip, confirmAction, Badge } from "../ui";
-import { actionDetailFr, actionTitleFr } from "./actionLabels";
+import { useT } from "../i18n";
+import { actionDetail, actionTitle } from "./actionLabels";
 import { LibrarySidebar } from "../library/LibrarySidebar";
 import { ActionList } from "./ActionList";
 import { ActionProps } from "./ActionProps";
@@ -137,6 +138,7 @@ export function MacroWorkspace({
   onFocusMacroConsumed,
   onDirtyChange,
 }: Props) {
+  const t = useT();
   const [doc, setDoc] = useState<MacroDocument>(emptyMacro());
   const [library, setLibrary] = useState<
     {
@@ -287,7 +289,7 @@ export function MacroWorkspace({
       autosaveTimer.current = window.setTimeout(() => {
         autosaveTimer.current = null;
         void persistNow(next, id).catch((e) => {
-          setTransportError(errMessage(e, "Enregistrement impossible."));
+          setTransportError(errMessage(e, t("macros.toast.saveFailedLegacy")));
         });
       }, AUTOSAVE_MS);
     },
@@ -381,7 +383,7 @@ export function MacroWorkspace({
           await invoke("clear_macro");
         }
       } catch (e) {
-        setTransportError(errMessage(e, "Impossible de charger les macros."));
+        setTransportError(errMessage(e, t("macros.toast.loadLibraryFailed")));
       } finally {
         setBootstrapped(true);
         await syncRecordState();
@@ -504,7 +506,7 @@ export function MacroWorkspace({
           setTransportError(null);
         } catch (err) {
           setTransportError(
-            errMessage(err, "Impossible de changer le raccourci macro."),
+            errMessage(err, t("macros.toast.hotkeyAppChangeFailed")),
           );
         }
       })();
@@ -557,7 +559,7 @@ export function MacroWorkspace({
       const reserved = hotkeysRef.current;
       if (reserved && triggerConflictsWithReserved(vk, mods, reserved)) {
         setTransportError(
-          "Raccourci réservé (clicker / global / urgence).",
+          t("macros.toast.hotkeyReserved"),
         );
         return;
       }
@@ -573,7 +575,7 @@ export function MacroWorkspace({
         return hotkeyTriggerMatches(otherTrigger, vk, mods);
       });
       if (clash) {
-        setTransportError(`Déjà utilisé par « ${clash.name} ».`);
+        setTransportError(t("macros.toast.hotkeyClash", { name: clash.name }));
         return;
       }
       const next: MacroDocument = {
@@ -581,7 +583,7 @@ export function MacroWorkspace({
         trigger: { type: "hotkey", key: String(vk), mods },
       };
       void pushDoc(next).catch((err) => {
-        setTransportError(errMessage(err, "Raccourci macro impossible."));
+        setTransportError(errMessage(err, t("macros.toast.hotkeyMacroFailed")));
       });
     };
     window.addEventListener("keydown", onKey, true);
@@ -629,7 +631,7 @@ export function MacroWorkspace({
       await refreshList();
       applyLoaded(created);
     } catch (e) {
-      setTransportError(errMessage(e, "Création impossible."));
+      setTransportError(errMessage(e, t("macros.toast.createFailed")));
     }
   }
 
@@ -644,7 +646,7 @@ export function MacroWorkspace({
       const row = libraryRef.current.find((m) => m.name === name);
       applyLoaded(loaded, Boolean(row?.locked));
     } catch (e) {
-      setTransportError(errMessage(e, "Chargement impossible."));
+      setTransportError(errMessage(e, t("macros.toast.loadFailed")));
     }
   }
 
@@ -660,7 +662,7 @@ export function MacroWorkspace({
       await refreshList();
       applyLoaded(copy);
     } catch (e) {
-      setTransportError(errMessage(e, "Duplication impossible."));
+      setTransportError(errMessage(e, t("shell.duplicateFailed")));
     }
   }
 
@@ -668,8 +670,8 @@ export function MacroWorkspace({
     setTransportError(null);
     try {
       const ok = await confirmAction({
-        title: "Supprimer la macro",
-        message: `Supprimer « ${name} » ? Cette action est définitive.`,
+        title: t("macros.confirm.deleteMacroTitle"),
+        message: t("macros.confirm.deleteMacroMessage", { name }),
       });
       if (!ok) return;
       if (autosaveTimer.current != null) {
@@ -704,7 +706,7 @@ export function MacroWorkspace({
         setSelectedPath(null);
       }
     } catch (e) {
-      setTransportError(errMessage(e, "Suppression impossible."));
+      setTransportError(errMessage(e, t("macros.toast.deleteFailed")));
     }
   }
 
@@ -718,7 +720,7 @@ export function MacroWorkspace({
       });
       setFavoriteMacros(qa.favorites.macros);
     } catch (e) {
-      setTransportError(errMessage(e, "Favori impossible."));
+      setTransportError(errMessage(e, t("macros.toast.favoriteFailed")));
     }
   }
 
@@ -742,7 +744,7 @@ export function MacroWorkspace({
       applyLoaded(renamed);
     } catch (e) {
       setDoc((d) => ({ ...d, name: activeName }));
-      setTransportError(errMessage(e, "Renommage impossible."));
+      setTransportError(errMessage(e, t("shell.renameFailed")));
     }
   }
 
@@ -756,18 +758,18 @@ export function MacroWorkspace({
       }
       await persistNow(doc, activeName);
     } catch (e) {
-      setTransportError(errMessage(e, "Enregistrement impossible."));
+      setTransportError(errMessage(e, t("macros.toast.saveFailedLegacy")));
     }
   }
 
   async function onPlay() {
     setTransportError(null);
     if (!activeName) {
-      setTransportError("Crée ou sélectionne une macro.");
+      setTransportError(t("macros.toast.noMacroSelected"));
       return;
     }
     if (doc.actions.length === 0) {
-      setTransportError("Macro vide — ajoute une action ou enregistre.");
+      setTransportError(t("macros.toast.emptyMacroRun"));
       return;
     }
     try {
@@ -776,7 +778,7 @@ export function MacroWorkspace({
       const s = await invoke<EngineStatus>("run_macro");
       onStatus(s);
     } catch (e) {
-      setTransportError(errMessage(e, "Impossible de lancer la macro."));
+      setTransportError(errMessage(e, t("macros.toast.runFailed")));
     }
   }
 
@@ -786,7 +788,7 @@ export function MacroWorkspace({
       const s = await invoke<EngineStatus>("pause_macro");
       onStatus(s);
     } catch (e) {
-      setTransportError(errMessage(e, "Impossible de mettre en pause."));
+      setTransportError(errMessage(e, t("macros.toast.pauseFailed")));
     }
   }
 
@@ -796,7 +798,7 @@ export function MacroWorkspace({
       const s = await invoke<EngineStatus>("resume_macro");
       onStatus(s);
     } catch (e) {
-      setTransportError(errMessage(e, "Impossible de reprendre."));
+      setTransportError(errMessage(e, t("macros.toast.resumeFailed")));
     }
   }
 
@@ -818,7 +820,7 @@ export function MacroWorkspace({
         const s = await invoke<EngineStatus>("request_cancel");
         onStatus(s);
       } catch (e) {
-        setTransportError(errMessage(e, "Impossible d’arrêter."));
+        setTransportError(errMessage(e, t("macros.toast.stopFailed")));
       }
     } finally {
       setRecording(false);
@@ -840,22 +842,21 @@ export function MacroWorkspace({
   async function onStartRecord() {
     setTransportError(null);
     if (!activeName) {
-      setTransportError("Crée une macro avant d’enregistrer.");
+      setTransportError(t("macros.toast.createBeforeRecord"));
       return;
     }
     if (activeLocked) {
-      setTransportError("Macro verrouillée — enregistrement impossible.");
+      setTransportError(t("macros.toast.lockedNoRecord"));
       return;
     }
     try {
       let replace = false;
       if (doc.actions.length > 0) {
         const ok = await confirmAction({
-          title: "Mode enregistrement",
-          message:
-            "Cette macro a déjà des actions. Remplacer la séquence ou ajouter à la fin ?",
-          confirmLabel: "Remplacer",
-          cancelLabel: "Ajouter",
+          title: t("macros.confirm.recordModeTitle"),
+          message: t("macros.confirm.recordModeMessage"),
+          confirmLabel: t("macros.confirm.recordModeReplace"),
+          cancelLabel: t("macros.confirm.recordModeAppend"),
           danger: false,
         });
         replace = ok;
@@ -873,7 +874,7 @@ export function MacroWorkspace({
       setRecordCount(0);
     } catch (e) {
       setRecording(false);
-      setTransportError(errMessage(e, "Impossible de démarrer l’enregistrement."));
+      setTransportError(errMessage(e, t("macros.toast.captureStartFailed")));
       await syncRecordState();
     }
   }
@@ -886,7 +887,7 @@ export function MacroWorkspace({
       setRecordPaused(!!rec.paused);
       if (typeof rec.actionCount === "number") setRecordCount(rec.actionCount);
     } catch (e) {
-      setTransportError(errMessage(e, "Pause capture impossible."));
+      setTransportError(errMessage(e, t("macros.toast.capturePauseFailed")));
     }
   }
 
@@ -898,7 +899,7 @@ export function MacroWorkspace({
       setRecordPaused(!!rec.paused);
       if (typeof rec.actionCount === "number") setRecordCount(rec.actionCount);
     } catch (e) {
-      setTransportError(errMessage(e, "Reprise capture impossible."));
+      setTransportError(errMessage(e, t("macros.toast.captureResumeFailed")));
     }
   }
 
@@ -913,7 +914,7 @@ export function MacroWorkspace({
       await refreshList();
     } catch (e) {
       setRecording(false);
-      setTransportError(errMessage(e, "Enregistrement déjà arrêté."));
+      setTransportError(errMessage(e, t("macros.toast.captureAlreadyStopped")));
       await syncRecordState();
       try {
         const loaded = await invoke<MacroDocument | null>("get_macro");
@@ -931,7 +932,7 @@ export function MacroWorkspace({
     try {
       const path = await open({
         multiple: false,
-        filters: [{ name: "Macro", extensions: ["json", "macro.json"] }],
+        filters: [{ name: t("macros.library.dialogFilter"), extensions: ["json", "macro.json"] }],
       });
       if (!path || Array.isArray(path)) return;
       const loaded = await invoke<MacroDocument>("import_macro_path", { path });
@@ -946,7 +947,7 @@ export function MacroWorkspace({
       await refreshList();
       applyLoaded(saved);
     } catch (e) {
-      setTransportError(errMessage(e, "Import impossible."));
+      setTransportError(errMessage(e, t("macros.toast.importFailed")));
     }
   }
 
@@ -955,13 +956,13 @@ export function MacroWorkspace({
     try {
       await invoke("set_macro", { doc });
       const path = await save({
-        filters: [{ name: "Macro", extensions: ["macro.json"] }],
+        filters: [{ name: t("macros.library.dialogFilter"), extensions: ["macro.json"] }],
         defaultPath: `${doc.name.replace(/\s+/g, "-").toLowerCase()}.macro.json`,
       });
       if (!path) return;
       await invoke("export_macro_path", { path });
     } catch (e) {
-      setTransportError(errMessage(e, "Export impossible."));
+      setTransportError(errMessage(e, t("macros.toast.exportFailed")));
     }
   }
 
@@ -980,17 +981,17 @@ export function MacroWorkspace({
       await refreshList();
       applyLoaded(saved);
     } catch (e) {
-      setTransportError(errMessage(e, "Preset introuvable."));
+      setTransportError(errMessage(e, t("macros.toast.presetNotFound")));
     }
   }
 
   function addAction(kind: MacroAction["type"]) {
     if (!activeName) {
-      setTransportError("Crée une macro avant d’ajouter des actions.");
+      setTransportError(t("macros.toast.createBeforeAdd"));
       return;
     }
     if (activeLocked) return;
-    const action = makeAction(kind);
+    const action = makeAction(kind, t);
     const next = {
       ...doc,
       schemaVersion: 8,
@@ -1030,7 +1031,7 @@ export function MacroWorkspace({
     if (!selectedPath || activeLocked) return;
     const selected = getAtPath(doc.actions, selectedPath);
     if (!selected || selected.type !== "control.if") return;
-    const child = makeAction(kind);
+    const child = makeAction(kind, t);
     const actions = appendChild(doc.actions, selectedPath, branch, child);
     const branchIdx = branch === "then" ? 0 : 1;
     const list = branch === "then" ? selected.then : selected.else ?? [];
@@ -1067,8 +1068,8 @@ export function MacroWorkspace({
       <div className="macro-layout">
         <LibrarySidebar
           kind="macro"
-          title="Bibliothèque"
-          subtitle="Macros"
+          title={t("macros.library.title")}
+          subtitle={t("macros.library.subtitle")}
           activeId={activeName}
           favoriteIds={favoriteMacros}
           dirtyId={dirty ? activeName : null}
@@ -1104,8 +1105,8 @@ export function MacroWorkspace({
           {!activeName ? (
             <EmptyState
               icon={Icons.macros}
-              title="Aucune macro"
-              lead="Crée une macro pour capturer des gestes ou construire une séquence."
+              title={t("macros.empty.noMacroTitle")}
+              lead={t("macros.empty.noMacroLead")}
               actions={
                 <button
                   type="button"
@@ -1113,7 +1114,7 @@ export function MacroWorkspace({
                   disabled={!bootstrapped || busy}
                   onClick={() => void onCreate()}
                 >
-                  + Nouvelle macro
+                  {t("macros.empty.noMacroCta")}
                 </button>
               }
             />
@@ -1124,7 +1125,7 @@ export function MacroWorkspace({
                   className="seq-name macro-toolbar-name"
                   value={doc.name}
                   disabled={busy || activeLocked}
-                  aria-label="Nom de la macro"
+                  aria-label={t("macros.toolbar.metaNameAria")}
                   onChange={(e) =>
                     setDoc((d) => ({ ...d, name: e.target.value }))
                   }
@@ -1136,16 +1137,22 @@ export function MacroWorkspace({
                   }}
                 />
                 {activeLocked ? (
-                  <span className="library-lock" title="Macro verrouillée">
-                    Verrouillée
+                  <span className="library-lock" title={t("macros.toolbar.lockedTitle")}>
+                    {t("macros.toolbar.lockedFeminine")}
                   </span>
                 ) : null}
                 {processFilter.enabled ? (
                   <span
                     title={
                       processFilterBlocked
-                        ? `Filtre processus actif — « ${foregroundExe ?? "?"} » bloqué (${processFilter.mode === "allow" ? "autoriser" : "bloquer"})`
-                        : "Filtre processus actif — premier plan autorisé"
+                        ? t("macros.toolbar.filterBlockedTitle", {
+                            exe: foregroundExe ?? "?",
+                            mode:
+                              processFilter.mode === "allow"
+                                ? t("macros.toolbar.filterModeAllow")
+                                : t("macros.toolbar.filterModeBlock"),
+                          })
+                        : t("macros.toolbar.filterAllowedTitle")
                     }
                   >
                     <Badge
@@ -1153,7 +1160,9 @@ export function MacroWorkspace({
                         processFilterBlocked ? "macro-filter-blocked" : "macro-filter-ok"
                       }
                     >
-                      {processFilterBlocked ? "Filtre · bloqué" : "Filtre · OK"}
+                      {processFilterBlocked
+                        ? t("macros.toolbar.filterBlocked")
+                        : t("macros.toolbar.filterOk")}
                     </Badge>
                   </span>
                 ) : null}
@@ -1163,11 +1172,13 @@ export function MacroWorkspace({
                       type="button"
                       className={`macro-toolbar-hotkey-btn${capturingTrigger ? " is-capturing" : ""}`}
                       disabled={busy || activeLocked}
-                      title="Raccourci de cette macro — clic pour modifier, clic droit pour retirer"
+                      title={t("macros.toolbar.hotkeyMacroTitle")}
                       aria-label={
                         capturingTrigger
-                          ? "Appuie sur une touche, Échap pour annuler"
-                          : `Raccourci macro ${docTriggerLabel}`
+                          ? t("macros.params.hotkeyCapturing")
+                          : t("macros.params.hotkeyMacroValue", {
+                              label: docTriggerLabel,
+                            })
                       }
                       onClick={() => {
                         setCapturingHotkey(false);
@@ -1182,7 +1193,7 @@ export function MacroWorkspace({
                         });
                       }}
                     >
-                      <span className="macro-hotkey-tag">Macro</span>
+                      <span className="macro-hotkey-tag">{t("macros.toolbar.hotkeyMacroTag")}</span>
                       <KbdChip className="macro-toolbar-hotkey">
                         {capturingTrigger ? "…" : docTriggerLabel}
                       </KbdChip>
@@ -1192,13 +1203,15 @@ export function MacroWorkspace({
                       type="button"
                       className={`macro-toolbar-hotkey-btn${capturingHotkey || capturingTrigger ? " is-capturing" : ""}`}
                       disabled={busy || activeLocked}
-                      title="Raccourci app (fallback) — clic pour modifier. Clic droit = raccourci de cette macro."
+                      title={t("macros.toolbar.hotkeyAppTitle")}
                       aria-label={
                         capturingHotkey
-                          ? "Appuie sur une touche, Échap pour annuler"
+                          ? t("macros.params.hotkeyCapturing")
                           : capturingTrigger
-                            ? "Appuie sur une touche pour le raccourci macro"
-                            : `Raccourci app ${macroHotkeyLabel}`
+                            ? t("macros.params.hotkeyMacroCapture")
+                            : t("macros.params.hotkeyAppValue", {
+                                label: macroHotkeyLabel,
+                              })
                       }
                       onClick={() => {
                         setCapturingTrigger(false);
@@ -1211,7 +1224,7 @@ export function MacroWorkspace({
                         setCapturingTrigger(true);
                       }}
                     >
-                      <span className="macro-hotkey-tag">App</span>
+                      <span className="macro-hotkey-tag">{t("macros.toolbar.hotkeyAppTag")}</span>
                       <KbdChip className="macro-toolbar-hotkey">
                         {capturingHotkey || capturingTrigger
                           ? "…"
@@ -1229,8 +1242,8 @@ export function MacroWorkspace({
                       type="button"
                       className="ghost tiny"
                       disabled={!canUndo || busy || activeLocked}
-                      title="Annuler (Ctrl+Z)"
-                      aria-label="Annuler"
+                      title={t("macros.toolbar.undoLegacy")}
+                      aria-label={t("common.cancel")}
                       onClick={() => undo()}
                     >
                       ↶
@@ -1239,8 +1252,8 @@ export function MacroWorkspace({
                       type="button"
                       className="ghost tiny"
                       disabled={!canRedo || busy || activeLocked}
-                      title="Rétablir (Ctrl+Y)"
-                      aria-label="Rétablir"
+                      title={t("macros.toolbar.redoLegacy")}
+                      aria-label={t("macros.toolbar.redo")}
                       onClick={() => redo()}
                     >
                       ↷
@@ -1253,7 +1266,7 @@ export function MacroWorkspace({
                       disabled={!dirty || busy || saving || activeLocked}
                       onClick={() => void onSaveExplicit()}
                     >
-                      {saving ? "…" : "Sauver"}
+                      {saving ? "…" : t("common.save")}
                     </button>
                   ) : null}
                   {engineState === "running" ? (
@@ -1262,12 +1275,12 @@ export function MacroWorkspace({
                       disabled={recording}
                       onClick={() => void onPause()}
                     >
-                      Pause
+                      {t("macros.toolbar.pauseCapture")}
                     </button>
                   ) : null}
                   {engineState === "paused" ? (
                     <button type="button" onClick={() => void onResume()}>
-                      Reprendre
+                      {t("macros.toolbar.resumeCapture")}
                     </button>
                   ) : null}
                   {engineState === "running" ||
@@ -1279,7 +1292,7 @@ export function MacroWorkspace({
                       className="danger"
                       onClick={() => void onStop()}
                     >
-                      Arrêter
+                      {t("macros.toolbar.stopCapture")}
                     </button>
                   ) : null}
                   <label className="field macro-toolbar-repeat">
@@ -1289,8 +1302,8 @@ export function MacroWorkspace({
                       min={0}
                       value={doc.repeatCount}
                       disabled={busy || activeLocked}
-                      title="Répétitions (0 = infini)"
-                      aria-label="Répétitions"
+                      title={t("macros.toolbar.repeatTitle")}
+                      aria-label={t("macros.toolbar.repeatAria")}
                       onChange={(e) =>
                         void pushDoc({
                           ...doc,
@@ -1305,12 +1318,12 @@ export function MacroWorkspace({
                     items={[
                       {
                         id: "play",
-                        label: "Jouer",
+                        label: t("macros.toolbar.play"),
                         onSelect: () => void onPlay(),
                       },
                       {
                         id: "hk-app",
-                        label: "Raccourci app…",
+                        label: t("macros.menu.more.hotkeyApp"),
                         onSelect: () => {
                           setCapturingTrigger(false);
                           setCapturingHotkey(true);
@@ -1318,7 +1331,7 @@ export function MacroWorkspace({
                       },
                       {
                         id: "hk-macro",
-                        label: "Raccourci macro…",
+                        label: t("macros.menu.more.hotkeyMacro"),
                         onSelect: () => {
                           setCapturingHotkey(false);
                           setCapturingTrigger(true);
@@ -1328,7 +1341,7 @@ export function MacroWorkspace({
                         ? [
                             {
                               id: "hk-clear",
-                              label: "Retirer raccourci macro",
+                              label: t("macros.menu.more.clearHotkey"),
                               onSelect: () => {
                                 void pushDoc({
                                   ...doc,
@@ -1340,22 +1353,22 @@ export function MacroWorkspace({
                         : []),
                       {
                         id: "preset-click",
-                        label: "Preset click-delay",
+                        label: t("macros.menu.empty.presetClickDelay"),
                         onSelect: () => void onPreset("click-delay"),
                       },
                       {
                         id: "preset-echo",
-                        label: "Preset process-echo",
+                        label: t("macros.menu.empty.presetProcessEcho"),
                         onSelect: () => void onPreset("process-echo"),
                       },
                       {
                         id: "import",
-                        label: "Importer…",
+                        label: t("macros.menu.more.import"),
                         onSelect: () => void onImport(),
                       },
                       {
                         id: "export",
-                        label: "Exporter…",
+                        label: t("macros.menu.more.export"),
                         onSelect: () => void onExport(),
                       },
                     ]}
@@ -1369,13 +1382,17 @@ export function MacroWorkspace({
               ) : null}
               {processFilterBlocked ? (
                 <p className="hint macro-filter-hint" role="status">
-                  Filtre processus actif — la macro attendra un premier plan autorisé
-                  ({processFilter.mode === "allow" ? "liste blanche" : "liste noire"}).
+                  {t("macros.toast.filterWaiting", {
+                    listType:
+                      processFilter.mode === "allow"
+                        ? t("macros.toast.filterWhitelist")
+                        : t("macros.toast.filterBlacklist"),
+                  })}
                 </p>
               ) : null}
               <div className="sr-only" aria-live="polite">
                 {recording
-                  ? `Capture en cours — ${recordCount} événement${recordCount === 1 ? "" : "s"}`
+                  ? t("macros.toast.captureLive", { count: recordCount })
                   : ""}
               </div>
 
@@ -1391,10 +1408,10 @@ export function MacroWorkspace({
                           engineState === "running" ||
                           engineState === "paused"
                         }
-                        title="Capturer des gestes à l’écran"
+                        title={t("macros.toolbar.captureScreenTitle")}
                         onClick={() => void onStartRecord()}
                       >
-                        Capturer
+                        {t("macros.toolbar.capture")}
                       </button>
                     ) : (
                       <>
@@ -1407,14 +1424,18 @@ export function MacroWorkspace({
                               : onPauseRecord())
                           }
                         >
-                          {recordPaused ? "Reprendre" : "Pause"}
+                          {recordPaused
+                            ? t("macros.toolbar.resumeCapture")
+                            : t("macros.toolbar.pauseCapture")}
                         </button>
                         <button
                           type="button"
                           className="danger"
                           onClick={() => void onStopRecord()}
                         >
-                          Stop ({recordCount})
+                          {t("macros.toolbar.stopRecordCount", {
+                            count: recordCount,
+                          })}
                         </button>
                       </>
                     )}
@@ -1426,7 +1447,7 @@ export function MacroWorkspace({
                             checked={recordMouseOnly}
                             disabled
                           />{" "}
-                          Souris seule
+                          {t("macros.toolbar.recordMouseOnly")}
                         </label>
                         <label className="hint">
                           <input
@@ -1434,7 +1455,7 @@ export function MacroWorkspace({
                             checked={recordKeyboardOnly}
                             disabled
                           />{" "}
-                          Clavier seul
+                          {t("macros.toolbar.recordKeyboardOnly")}
                         </label>
                       </span>
                     ) : (
@@ -1448,7 +1469,7 @@ export function MacroWorkspace({
                               if (e.target.checked) setRecordKeyboardOnly(false);
                             }}
                           />{" "}
-                          Souris seule
+                          {t("macros.toolbar.recordMouseOnly")}
                         </label>
                         <label className="hint">
                           <input
@@ -1459,14 +1480,14 @@ export function MacroWorkspace({
                               if (e.target.checked) setRecordMouseOnly(false);
                             }}
                           />{" "}
-                          Clavier seul
+                          {t("macros.toolbar.recordKeyboardOnly")}
                         </label>
                       </span>
                     )}
                     <AddMenu
-                      label="+ Ajouter"
+                      label={t("macros.toolbar.add")}
                       disabled={editorDisabled}
-                      items={buildActionAddMenu(addAction)}
+                      items={buildActionAddMenu(addAction, t)}
                     />
                   </div>
                 </div>
@@ -1475,8 +1496,8 @@ export function MacroWorkspace({
                   {doc.actions.length === 0 ? (
                     <EmptyState
                       icon={Icons.macros}
-                      title="Macro vide"
-                      lead="Capture des gestes ou ajoute une action pour commencer."
+                      title={t("macros.empty.emptyMacroTitle")}
+                      lead={t("macros.empty.emptyMacroLead")}
                       actions={
                         <>
                           <button
@@ -1485,7 +1506,7 @@ export function MacroWorkspace({
                             disabled={busy || activeLocked}
                             onClick={() => void onStartRecord()}
                           >
-                            Capturer des gestes
+                            {t("macros.toolbar.captureGestures")}
                           </button>
                           <button
                             type="button"
@@ -1493,7 +1514,7 @@ export function MacroWorkspace({
                             disabled={busy || activeLocked}
                             onClick={() => addAction("mouse.click")}
                           >
-                            + Clic
+                            {t("macros.empty.emptyMacroAddClick")}
                           </button>
                         </>
                       }
@@ -1518,27 +1539,27 @@ export function MacroWorkspace({
                             });
                           }}
                           branchAddMenuItems={(branch) =>
-                            buildActionAddMenu((kind) => addToBranch(branch, kind))
+                            buildActionAddMenu((kind) => addToBranch(branch, kind), t)
                           }
                         />
                       </div>
-                      <aside className="macro-props-panel" aria-label="Propriétés">
+                      <aside className="macro-props-panel" aria-label={t("macros.params.panelTitle")}>
                         <div className="macro-props-head">
-                          <span className="v2-meta-label">Propriétés</span>
+                          <span className="v2-meta-label">{t("macros.params.panelTitle")}</span>
                           {selectedAction ? (
                             <p className="macro-props-title">
-                              <strong>{actionTitleFr(selectedAction.type)}</strong>
-                              <span>{actionDetailFr(selectedAction)}</span>
+                              <strong>{actionTitle(selectedAction.type, t)}</strong>
+                              <span>{actionDetail(selectedAction, t)}</span>
                             </p>
                           ) : (
                             <p className="hint">
-                              Sélectionne une action dans la liste.
+                              {t("macros.empty.noSelection")}
                             </p>
                           )}
                         </div>
                         {activeLocked ? (
                           <p className="ui-alert" role="status">
-                            Macro verrouillée — lecture seule.
+                            {t("macros.empty.lockedReadOnly")}
                           </p>
                         ) : null}
                         <ActionProps
@@ -1546,7 +1567,7 @@ export function MacroWorkspace({
                           disabled={editorDisabled}
                           onChange={updateSelected}
                           branchAddMenuItems={(branch) =>
-                            buildActionAddMenu((kind) => addToBranch(branch, kind))
+                            buildActionAddMenu((kind) => addToBranch(branch, kind), t)
                           }
                         />
                       </aside>
