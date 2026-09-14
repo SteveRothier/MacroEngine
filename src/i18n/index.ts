@@ -4,8 +4,7 @@
  * To add a language: update SUPPORTED_LOCALES + LOCALE_META, fill each catalog via
  * defineCatalog, and add a Rust UiLocale variant. See src/i18n/locales.ts.
  *
- * Tray / Rust menu strings stay French for now — recreate the tray menu from the
- * front-end (or pass locale into Rust) in a follow-up.
+ * Tray / Rust menu + tooltips follow `shell.ui_locale` (rebuilt on settings save).
  */
 export type { AppLocale, UiLocalePref, InterpVars } from "./types";
 export {
