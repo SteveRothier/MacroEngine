@@ -35,7 +35,8 @@ import {
 import { TitleBarProvider, useTitleBarContext } from "../ui/v2/TitleBarContext";
 import { ConfirmHost, confirmAction, PromptHost, promptAction } from "../ui";
 import { applyTheme, readStoredTheme, subscribeSystemTheme, type ThemeMode } from "../theme";
-import { stateLabelFr, sessionLabelFr } from "../ui/labels";
+import { stateLabel, sessionLabel } from "../ui/labels";
+import { LocaleProvider, useLocale, useT } from "../i18n";
 import { loadRecent, loadLastStudio, pushRecent, saveLastStudio } from "./recent";
 import type { SettingsSection } from "./types";
 import type { AppSettings } from "../clicker/clickerTypes";
@@ -115,17 +116,29 @@ function playFinishBeep() {
 }
 
 export function MainAppV2() {
+  const [uiLocalePref, setUiLocalePref] = useState(() => mergeShellPrefs().uiLocale);
   return (
     <TitleBarProvider>
       <ToastProvider>
-        <MainAppV2Inner />
+        <LocaleProvider
+          preference={uiLocalePref}
+          onPreferenceChange={setUiLocalePref}
+        >
+          <MainAppV2Inner onUiLocalePrefChange={setUiLocalePref} />
+        </LocaleProvider>
       </ToastProvider>
     </TitleBarProvider>
   );
 }
 
-function MainAppV2Inner() {
+function MainAppV2Inner({
+  onUiLocalePrefChange,
+}: {
+  onUiLocalePrefChange: (pref: ShellPrefs["uiLocale"]) => void;
+}) {
   const toast = useToast();
+  const t = useT();
+  const { locale } = useLocale();
   const titleBarCtx = useTitleBarContext();
   const automationsPage = useAutomationsPageState();
   const [shellPrefs, setShellPrefs] = useState<ShellPrefs>(() => mergeShellPrefs());
@@ -196,6 +209,7 @@ function MainAppV2Inner() {
         if (typeof s.journalOpen === "boolean") setJournalOpen(s.journalOpen);
         const sh = mergeShellPrefs(s.shell);
         setShellPrefs(sh);
+        onUiLocalePrefChange(sh.uiLocale);
         setAutomationPrefs(mergeAutomationPrefs(s.automation));
         if (!sh.restoreWorkspaceTabs) {
           setWorkspace((ws) => selectHome({ ...ws, tabs: [] }));
@@ -229,7 +243,7 @@ function MainAppV2Inner() {
     const wasActive = prev === "running" || prev === "paused";
     if (wasActive && status.state === "idle") {
       if (shellPrefs.toastOnFinish) {
-        toast.success("Session terminée");
+        toast.success(t("shell.sessionEnded"));
       }
       if (automationPrefs.soundOnFinish) {
         playFinishBeep();
@@ -245,6 +259,7 @@ function MainAppV2Inner() {
     persistShell,
     shellPrefs.toastOnFinish,
     status.state,
+    t,
     toast,
   ]);
 
@@ -253,9 +268,9 @@ function MainAppV2Inner() {
     void listen("app://confirm-quit", () => {
       void (async () => {
         const ok = await confirmAction({
-          title: "Quitter Caster",
-          message: "Une session est encore active. Quitter quand même ?",
-          confirmLabel: "Quitter",
+          title: t("shell.quitTitle"),
+          message: t("shell.quitMessage"),
+          confirmLabel: t("shell.quitConfirm"),
           danger: true,
         });
         if (ok) void invoke("confirm_app_exit");
@@ -264,7 +279,7 @@ function MainAppV2Inner() {
       un = fn;
     });
     return () => un?.();
-  }, []);
+  }, [t]);
 
   const rememberLastRun = useCallback(
     async (kind: "macro" | "clicker", id: string) => {
@@ -295,7 +310,7 @@ function MainAppV2Inner() {
     void invoke<EngineStatus>("emergency_stop")
       .then((s) => {
         setStatus(s);
-        toast.info("Session arrêtée");
+        toast.info(t("shell.sessionStopped"));
         if (shellPrefs.goHomeAfterEmergency) {
           setWorkspace((ws) => selectHome(ws));
         }
@@ -304,14 +319,14 @@ function MainAppV2Inner() {
         void invoke<EngineStatus>("request_cancel")
           .then((s) => {
             setStatus(s);
-            toast.info("Annulation demandée");
+            toast.info(t("shell.cancelRequested"));
             if (shellPrefs.goHomeAfterEmergency) {
               setWorkspace((ws) => selectHome(ws));
             }
           })
-          .catch((e) => toast.error(launchErr(e, "Impossible d’arrêter"))),
+          .catch((e) => toast.error(launchErr(e, t("shell.cannotStop")))),
       );
-  }, [shellPrefs.goHomeAfterEmergency, toast]);
+  }, [shellPrefs.goHomeAfterEmergency, t, toast]);
 
   const openDoc = useCallback(
     (kind: DocTabKind, resourceId: string, label?: string) => {
@@ -350,21 +365,21 @@ function MainAppV2Inner() {
       const tab = workspace.tabs.find((t) => t.id === tabId);
       if (!tab) return;
       if (tab.pinned) {
-        toast.info("Onglet épinglé — désépinglez-le pour le fermer");
+        toast.info(t("shell.pinnedTab"));
         return;
       }
       if (tab.dirty) {
         const ok = await confirmAction({
-          title: "Fermer",
-          message: `« ${tab.label} » a des modifications non enregistrées. Fermer quand même ?`,
-          confirmLabel: "Fermer",
+          title: t("shell.closeTitle"),
+          message: t("shell.closeDirty", { label: tab.label }),
+          confirmLabel: t("shell.closeConfirm"),
           danger: true,
         });
         if (!ok) return;
       }
       setWorkspace((ws) => closeDocTab(ws, tabId));
     },
-    [toast, workspace.tabs],
+    [t, toast, workspace.tabs],
   );
 
   const applyBatchTabClose = useCallback(
@@ -375,19 +390,22 @@ function MainAppV2Inner() {
       if (dirty.length > 0) {
         const message =
           dirty.length === 1
-            ? `« ${dirty[0]!.label} » a des modifications non enregistrées. Fermer quand même ?`
-            : `${dirty.length} onglets ont des modifications non enregistrées (${dirty.map((t) => t.label).join(", ")}). Fermer quand même ?`;
+            ? t("shell.closeDirty", { label: dirty[0]!.label })
+            : t("shell.closeDirtyMany", {
+                n: dirty.length,
+                names: dirty.map((tab) => tab.label).join(", "),
+              });
         const ok = await confirmAction({
-          title: "Fermer",
+          title: t("shell.closeTitle"),
           message,
-          confirmLabel: "Fermer",
+          confirmLabel: t("shell.closeConfirm"),
           danger: true,
         });
         if (!ok) return;
       }
       setWorkspace(apply);
     },
-    [workspace],
+    [t, workspace],
   );
 
   const onTabContextAction = useCallback(
@@ -415,14 +433,14 @@ function MainAppV2Inner() {
                 name: tab.resourceId,
               });
               bumpRefresh();
-              toast.success(`Macro dupliquée · ${copy.name}`);
+              toast.success(t("shell.macroDuplicated", { name: copy.name }));
               openDoc("macro", copy.name);
             } else if (tab.kind === "clicker") {
               const copy = await invoke<{ name: string }>("duplicate_clicker_preset", {
                 name: tab.resourceId,
               });
               bumpRefresh();
-              toast.success(`Preset dupliqué · ${copy.name}`);
+              toast.success(t("shell.presetDuplicated", { name: copy.name }));
               openDoc("clicker", copy.name);
             } else {
               const src = await invoke<ScriptDoc>("load_script_cmd", {
@@ -431,31 +449,31 @@ function MainAppV2Inner() {
               const copy: ScriptDoc = {
                 ...src,
                 id: newScriptId(),
-                name: `${src.name} (copie)`,
+                name: `${src.name}${t("shell.copySuffix")}`,
               };
               await invoke("save_script_cmd", { doc: copy });
               bumpRefresh();
-              toast.success(`Script dupliqué · ${copy.name}`);
+              toast.success(t("shell.scriptDuplicated", { name: copy.name }));
               openDoc("script", copy.id, copy.name);
             }
           } catch (e) {
-            toast.error(launchErr(e, "Duplication impossible"));
+            toast.error(launchErr(e, t("shell.duplicateFailed")));
           }
           return;
         case "rename": {
           if (tab.dirty) {
             const ok = await confirmAction({
-              title: "Renommer",
-              message: `« ${tab.label} » a des modifications non enregistrées. Renommer quand même ?`,
-              confirmLabel: "Renommer",
+              title: t("shell.renameTitle"),
+              message: t("shell.renameDirty", { label: tab.label }),
+              confirmLabel: t("shell.renameConfirm"),
             });
             if (!ok) return;
           }
           const nextName = await promptAction({
-            title: "Renommer",
+            title: t("shell.renameTitle"),
             defaultValue: tab.kind === "script" ? tab.label : tab.resourceId,
-            confirmLabel: "Renommer",
-            placeholder: "Nouveau nom",
+            confirmLabel: t("shell.renameConfirm"),
+            placeholder: t("shell.renamePlaceholder"),
           });
           if (!nextName || nextName === tab.resourceId || nextName === tab.label) return;
           try {
@@ -466,7 +484,7 @@ function MainAppV2Inner() {
               });
               bumpRefresh();
               setWorkspace((ws) => renameDocTab(ws, tabId, doc.name, doc.name));
-              toast.success(`Macro renommée · ${doc.name}`);
+              toast.success(t("shell.macroRenamed", { name: doc.name }));
             } else if (tab.kind === "clicker") {
               const preset = await invoke<{ name: string }>("rename_clicker_preset", {
                 from: tab.resourceId,
@@ -474,7 +492,7 @@ function MainAppV2Inner() {
               });
               bumpRefresh();
               setWorkspace((ws) => renameDocTab(ws, tabId, preset.name, preset.name));
-              toast.success(`Preset renommé · ${preset.name}`);
+              toast.success(t("shell.presetRenamed", { name: preset.name }));
             } else {
               const src = await invoke<ScriptDoc>("load_script_cmd", {
                 id: tab.resourceId,
@@ -483,17 +501,17 @@ function MainAppV2Inner() {
               await invoke("save_script_cmd", { doc: updated });
               bumpRefresh();
               setWorkspace((ws) => setTabLabel(ws, tabId, nextName));
-              toast.success(`Script renommé · ${nextName}`);
+              toast.success(t("shell.scriptRenamed", { name: nextName }));
             }
           } catch (e) {
-            toast.error(launchErr(e, "Renommage impossible"));
+            toast.error(launchErr(e, t("shell.renameFailed")));
           }
           return;
         }
         case "reveal":
           try {
             if (tab.kind === "script") {
-              toast.info("Les scripts sont dans le dossier config / scripts");
+              toast.info(t("shell.scriptsFolderHint"));
               return;
             }
             await invoke("reveal_library_entry", {
@@ -501,12 +519,12 @@ function MainAppV2Inner() {
               name: tab.resourceId,
             });
           } catch (e) {
-            toast.error(launchErr(e, "Impossible d’ouvrir l’emplacement"));
+            toast.error(launchErr(e, t("shell.openLocationFailed")));
           }
           return;
       }
     },
-    [applyBatchTabClose, bumpRefresh, onTabClose, openDoc, toast, workspace.tabs],
+    [applyBatchTabClose, bumpRefresh, onTabClose, openDoc, t, toast, workspace.tabs],
   );
 
   const onTabReorder = useCallback(
@@ -544,14 +562,14 @@ function MainAppV2Inner() {
         const next = await invoke<EngineStatus>("launch_clicker_preset", { name });
         setStatus(next);
         bumpRefresh();
-        toast.success(`Clicker lancé · ${name}`);
+        toast.success(t("shell.clickerLaunched", { name }));
         openJournalOnRun();
         void rememberLastRun("clicker", name);
       } catch (e) {
-        toast.error(launchErr(e, "Échec du lancement clicker"));
+        toast.error(launchErr(e, t("shell.launchClickerFailed")));
       }
     },
-    [bumpRefresh, openJournalOnRun, rememberLastRun, toast],
+    [bumpRefresh, openJournalOnRun, rememberLastRun, t, toast],
   );
 
   const onLaunchMacro = useCallback(
@@ -560,26 +578,26 @@ function MainAppV2Inner() {
         const next = await invoke<EngineStatus>("launch_saved_macro", { name });
         setStatus(next);
         bumpRefresh();
-        toast.success(`Macro lancée · ${name}`);
+        toast.success(t("shell.macroLaunched", { name }));
         openJournalOnRun();
         void rememberLastRun("macro", name);
       } catch (e) {
-        toast.error(launchErr(e, "Échec du lancement macro"));
+        toast.error(launchErr(e, t("shell.launchMacroFailed")));
       }
     },
-    [bumpRefresh, openJournalOnRun, rememberLastRun, toast],
+    [bumpRefresh, openJournalOnRun, rememberLastRun, t, toast],
   );
 
   const onCreateMacro = useCallback(async () => {
     try {
       const doc = await invoke<{ name: string }>("create_saved_macro", { name: null });
       bumpRefresh();
-      toast.success("Macro créée");
+      toast.success(t("shell.macroCreated"));
       openDoc("macro", doc.name);
     } catch (e) {
-      toast.error(launchErr(e, "Impossible de créer la macro"));
+      toast.error(launchErr(e, t("shell.createMacroFailed")));
     }
-  }, [bumpRefresh, openDoc, toast]);
+  }, [bumpRefresh, openDoc, t, toast]);
 
   const onCreateClicker = useCallback(async () => {
     try {
@@ -589,19 +607,19 @@ function MainAppV2Inner() {
         config: DEFAULT_CLICKER,
       });
       bumpRefresh();
-      toast.success("Preset clicker créé");
+      toast.success(t("shell.clickerCreated"));
       openDoc("clicker", name);
     } catch (e) {
-      toast.error(launchErr(e, "Impossible de créer le preset"));
+      toast.error(launchErr(e, t("shell.createClickerFailed")));
     }
-  }, [bumpRefresh, openDoc, toast]);
+  }, [bumpRefresh, openDoc, t, toast]);
 
   const onCreateScript = useCallback(async () => {
     try {
       const id = newScriptId();
       const doc: ScriptDoc = {
         id,
-        name: "Nouveau script",
+        name: t("shell.newScriptName"),
         source:
           "//@param label string world\ncaster.log('hello ' + caster.get('label'));\n",
         allowNetwork: false,
@@ -612,12 +630,12 @@ function MainAppV2Inner() {
       };
       await invoke("save_script_cmd", { doc });
       bumpRefresh();
-      toast.success("Script créé");
+      toast.success(t("shell.scriptCreated"));
       openDoc("script", id, doc.name);
     } catch (e) {
-      toast.error(launchErr(e, "Impossible de créer le script"));
+      toast.error(launchErr(e, t("shell.createScriptFailed")));
     }
-  }, [bumpRefresh, openDoc, toast]);
+  }, [bumpRefresh, openDoc, t, toast]);
 
   const onBarContextAction = useCallback(
     async (action: BarContextAction) => {
@@ -684,22 +702,22 @@ function MainAppV2Inner() {
     const nav: CommandItem[] = [
       {
         id: "nav-home",
-        label: "Accueil",
-        hint: "Liste des automations",
-        group: "Navigation",
+        label: t("shell.navHome"),
+        hint: t("shell.navHomeHint"),
+        group: t("shell.navGroup"),
         onSelect: () => goHome(),
       },
       {
         id: "nav-settings",
-        label: "Paramètres",
+        label: t("shell.navSettings"),
         hint: "Ctrl+,",
-        group: "Navigation",
+        group: t("shell.navGroup"),
         onSelect: () => goSettings("application"),
       },
       {
         id: "nav-journal",
-        label: journalOpen ? "Masquer le journal" : "Afficher le journal",
-        group: "Navigation",
+        label: journalOpen ? t("shell.hideJournal") : t("shell.showJournal"),
+        group: t("shell.navGroup"),
         onSelect: () => {
           setJournalOpen((o) => {
             const next = !o;
@@ -713,39 +731,39 @@ function MainAppV2Inner() {
     const create: CommandItem[] = [
       {
         id: "create-macro",
-        label: "Nouvelle macro",
+        label: t("shell.newMacro"),
         hint: "Ctrl+T",
-        group: "Créer",
+        group: t("shell.createGroup"),
         onSelect: () => void onCreateMacro(),
       },
       {
         id: "create-clicker",
-        label: "Nouveau clicker",
-        group: "Créer",
+        label: t("shell.newClicker"),
+        group: t("shell.createGroup"),
         onSelect: () => void onCreateClicker(),
       },
       {
         id: "create-script",
-        label: "Nouveau script",
-        group: "Créer",
+        label: t("shell.newScript"),
+        group: t("shell.createGroup"),
         onSelect: () => void onCreateScript(),
       },
     ];
 
-    const tabs: CommandItem[] = sortTabsForDisplay(workspace.tabs).map((t) => ({
-      id: `tab-${t.id}`,
-      label: t.label,
-      hint: t.kind,
-      group: "Onglets ouverts",
-      onSelect: () => setWorkspace((ws) => selectDocTab(ws, t.id)),
+    const tabs: CommandItem[] = sortTabsForDisplay(workspace.tabs).map((tab) => ({
+      id: `tab-${tab.id}`,
+      label: tab.label,
+      hint: tab.kind,
+      group: t("shell.openTabs"),
+      onSelect: () => setWorkspace((ws) => selectDocTab(ws, tab.id)),
     }));
 
     const session: CommandItem[] = running
       ? [
           {
             id: "stop-session",
-            label: "Arrêter la session",
-            group: "Session",
+            label: t("shell.stopSession"),
+            group: t("shell.sessionGroup"),
             onSelect: () => onEmergencyStop(),
           },
         ]
@@ -754,8 +772,8 @@ function MainAppV2Inner() {
     const actions: CommandItem[] = [
       {
         id: "home-order",
-        label: "Accueil · tri ordre manuel (#)",
-        group: "Actions",
+        label: t("shell.homeSortManual"),
+        group: t("shell.actionsGroup"),
         onSelect: () => {
           goHome();
           automationsPage.setDisplay({
@@ -767,8 +785,8 @@ function MainAppV2Inner() {
       },
       {
         id: "launch-focused",
-        label: "Lancer l’automation sélectionnée",
-        group: "Actions",
+        label: t("shell.launchSelected"),
+        group: t("shell.actionsGroup"),
         onSelect: () => {
           const key = automationsPage.focusKey;
           if (!key) {
@@ -786,15 +804,15 @@ function MainAppV2Inner() {
                 void invoke("run_script_session_cmd", { id: tab.resourceId })
                   .then(() => {
                     bumpRefresh();
-                    toast.success(`Script lancé · ${tab.label}`);
+                    toast.success(t("shell.scriptLaunched", { name: tab.label }));
                   })
                   .catch((e) =>
-                    toast.error(launchErr(e, "Échec du lancement script")),
+                    toast.error(launchErr(e, t("shell.launchScriptFailed"))),
                   );
               }
               return;
             }
-            toast.info("Sélectionnez une automation sur l’Accueil");
+            toast.info(t("shell.selectAutomation"));
             return;
           }
           const colon = key.indexOf(":");
@@ -807,10 +825,10 @@ function MainAppV2Inner() {
             void invoke("run_script_session_cmd", { id })
               .then(() => {
                 bumpRefresh();
-                toast.success(`Script lancé · ${id}`);
+                toast.success(t("shell.scriptLaunched", { name: id }));
               })
               .catch((e) =>
-                toast.error(launchErr(e, "Échec du lancement script")),
+                toast.error(launchErr(e, t("shell.launchScriptFailed"))),
               );
           }
         },
@@ -832,6 +850,7 @@ function MainAppV2Inner() {
     onLaunchMacro,
     persistShell,
     running,
+    t,
     toast,
     workspace.shellView,
     workspace.tabs,
@@ -847,23 +866,23 @@ function MainAppV2Inner() {
           : "healthy";
     return {
       kind,
-      label: sessionLabelFr(status) ?? stateLabelFr(status.state),
+      label: sessionLabel(locale, status) ?? stateLabel(locale, status.state),
     };
-  }, [running, status]);
+  }, [locale, running, status]);
 
   const documentTabs = useMemo((): DocumentTabItem[] => {
     return [
-      { id: HOME_TAB_ID, label: "Accueil", kind: "home", closable: false },
-      ...sortTabsForDisplay(workspace.tabs).map((t) => ({
-        id: t.id,
-        label: t.label,
-        kind: t.kind,
-        dirty: t.dirty,
-        pinned: t.pinned,
-        closable: !t.pinned,
+      { id: HOME_TAB_ID, label: t("shell.navHome"), kind: "home", closable: false },
+      ...sortTabsForDisplay(workspace.tabs).map((tab) => ({
+        id: tab.id,
+        label: tab.label,
+        kind: tab.kind,
+        dirty: tab.dirty,
+        pinned: tab.pinned,
+        closable: !tab.pinned,
       })),
     ];
-  }, [workspace.tabs]);
+  }, [t, workspace.tabs]);
 
   const tabBarActiveId = titleBarHighlightTabId(workspace);
 
@@ -888,7 +907,10 @@ function MainAppV2Inner() {
             setJournalOpen(v);
             void persistShell({ journalOpen: v });
           }}
-          onShellPrefsChange={setShellPrefs}
+          onShellPrefsChange={(prefs) => {
+            setShellPrefs(prefs);
+            onUiLocalePrefChange(prefs.uiLocale);
+          }}
           onAutomationPrefsChange={setAutomationPrefs}
         />
       );
@@ -1017,9 +1039,7 @@ function MainAppV2Inner() {
             onTabContextAction={(tabId, action) => void onTabContextAction(tabId, action)}
             onBarContextAction={(action) => void onBarContextAction(action)}
             onTabReorder={onTabReorder}
-            onPinnedCloseAttempt={() =>
-              toast.info("Onglet épinglé — désépinglez-le pour le fermer")
-            }
+            onPinnedCloseAttempt={() => toast.info(t("shell.pinnedTab"))}
             settingsActive={settingsActive}
             onSettingsClick={() => goSettings(settingsSection)}
             onJournalClick={() => {
