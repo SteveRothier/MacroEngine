@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { chordLabel, eventToVk, type HotkeyBindings, vkLabel } from "../macros/types";
-import { InspectorSection, useToast } from "../ui/v2";
+import { useToast } from "../ui/v2";
 
 const DEFAULTS: HotkeyBindings = {
   actionVk: 0x75,
@@ -110,8 +110,8 @@ export function HotkeySettings({ onBindingsChange }: Props) {
   const conflict = hotkeyConflict(bindings);
 
   return (
-    <InspectorSection title="Raccourcis globaux">
-      <p className="v2-settings-pane-hint">
+    <>
+      <p className="v2-settings-group-hint">
         Actifs hors focus (F6 clicker, F7 pause clicker, F9 macro, F8 urgence par
         défaut). F7 peut activer le parcours caret WebView si le focus est dans
         l’app — le raccourci global est mangé hors focus.
@@ -154,7 +154,7 @@ export function HotkeySettings({ onBindingsChange }: Props) {
             </button>
           </div>
         ))}
-        <div className="v2-field-row" style={{ marginTop: 12 }}>
+        <div className="v2-field-row v2-hotkey-actions">
           <button
             type="button"
             className="v2-btn v2-btn-primary"
@@ -168,6 +168,6 @@ export function HotkeySettings({ onBindingsChange }: Props) {
           </button>
         </div>
       </div>
-    </InspectorSection>
+    </>
   );
 }
