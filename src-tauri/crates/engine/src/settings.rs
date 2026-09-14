@@ -218,6 +218,24 @@ pub enum StartupView {
     LastDocument,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum UiLocale {
+    #[default]
+    System,
+    Fr,
+    En,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowBounds {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ShellPrefs {
@@ -235,6 +253,26 @@ pub struct ShellPrefs {
     pub recent_list_max: u32,
     #[serde(default = "default_true")]
     pub warn_on_unsaved_quit: bool,
+    #[serde(default)]
+    pub always_on_top: bool,
+    #[serde(default = "default_true")]
+    pub confirm_quit_if_running: bool,
+    #[serde(default)]
+    pub go_home_after_emergency: bool,
+    #[serde(default = "default_true")]
+    pub toast_on_finish: bool,
+    #[serde(default = "default_true")]
+    pub tray_relaunch_last: bool,
+    #[serde(default = "default_true")]
+    pub remember_window_bounds: bool,
+    #[serde(default)]
+    pub window_bounds: Option<WindowBounds>,
+    #[serde(default)]
+    pub ui_locale: UiLocale,
+    #[serde(default)]
+    pub last_clicker_id: Option<String>,
+    #[serde(default)]
+    pub last_macro_id: Option<String>,
 }
 
 impl Default for ShellPrefs {
@@ -247,6 +285,16 @@ impl Default for ShellPrefs {
             command_palette_enabled: true,
             recent_list_max: 12,
             warn_on_unsaved_quit: true,
+            always_on_top: false,
+            confirm_quit_if_running: true,
+            go_home_after_emergency: false,
+            toast_on_finish: true,
+            tray_relaunch_last: true,
+            remember_window_bounds: true,
+            window_bounds: None,
+            ui_locale: UiLocale::System,
+            last_clicker_id: None,
+            last_macro_id: None,
         }
     }
 }
@@ -574,6 +622,8 @@ mod tests {
         let loaded = load_settings(&dir).unwrap();
         assert_eq!(loaded.accueil.default_sort_by, AccueilSortBy::Order);
         assert!(loaded.shell.command_palette_enabled);
+        assert!(loaded.shell.confirm_quit_if_running);
+        assert!(loaded.shell.toast_on_finish);
         assert!(loaded.confirmations.purge_trash);
         assert_eq!(loaded.appearance.density, UiDensity::Comfortable);
         assert_eq!(loaded.scripts.default_timeout_ms, 0);

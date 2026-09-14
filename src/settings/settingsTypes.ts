@@ -6,6 +6,14 @@ export type AccueilFilter = "all" | "favorites" | "recent" | "scripts";
 export type StartupView = "home" | "lastDocument";
 export type UiDensity = "comfortable" | "compact";
 export type AccentTheme = "default" | "blue" | "teal";
+export type UiLocale = "system" | "fr" | "en";
+
+export type WindowBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
 
 export type AccueilPrefs = {
   defaultSortBy: AccueilSortBy;
@@ -29,6 +37,16 @@ export type ShellPrefs = {
   commandPaletteEnabled: boolean;
   recentListMax: number;
   warnOnUnsavedQuit: boolean;
+  alwaysOnTop: boolean;
+  confirmQuitIfRunning: boolean;
+  goHomeAfterEmergency: boolean;
+  toastOnFinish: boolean;
+  trayRelaunchLast: boolean;
+  rememberWindowBounds: boolean;
+  windowBounds: WindowBounds | null;
+  uiLocale: UiLocale;
+  lastClickerId: string | null;
+  lastMacroId: string | null;
 };
 
 export type AutomationPrefs = {
@@ -86,6 +104,16 @@ export const DEFAULT_SHELL_PREFS: ShellPrefs = {
   commandPaletteEnabled: true,
   recentListMax: 12,
   warnOnUnsavedQuit: true,
+  alwaysOnTop: false,
+  confirmQuitIfRunning: true,
+  goHomeAfterEmergency: false,
+  toastOnFinish: true,
+  trayRelaunchLast: true,
+  rememberWindowBounds: true,
+  windowBounds: null,
+  uiLocale: "system",
+  lastClickerId: null,
+  lastMacroId: null,
 };
 
 export const DEFAULT_AUTOMATION_PREFS: AutomationPrefs = {
@@ -128,7 +156,11 @@ export function mergeAccueilPrefs(
 }
 
 export function mergeShellPrefs(partial?: Partial<ShellPrefs> | null): ShellPrefs {
-  return { ...DEFAULT_SHELL_PREFS, ...partial };
+  const merged = { ...DEFAULT_SHELL_PREFS, ...partial };
+  if (partial && "windowBounds" in partial) {
+    merged.windowBounds = partial.windowBounds ?? null;
+  }
+  return merged;
 }
 
 export function mergeAutomationPrefs(

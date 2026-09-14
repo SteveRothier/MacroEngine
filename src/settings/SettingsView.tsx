@@ -23,10 +23,14 @@ import type { HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import type { SettingsSection } from "../app/types";
 import {
+  mergeAutomationPrefs,
   mergeShellPrefs,
+  type AutomationPrefs,
   type ShellPrefs,
   type StartupView,
+  type UiLocale,
 } from "./settingsTypes";
+import { tApp } from "./uiLocale";
 
 const SECTIONS: {
   id: SettingsSection;
@@ -58,6 +62,7 @@ type Props = {
   journalOpen: boolean;
   onJournalOpenChange: (v: boolean) => void;
   onShellPrefsChange?: (prefs: ShellPrefs) => void;
+  onAutomationPrefsChange?: (prefs: AutomationPrefs) => void;
 };
 
 function displayOptionLabel(d: DisplayDto): string {
@@ -119,6 +124,7 @@ export function SettingsView({
   journalOpen,
   onJournalOpenChange,
   onShellPrefsChange,
+  onAutomationPrefsChange,
 }: Props) {
   const toast = useToast();
   const { loadSettings, saveBundle } = useClickerSettingsApi();
@@ -128,6 +134,9 @@ export function SettingsView({
   const [closeToTray, setCloseToTray] = useState(false);
   const [startWithWindows, setStartWithWindows] = useState(false);
   const [shell, setShell] = useState<ShellPrefs>(() => mergeShellPrefs());
+  const [automation, setAutomation] = useState<AutomationPrefs>(() =>
+    mergeAutomationPrefs(),
+  );
   const [liveExes, setLiveExes] = useState<string[]>([]);
   const [foregroundExe, setForegroundExe] = useState<string | null>(null);
   const [processDraft, setProcessDraft] = useState("");
@@ -163,12 +172,20 @@ export function SettingsView({
       const sh = mergeShellPrefs(s.shell);
       setShell(sh);
       onShellPrefsChange?.(sh);
+      const au = mergeAutomationPrefs(s.automation);
+      setAutomation(au);
+      onAutomationPrefsChange?.(au);
     });
     refreshDisplays();
     void invoke<AppPaths>("get_paths")
       .then(setPaths)
       .catch(() => setPaths(null));
-  }, [loadSettings, refreshDisplays, onShellPrefsChange]);
+  }, [
+    loadSettings,
+    refreshDisplays,
+    onShellPrefsChange,
+    onAutomationPrefsChange,
+  ]);
 
   useEffect(() => {
     void invoke<{ measuredCps: number; clicksEmitted: number }>("get_clicker_metrics")
@@ -201,6 +218,7 @@ export function SettingsView({
       closeToTray?: boolean;
       startWithWindows?: boolean;
       shell?: ShellPrefs;
+      automation?: AutomationPrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
@@ -216,18 +234,24 @@ export function SettingsView({
         closeToTray: partial.closeToTray ?? current.closeToTray,
         startWithWindows: partial.startWithWindows ?? current.startWithWindows,
         shell: partial.shell,
+        automation: partial.automation,
       });
     },
     [loadSettings, saveBundle, theme],
   );
 
-  const persistShellPrefs = (
-    patch: Partial<Pick<ShellPrefs, "startupView" | "restoreWorkspaceTabs">>,
-  ) => {
+  const persistShellPrefs = (patch: Partial<ShellPrefs>) => {
     const next = mergeShellPrefs({ ...shell, ...patch });
     setShell(next);
     onShellPrefsChange?.(next);
     void persist({ shell: next });
+  };
+
+  const persistAutomationPrefs = (patch: Partial<AutomationPrefs>) => {
+    const next = mergeAutomationPrefs({ ...automation, ...patch });
+    setAutomation(next);
+    onAutomationPrefsChange?.(next);
+    void persist({ automation: next });
   };
 
   const setAdvanced = (next: boolean) => {
@@ -367,20 +391,18 @@ export function SettingsView({
           <div className="v2-settings-pane-inner">
             {section === "application" ? (
               <>
-                <h2 className="v2-settings-pane-title">Application</h2>
-                <p className="v2-settings-pane-hint">
-                  Démarrage, fenêtre et apparence de Caster.
-                </p>
-                <SettingsGroup title="Démarrage & fenêtre">
+                <h2 className="v2-settings-pane-title">{tApp(shell.uiLocale, "paneTitle")}</h2>
+                <p className="v2-settings-pane-hint">{tApp(shell.uiLocale, "paneHint")}</p>
+                <SettingsGroup title={tApp(shell.uiLocale, "groupStartup")}>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Démarrer avec Windows</span>
-                      <p>Lance Caster à la connexion de votre compte.</p>
+                      <span>{tApp(shell.uiLocale, "startWithWindows")}</span>
+                      <p>{tApp(shell.uiLocale, "startWithWindowsHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={startWithWindows}
-                        ariaLabel="Démarrer avec Windows"
+                        ariaLabel={tApp(shell.uiLocale, "startWithWindows")}
                         onChange={(checked) => {
                           setStartWithWindows(checked);
                           void persist({ startWithWindows: checked });
@@ -390,13 +412,28 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Fermer vers la barre d’état</span>
-                      <p>La croix cache la fenêtre ; quitter via l’icône tray.</p>
+                      <span>{tApp(shell.uiLocale, "startInTray")}</span>
+                      <p>{tApp(shell.uiLocale, "startInTrayHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.minimizeToTray}
+                        ariaLabel={tApp(shell.uiLocale, "startInTray")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ minimizeToTray: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "closeToTray")}</span>
+                      <p>{tApp(shell.uiLocale, "closeToTrayHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={closeToTray}
-                        ariaLabel="Fermer vers la barre d’état"
+                        ariaLabel={tApp(shell.uiLocale, "closeToTray")}
                         onChange={(checked) => {
                           setCloseToTray(checked);
                           void persist({ closeToTray: checked });
@@ -406,13 +443,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Journal au démarrage</span>
-                      <p>Ouvre le journal d’exécution au lancement.</p>
+                      <span>{tApp(shell.uiLocale, "journalOnStart")}</span>
+                      <p>{tApp(shell.uiLocale, "journalOnStartHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={journalOpen}
-                        ariaLabel="Journal au démarrage"
+                        ariaLabel={tApp(shell.uiLocale, "journalOnStart")}
                         onChange={(checked) => {
                           onJournalOpenChange(checked);
                           void persist({ journalOpen: checked });
@@ -422,14 +459,14 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Vue au démarrage</span>
-                      <p>Écran montré juste après le lancement.</p>
+                      <span>{tApp(shell.uiLocale, "startupView")}</span>
+                      <p>{tApp(shell.uiLocale, "startupViewHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <Select
                         className="v2-select"
                         value={shell.startupView}
-                        ariaLabel="Vue au démarrage"
+                        ariaLabel={tApp(shell.uiLocale, "startupView")}
                         options={[
                           { value: "home", label: "Accueil" },
                           { value: "lastDocument", label: "Dernier document" },
@@ -442,25 +479,147 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Restaurer les onglets</span>
-                      <p>Rouvre les documents ouverts à la fermeture précédente.</p>
+                      <span>{tApp(shell.uiLocale, "restoreTabs")}</span>
+                      <p>{tApp(shell.uiLocale, "restoreTabsHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.restoreWorkspaceTabs}
-                        ariaLabel="Restaurer les onglets"
+                        ariaLabel={tApp(shell.uiLocale, "restoreTabs")}
                         onChange={(checked) =>
                           persistShellPrefs({ restoreWorkspaceTabs: checked })
                         }
                       />
                     </div>
                   </div>
-                </SettingsGroup>
-                <SettingsGroup title="Apparence">
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Thème</span>
-                      <p>Suit Windows si Système.</p>
+                      <span>{tApp(shell.uiLocale, "alwaysOnTop")}</span>
+                      <p>{tApp(shell.uiLocale, "alwaysOnTopHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.alwaysOnTop}
+                        ariaLabel={tApp(shell.uiLocale, "alwaysOnTop")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ alwaysOnTop: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "rememberBounds")}</span>
+                      <p>{tApp(shell.uiLocale, "rememberBoundsHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.rememberWindowBounds}
+                        ariaLabel={tApp(shell.uiLocale, "rememberBounds")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ rememberWindowBounds: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "confirmQuit")}</span>
+                      <p>{tApp(shell.uiLocale, "confirmQuitHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.confirmQuitIfRunning}
+                        ariaLabel={tApp(shell.uiLocale, "confirmQuit")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ confirmQuitIfRunning: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "goHomeAfterEmergency")}</span>
+                      <p>{tApp(shell.uiLocale, "goHomeAfterEmergencyHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.goHomeAfterEmergency}
+                        ariaLabel={tApp(shell.uiLocale, "goHomeAfterEmergency")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ goHomeAfterEmergency: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </SettingsGroup>
+                <SettingsGroup title={tApp(shell.uiLocale, "groupNotifications")}>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "toastOnFinish")}</span>
+                      <p>{tApp(shell.uiLocale, "toastOnFinishHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.toastOnFinish}
+                        ariaLabel={tApp(shell.uiLocale, "toastOnFinish")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ toastOnFinish: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "soundOnFinish")}</span>
+                      <p>{tApp(shell.uiLocale, "soundOnFinishHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={automation.soundOnFinish}
+                        ariaLabel={tApp(shell.uiLocale, "soundOnFinish")}
+                        onChange={(checked) =>
+                          persistAutomationPrefs({ soundOnFinish: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "focusJournal")}</span>
+                      <p>{tApp(shell.uiLocale, "focusJournalHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={automation.focusFollowsRun}
+                        ariaLabel={tApp(shell.uiLocale, "focusJournal")}
+                        onChange={(checked) =>
+                          persistAutomationPrefs({ focusFollowsRun: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "trayRelaunch")}</span>
+                      <p>{tApp(shell.uiLocale, "trayRelaunchHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.trayRelaunchLast}
+                        ariaLabel={tApp(shell.uiLocale, "trayRelaunch")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ trayRelaunchLast: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </SettingsGroup>
+                <SettingsGroup title={tApp(shell.uiLocale, "groupAppearance")}>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "theme")}</span>
+                      <p>{tApp(shell.uiLocale, "themeHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <div className="v2-segmented" role="group" aria-label="Thème">
@@ -518,16 +677,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Indicateur flottant (HUD)</span>
-                      <p>
-                        Affiche l’état au-dessus des autres fenêtres (pas les zones
-                        Clicker).
-                      </p>
+                      <span>{tApp(shell.uiLocale, "hud")}</span>
+                      <p>{tApp(shell.uiLocale, "hudHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={overlayVisible}
-                        ariaLabel="Indicateur flottant HUD"
+                        ariaLabel={tApp(shell.uiLocale, "hud")}
                         onChange={(checked) => {
                           setOverlayVisible(checked);
                           void invoke("set_overlay_visible", { visible: checked });
@@ -538,7 +694,7 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Opacité du HUD</span>
+                      <span>{tApp(shell.uiLocale, "hudOpacity")}</span>
                     </div>
                     <div className="v2-settings-row-control v2-settings-row-control--grow">
                       <label className="v2-settings-range">
@@ -557,12 +713,33 @@ export function SettingsView({
                       </label>
                     </div>
                   </div>
-                </SettingsGroup>
-                <SettingsGroup title="Clicker">
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Mode interface</span>
-                      <p>Change uniquement l’éditeur Clicker.</p>
+                      <span>{tApp(shell.uiLocale, "language")}</span>
+                      <p>{tApp(shell.uiLocale, "languageHint")}</p>
+                    </div>
+                    <div className="v2-settings-row-control">
+                      <Select
+                        className="v2-select"
+                        value={shell.uiLocale}
+                        ariaLabel={tApp(shell.uiLocale, "language")}
+                        options={[
+                          { value: "system", label: "Système" },
+                          { value: "fr", label: "Français" },
+                          { value: "en", label: "English" },
+                        ]}
+                        onChange={(v) =>
+                          persistShellPrefs({ uiLocale: v as UiLocale })
+                        }
+                      />
+                    </div>
+                  </div>
+                </SettingsGroup>
+                <SettingsGroup title={tApp(shell.uiLocale, "groupClicker")}>
+                  <div className="v2-settings-row">
+                    <div className="v2-settings-row-label">
+                      <span>{tApp(shell.uiLocale, "clickerMode")}</span>
+                      <p>{tApp(shell.uiLocale, "clickerModeHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <div className="v2-segmented" role="group" aria-label="Mode Clicker">
@@ -589,7 +766,7 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>État</span>
+                      <span>{tApp(shell.uiLocale, "state")}</span>
                     </div>
                     <div className="v2-settings-row-control">
                       <strong className="v2-settings-status">
@@ -599,7 +776,7 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Mesure live</span>
+                      <span>{tApp(shell.uiLocale, "liveMetrics")}</span>
                     </div>
                     <div className="v2-settings-row-control">
                       <code className="v2-settings-mono">
