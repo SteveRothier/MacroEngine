@@ -36,6 +36,7 @@ import {
 } from "../ui/v2";
 import { confirmAction, promptAction } from "../ui";
 import type { AppRoute } from "../app/types";
+import { useLocale, useT, type TFunction } from "../i18n";
 import type { ScriptDoc } from "../scripts/types";
 import { newScriptId } from "../scripts/ScriptEditorView";
 import {
@@ -133,10 +134,10 @@ function rowKey(r: AutomationRow): string {
   return rowOrderKey(r);
 }
 
-function kindLabel(kind: AutomationRow["kind"]): string {
-  if (kind === "macro") return "Macro";
-  if (kind === "script") return "Script";
-  return "Clicker";
+function kindLabel(kind: AutomationRow["kind"], t: TFunction): string {
+  if (kind === "macro") return t("automations.row.kindMacro");
+  if (kind === "script") return t("automations.row.kindScript");
+  return t("automations.row.kindClicker");
 }
 
 function loadCollapsedSections(): Set<string> {
@@ -152,7 +153,8 @@ function loadCollapsedSections(): Set<string> {
 }
 
 const KindIcon = memo(function KindIcon({ row }: { row: AutomationRow }) {
-  const tip = kindTooltip(row);
+  const t = useT();
+  const tip = kindTooltip(row, t);
   const Icon =
     row.kind === "macro"
       ? Workflow
@@ -209,6 +211,9 @@ export function AutomationsTable({
   onFocusKeyChange,
   onLaunchFocusJournal,
 }: Props) {
+  const t = useT();
+  const { locale } = useLocale();
+  const empty = t("common.empty");
   const accueilPrefs = mergeAccueilPrefs();
   const automationPrefs = mergeAutomationPrefs();
   const scriptsPrefs = mergeScriptsPrefs();
@@ -395,16 +400,16 @@ export function AutomationsTable({
       await refresh();
       onRefresh?.();
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de modifier le favori"));
+      toast.error(errMessage(e, t("automations.toast.favoriteFail")));
     }
   }
 
   async function launchRow(r: AutomationRow) {
     if (automationPrefs.confirmLaunchFromHome) {
       const ok = await confirmAction({
-        title: "Lancer",
-        message: `Lancer « ${r.name} » ?`,
-        confirmLabel: "Lancer",
+        title: t("automations.confirm.launchTitle"),
+        message: t("automations.confirm.launchMessage", { name: r.name }),
+        confirmLabel: t("automations.confirm.launchConfirm"),
       });
       if (!ok) return;
     }
@@ -420,12 +425,12 @@ export function AutomationsTable({
     }
     try {
       await invoke("run_script_session_cmd", { id: r.id });
-      toast.success(`Script lancé · ${r.name}`);
+      toast.success(t("automations.toast.scriptLaunched", { name: r.name }));
       onLaunchFocusJournal?.();
       await refresh();
       onRefresh?.();
     } catch (e) {
-      toast.error(errMessage(e, "Échec du lancement script"));
+      toast.error(errMessage(e, t("automations.toast.scriptLaunchFail")));
     }
   }
 
@@ -470,7 +475,7 @@ export function AutomationsTable({
       if (display.sortBy === "type") cmp = a.kind.localeCompare(b.kind);
       else if (display.sortBy === "status")
         cmp = a.status.localeCompare(b.status);
-      else cmp = a.name.localeCompare(b.name, "fr");
+      else cmp = a.name.localeCompare(b.name, locale);
       if (cmp === 0) {
         const kr = kindRank(a.kind) - kindRank(b.kind);
         if (kr !== 0) return kr;
@@ -486,6 +491,7 @@ export function AutomationsTable({
     filter,
     manualOrder,
     accueilPrefs.showScriptsInAll,
+    locale,
   ]);
   sortedRef.current = sorted;
 
@@ -513,7 +519,7 @@ export function AutomationsTable({
     if (favs.length > 0) {
       out.push({
         id: "favorites",
-        label: `Favoris (${favs.length})`,
+        label: t("automations.sections.favorites", { count: favs.length }),
         icon: "star",
         items: favs,
       });
@@ -523,14 +529,14 @@ export function AutomationsTable({
         id: "all",
         label:
           favs.length > 0
-            ? `Toutes les automatisations (${rest.length || sorted.length})`
+            ? t("automations.sections.all", { count: rest.length || sorted.length })
             : null,
         icon: favs.length > 0 ? "list" : null,
         items: rest.length > 0 ? rest : sorted,
       });
     }
     return out;
-  }, [sorted, filter, display.sortBy]);
+  }, [sorted, filter, display.sortBy, t]);
 
   const selectedRows = useMemo(() => {
     return sorted.filter((r) => selected.has(rowKey(r)));
@@ -540,8 +546,8 @@ export function AutomationsTable({
     if (query.trim() || folderKey) {
       return (
         <EmptyState
-          title="Aucun résultat"
-          lead="Aucun élément ne correspond à ce filtre."
+          title={t("automations.empty.noResultsTitle")}
+          lead={t("automations.empty.noResultsLead")}
           actions={
             <>
               {query.trim() ? (
@@ -550,7 +556,7 @@ export function AutomationsTable({
                   className="v2-btn v2-btn-ghost"
                   onClick={() => onQueryChange("")}
                 >
-                  Effacer la recherche
+                  {t("automations.empty.clearSearch")}
                 </button>
               ) : null}
               {folderKey ? (
@@ -559,7 +565,7 @@ export function AutomationsTable({
                   className="v2-btn v2-btn-ghost"
                   onClick={() => onFolderKeyChange(null)}
                 >
-                  Tous les dossiers
+                  {t("automations.empty.allFolders")}
                 </button>
               ) : null}
             </>
@@ -570,15 +576,15 @@ export function AutomationsTable({
     if (filter === "favorites") {
       return (
         <EmptyState
-          title="Aucun favori"
-          lead="Ajoutez une automation aux favoris via l’étoile pour la retrouver ici."
+          title={t("automations.empty.noFavoritesTitle")}
+          lead={t("automations.empty.noFavoritesLead")}
           actions={
             <button
               type="button"
               className="v2-btn v2-btn-ghost"
               onClick={() => onFilterChange?.("all")}
             >
-              Voir toutes les automations
+              {t("automations.empty.seeAll")}
             </button>
           }
         />
@@ -587,22 +593,22 @@ export function AutomationsTable({
     if (filter === "recent") {
       return (
         <EmptyState
-          title="Aucune exécution récente"
-          lead="Lancez une macro, un clicker ou un script pour la voir apparaître ici."
+          title={t("automations.empty.noRecentTitle")}
+          lead={t("automations.empty.noRecentLead")}
           actions={
             <>
               <button type="button" className="v2-btn" onClick={onCreateClicker}>
-                Nouveau clicker
+                {t("automations.empty.newClicker")}
               </button>
               <button type="button" className="v2-btn" onClick={onCreateScript}>
-                Nouveau script
+                {t("automations.empty.newScript")}
               </button>
               <button
                 type="button"
                 className="v2-btn v2-btn-primary"
                 onClick={onCreateMacro}
               >
-                Nouvelle macro
+                {t("automations.empty.newMacro")}
               </button>
             </>
           }
@@ -612,15 +618,15 @@ export function AutomationsTable({
     if (filter === "scripts") {
       return (
         <EmptyState
-          title="Aucun script"
-          lead="Créez un script JavaScript réutilisable pour vos macros."
+          title={t("automations.empty.noScriptsTitle")}
+          lead={t("automations.empty.noScriptsLead")}
           actions={
             <button
               type="button"
               className="v2-btn v2-btn-primary"
               onClick={onCreateScript}
             >
-              Créer un script
+              {t("automations.empty.createScript")}
             </button>
           }
         />
@@ -628,22 +634,22 @@ export function AutomationsTable({
     }
     return (
       <EmptyState
-        title="Aucune automation"
-        lead="Créez une macro, un preset clicker ou un script pour commencer."
+        title={t("automations.empty.noAutomationsTitle")}
+        lead={t("automations.empty.noAutomationsLead")}
         actions={
           <>
             <button type="button" className="v2-btn" onClick={onCreateClicker}>
-              Clicker
+              {t("automations.create.clicker")}
             </button>
             <button type="button" className="v2-btn" onClick={onCreateScript}>
-              Script
+              {t("automations.create.script")}
             </button>
             <button
               type="button"
               className="v2-btn v2-btn-primary"
               onClick={onCreateMacro}
             >
-              Macro
+              {t("automations.create.macro")}
             </button>
           </>
         }
@@ -659,6 +665,7 @@ export function AutomationsTable({
     onFolderKeyChange,
     onQueryChange,
     query,
+    t,
   ]);
 
   async function onDeleteSelected() {
@@ -667,11 +674,23 @@ export function AutomationsTable({
       (r) => r.kind === "macro" || r.kind === "clicker",
     );
     const ok = await confirmAction({
-      title: hasLibrary ? "Mettre à la corbeille" : "Supprimer",
+      title: hasLibrary
+        ? t("automations.confirm.trashTitle")
+        : t("automations.confirm.deleteTitle"),
       message: hasLibrary
-        ? `Mettre ${selectedRows.length} automation${selectedRows.length > 1 ? "s" : ""} à la corbeille ?`
-        : `Supprimer ${selectedRows.length} automation${selectedRows.length > 1 ? "s" : ""} ?`,
-      confirmLabel: hasLibrary ? "Corbeille" : "Supprimer",
+        ? selectedRows.length === 1
+          ? t("automations.confirm.trashMany", { count: selectedRows.length })
+          : t("automations.confirm.trashManyOther", {
+              count: selectedRows.length,
+            })
+        : selectedRows.length === 1
+          ? t("automations.confirm.deleteMany", { count: selectedRows.length })
+          : t("automations.confirm.deleteManyOther", {
+              count: selectedRows.length,
+            }),
+      confirmLabel: hasLibrary
+        ? t("automations.confirm.trashConfirm")
+        : t("automations.confirm.deleteConfirm"),
       danger: true,
     });
     if (!ok) return;
@@ -682,16 +701,16 @@ export function AutomationsTable({
       setSelected(new Set());
       await refresh();
       onRefresh?.();
-      toast.success(hasLibrary ? "Mis à la corbeille" : "Suppression effectuée");
+      toast.success(hasLibrary ? t("automations.toast.trashed") : t("automations.toast.deleted"));
     } catch (e) {
-      toast.error(errMessage(e, "Échec de la suppression"));
+      toast.error(errMessage(e, t("automations.toast.deleteFail")));
     }
   }
 
   async function onFavoriteSelected() {
     const targets = selectedRows.filter((r) => r.kind !== "script");
     if (targets.length === 0) {
-      toast.info("Les scripts n’ont pas de favori");
+      toast.info(t("automations.toast.scriptsNoFavorite"));
       return;
     }
     const makeFav = targets.some((r) => !r.favorite);
@@ -707,14 +726,14 @@ export function AutomationsTable({
       await refresh();
       onRefresh?.();
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de modifier les favoris"));
+      toast.error(errMessage(e, t("automations.toast.favoritesFail")));
     }
   }
 
   async function onLockSelected(locked: boolean) {
     const targets = selectedRows.filter((r) => r.kind !== "script");
     if (targets.length === 0) {
-      toast.info("Les scripts ne peuvent pas être verrouillés");
+      toast.info(t("automations.toast.scriptsNoLock"));
       return;
     }
     try {
@@ -728,9 +747,9 @@ export function AutomationsTable({
       }
       await refresh();
       onRefresh?.();
-      toast.success(locked ? "Verrouillage effectué" : "Déverrouillage effectué");
+      toast.success(locked ? t("automations.toast.locked") : t("automations.toast.unlocked"));
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de modifier le verrouillage"));
+      toast.error(errMessage(e, t("automations.toast.lockFail")));
     }
   }
 
@@ -745,7 +764,7 @@ export function AutomationsTable({
       await refresh();
       onRefresh?.();
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de modifier le verrouillage"));
+      toast.error(errMessage(e, t("automations.toast.lockFail")));
     }
   }
 
@@ -755,7 +774,7 @@ export function AutomationsTable({
   ) {
     if (r.kind === "script") return;
     if (folder && folder.kind !== r.kind) {
-      toast.info("Dossier incompatible avec ce type");
+      toast.info(t("automations.toast.folderIncompatible"));
       return;
     }
     try {
@@ -767,9 +786,9 @@ export function AutomationsTable({
       });
       await refresh();
       onRefresh?.();
-      toast.success("Déplacement effectué");
+      toast.success(t("automations.toast.moved"));
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de déplacer"));
+      toast.error(errMessage(e, t("automations.toast.moveFail")));
     }
   }
 
@@ -803,16 +822,18 @@ export function AutomationsTable({
         /* Accueil order already saved; library sync best-effort */
       }
     }
-    toast.success("Ordre mis à jour");
+    toast.success(t("automations.toast.orderUpdated"));
   }
 
   async function onCreateFolder(kind: "macro" | "clicker") {
     const name = await promptAction({
       title:
-        kind === "macro" ? "Nouveau dossier (macros)" : "Nouveau dossier (clickers)",
+        kind === "macro"
+          ? t("automations.confirm.createFolderMacroTitle")
+          : t("automations.confirm.createFolderClickerTitle"),
       defaultValue: "",
-      confirmLabel: "Créer",
-      placeholder: "Nom du dossier",
+      confirmLabel: t("automations.confirm.createFolderConfirm"),
+      placeholder: t("automations.confirm.createFolderPlaceholder"),
     });
     if (!name?.trim()) return;
     const trimmed = name.trim();
@@ -824,24 +845,24 @@ export function AutomationsTable({
       await refresh();
       onRefresh?.();
       onFolderKeyChange(folderOptionKey({ kind, id: created.id }));
-      toast.success(`Dossier créé · ${created.name}`);
+      toast.success(t("automations.toast.folderCreated", { name: created.name }));
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de créer le dossier"));
+      toast.error(errMessage(e, t("automations.toast.folderCreateFail")));
     }
   }
 
   async function onRenameFolder() {
     if (!folderKey) {
-      toast.info("Filtrez d’abord un dossier à renommer");
+      toast.info(t("automations.toast.filterFolderToRename"));
       return;
     }
     const folder = folders.find((f) => folderOptionKey(f) === folderKey);
     if (!folder) return;
     const nextName = await promptAction({
-      title: "Renommer le dossier",
+      title: t("automations.confirm.renameFolderTitle"),
       defaultValue: folder.name,
-      confirmLabel: "Renommer",
-      placeholder: "Nouveau nom",
+      confirmLabel: t("automations.confirm.renameFolderConfirm"),
+      placeholder: t("automations.confirm.renameFolderPlaceholder"),
     });
     if (!nextName) return;
     const trimmed = nextName.trim();
@@ -854,9 +875,9 @@ export function AutomationsTable({
       await refresh();
       onRefresh?.();
       onFolderKeyChange(folderOptionKey({ kind: folder.kind, id: renamed.id }));
-      toast.success(`Dossier renommé · ${renamed.name}`);
+      toast.success(t("automations.toast.folderRenamed", { name: renamed.name }));
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de renommer le dossier"));
+      toast.error(errMessage(e, t("automations.toast.folderRenameFail")));
     }
   }
 
@@ -874,9 +895,9 @@ export function AutomationsTable({
       }
       await refresh();
       onRefresh?.();
-      toast.success("Déplacement effectué");
+      toast.success(t("automations.toast.moved"));
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de déplacer"));
+      toast.error(errMessage(e, t("automations.toast.moveFail")));
     }
   }
 
@@ -932,18 +953,22 @@ export function AutomationsTable({
         setMenuKey(null);
         await refresh();
         onRefresh?.();
-        toast.success("Mis à la corbeille");
+        toast.success(t("automations.toast.trashed"));
       } catch (e) {
-        toast.error(errMessage(e, "Échec de la suppression"));
+        toast.error(errMessage(e, t("automations.toast.deleteFail")));
       }
       return;
     }
     const ok = await confirmAction({
-      title: toTrash ? "Mettre à la corbeille" : "Supprimer",
+      title: toTrash
+        ? t("automations.confirm.trashTitle")
+        : t("automations.confirm.deleteTitle"),
       message: toTrash
-        ? `Mettre « ${r.name} » à la corbeille ?`
-        : `Supprimer « ${r.name} » ?`,
-      confirmLabel: toTrash ? "Corbeille" : "Supprimer",
+        ? t("automations.confirm.trashOne", { name: r.name })
+        : t("automations.confirm.deleteOne", { name: r.name }),
+      confirmLabel: toTrash
+        ? t("automations.confirm.trashConfirm")
+        : t("automations.confirm.deleteConfirm"),
       danger: true,
     });
     if (!ok) return;
@@ -952,24 +977,26 @@ export function AutomationsTable({
       setMenuKey(null);
       await refresh();
       onRefresh?.();
-      toast.success(toTrash ? "Mis à la corbeille" : "Suppression effectuée");
+      toast.success(toTrash ? t("automations.toast.trashed") : t("automations.toast.deleted"));
     } catch (e) {
-      toast.error(errMessage(e, "Échec de la suppression"));
+      toast.error(errMessage(e, t("automations.toast.deleteFail")));
     }
   }
 
   async function onDeleteFolder() {
     if (!folderKey) {
-      toast.info("Filtrez d’abord un dossier à supprimer");
+      toast.info(t("automations.toast.filterFolderToDelete"));
       return;
     }
     const folder = folders.find((f) => folderOptionKey(f) === folderKey);
     if (!folder) return;
     if (accueilPrefs.confirmDeleteFolder) {
       const ok = await confirmAction({
-        title: "Supprimer le dossier",
-        message: `Supprimer le dossier « ${folder.name} » ? Les automations qu’il contient resteront disponibles (hors dossier).`,
-        confirmLabel: "Supprimer",
+        title: t("automations.confirm.deleteFolderTitle"),
+        message: t("automations.confirm.deleteFolderMessage", {
+          name: folder.name,
+        }),
+        confirmLabel: t("automations.confirm.deleteConfirm"),
         danger: true,
       });
       if (!ok) return;
@@ -982,22 +1009,22 @@ export function AutomationsTable({
       onFolderKeyChange(null);
       await refresh();
       onRefresh?.();
-      toast.success(`Dossier supprimé · ${folder.name}`);
+      toast.success(t("automations.toast.folderDeleted", { name: folder.name }));
     } catch (e) {
-      toast.error(errMessage(e, "Impossible de supprimer le dossier"));
+      toast.error(errMessage(e, t("automations.toast.folderDeleteFail")));
     }
   }
 
   async function onRenameOne(r: AutomationRow) {
     if (r.locked) {
-      toast.info("Déverrouillez avant de renommer");
+      toast.info(t("automations.toast.unlockBeforeRename"));
       return;
     }
     const nextName = await promptAction({
-      title: "Renommer",
+      title: t("automations.confirm.renameTitle"),
       defaultValue: r.name,
-      confirmLabel: "Renommer",
-      placeholder: "Nouveau nom",
+      confirmLabel: t("automations.confirm.renameConfirm"),
+      placeholder: t("automations.confirm.renamePlaceholder"),
     });
     if (!nextName) return;
     const trimmed = nextName.trim();
@@ -1023,15 +1050,15 @@ export function AutomationsTable({
       setMenuKey(null);
       await refresh();
       onRefresh?.();
-      toast.success(`Renommé · ${trimmed}`);
+      toast.success(t("automations.toast.renamed", { name: trimmed }));
     } catch (e) {
-      toast.error(errMessage(e, "Renommage impossible"));
+      toast.error(errMessage(e, t("automations.toast.renameFail")));
     }
   }
 
   async function onDuplicateOne(r: AutomationRow) {
     if (r.locked) {
-      toast.info("Déverrouillez avant de dupliquer");
+      toast.info(t("automations.toast.unlockBeforeDuplicate"));
       return;
     }
     try {
@@ -1041,7 +1068,7 @@ export function AutomationsTable({
         });
         await refresh();
         onRefresh?.();
-        toast.success(`Macro dupliquée · ${doc.name}`);
+        toast.success(t("automations.toast.macroDuplicated", { name: doc.name }));
         onNavigate({
           name: "automation",
           id: doc.name,
@@ -1054,7 +1081,7 @@ export function AutomationsTable({
         });
         await refresh();
         onRefresh?.();
-        toast.success(`Preset dupliqué · ${preset.name}`);
+        toast.success(t("automations.toast.presetDuplicated", { name: preset.name }));
         onNavigate({
           name: "automation",
           id: preset.name,
@@ -1066,12 +1093,12 @@ export function AutomationsTable({
         const copy: ScriptDoc = {
           ...src,
           id: newScriptId(),
-          name: `${src.name} (copie)`,
+          name: t("automations.toast.scriptCopySuffix", { name: src.name }),
         };
         await invoke("save_script_cmd", { doc: copy });
         await refresh();
         onRefresh?.();
-        toast.success(`Script dupliqué · ${copy.name}`);
+        toast.success(t("automations.toast.scriptDuplicated", { name: copy.name }));
         onNavigate({
           name: "automation",
           id: copy.id,
@@ -1081,19 +1108,19 @@ export function AutomationsTable({
       }
       setMenuKey(null);
     } catch (e) {
-      toast.error(errMessage(e, "Duplication impossible"));
+      toast.error(errMessage(e, t("automations.toast.duplicateFail")));
     }
   }
 
   async function onRevealOne(r: AutomationRow) {
     if (r.kind === "script") {
-      toast.info("Les scripts sont dans le dossier config / scripts");
+      toast.info(t("automations.toast.scriptsInConfigFolder"));
       return;
     }
     try {
       await invoke("reveal_library_entry", { kind: r.kind, name: r.id });
     } catch (e) {
-      toast.error(errMessage(e, "Impossible d’ouvrir l’explorateur"));
+      toast.error(errMessage(e, t("automations.toast.revealFail")));
     }
   }
 
@@ -1243,7 +1270,7 @@ export function AutomationsTable({
       ctxRow.kind === "script"
         ? []
         : folders.filter((f) => f.kind === ctxRow.kind);
-    return buildAutomationRowMenuItems(ctxRow, {
+    return buildAutomationRowMenuItems(ctxRow, t, {
       onOpen: () => openRow(ctxRow),
       onLaunch: () => void launchRow(ctxRow),
       onRename: () => void onRenameOne(ctxRow),
@@ -1258,42 +1285,42 @@ export function AutomationsTable({
       icons: automationRowMenuIcons(),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close over latest row
-  }, [ctxRow, folders]);
+  }, [ctxRow, folders, t]);
 
   const emptyMenuItems = useMemo(
     () => [
       {
         id: "create-macro",
-        label: "Nouvelle macro",
+        label: t("automations.menu.empty.newMacro"),
         icon: <Workflow size={14} />,
         onSelect: () => onCreateMacro(),
       },
       {
         id: "create-clicker",
-        label: "Nouveau clicker",
+        label: t("automations.menu.empty.newClicker"),
         icon: <MousePointer2 size={14} />,
         onSelect: () => onCreateClicker(),
       },
       {
         id: "create-script",
-        label: "Nouveau script",
+        label: t("automations.menu.empty.newScript"),
         icon: <Code2 size={14} />,
         onSelect: () => onCreateScript(),
       },
       {
         id: "create-folder",
-        label: "Nouveau dossier",
+        label: t("automations.menu.empty.newFolder"),
         icon: <FolderPlus size={14} />,
         submenu: [
           {
             id: "folder-macro",
-            label: "Macros",
+            label: t("automations.menu.empty.folderMacros"),
             icon: <Workflow size={14} />,
             onSelect: () => void onCreateFolder("macro"),
           },
           {
             id: "folder-clicker",
-            label: "Clickers",
+            label: t("automations.menu.empty.folderClickers"),
             icon: <MousePointer2 size={14} />,
             onSelect: () => void onCreateFolder("clicker"),
           },
@@ -1303,7 +1330,7 @@ export function AutomationsTable({
         ? [
             {
               id: "rename-folder",
-              label: "Renommer le dossier",
+              label: t("automations.menu.empty.renameFolder"),
               icon: <PenLine size={14} />,
               onSelect: () => void onRenameFolder(),
             },
@@ -1312,7 +1339,7 @@ export function AutomationsTable({
       { id: "sep-empty", label: "", separator: true },
       {
         id: "refresh",
-        label: "Actualiser",
+        label: t("automations.menu.empty.refresh"),
         icon: <RefreshCw size={14} />,
         onSelect: () => {
           void refresh();
@@ -1322,7 +1349,9 @@ export function AutomationsTable({
       {
         id: "toggle-favorites",
         label:
-          filter === "favorites" ? "Afficher tout" : "Afficher les favoris",
+          filter === "favorites"
+            ? t("automations.menu.empty.showAll")
+            : t("automations.menu.empty.showFavorites"),
         icon: <Star size={14} />,
         onSelect: () =>
           onFilterChange?.(filter === "favorites" ? "all" : "favorites"),
@@ -1337,6 +1366,7 @@ export function AutomationsTable({
       onFilterChange,
       onRefresh,
       refresh,
+      t,
     ],
   );
 
@@ -1350,8 +1380,12 @@ export function AutomationsTable({
       ref={pageRef}
       onContextMenu={(e) => {
         e.preventDefault();
-        const t = e.target as HTMLElement;
-        if (t.closest(".v2-auto-row") || t.closest(".v2-context-menu")) return;
+        const target = e.target as HTMLElement;
+        if (
+          target.closest(".v2-auto-row") ||
+          target.closest(".v2-context-menu")
+        )
+          return;
         emptyCtx.openFromEvent(e);
         ctxMenu.close();
         setCtxRow(null);
@@ -1393,7 +1427,7 @@ export function AutomationsTable({
           <div
             className="v2-skeleton-page"
             aria-busy="true"
-            aria-label="Chargement des automations"
+            aria-label={t("automations.empty.loadingAria")}
           >
             {[0, 1, 2, 3, 4].map((i) => (
               <div key={i} className="v2-skeleton-row">
@@ -1437,10 +1471,10 @@ export function AutomationsTable({
                     .filter(Boolean)
                     .join(" ")}
                   aria-sort={ariaSortFor("order")}
-                  title="Ordre manuel (glisser-déposer)"
+                  title={t("automations.columns.orderTitle")}
                   onClick={() => setSortBy("order")}
                 >
-                  #
+                  {t("automations.columns.order")}
                   {display.sortBy === "order" ? (
                     <ChevronDown
                       size={12}
@@ -1466,7 +1500,7 @@ export function AutomationsTable({
                   aria-sort={ariaSortFor("name")}
                   onClick={() => setSortBy("name")}
                 >
-                  Nom
+                  {t("automations.columns.name")}
                   {display.sortBy === "name" ? (
                     <ChevronDown
                       size={12}
@@ -1493,7 +1527,7 @@ export function AutomationsTable({
                 aria-sort={ariaSortFor("type")}
                 onClick={() => setSortBy("type")}
               >
-                Type
+                {t("automations.columns.type")}
                 {display.sortBy === "type" ? (
                   <ChevronDown
                     size={12}
@@ -1508,16 +1542,16 @@ export function AutomationsTable({
               </button>
               <div className="v2-auto-row-props v2-auto-colhead-props">
                 <span className="v2-auto-colhead-label v2-auto-row-prop v2-auto-row-prop--trigger">
-                  Déclencheur
+                  {t("automations.columns.trigger")}
                 </span>
                 <span className="v2-auto-colhead-label v2-auto-row-prop v2-auto-row-prop--secondary">
-                  Dossier / Meta
+                  {t("automations.columns.folderMeta")}
                 </span>
                 <span className="v2-auto-colhead-label v2-auto-row-prop v2-auto-row-prop--run">
-                  Dernière exécution
+                  {t("automations.columns.lastRun")}
                 </span>
                 <span className="v2-auto-colhead-label v2-auto-row-prop v2-auto-row-prop--status">
-                  État
+                  {t("automations.columns.status")}
                 </span>
               </div>
               <span className="v2-auto-colhead-trail" aria-hidden />
@@ -1564,7 +1598,7 @@ export function AutomationsTable({
                     : section.items.map((r) => {
                         const key = rowKey(r);
                         const isSelected = selected.has(key);
-                        const pill = statusToPill(r.status);
+                        const pill = statusToPill(r.status, t);
                         const scriptRunning =
                           r.kind === "script" &&
                           liveScriptName != null &&
@@ -1573,12 +1607,12 @@ export function AutomationsTable({
                         const propSecondary =
                           r.kind === "script"
                             ? null
-                            : r.folderLabel !== "—"
+                            : r.folderLabel !== empty
                               ? r.folderLabel
                               : (r.meta ?? null);
                         const propLastRun =
-                          r.lastRunLabel !== "—" ? r.lastRunLabel : null;
-                        const subtitle = rowSubtitle(r, {
+                          r.lastRunLabel !== empty ? r.lastRunLabel : null;
+                        const subtitle = rowSubtitle(r, t, {
                           running: scriptRunning,
                         });
                         const dropBefore =
@@ -1643,7 +1677,7 @@ export function AutomationsTable({
                             onKeyDown={(e) => onRowKeyDown(e, r)}
                             tabIndex={0}
                           >
-                            <Tooltip content="Sélectionner pour actions groupées">
+                            <Tooltip content={t("automations.row.selectTip")}>
                               <label
                                 className="v2-auto-row-check"
                                 onClick={(e) => e.stopPropagation()}
@@ -1662,7 +1696,7 @@ export function AutomationsTable({
                                   onChange={() => {
                                     /* controlled via onClick */
                                   }}
-                                  aria-label={`Sélectionner ${r.name}`}
+                                  aria-label={t("automations.row.selectAria", { name: r.name })}
                                 />
                               </label>
                             </Tooltip>
@@ -1812,31 +1846,33 @@ export function AutomationsTable({
                             <span
                               className={`v2-auto-type-badge v2-auto-type-badge--${r.kind}`}
                             >
-                              {kindLabel(r.kind)}
+                              {kindLabel(r.kind, t)}
                             </span>
                             <div className="v2-auto-row-props">
                               {scriptRunning ? (
                                 <span className="v2-auto-row-prop v2-auto-row-prop--trigger is-running">
                                   <Play size={11} aria-hidden />
-                                  En cours
+                                  {t("common.running")}
                                 </span>
                               ) : r.kind === "script" &&
                                 scriptsPrefs.showPermBadgesOnHome &&
                                 permCount > 0 ? (
                                 <Tooltip
-                                  content={`Ce script utilise : ${(r.permLabels ?? []).join(", ")}`}
+                                  content={t("automations.row.permTooltip", {
+                                    list: (r.permLabels ?? []).join(", "),
+                                  })}
                                 >
                                   <span
                                     className="v2-auto-row-prop v2-auto-row-prop--trigger"
                                     tabIndex={0}
                                   >
                                     <span className="v2-auto-row-perm-badge">
-                                      {permCount} accès
+                                      {t("automations.row.permAccess", { count: permCount })}
                                     </span>
                                   </span>
                                 </Tooltip>
                               ) : (
-                                <TruncatedTooltip content={metaTooltip(r)}>
+                                <TruncatedTooltip content={metaTooltip(r, t)}>
                                   <span className="v2-auto-row-prop v2-auto-row-prop--trigger">
                                     <Play size={11} aria-hidden />
                                     {r.triggerLabel}
@@ -1844,7 +1880,7 @@ export function AutomationsTable({
                                 </TruncatedTooltip>
                               )}
                               <TruncatedTooltip
-                                content={propSecondary ?? metaTooltip(r)}
+                                content={propSecondary ?? metaTooltip(r, t)}
                               >
                                 <span
                                   className={[
@@ -1921,15 +1957,17 @@ export function AutomationsTable({
                                   r.lastRunTooltip && propLastRun
                                     ? r.lastRunTooltip
                                     : propLastRun
-                                      ? `Dernière exécution · ${propLastRun}`
-                                      : "Jamais exécuté"
+                                      ? t("automations.row.lastRunTooltip", {
+                                          label: propLastRun,
+                                        })
+                                      : t("automations.row.neverRun")
                                 }
                               >
                                 <span className="v2-auto-row-prop v2-auto-row-prop--run">
                                   {propLastRun ?? ""}
                                 </span>
                               </Tooltip>
-                              <Tooltip content={statusTooltip(r.status)}>
+                              <Tooltip content={statusTooltip(r.status, t)}>
                                 <span
                                   className={[
                                     "v2-auto-row-prop",
@@ -1953,7 +1991,9 @@ export function AutomationsTable({
                             >
                               <Tooltip
                                 content={
-                                  r.kind === "script" ? "Exécuter" : "Lancer"
+                                  r.kind === "script"
+                                    ? t("automations.row.executeTip")
+                                    : t("automations.row.playTip")
                                 }
                               >
                                   <button
@@ -1961,8 +2001,12 @@ export function AutomationsTable({
                                     className="v2-auto-row-play-btn"
                                     aria-label={
                                       r.kind === "script"
-                                        ? `Exécuter ${r.name}`
-                                        : `Lancer ${r.name}`
+                                        ? t("automations.row.executeAria", {
+                                            name: r.name,
+                                          })
+                                        : t("automations.row.playAria", {
+                                            name: r.name,
+                                          })
                                     }
                                     onClick={() => void launchRow(r)}
                                   >
@@ -1970,7 +2014,7 @@ export function AutomationsTable({
                                   </button>
                                 </Tooltip>
                               {r.kind !== "script" ? (
-                                <Tooltip content={favoriteTooltip(r.favorite)}>
+                                <Tooltip content={favoriteTooltip(r.favorite, t)}>
                                   <button
                                     type="button"
                                     className={[
@@ -1980,7 +2024,7 @@ export function AutomationsTable({
                                       .filter(Boolean)
                                       .join(" ")}
                                     aria-pressed={r.favorite}
-                                    aria-label={favoriteTooltip(r.favorite)}
+                                    aria-label={favoriteTooltip(r.favorite, t)}
                                     onClick={(ev) => void onToggleFavorite(r, ev)}
                                   >
                                     <Star
@@ -2030,11 +2074,12 @@ export function AutomationsTable({
         <div
           className="v2-automations-selection-dock"
           role="toolbar"
-          aria-label="Actions de sélection"
+          aria-label={t("automations.selection.aria")}
         >
           <span className="v2-automations-selection-count">
-            {selected.size} élément{selected.size > 1 ? "s" : ""} sélectionné
-            {selected.size > 1 ? "s" : ""}
+            {selected.size === 1
+              ? t("automations.selection.countOne", { count: selected.size })
+              : t("automations.selection.countMany", { count: selected.size })}
           </span>
           <div className="v2-automations-selection-actions">
             <button
@@ -2042,21 +2087,21 @@ export function AutomationsTable({
               className="v2-btn v2-btn-ghost"
               onClick={onOpenSelected}
             >
-              Ouvrir
+              {t("common.open")}
             </button>
             <button
               type="button"
               className="v2-btn v2-btn-primary"
               onClick={onLaunchSelected}
             >
-              Lancer
+              {t("automations.selection.launch")}
             </button>
             <button
               type="button"
               className="v2-btn v2-btn-ghost"
               onClick={() => void onFavoriteSelected()}
             >
-              Favori
+              {t("automations.selection.favorite")}
             </button>
             {canLock ? (
               <button
@@ -2065,7 +2110,7 @@ export function AutomationsTable({
                 onClick={() => void onLockSelected(true)}
               >
                 <Lock size={14} aria-hidden />
-                Verrouiller
+                {t("automations.selection.lock")}
               </button>
             ) : null}
             {canUnlock ? (
@@ -2075,13 +2120,13 @@ export function AutomationsTable({
                 onClick={() => void onLockSelected(false)}
               >
                 <LockOpen size={14} aria-hidden />
-                Déverrouiller
+                {t("automations.selection.unlock")}
               </button>
             ) : null}
             {moveFolders.length > 0 ? (
               <DropdownMenu
-                label="Dossier"
-                ariaLabel="Déplacer vers un dossier"
+                label={t("automations.selection.folder")}
+                ariaLabel={t("automations.selection.folderAria")}
                 align="end"
                 triggerClassName="v2-btn v2-btn-ghost"
                 items={[
@@ -2089,7 +2134,7 @@ export function AutomationsTable({
                     ? [
                         {
                           id: "root-macro",
-                          label: "Sans dossier (macros)",
+                          label: t("automations.selection.noFolderMacros"),
                           icon: <Folder size={14} />,
                           onSelect: () => void onMoveSelected(null, "macro"),
                         },
@@ -2099,7 +2144,7 @@ export function AutomationsTable({
                     ? [
                         {
                           id: "root-clicker",
-                          label: "Sans dossier (clickers)",
+                          label: t("automations.selection.noFolderClickers"),
                           icon: <Folder size={14} />,
                           onSelect: () => void onMoveSelected(null, "clicker"),
                         },
@@ -2107,14 +2152,20 @@ export function AutomationsTable({
                     : []),
                   ...moveFolders.map((f) => ({
                     id: folderOptionKey(f),
-                    label: `${f.name} (${f.kind === "macro" ? "macro" : "clicker"})`,
+                    label: t("automations.folder.namedWithKind", {
+                      name: f.name,
+                      kind:
+                        f.kind === "macro"
+                          ? t("automations.folder.kindSuffixMacro")
+                          : t("automations.folder.kindSuffixClicker"),
+                    }),
                     icon: <Folder size={14} />,
                     onSelect: () => void onMoveSelected(f.id, f.kind),
                   })),
                 ]}
               >
                 <Folder size={14} aria-hidden />
-                Dossier
+                {t("automations.selection.folder")}
                 <ChevronDown size={14} aria-hidden />
               </DropdownMenu>
             ) : null}
@@ -2123,14 +2174,14 @@ export function AutomationsTable({
               className="v2-btn v2-btn-danger-ghost"
               onClick={() => void onDeleteSelected()}
             >
-              Corbeille
+              {t("automations.selection.trash")}
             </button>
             <button
               type="button"
               className="v2-btn v2-btn-ghost"
               onClick={() => setSelected(new Set())}
             >
-              Annuler
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -2140,10 +2191,12 @@ export function AutomationsTable({
         <div
           className="v2-auto-folder-drop-strip"
           role="toolbar"
-          aria-label={`Déplacer « ${dragRow.name} » vers un dossier`}
+          aria-label={t("automations.folder.dropStripAria", {
+            name: dragRow.name,
+          })}
         >
           <span className="v2-auto-folder-drop-hint">
-            Déposer « {dragRow.name} » :
+            {t("automations.folder.dropHint", { name: dragRow.name })}
           </span>
           <button
             type="button"
@@ -2163,7 +2216,7 @@ export function AutomationsTable({
             }}
           >
             <Folder size={14} aria-hidden />
-            Sans dossier
+            {t("automations.folder.chipNoFolder")}
           </button>
           {dragFolders.map((f) => {
             const fKey = folderOptionKey(f);
@@ -2196,7 +2249,7 @@ export function AutomationsTable({
             className="v2-btn v2-btn-ghost"
             onClick={() => clearFolderDrag()}
           >
-            Annuler
+            {t("common.cancel")}
           </button>
         </div>
       ) : null}
@@ -2214,7 +2267,7 @@ export function AutomationsTable({
           onSelect={(id) => {
             findMenuItem(ctxMenuItems, id)?.onSelect?.();
           }}
-          ariaLabel={`Actions pour ${ctxRow.name}`}
+          ariaLabel={t("automations.row.ctxAria", { name: ctxRow.name })}
         />
       ) : null}
 
@@ -2227,7 +2280,7 @@ export function AutomationsTable({
         onSelect={(id) => {
           findMenuItem(emptyMenuItems, id)?.onSelect?.();
         }}
-        ariaLabel="Actions Accueil"
+        ariaLabel={t("automations.menu.empty.aria")}
       />
 
       {dragGhost
@@ -2242,7 +2295,7 @@ export function AutomationsTable({
               <span
                 className={`v2-auto-type-badge v2-auto-type-badge--${dragGhost.kind}`}
               >
-                {kindLabel(dragGhost.kind)}
+                {kindLabel(dragGhost.kind, t)}
               </span>
               <span className="v2-auto-drag-ghost-name">{dragGhost.name}</span>
             </div>,

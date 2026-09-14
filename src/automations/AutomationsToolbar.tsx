@@ -14,6 +14,7 @@ import {
   Trash2,
   Workflow,
 } from "lucide-react";
+import { useT } from "../i18n";
 import { DropdownMenu, Select, Tooltip } from "../ui/v2";
 import type {
   AutomationFilter,
@@ -48,21 +49,40 @@ type Props = {
   onCreateOpenChange?: (open: boolean) => void;
 };
 
-const FILTER_PILLS: {
+const FILTER_PILL_DEFS: {
   value: AutomationFilter;
-  label: string;
+  labelKey:
+    | "automations.filter.all"
+    | "automations.filter.favorites"
+    | "automations.filter.recent"
+    | "automations.filter.scripts";
   icon: typeof Clock;
   countKey: keyof FilterCounts;
 }[] = [
-  { value: "all", label: "Tous", icon: Clock, countKey: "all" },
-  { value: "favorites", label: "Favoris", icon: Star, countKey: "favorites" },
+  {
+    value: "all",
+    labelKey: "automations.filter.all",
+    icon: Clock,
+    countKey: "all",
+  },
+  {
+    value: "favorites",
+    labelKey: "automations.filter.favorites",
+    icon: Star,
+    countKey: "favorites",
+  },
   {
     value: "recent",
-    label: "Dernières exécutions",
+    labelKey: "automations.filter.recent",
     icon: History,
     countKey: "recent",
   },
-  { value: "scripts", label: "Scripts", icon: Code2, countKey: "scripts" },
+  {
+    value: "scripts",
+    labelKey: "automations.filter.scripts",
+    icon: Code2,
+    countKey: "scripts",
+  },
 ];
 
 export function AutomationsToolbar({
@@ -88,6 +108,7 @@ export function AutomationsToolbar({
   createOpen,
   onCreateOpenChange,
 }: Props) {
+  const t = useT();
   const localSearchRef = useRef<HTMLInputElement>(null);
   const searchRef = searchInputRef ?? localSearchRef;
   const dragging =
@@ -97,12 +118,18 @@ export function AutomationsToolbar({
     : folders;
 
   const folderOptions = [
-    { value: "", label: "Tous les dossiers" },
+    { value: "", label: t("automations.folder.allFolders") },
     ...folders.map((f) => ({
       value: folderOptionKey(f),
       label:
         folders.filter((o) => o.name === f.name).length > 1
-          ? `${f.name} (${f.kind === "macro" ? "macro" : "clicker"})`
+          ? t("automations.folder.namedWithKind", {
+              name: f.name,
+              kind:
+                f.kind === "macro"
+                  ? t("automations.folder.kindSuffixMacro")
+                  : t("automations.folder.kindSuffixClicker"),
+            })
           : f.name,
     })),
   ];
@@ -110,13 +137,13 @@ export function AutomationsToolbar({
   const folderMenuItems = [
     {
       id: "folder-macro",
-      label: "Dossier macros",
+      label: t("automations.folder.createMacro"),
       icon: <FolderPlus size={14} />,
       onSelect: () => onCreateFolder?.("macro"),
     },
     {
       id: "folder-clicker",
-      label: "Dossier clickers",
+      label: t("automations.folder.createClicker"),
       icon: <FolderPlus size={14} />,
       onSelect: () => onCreateFolder?.("clicker"),
     },
@@ -125,7 +152,7 @@ export function AutomationsToolbar({
           { id: "sep-rename", label: "", separator: true as const },
           {
             id: "rename-folder",
-            label: "Renommer le dossier filtré",
+            label: t("automations.folder.renameFiltered"),
             icon: <PenLine size={14} />,
             onSelect: () => onRenameFolder(),
           },
@@ -135,7 +162,7 @@ export function AutomationsToolbar({
       ? [
           {
             id: "delete-folder",
-            label: "Supprimer le dossier",
+            label: t("automations.folder.delete"),
             icon: <Trash2 size={14} />,
             danger: true as const,
             onSelect: () => onDeleteFolder(),
@@ -144,12 +171,19 @@ export function AutomationsToolbar({
       : []),
   ];
 
+  const selectedFolderName =
+    folders.find((f) => folderOptionKey(f) === folderKey)?.name ?? "…";
+
   return (
     <div className="v2-automations-chrome">
       <div className="v2-automations-filter-bar">
-        <div className="v2-filter-pills" role="group" aria-label="Filtre">
-          {FILTER_PILLS.map(({ value, label, icon: Icon, countKey }) => (
-            <Tooltip key={value} content={filterPillTooltip(value)}>
+        <div
+          className="v2-filter-pills"
+          role="group"
+          aria-label={t("automations.filter.aria")}
+        >
+          {FILTER_PILL_DEFS.map(({ value, labelKey, icon: Icon, countKey }) => (
+            <Tooltip key={value} content={filterPillTooltip(value, t)}>
               <button
                 type="button"
                 className={["v2-filter-pill", filter === value ? "active" : ""]
@@ -158,7 +192,7 @@ export function AutomationsToolbar({
                 onClick={() => onFilterChange(value)}
               >
                 <Icon size={13} aria-hidden />
-                {label}
+                {t(labelKey)}
                 <span className="v2-filter-pill-count">{counts[countKey]}</span>
               </button>
             </Tooltip>
@@ -170,26 +204,25 @@ export function AutomationsToolbar({
             value={folderKey ?? ""}
             triggerLabel={
               folderKey
-                ? `Dossier : ${
-                    folders.find((f) => folderOptionKey(f) === folderKey)
-                      ?.name ?? "…"
-                  }`
-                : "Dossier"
+                ? t("automations.folder.selectTriggerNamed", {
+                    name: selectedFolderName,
+                  })
+                : t("automations.folder.selectTrigger")
             }
-            ariaLabel="Filtrer par dossier"
+            ariaLabel={t("automations.folder.selectAria")}
             options={folderOptions}
             onChange={(v) => onFolderKeyChange(v || null)}
           />
           {onCreateFolder ? (
             <DropdownMenu
-              label="Dossiers"
-              ariaLabel="Gérer les dossiers"
+              label={t("automations.folder.manageLabel")}
+              ariaLabel={t("automations.folder.manageAria")}
               align="end"
               triggerClassName="v2-btn v2-btn-ghost"
               items={folderMenuItems}
             >
               <FolderPlus size={14} aria-hidden />
-              Dossiers
+              {t("automations.folder.manageLabel")}
               <ChevronDown size={14} aria-hidden />
             </DropdownMenu>
           ) : null}
@@ -202,16 +235,16 @@ export function AutomationsToolbar({
             <input
               ref={searchRef}
               type="search"
-              placeholder="Rechercher…"
+              placeholder={t("automations.search.placeholder")}
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               className="v2-search-inline v2-automations-filter-search"
-              aria-label="Rechercher les automations"
+              aria-label={t("automations.search.aria")}
             />
           </label>
           <DropdownMenu
-            label="Créer"
-            ariaLabel="Créer une automation"
+            label={t("automations.create.label")}
+            ariaLabel={t("automations.create.aria")}
             align="end"
             triggerClassName="v2-btn v2-btn-primary v2-automations-create-btn"
             open={createOpen}
@@ -219,29 +252,29 @@ export function AutomationsToolbar({
             items={[
               {
                 id: "macro",
-                label: "Macro",
-                description: "Séquence d’actions",
+                label: t("automations.create.macro"),
+                description: t("automations.create.macroDesc"),
                 icon: <Workflow size={14} />,
                 onSelect: onCreateMacro,
               },
               {
                 id: "clicker",
-                label: "Clicker",
-                description: "Preset CPS",
+                label: t("automations.create.clicker"),
+                description: t("automations.create.clickerDesc"),
                 icon: <MousePointer2 size={14} />,
                 onSelect: onCreateClicker,
               },
               {
                 id: "script",
-                label: "Script",
-                description: "JavaScript",
+                label: t("automations.create.script"),
+                description: t("automations.create.scriptDesc"),
                 icon: <Code2 size={14} />,
                 onSelect: onCreateScript,
               },
             ]}
           >
             <Plus size={14} aria-hidden />
-            Créer
+            {t("automations.create.label")}
             <ChevronDown size={14} aria-hidden />
           </DropdownMenu>
         </div>
@@ -258,8 +291,8 @@ export function AutomationsToolbar({
           role="toolbar"
           aria-label={
             dragging
-              ? `Déposer « ${dragRow.name} » dans un dossier`
-              : "Dossiers"
+              ? t("automations.folder.chipsDropAria", { name: dragRow.name })
+              : t("automations.folder.chipsAria")
           }
         >
           <button
@@ -288,7 +321,9 @@ export function AutomationsToolbar({
             }}
           >
             <Folder size={13} aria-hidden />
-            {dragging ? "Sans dossier" : "Tous"}
+            {dragging
+              ? t("automations.folder.chipNoFolder")
+              : t("automations.folder.chipAll")}
           </button>
           {dropFolders.map((f) => {
             const fKey = folderOptionKey(f);

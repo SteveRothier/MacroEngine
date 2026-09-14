@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest";
+import { tStatic } from "../i18n";
 import {
-  formatDurationFr,
+  formatDuration,
   formatLastRunSummary,
   formatLastRunTooltip,
 } from "./relativeTime";
 import type { RecentEntry } from "../quickAccess";
 
+const t = (key: string, vars?: Record<string, string | number>) =>
+  tStatic("fr", key, vars);
+
 describe("last-run formatting", () => {
   const now = Date.parse("2026-08-27T12:00:00.000Z");
 
   it("formats duration", () => {
-    expect(formatDurationFr(420)).toBe("420 ms");
-    expect(formatDurationFr(1500)).toBe("1,5 s");
-    expect(formatDurationFr(65_000)).toBe("1 min 5 s");
+    expect(formatDuration(420, t)).toBe("420 ms");
+    expect(formatDuration(1500, t)).toBe("1,5 s");
+    expect(formatDuration(65_000, t)).toBe("1 min 5 s");
   });
 
   it("builds summary and tooltip with status + duration", () => {
@@ -23,7 +27,11 @@ describe("last-run formatting", () => {
       status: "ok",
       durationMs: 1500,
     };
-    expect(formatLastRunSummary(entry, now)).toBe("il y a 2 min · 1,5 s · OK");
-    expect(formatLastRunTooltip(entry, now)).toBe("OK · 1,5 s · il y a 2 min");
+    expect(formatLastRunSummary(entry, t, now)).toBe(
+      "il y a 2 min · 1,5 s · OK",
+    );
+    expect(formatLastRunTooltip(entry, t, now)).toBe(
+      "OK · 1,5 s · il y a 2 min",
+    );
   });
 });

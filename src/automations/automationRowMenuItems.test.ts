@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { tStatic } from "../i18n";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import type { AutomationRow } from "./types";
+
+const t = (key: string, vars?: Record<string, string | number>) =>
+  tStatic("fr", key, vars);
 
 function baseRow(
   partial: Partial<AutomationRow> & Pick<AutomationRow, "kind" | "id" | "name">,
@@ -28,10 +32,12 @@ describe("buildAutomationRowMenuItems", () => {
     };
     const macroItems = buildAutomationRowMenuItems(
       baseRow({ kind: "macro", id: "M", name: "M" }),
+      t,
       actions,
     );
     const scriptItems = buildAutomationRowMenuItems(
       baseRow({ kind: "script", id: "S", name: "S" }),
+      t,
       actions,
     );
     expect(macroItems.find((i) => i.id === "delete")?.label).toBe(
