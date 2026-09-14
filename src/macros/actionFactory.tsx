@@ -12,10 +12,14 @@ import {
   Terminal,
   Variable,
 } from "lucide-react";
+import type { TFunction } from "../i18n";
 import type { ActionPickerEntry } from "../ui/v2/ActionPickerMenu";
 import { newActionId, type MacroAction } from "./types";
 
-export function makeAction(kind: MacroAction["type"]): MacroAction {
+export function makeAction(
+  kind: MacroAction["type"],
+  t?: TFunction,
+): MacroAction {
   const id = newActionId();
   switch (kind) {
     case "mouse.click":
@@ -52,8 +56,9 @@ export function makeAction(kind: MacroAction["type"]): MacroAction {
       return {
         id,
         type: "script.run",
-        source:
-          "//@param label string world\n// Variables : caster.get / caster.set / caster.return\n// Réseau : caster.fetch({ method, url, headers, body, timeoutMs })\n// Log : caster.log(msg)\n\nconst label = caster.get('label');\ncaster.log('hello ' + label);\ncaster.return(label);\n",
+        source: t
+          ? t("macros.action.defaultScriptSource")
+          : "//@param label string world\nconst label = caster.get('label');\ncaster.log('hello ' + label);\ncaster.return(label);\n",
         timeoutMs: 10000,
         params: {},
         resultVar: "scriptResult",
@@ -96,44 +101,45 @@ function ic(node: ReactNode): ReactNode {
 
 export function buildActionAddMenu(
   onSelect: (kind: MacroAction["type"]) => void,
+  t: TFunction,
 ): ActionPickerEntry[] {
   const s = 14;
   return [
     {
       id: "mouse",
-      label: "Souris",
+      label: t("macros.menu.addGroup.mouse"),
       items: [
         {
           id: "click",
-          label: "Clic",
+          label: t("macros.menu.add.click"),
           hint: "mouse.click",
           icon: ic(<MousePointer2 size={s} />),
           onSelect: () => onSelect("mouse.click"),
         },
         {
           id: "move",
-          label: "Déplacer",
+          label: t("macros.menu.add.move"),
           hint: "mouse.move",
           icon: ic(<MousePointer2 size={s} />),
           onSelect: () => onSelect("mouse.move"),
         },
         {
           id: "down",
-          label: "Enfoncer",
+          label: t("macros.menu.add.down"),
           hint: "mouse.down",
           icon: ic(<MousePointer2 size={s} />),
           onSelect: () => onSelect("mouse.down"),
         },
         {
           id: "up",
-          label: "Relâcher",
+          label: t("macros.menu.add.up"),
           hint: "mouse.up",
           icon: ic(<MousePointer2 size={s} />),
           onSelect: () => onSelect("mouse.up"),
         },
         {
           id: "wheel",
-          label: "Molette",
+          label: t("macros.menu.add.wheel"),
           hint: "mouse.wheel",
           icon: ic(<MousePointer2 size={s} />),
           onSelect: () => onSelect("mouse.wheel"),
@@ -142,25 +148,25 @@ export function buildActionAddMenu(
     },
     {
       id: "keyboard",
-      label: "Clavier",
+      label: t("macros.menu.addGroup.keyboard"),
       items: [
         {
           id: "key",
-          label: "Touche",
+          label: t("macros.menu.add.key"),
           hint: "key.tap",
           icon: ic(<Keyboard size={s} />),
           onSelect: () => onSelect("key.tap"),
         },
         {
           id: "keydown",
-          label: "Maintenir",
+          label: t("macros.menu.add.keyDown"),
           hint: "key.down",
           icon: ic(<Keyboard size={s} />),
           onSelect: () => onSelect("key.down"),
         },
         {
           id: "keyup",
-          label: "Relâcher",
+          label: t("macros.menu.add.keyUp"),
           hint: "key.up",
           icon: ic(<Keyboard size={s} />),
           onSelect: () => onSelect("key.up"),
@@ -169,18 +175,18 @@ export function buildActionAddMenu(
     },
     {
       id: "clip",
-      label: "Presse-papiers",
+      label: t("macros.menu.addGroup.clipboard"),
       items: [
         {
           id: "clipset",
-          label: "Copier du texte",
+          label: t("macros.menu.add.clipSet"),
           hint: "clipboard.set",
           icon: ic(<Clipboard size={s} />),
           onSelect: () => onSelect("clipboard.set"),
         },
         {
           id: "clipget",
-          label: "Lire vers une variable",
+          label: t("macros.menu.add.clipGet"),
           hint: "clipboard.get",
           icon: ic(<Clipboard size={s} />),
           onSelect: () => onSelect("clipboard.get"),
@@ -189,32 +195,32 @@ export function buildActionAddMenu(
     },
     {
       id: "flow",
-      label: "Flux",
+      label: t("macros.menu.addGroup.flow"),
       items: [
         {
           id: "delay",
-          label: "Délai",
+          label: t("macros.menu.add.delay"),
           hint: "delay",
           icon: ic(<Clock size={s} />),
           onSelect: () => onSelect("delay"),
         },
         {
           id: "if",
-          label: "Si",
+          label: t("macros.menu.add.if"),
           hint: "control.if",
           icon: ic(<GitBranch size={s} />),
           onSelect: () => onSelect("control.if"),
         },
         {
           id: "while",
-          label: "Tant que",
+          label: t("macros.menu.add.while"),
           hint: "control.while",
           icon: ic(<Repeat size={s} />),
           onSelect: () => onSelect("control.while"),
         },
         {
           id: "var",
-          label: "Variable",
+          label: t("macros.menu.add.var"),
           hint: "var.set",
           icon: ic(<Variable size={s} />),
           onSelect: () => onSelect("var.set"),
@@ -223,12 +229,12 @@ export function buildActionAddMenu(
     },
     {
       id: "script",
-      label: "Script",
+      label: t("macros.menu.addGroup.script"),
       items: [
         {
           id: "script-run",
-          label: "Script",
-          hint: "JS · script.run",
+          label: t("macros.menu.add.script"),
+          hint: t("macros.menu.add.scriptHint"),
           icon: ic(<Code2 size={s} />),
           onSelect: () => onSelect("script.run"),
         },
@@ -236,25 +242,25 @@ export function buildActionAddMenu(
     },
     {
       id: "sys",
-      label: "Système",
+      label: t("macros.menu.addGroup.system"),
       items: [
         {
           id: "http",
-          label: "HTTP",
+          label: t("macros.menu.add.http"),
           hint: "http.request",
           icon: ic(<Globe size={s} />),
           onSelect: () => onSelect("http.request"),
         },
         {
           id: "json",
-          label: "JSON path",
+          label: t("macros.menu.add.jsonPath"),
           hint: "json.path",
           icon: ic(<Braces size={s} />),
           onSelect: () => onSelect("json.path"),
         },
         {
           id: "process",
-          label: "Processus",
+          label: t("macros.menu.add.process"),
           hint: "process.run",
           icon: ic(<Terminal size={s} />),
           onSelect: () => onSelect("process.run"),

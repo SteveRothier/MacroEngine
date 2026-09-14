@@ -35,6 +35,7 @@ import {
   type ActionPickerEntry,
   type MenuItemDef,
 } from "../ui/v2";
+import { useT, type TFunction } from "../i18n";
 import { ActionParamCells } from "./ActionParamCells";
 import {
   flattenTree,
@@ -47,10 +48,10 @@ import {
   type MacroAction,
 } from "./types";
 import {
-  actionDetailFr,
+  actionDetail,
   actionTitleInList,
   actionTone,
-  branchLabelFr,
+  branchLabel,
   dragGestureEndIndex,
 } from "./actionLabels";
 import { actionOffsetMs, formatActionOffset } from "./sequenceUtils";
@@ -108,25 +109,26 @@ function kindInsertItems(
   prefix: string,
   disabled: boolean,
   onPick: (kind: MacroAction["type"]) => void,
+  t: TFunction,
 ): MenuItemDef[] {
   return [
     {
       id: `${prefix}-click`,
-      label: "Clic",
+      label: t("macros.menu.add.click"),
       icon: <MousePointer2 size={14} />,
       disabled,
       onSelect: () => onPick("mouse.click"),
     },
     {
       id: `${prefix}-delay`,
-      label: "Délai",
+      label: t("macros.menu.add.delay"),
       icon: <Clock size={14} />,
       disabled,
       onSelect: () => onPick("delay"),
     },
     {
       id: `${prefix}-if`,
-      label: "Condition",
+      label: t("macros.menu.add.condition"),
       icon: <GitBranch size={14} />,
       disabled,
       onSelect: () => onPick("control.if"),
@@ -300,6 +302,7 @@ export function ActionList({
   branchAddMenuItems,
   onOpenScript,
 }: Props) {
+  const t = useT();
   const rows: FlatRow[] = flattenTree(actions);
   const locked = disabled || readOnly;
   const reducedMotion = usePrefersReducedMotion();
@@ -354,20 +357,26 @@ export function ActionList({
     const addSub: MenuItemDef[] = [
       {
         id: "insert-before",
-        label: "Insérer avant",
+        label: t("macros.menu.ctx.insertBefore"),
         icon: <Plus size={14} />,
         disabled: !onInsertBefore,
-        submenu: kindInsertItems("before", !onInsertBefore, (kind) =>
-          onInsertBefore?.(ctxPath, kind),
+        submenu: kindInsertItems(
+          "before",
+          !onInsertBefore,
+          (kind) => onInsertBefore?.(ctxPath, kind),
+          t,
         ),
       },
       {
         id: "insert-after",
-        label: "Insérer après",
+        label: t("macros.menu.ctx.insertAfter"),
         icon: <Plus size={14} />,
         disabled: !onInsertAfter,
-        submenu: kindInsertItems("after", !onInsertAfter, (kind) =>
-          onInsertAfter?.(ctxPath, kind),
+        submenu: kindInsertItems(
+          "after",
+          !onInsertAfter,
+          (kind) => onInsertAfter?.(ctxPath, kind),
+          t,
         ),
       },
     ];
@@ -376,7 +385,7 @@ export function ActionList({
         { id: "sep-more", label: "", separator: true },
         {
           id: "add-picker",
-          label: "Plus d’actions…",
+          label: t("macros.menu.ctx.moreActions"),
           icon: <ListPlus size={14} />,
           onSelect: () => onOpenAddMenu(),
         },
@@ -385,69 +394,69 @@ export function ActionList({
     return [
       {
         id: "run-from",
-        label: "Tester depuis ici",
-        shortcut: "Ctrl+Shift+Entrée",
+        label: t("macros.menu.ctx.runFrom"),
+        shortcut: t("macros.toolbar.playFromShortcut"),
         icon: <Play size={14} />,
         disabled: !onRunFrom,
         onSelect: () => onRunFrom?.(ctxPath),
       },
       {
         id: "copy",
-        label: "Copier",
+        label: t("macros.menu.ctx.copy"),
         icon: <Copy size={14} />,
         onSelect: () => copyPath(ctxPath),
       },
       {
         id: "cut",
-        label: "Couper",
+        label: t("macros.menu.ctx.cut"),
         icon: <Scissors size={14} />,
         onSelect: () => cutPath(ctxPath),
       },
       {
         id: "paste",
-        label: "Coller après",
+        label: t("macros.menu.ctx.pasteAfter"),
         icon: <ClipboardPaste size={14} />,
         disabled: !onPasteAfter || !actionClipboard,
         onSelect: () => pasteAfterPath(ctxPath),
       },
       {
         id: "duplicate",
-        label: "Dupliquer",
+        label: t("macros.menu.ctx.duplicate"),
         icon: <Copy size={14} />,
         disabled: !onDuplicate,
         onSelect: () => onDuplicate?.(ctxPath),
       },
       {
         id: "move-up",
-        label: "Monter",
+        label: t("macros.menu.ctx.moveUp"),
         icon: <ArrowUp size={14} />,
         disabled: !onMove || !canUp,
         onSelect: () => onMove?.(ctxPath, -1),
       },
       {
         id: "move-down",
-        label: "Descendre",
+        label: t("macros.menu.ctx.moveDown"),
         icon: <ArrowDown size={14} />,
         disabled: !onMove || !canDown,
         onSelect: () => onMove?.(ctxPath, 1),
       },
       {
         id: "ajout",
-        label: "Ajout",
+        label: t("macros.menu.ctx.addGroup"),
         icon: <Plus size={14} />,
         disabled: !canInsert && !onOpenAddMenu,
         submenu: addSub,
       },
       {
         id: "undo",
-        label: "Retour en arrière",
+        label: t("macros.toolbar.undo"),
         icon: <Undo2 size={14} />,
         disabled: !onUndo || !canUndo,
         onSelect: () => onUndo?.(),
       },
       {
         id: "redo",
-        label: "Retour en avant",
+        label: t("macros.toolbar.redo"),
         icon: <Redo2 size={14} />,
         disabled: !onRedo || !canRedo,
         onSelect: () => onRedo?.(),
@@ -455,20 +464,20 @@ export function ActionList({
       { id: "sep-sel", label: "", separator: true },
       {
         id: "select",
-        label: "Sélectionner",
+        label: t("macros.menu.ctx.select"),
         icon: <MousePointerClick size={14} />,
         onSelect: () => onSelect(ctxPath),
       },
       {
         id: "clear-selection",
-        label: "Désélectionner",
+        label: t("macros.menu.ctx.deselect"),
         icon: <CircleDot size={14} />,
         disabled: !onClearSelection || !selectedPath,
         onSelect: () => onClearSelection?.(),
       },
       {
         id: "delete",
-        label: "Supprimer",
+        label: t("macros.menu.ctx.delete"),
         icon: <Trash2 size={14} />,
         danger: true,
         onSelect: () => onRemove(ctxPath),
@@ -493,32 +502,33 @@ export function ActionList({
     onUndo,
     selectedPath,
     clipboardTick,
+    t,
   ]);
 
   const emptyMenuItems: MenuItemDef[] = useMemo(() => {
     const addSub: MenuItemDef[] = [
       {
         id: "add-click",
-        label: "Clic",
+        label: t("macros.menu.add.click"),
         icon: <MousePointer2 size={14} />,
         onSelect: () => onAddKind?.("mouse.click"),
       },
       {
         id: "add-delay",
-        label: "Délai",
+        label: t("macros.menu.add.delay"),
         icon: <Clock size={14} />,
         onSelect: () => onAddKind?.("delay"),
       },
       {
         id: "add-if",
-        label: "Condition",
+        label: t("macros.menu.add.condition"),
         icon: <GitBranch size={14} />,
         onSelect: () => onAddKind?.("control.if"),
       },
       { id: "sep-more", label: "", separator: true },
       {
         id: "add-picker",
-        label: "Plus d’actions…",
+        label: t("macros.menu.ctx.moreActions"),
         icon: <ListPlus size={14} />,
         onSelect: () => onOpenAddMenu?.(),
       },
@@ -527,7 +537,7 @@ export function ActionList({
     const items: MenuItemDef[] = [
       {
         id: "ajout",
-        label: "Ajout",
+        label: t("macros.menu.ctx.addGroup"),
         icon: <Plus size={14} />,
         submenu: addSub,
       },
@@ -536,7 +546,7 @@ export function ActionList({
     if (onStartRecord) {
       items.push({
         id: "record",
-        label: "Enregistrer",
+        label: t("macros.menu.empty.record"),
         icon: <CircleDot size={14} />,
         onSelect: () => onStartRecord(),
       });
@@ -545,18 +555,18 @@ export function ActionList({
     if (onApplyPreset) {
       items.push({
         id: "presets",
-        label: "Modèles",
+        label: t("macros.menu.empty.presets"),
         icon: <LayoutTemplate size={14} />,
         submenu: [
           {
             id: "preset-click-delay",
-            label: "Click-delay",
+            label: t("macros.menu.empty.presetClickDelay"),
             icon: <MousePointer2 size={14} />,
             onSelect: () => onApplyPreset("click-delay"),
           },
           {
             id: "preset-process-echo",
-            label: "Process-echo",
+            label: t("macros.menu.empty.presetProcessEcho"),
             icon: <LayoutTemplate size={14} />,
             onSelect: () => onApplyPreset("process-echo"),
           },
@@ -567,14 +577,14 @@ export function ActionList({
     items.push(
       {
         id: "undo",
-        label: "Retour en arrière",
+        label: t("macros.toolbar.undo"),
         icon: <Undo2 size={14} />,
         disabled: !onUndo || !canUndo,
         onSelect: () => onUndo?.(),
       },
       {
         id: "redo",
-        label: "Retour en avant",
+        label: t("macros.toolbar.redo"),
         icon: <Redo2 size={14} />,
         disabled: !onRedo || !canRedo,
         onSelect: () => onRedo?.(),
@@ -582,7 +592,7 @@ export function ActionList({
       { id: "sep-clear", label: "", separator: true },
       {
         id: "clear-selection",
-        label: "Désélectionner",
+        label: t("macros.menu.ctx.deselect"),
         icon: <CircleDot size={14} />,
         disabled: !onClearSelection || !selectedPath,
         onSelect: () => onClearSelection?.(),
@@ -601,6 +611,7 @@ export function ActionList({
     onStartRecord,
     onUndo,
     selectedPath,
+    t,
   ]);
 
   useEffect(() => {
@@ -636,9 +647,9 @@ export function ActionList({
       e.preventDefault();
       void (async () => {
         const ok = await confirmAction({
-          title: "Supprimer l’action",
-          message: "Retirer cette action de la séquence ?",
-          confirmLabel: "Supprimer",
+          title: t("macros.confirm.deleteActionTitle"),
+          message: t("macros.confirm.deleteActionMessage"),
+          confirmLabel: t("automations.confirm.deleteConfirm"),
           danger: true,
         });
         if (ok) onRemoveRef.current(path);
@@ -646,7 +657,7 @@ export function ActionList({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [actions, locked, selectedPath]);
+  }, [actions, locked, selectedPath, t]);
 
   let prevAbs = 0;
 
@@ -706,10 +717,10 @@ export function ActionList({
 
   function onRowPointerDown(flatIndex: number, e: ReactPointerEvent) {
     if (locked || e.button !== 0) return;
-    const t = e.target as HTMLElement;
-    if (t.closest(".row-ops")) return;
+    const target = e.target as HTMLElement;
+    if (target.closest(".row-ops")) return;
     if (
-      t.closest(
+      target.closest(
         "input, select, textarea, button, label.action-cell-mod, .action-cell-btn",
       )
     ) {
@@ -744,7 +755,7 @@ export function ActionList({
           const siblings = siblingList(actions, row.path);
           const siblingIdx = row.path[row.path.length - 1]!;
           setGhost({
-            title: actionTitleInList(siblings, siblingIdx),
+            title: actionTitleInList(siblings, siblingIdx, t),
             indexLabel: padIndex(siblingIdx + 1),
             tone: actionTone(row.action.type),
             x: ev.clientX,
@@ -858,9 +869,9 @@ export function ActionList({
           <li className="action-list-head" aria-hidden>
             <span />
             <span>#</span>
-            <span>Action</span>
-            <span>Paramètres</span>
-            <span>Offset</span>
+            <span>{t("macros.menu.list.headAction")}</span>
+            <span>{t("macros.menu.list.headParams")}</span>
+            <span>{t("macros.menu.list.headOffset")}</span>
             <span />
           </li>
         ) : null}
@@ -948,7 +959,7 @@ export function ActionList({
               <span className="idx">
                 {isBranchHead(row) && row.branchLabel ? (
                   <em className="branch-tag">
-                    {branchLabelFr(row.branchLabel)}
+                    {branchLabel(row.branchLabel, t)}
                   </em>
                 ) : (
                   padIndex(row.path[row.path.length - 1]! + 1)
@@ -956,7 +967,7 @@ export function ActionList({
               </span>
               <span className="lbl">
                 <strong className="act-type">
-                  {actionTitleInList(siblings, siblingIdx)}
+                  {actionTitleInList(siblings, siblingIdx, t)}
                 </strong>
               </span>
               <div className="act-params">
@@ -973,7 +984,7 @@ export function ActionList({
                   />
                 ) : (
                   <span className="action-cell-summary">
-                    {actionDetailFr(row.action)}
+                    {actionDetail(row.action, t)}
                   </span>
                 )}
               </div>
@@ -984,8 +995,8 @@ export function ActionList({
                     type="button"
                     className="icon-ghost danger-text"
                     disabled={locked}
-                    title="Supprimer"
-                    aria-label="Supprimer"
+                    title={t("macros.menu.list.deleteTitle")}
+                    aria-label={t("macros.menu.list.deleteTitle")}
                     onClick={(e) => {
                       e.stopPropagation();
                       onRemove(row.path);
@@ -1003,11 +1014,8 @@ export function ActionList({
         {rows.length === 0 ? (
           <li className="action-list-empty">
             <div className="v2-empty-state">
-              <strong>Aucune étape</strong>
-              <p>
-                Ajoute un clic, un délai ou une condition pour démarrer la
-                macro.
-              </p>
+              <strong>{t("macros.empty.noStepsTitle")}</strong>
+              <p>{t("macros.empty.noStepsLead")}</p>
               {onEmptyAdd && !readOnly ? (
                 <button
                   type="button"
@@ -1016,7 +1024,7 @@ export function ActionList({
                   onClick={onEmptyAdd}
                 >
                   <Plus size={14} aria-hidden />
-                  Ajouter une étape
+                  {t("macros.empty.noStepsCta")}
                 </button>
               ) : null}
             </div>
@@ -1033,7 +1041,7 @@ export function ActionList({
         onSelect={(id) => {
           findMenuItem(ctxRowItems, id)?.onSelect?.();
         }}
-        ariaLabel="Actions sur l’étape"
+        ariaLabel={t("macros.menu.list.ctxAria")}
       />
 
       <ContextMenu
@@ -1045,7 +1053,7 @@ export function ActionList({
         onSelect={(id) => {
           findMenuItem(emptyMenuItems, id)?.onSelect?.();
         }}
-        ariaLabel="Ajouter une étape"
+        ariaLabel={t("macros.menu.list.emptyCtxAria")}
       />
 
       {ghost && typeof document !== "undefined"

@@ -2,8 +2,9 @@
  * Legacy graph projection helpers (UI layout only).
  * MacroEditorView no longer mounts MacroCanvas; kept for optional future use / uiLayout round-trip.
  */
+import type { TFunction } from "../../i18n";
 import type { MacroAction, MacroDocument, MacroTrigger } from "../types";
-import { actionDetailFr, actionTitleFr } from "../actionLabels";
+import { actionDetail, actionTitle } from "../actionLabels";
 import { triggerHotkeyLabel } from "../types";
 
 export type MacroNodeKind = "trigger" | "action" | "if" | "while";
@@ -39,9 +40,9 @@ const X_GAP = 0;
 const Y_GAP = 120;
 const BRANCH_X = 220;
 
-function triggerLabel(t: MacroTrigger): string {
-  if (t.type === "manual") return "Manuel";
-  return triggerHotkeyLabel(t);
+function triggerLabel(trigger: MacroTrigger, t: TFunction): string {
+  if (trigger.type === "manual") return t("macros.action.graph.triggerManual");
+  return triggerHotkeyLabel(trigger);
 }
 
 function layoutPos(id: string, layout: MacroUiLayout | undefined, x: number, y: number) {
@@ -56,6 +57,7 @@ function chainActions(
   nodes: MacroGraphNode[],
   edges: MacroGraphEdge[],
   layout: MacroUiLayout | undefined,
+  t: TFunction,
 ): { lastId: string | null; nextY: number } {
   let prev = startId;
   let cy = y;
@@ -68,8 +70,8 @@ function chainActions(
         position: layoutPos(nid, layout, x, cy),
         actionId: action.id,
         action,
-        label: "Si / sinon",
-        subtitle: actionDetailFr(action),
+        label: t("macros.action.graph.ifNode"),
+        subtitle: actionDetail(action, t),
       });
       if (prev) {
         edges.push({
@@ -87,6 +89,7 @@ function chainActions(
         nodes,
         edges,
         layout,
+        t,
       );
       if (thenEnd.lastId) {
         edges.push({
@@ -104,6 +107,7 @@ function chainActions(
         nodes,
         edges,
         layout,
+        t,
       );
       if (elseEnd.lastId && (action.else?.length ?? 0) > 0) {
         edges.push({
@@ -125,8 +129,8 @@ function chainActions(
         position: layoutPos(nid, layout, x, cy),
         actionId: action.id,
         action,
-        label: "Tant que",
-        subtitle: actionDetailFr(action),
+        label: t("macros.action.graph.whileNode"),
+        subtitle: actionDetail(action, t),
       });
       if (prev) {
         edges.push({ id: `${prev}->${nid}`, source: prev, target: nid });
@@ -140,6 +144,7 @@ function chainActions(
         nodes,
         edges,
         layout,
+        t,
       );
       if (bodyEnd.lastId) {
         edges.push({
@@ -160,8 +165,8 @@ function chainActions(
       position: layoutPos(nid, layout, x, cy),
       actionId: action.id,
       action,
-      label: actionTitleFr(action.type),
-      subtitle: actionDetailFr(action),
+      label: actionTitle(action.type, t),
+      subtitle: actionDetail(action, t),
     });
     if (prev) {
       edges.push({ id: `${prev}->${nid}`, source: prev, target: nid });
@@ -175,6 +180,7 @@ function chainActions(
 export function macroToGraph(
   doc: MacroDocument,
   layout?: MacroUiLayout,
+  t: TFunction = (key) => key,
 ): MacroGraph {
   const nodes: MacroGraphNode[] = [];
   const edges: MacroGraphEdge[] = [];
@@ -184,10 +190,10 @@ export function macroToGraph(
     kind: "trigger",
     position: layoutPos(triggerId, layout, X_GAP, 0),
     trigger: doc.trigger,
-    label: "Trigger",
-    subtitle: triggerLabel(doc.trigger),
+    label: t("macros.action.graph.triggerNode"),
+    subtitle: triggerLabel(doc.trigger, t),
   });
-  chainActions(doc.actions, triggerId, X_GAP, Y_GAP, nodes, edges, layout);
+  chainActions(doc.actions, triggerId, X_GAP, Y_GAP, nodes, edges, layout, t);
   return { nodes, edges };
 }
 
