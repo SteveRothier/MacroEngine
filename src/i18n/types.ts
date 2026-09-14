@@ -1,18 +1,22 @@
-import type { UiLocale } from "../settings/settingsTypes";
+import type { UiLocalePref } from "./locales";
+import {
+  FALLBACK_LOCALE,
+  isAppLocale,
+  matchSystemLocale,
+  type AppLocale,
+} from "./locales";
 
-export type AppLocale = "fr" | "en";
-export type UiLocalePref = UiLocale;
+export type { AppLocale, UiLocalePref } from "./locales";
 
 export type InterpVars = Record<string, string | number>;
 
 export function resolveLocale(pref: UiLocalePref): AppLocale {
-  if (pref === "fr") return "fr";
-  if (pref === "en") return "en";
+  if (isAppLocale(pref)) return pref;
   try {
-    const lang = Intl.DateTimeFormat().resolvedOptions().locale.toLowerCase();
-    return lang.startsWith("fr") ? "fr" : "en";
+    const lang = Intl.DateTimeFormat().resolvedOptions().locale;
+    return matchSystemLocale(lang);
   } catch {
-    return "fr";
+    return FALLBACK_LOCALE;
   }
 }
 

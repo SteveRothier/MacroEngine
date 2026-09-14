@@ -1,5 +1,6 @@
+import { defineCatalog } from "../defineCatalog";
 /** App chrome: toasts, palette, confirms in MainAppV2. */
-export const shell = {
+export const shell = defineCatalog({
   fr: {
     sessionEnded: "Session terminée",
     sessionStopped: "Session arrêtée",
@@ -121,4 +122,4 @@ export const shell = {
     scriptsFolderHint: "Scripts live in the config / scripts folder",
     openLocationFailed: "Unable to open location",
   },
-} as const;
+});

@@ -30,7 +30,7 @@ import {
   type StartupView,
   type UiLocale,
 } from "./settingsTypes";
-import { useT } from "../i18n";
+import { useT, localePreferenceOptions } from "../i18n";
 
 type AppPaths = {
   configDir: string;
@@ -721,8 +721,7 @@ export function SettingsView({
                         ariaLabel={t("settings.application.language")}
                         options={[
                           { value: "system", label: t("common.system") },
-                          { value: "fr", label: t("common.french") },
-                          { value: "en", label: t("common.english") },
+                          ...localePreferenceOptions(),
                         ]}
                         onChange={(v) =>
                           persistShellPrefs({ uiLocale: v as UiLocale })

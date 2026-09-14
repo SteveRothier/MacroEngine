@@ -1,9 +1,9 @@
 import { catalogs } from "./catalogs";
+import { FALLBACK_LOCALE, type AppLocale } from "./locales";
 import {
   interpolate,
   leafPaths,
   lookupPath,
-  type AppLocale,
   type InterpVars,
 } from "./types";
 
@@ -19,9 +19,9 @@ type Leaves<T, P extends string = ""> = T extends string
     ? { [K in keyof T]-?: Leaves<T[K], Join<K, P>> }[keyof T]
     : never;
 
-export type MessageKey = Leaves<(typeof catalogs)["fr"]>;
+export type MessageKey = Leaves<(typeof catalogs)[typeof FALLBACK_LOCALE]>;
 
-export function catalogKeys(locale: AppLocale = "fr"): string[] {
+export function catalogKeys(locale: AppLocale = FALLBACK_LOCALE): string[] {
   return leafPaths(catalogs[locale]);
 }
 
@@ -32,7 +32,7 @@ export function tStatic(
 ): string {
   const hit =
     lookupPath(catalogs[locale], key) ??
-    lookupPath(catalogs.fr, key) ??
+    lookupPath(catalogs[FALLBACK_LOCALE], key) ??
     key;
   return interpolate(hit, vars);
 }

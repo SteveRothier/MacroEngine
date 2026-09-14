@@ -1,3 +1,5 @@
+import type { UiLocalePref } from "../i18n/locales";
+
 /** Nested app preference groups (mirrored from engine `AppSettings`). */
 
 export type AccueilSortBy = "order" | "name" | "type" | "status";
@@ -6,7 +8,7 @@ export type AccueilFilter = "all" | "favorites" | "recent" | "scripts";
 export type StartupView = "home" | "lastDocument";
 export type UiDensity = "comfortable" | "compact";
 export type AccentTheme = "default" | "blue" | "teal";
-export type UiLocale = "system" | "fr" | "en";
+export type UiLocale = UiLocalePref;
 
 export type WindowBounds = {
   x: number;
