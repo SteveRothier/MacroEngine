@@ -1,28 +1,34 @@
-/** Libellés UI français partagés. */
+/** Shared engine status labels (FR/EN via i18n). */
 
 import type { EngineStatus } from "../macros/types";
+import { tStatic, type AppLocale } from "../i18n";
 
-export function stateLabelFr(state: string): string {
+export function stateLabel(locale: AppLocale, state: string): string {
   switch (state) {
     case "idle":
-      return "Inactif";
+      return tStatic(locale, "labels.idle");
     case "running":
-      return "En cours";
+      return tStatic(locale, "labels.running");
     case "paused":
-      return "En pause";
+      return tStatic(locale, "labels.paused");
     case "stopping":
-      return "Arrêt…";
+      return tStatic(locale, "labels.stopping");
     default:
       return state;
   }
 }
 
-export function runningPillLabel(running: boolean): string {
-  return running ? "Actif" : "Arrêt";
+export function runningPillLabel(locale: AppLocale, running: boolean): string {
+  return running
+    ? tStatic(locale, "labels.active")
+    : tStatic(locale, "labels.stopped");
 }
 
 /** What is running — for Automations, dock, statusbar. */
-export function sessionLabelFr(status: EngineStatus): string | null {
+export function sessionLabel(
+  locale: AppLocale,
+  status: EngineStatus,
+): string | null {
   const busy =
     status.state === "running" ||
     status.state === "paused" ||
@@ -31,18 +37,36 @@ export function sessionLabelFr(status: EngineStatus): string | null {
   const kind = status.sessionKind;
   const name = status.sessionName?.trim();
   if (kind === "macro") {
-    return name ? `Macro « ${name} »` : "Macro";
+    return name
+      ? tStatic(locale, "labels.macroNamed", { name })
+      : tStatic(locale, "labels.macro");
   }
   if (kind === "clicker") {
-    return name ? `Clicker · ${name}` : "Clicker";
+    return name
+      ? tStatic(locale, "labels.clickerNamed", { name })
+      : tStatic(locale, "labels.clicker");
   }
   if (kind === "record") {
-    return name ? `Enregistrement « ${name} »` : "Enregistrement";
+    return name
+      ? tStatic(locale, "labels.recordNamed", { name })
+      : tStatic(locale, "labels.record");
   }
   if (kind === "script") {
-    return name ? `Script « ${name} »` : "Script";
+    return name
+      ? tStatic(locale, "labels.scriptNamed", { name })
+      : tStatic(locale, "labels.script");
   }
   return null;
+}
+
+/** @deprecated Use stateLabel(locale, state). */
+export function stateLabelFr(state: string): string {
+  return stateLabel("fr", state);
+}
+
+/** @deprecated Use sessionLabel(locale, status). */
+export function sessionLabelFr(status: EngineStatus): string | null {
+  return sessionLabel("fr", status);
 }
 
 /** Hide engine-internal status strings from the chrome. */

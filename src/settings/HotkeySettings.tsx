@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { chordLabel, eventToVk, type HotkeyBindings, vkLabel } from "../macros/types";
 import { useToast } from "../ui/v2";
+import { useT } from "../i18n";
 
 const DEFAULTS: HotkeyBindings = {
   actionVk: 0x75,
@@ -13,17 +14,6 @@ const DEFAULTS: HotkeyBindings = {
   emergencyVk: 0x77,
 };
 
-function hotkeyConflict(b: HotkeyBindings): string | null {
-  const pause = b.pauseVk ?? 0x76;
-  if (b.actionVk === b.macroVk) return "Clicker et Macro partagent la même touche.";
-  if (b.actionVk === pause) return "Clicker et Pause partagent la même touche.";
-  if (b.actionVk === b.emergencyVk) return "Clicker et Urgence partagent la même touche.";
-  if (b.macroVk === pause) return "Macro et Pause partagent la même touche.";
-  if (b.macroVk === b.emergencyVk) return "Macro et Urgence partagent la même touche.";
-  if (pause === b.emergencyVk) return "Pause et Urgence partagent la même touche.";
-  return null;
-}
-
 type CaptureSlot = "action" | "macro" | "pause" | "emergency" | null;
 
 type Props = {
@@ -32,6 +22,7 @@ type Props = {
 
 export function HotkeySettings({ onBindingsChange }: Props) {
   const toast = useToast();
+  const t = useT();
   const [bindings, setBindings] = useState<HotkeyBindings>(DEFAULTS);
   const [capture, setCapture] = useState<CaptureSlot>(null);
 
@@ -97,9 +88,9 @@ export function HotkeySettings({ onBindingsChange }: Props) {
       };
       setBindings(normalized);
       onBindingsChange?.(normalized);
-      toast.success("Raccourcis enregistrés");
+      toast.success(t("settings.hotkeys.saved"));
     } catch {
-      toast.error("Échec de l’enregistrement");
+      toast.error(t("settings.hotkeys.saveFailed"));
     }
   }
 
@@ -107,19 +98,29 @@ export function HotkeySettings({ onBindingsChange }: Props) {
     setBindings(DEFAULTS);
   }
 
-  const conflict = hotkeyConflict(bindings);
+  const pause = bindings.pauseVk ?? 0x76;
+  let conflict: string | null = null;
+  if (bindings.actionVk === bindings.macroVk) {
+    conflict = t("settings.hotkeys.conflictClickerMacro");
+  } else if (bindings.actionVk === pause) {
+    conflict = t("settings.hotkeys.conflictClickerPause");
+  } else if (bindings.actionVk === bindings.emergencyVk) {
+    conflict = t("settings.hotkeys.conflictClickerEmergency");
+  } else if (bindings.macroVk === pause) {
+    conflict = t("settings.hotkeys.conflictMacroPause");
+  } else if (bindings.macroVk === bindings.emergencyVk) {
+    conflict = t("settings.hotkeys.conflictMacroEmergency");
+  } else if (pause === bindings.emergencyVk) {
+    conflict = t("settings.hotkeys.conflictPauseEmergency");
+  }
 
   return (
     <>
-      <p className="v2-settings-group-hint">
-        Actifs hors focus (F6 clicker, F7 pause clicker, F9 macro, F8 urgence par
-        défaut). F7 peut activer le parcours caret WebView si le focus est dans
-        l’app — le raccourci global est mangé hors focus.
-      </p>
+      <p className="v2-settings-group-hint">{t("settings.hotkeys.groupHint")}</p>
       {conflict ? <p className="v2-settings-warn">{conflict}</p> : null}
       <div className="v2-hotkey-settings">
         <div className="v2-hotkey-row v2-hotkey-row--featured">
-          <span className="v2-hotkey-label">Clicker</span>
+          <span className="v2-hotkey-label">{t("settings.hotkeys.clicker")}</span>
           <code className="v2-settings-mono">{chordLabel(bindings)}</code>
           <button
             type="button"
@@ -129,18 +130,18 @@ export function HotkeySettings({ onBindingsChange }: Props) {
             ].join(" ")}
             onClick={() => setCapture("action")}
           >
-            {capture === "action" ? "…" : "Capturer"}
+            {capture === "action" ? "…" : t("settings.hotkeys.capture")}
           </button>
         </div>
         {(
           [
-            ["pause", "Pause clicker", bindings.pauseVk ?? 0x76],
-            ["macro", "Macro", bindings.macroVk],
-            ["emergency", "Urgence", bindings.emergencyVk],
+            ["pause", "settings.hotkeys.pause", bindings.pauseVk ?? 0x76],
+            ["macro", "settings.hotkeys.macro", bindings.macroVk],
+            ["emergency", "settings.hotkeys.emergency", bindings.emergencyVk],
           ] as const
-        ).map(([slot, label, vk]) => (
+        ).map(([slot, labelKey, vk]) => (
           <div className="v2-hotkey-row" key={slot}>
-            <span className="v2-hotkey-label">{label}</span>
+            <span className="v2-hotkey-label">{t(labelKey)}</span>
             <code className="v2-settings-mono">{vkLabel(vk)}</code>
             <button
               type="button"
@@ -150,7 +151,7 @@ export function HotkeySettings({ onBindingsChange }: Props) {
               ].join(" ")}
               onClick={() => setCapture(slot)}
             >
-              {capture === slot ? "…" : "Capturer"}
+              {capture === slot ? "…" : t("settings.hotkeys.capture")}
             </button>
           </div>
         ))}
@@ -161,10 +162,10 @@ export function HotkeySettings({ onBindingsChange }: Props) {
             disabled={Boolean(conflict)}
             onClick={() => void save()}
           >
-            Sauver
+            {t("common.save")}
           </button>
           <button type="button" className="v2-btn v2-btn-ghost" onClick={resetDefaults}>
-            Défauts
+            {t("common.defaults")}
           </button>
         </div>
       </div>

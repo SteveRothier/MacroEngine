@@ -30,18 +30,7 @@ import {
   type StartupView,
   type UiLocale,
 } from "./settingsTypes";
-import { tApp } from "./uiLocale";
-
-const SECTIONS: {
-  id: SettingsSection;
-  label: string;
-  icon: LucideIcon;
-}[] = [
-  { id: "application", label: "Application", icon: AppWindow },
-  { id: "hotkeys", label: "Raccourcis", icon: Keyboard },
-  { id: "security", label: "Sécurité", icon: Shield },
-  { id: "data", label: "Données", icon: Database },
-];
+import { useT } from "../i18n";
 
 type AppPaths = {
   configDir: string;
@@ -65,9 +54,9 @@ type Props = {
   onAutomationPrefsChange?: (prefs: AutomationPrefs) => void;
 };
 
-function displayOptionLabel(d: DisplayDto): string {
+function displayOptionLabel(d: DisplayDto, primarySuffix: string): string {
   const scale = Math.round(d.scaleFactor * 100);
-  const primary = d.isPrimary ? " · primaire" : "";
+  const primary = d.isPrimary ? primarySuffix : "";
   return `${d.width}×${d.height} · ${scale} %${primary}`;
 }
 
@@ -127,6 +116,13 @@ export function SettingsView({
   onAutomationPrefsChange,
 }: Props) {
   const toast = useToast();
+  const t = useT();
+  const SECTIONS: { id: SettingsSection; labelKey: string; icon: LucideIcon }[] = [
+    { id: "application", labelKey: "settings.rail.application", icon: AppWindow },
+    { id: "hotkeys", labelKey: "settings.rail.hotkeys", icon: Keyboard },
+    { id: "security", labelKey: "settings.rail.security", icon: Shield },
+    { id: "data", labelKey: "settings.rail.data", icon: Database },
+  ];
   const { loadSettings, saveBundle } = useClickerSettingsApi();
   const [processFilter, setProcessFilter] = useState<ProcessFilter>(DEFAULT_PROCESS_FILTER);
   const [overlayVisible, setOverlayVisible] = useState(false);
@@ -271,10 +267,10 @@ export function SettingsView({
 
   const resetClicker = async () => {
     const ok = await confirmChoice({
-      title: "Réinitialiser le clicker",
-      message: "Restaurer la configuration clicker par défaut ?",
-      confirmLabel: "Réinitialiser",
-      cancelLabel: "Annuler",
+      title: t("settings.data.resetTitle"),
+      message: t("settings.data.resetMessage"),
+      confirmLabel: t("settings.data.reset"),
+      cancelLabel: t("common.cancel"),
       danger: true,
     });
     if (ok !== "confirm") return;
@@ -289,9 +285,9 @@ export function SettingsView({
         theme: s.theme ?? theme,
         displayId: s.displayId,
       });
-      toast.success("Réglages clicker restaurés");
+      toast.success(t("settings.data.resetOk"));
     } catch {
-      toast.error("Échec de la réinitialisation");
+      toast.error(t("settings.data.resetFail"));
     }
   };
 
@@ -303,18 +299,18 @@ export function SettingsView({
       });
       if (!path) return;
       await invoke("export_app_settings", { path });
-      toast.success("Configuration exportée");
+      toast.success(t("settings.data.exportOk"));
     } catch {
-      toast.error("Échec de l’export");
+      toast.error(t("settings.data.exportFail"));
     }
   };
 
   const importSettings = async () => {
     const ok = await confirmChoice({
-      title: "Importer une configuration",
-      message: "Cela écrase settings.json (y compris le clicker). Continuer ?",
-      confirmLabel: "Importer",
-      cancelLabel: "Annuler",
+      title: t("settings.data.importTitle"),
+      message: t("settings.data.importMessage"),
+      confirmLabel: t("common.import"),
+      cancelLabel: t("common.cancel"),
       danger: true,
     });
     if (ok !== "confirm") return;
@@ -340,33 +336,33 @@ export function SettingsView({
       if (typeof next.journalOpen === "boolean") {
         onJournalOpenChange(next.journalOpen);
       }
-      toast.success("Configuration importée");
+      toast.success(t("settings.data.importOk"));
     } catch {
-      toast.error("Échec de l’import");
+      toast.error(t("settings.data.importFail"));
     }
   };
 
   const purgeTrash = async () => {
     const ok = await confirmChoice({
-      title: "Vider la corbeille",
-      message: "Les automations en corbeille seront supprimées définitivement.",
-      confirmLabel: "Vider",
-      cancelLabel: "Annuler",
+      title: t("settings.data.purgeTitle"),
+      message: t("settings.data.purgeMessage"),
+      confirmLabel: t("settings.data.purge"),
+      cancelLabel: t("common.cancel"),
       danger: true,
     });
     if (ok !== "confirm") return;
     try {
       const n = await invoke<number>("purge_library_trash_cmd");
-      toast.success(n > 0 ? `${n} élément(s) supprimé(s)` : "Corbeille déjà vide");
+      toast.success(n > 0 ? t("settings.data.purgeOk", { n }) : t("settings.data.purgeEmpty"));
     } catch {
-      toast.error("Échec du vidage");
+      toast.error(t("settings.data.purgeFail"));
     }
   };
 
   return (
     <div className="v2-page">
       <div className="v2-settings-layout">
-        <nav className="v2-settings-rail" aria-label="Sections paramètres">
+        <nav className="v2-settings-rail" aria-label={t("settings.railAria")}>
           {SECTIONS.map((s) => {
             const Icon = s.icon;
             return (
@@ -382,7 +378,7 @@ export function SettingsView({
                 onClick={() => onSectionChange(s.id)}
               >
                 <Icon size={16} aria-hidden className="v2-settings-rail-icon" />
-                <span>{s.label}</span>
+                <span>{t(s.labelKey)}</span>
               </button>
             );
           })}
@@ -391,18 +387,18 @@ export function SettingsView({
           <div className="v2-settings-pane-inner">
             {section === "application" ? (
               <>
-                <h2 className="v2-settings-pane-title">{tApp(shell.uiLocale, "paneTitle")}</h2>
-                <p className="v2-settings-pane-hint">{tApp(shell.uiLocale, "paneHint")}</p>
-                <SettingsGroup title={tApp(shell.uiLocale, "groupStartup")}>
+                <h2 className="v2-settings-pane-title">{t("settings.application.paneTitle")}</h2>
+                <p className="v2-settings-pane-hint">{t("settings.application.paneHint")}</p>
+                <SettingsGroup title={t("settings.application.groupStartup")}>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "startWithWindows")}</span>
-                      <p>{tApp(shell.uiLocale, "startWithWindowsHint")}</p>
+                      <span>{t("settings.application.startWithWindows")}</span>
+                      <p>{t("settings.application.startWithWindowsHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={startWithWindows}
-                        ariaLabel={tApp(shell.uiLocale, "startWithWindows")}
+                        ariaLabel={t("settings.application.startWithWindows")}
                         onChange={(checked) => {
                           setStartWithWindows(checked);
                           void persist({ startWithWindows: checked });
@@ -412,13 +408,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "startInTray")}</span>
-                      <p>{tApp(shell.uiLocale, "startInTrayHint")}</p>
+                      <span>{t("settings.application.startInTray")}</span>
+                      <p>{t("settings.application.startInTrayHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.minimizeToTray}
-                        ariaLabel={tApp(shell.uiLocale, "startInTray")}
+                        ariaLabel={t("settings.application.startInTray")}
                         onChange={(checked) =>
                           persistShellPrefs({ minimizeToTray: checked })
                         }
@@ -427,13 +423,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "closeToTray")}</span>
-                      <p>{tApp(shell.uiLocale, "closeToTrayHint")}</p>
+                      <span>{t("settings.application.closeToTray")}</span>
+                      <p>{t("settings.application.closeToTrayHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={closeToTray}
-                        ariaLabel={tApp(shell.uiLocale, "closeToTray")}
+                        ariaLabel={t("settings.application.closeToTray")}
                         onChange={(checked) => {
                           setCloseToTray(checked);
                           void persist({ closeToTray: checked });
@@ -443,13 +439,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "journalOnStart")}</span>
-                      <p>{tApp(shell.uiLocale, "journalOnStartHint")}</p>
+                      <span>{t("settings.application.journalOnStart")}</span>
+                      <p>{t("settings.application.journalOnStartHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={journalOpen}
-                        ariaLabel={tApp(shell.uiLocale, "journalOnStart")}
+                        ariaLabel={t("settings.application.journalOnStart")}
                         onChange={(checked) => {
                           onJournalOpenChange(checked);
                           void persist({ journalOpen: checked });
@@ -459,17 +455,17 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "startupView")}</span>
-                      <p>{tApp(shell.uiLocale, "startupViewHint")}</p>
+                      <span>{t("settings.application.startupView")}</span>
+                      <p>{t("settings.application.startupViewHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <Select
                         className="v2-select"
                         value={shell.startupView}
-                        ariaLabel={tApp(shell.uiLocale, "startupView")}
+                        ariaLabel={t("settings.application.startupView")}
                         options={[
-                          { value: "home", label: "Accueil" },
-                          { value: "lastDocument", label: "Dernier document" },
+                          { value: "home", label: t("common.home") },
+                          { value: "lastDocument", label: t("common.lastDocument") },
                         ]}
                         onChange={(v) =>
                           persistShellPrefs({ startupView: v as StartupView })
@@ -479,13 +475,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "restoreTabs")}</span>
-                      <p>{tApp(shell.uiLocale, "restoreTabsHint")}</p>
+                      <span>{t("settings.application.restoreTabs")}</span>
+                      <p>{t("settings.application.restoreTabsHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.restoreWorkspaceTabs}
-                        ariaLabel={tApp(shell.uiLocale, "restoreTabs")}
+                        ariaLabel={t("settings.application.restoreTabs")}
                         onChange={(checked) =>
                           persistShellPrefs({ restoreWorkspaceTabs: checked })
                         }
@@ -494,13 +490,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "alwaysOnTop")}</span>
-                      <p>{tApp(shell.uiLocale, "alwaysOnTopHint")}</p>
+                      <span>{t("settings.application.alwaysOnTop")}</span>
+                      <p>{t("settings.application.alwaysOnTopHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.alwaysOnTop}
-                        ariaLabel={tApp(shell.uiLocale, "alwaysOnTop")}
+                        ariaLabel={t("settings.application.alwaysOnTop")}
                         onChange={(checked) =>
                           persistShellPrefs({ alwaysOnTop: checked })
                         }
@@ -509,13 +505,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "rememberBounds")}</span>
-                      <p>{tApp(shell.uiLocale, "rememberBoundsHint")}</p>
+                      <span>{t("settings.application.rememberBounds")}</span>
+                      <p>{t("settings.application.rememberBoundsHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.rememberWindowBounds}
-                        ariaLabel={tApp(shell.uiLocale, "rememberBounds")}
+                        ariaLabel={t("settings.application.rememberBounds")}
                         onChange={(checked) =>
                           persistShellPrefs({ rememberWindowBounds: checked })
                         }
@@ -524,13 +520,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "confirmQuit")}</span>
-                      <p>{tApp(shell.uiLocale, "confirmQuitHint")}</p>
+                      <span>{t("settings.application.confirmQuit")}</span>
+                      <p>{t("settings.application.confirmQuitHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.confirmQuitIfRunning}
-                        ariaLabel={tApp(shell.uiLocale, "confirmQuit")}
+                        ariaLabel={t("settings.application.confirmQuit")}
                         onChange={(checked) =>
                           persistShellPrefs({ confirmQuitIfRunning: checked })
                         }
@@ -539,13 +535,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "goHomeAfterEmergency")}</span>
-                      <p>{tApp(shell.uiLocale, "goHomeAfterEmergencyHint")}</p>
+                      <span>{t("settings.application.goHomeAfterEmergency")}</span>
+                      <p>{t("settings.application.goHomeAfterEmergencyHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.goHomeAfterEmergency}
-                        ariaLabel={tApp(shell.uiLocale, "goHomeAfterEmergency")}
+                        ariaLabel={t("settings.application.goHomeAfterEmergency")}
                         onChange={(checked) =>
                           persistShellPrefs({ goHomeAfterEmergency: checked })
                         }
@@ -553,16 +549,16 @@ export function SettingsView({
                     </div>
                   </div>
                 </SettingsGroup>
-                <SettingsGroup title={tApp(shell.uiLocale, "groupNotifications")}>
+                <SettingsGroup title={t("settings.application.groupNotifications")}>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "toastOnFinish")}</span>
-                      <p>{tApp(shell.uiLocale, "toastOnFinishHint")}</p>
+                      <span>{t("settings.application.toastOnFinish")}</span>
+                      <p>{t("settings.application.toastOnFinishHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.toastOnFinish}
-                        ariaLabel={tApp(shell.uiLocale, "toastOnFinish")}
+                        ariaLabel={t("settings.application.toastOnFinish")}
                         onChange={(checked) =>
                           persistShellPrefs({ toastOnFinish: checked })
                         }
@@ -571,13 +567,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "soundOnFinish")}</span>
-                      <p>{tApp(shell.uiLocale, "soundOnFinishHint")}</p>
+                      <span>{t("settings.application.soundOnFinish")}</span>
+                      <p>{t("settings.application.soundOnFinishHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={automation.soundOnFinish}
-                        ariaLabel={tApp(shell.uiLocale, "soundOnFinish")}
+                        ariaLabel={t("settings.application.soundOnFinish")}
                         onChange={(checked) =>
                           persistAutomationPrefs({ soundOnFinish: checked })
                         }
@@ -586,13 +582,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "focusJournal")}</span>
-                      <p>{tApp(shell.uiLocale, "focusJournalHint")}</p>
+                      <span>{t("settings.application.focusJournal")}</span>
+                      <p>{t("settings.application.focusJournalHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={automation.focusFollowsRun}
-                        ariaLabel={tApp(shell.uiLocale, "focusJournal")}
+                        ariaLabel={t("settings.application.focusJournal")}
                         onChange={(checked) =>
                           persistAutomationPrefs({ focusFollowsRun: checked })
                         }
@@ -601,13 +597,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "trayRelaunch")}</span>
-                      <p>{tApp(shell.uiLocale, "trayRelaunchHint")}</p>
+                      <span>{t("settings.application.trayRelaunch")}</span>
+                      <p>{t("settings.application.trayRelaunchHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={shell.trayRelaunchLast}
-                        ariaLabel={tApp(shell.uiLocale, "trayRelaunch")}
+                        ariaLabel={t("settings.application.trayRelaunch")}
                         onChange={(checked) =>
                           persistShellPrefs({ trayRelaunchLast: checked })
                         }
@@ -615,21 +611,21 @@ export function SettingsView({
                     </div>
                   </div>
                 </SettingsGroup>
-                <SettingsGroup title={tApp(shell.uiLocale, "groupAppearance")}>
+                <SettingsGroup title={t("settings.application.groupAppearance")}>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "theme")}</span>
-                      <p>{tApp(shell.uiLocale, "themeHint")}</p>
+                      <span>{t("settings.application.theme")}</span>
+                      <p>{t("settings.application.themeHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
-                      <div className="v2-segmented" role="group" aria-label="Thème">
+                      <div className="v2-segmented" role="group" aria-label={t("settings.application.themeAria")}>
                         {(
                           [
-                            ["light", "Clair"],
-                            ["dark", "Sombre"],
-                            ["system", "Système"],
+                            ["light", "common.light"],
+                            ["dark", "common.dark"],
+                            ["system", "common.system"],
                           ] as const
-                        ).map(([value, label]) => (
+                        ).map(([value, labelKey]) => (
                           <button
                             key={value}
                             type="button"
@@ -641,7 +637,7 @@ export function SettingsView({
                               .join(" ")}
                             onClick={() => setTheme(value)}
                           >
-                            {label}
+                            {t(labelKey)}
                           </button>
                         ))}
                       </div>
@@ -658,7 +654,7 @@ export function SettingsView({
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        aria-label="Thème sombre"
+                        aria-label={t("settings.application.themeDarkAria")}
                         onClick={() => setTheme("dark")}
                       />
                       <button
@@ -670,20 +666,20 @@ export function SettingsView({
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        aria-label="Thème clair"
+                        aria-label={t("settings.application.themeLightAria")}
                         onClick={() => setTheme("light")}
                       />
                     </div>
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "hud")}</span>
-                      <p>{tApp(shell.uiLocale, "hudHint")}</p>
+                      <span>{t("settings.application.hud")}</span>
+                      <p>{t("settings.application.hudHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={overlayVisible}
-                        ariaLabel={tApp(shell.uiLocale, "hud")}
+                        ariaLabel={t("settings.application.hud")}
                         onChange={(checked) => {
                           setOverlayVisible(checked);
                           void invoke("set_overlay_visible", { visible: checked });
@@ -694,7 +690,7 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "hudOpacity")}</span>
+                      <span>{t("settings.application.hudOpacity")}</span>
                     </div>
                     <div className="v2-settings-row-control v2-settings-row-control--grow">
                       <label className="v2-settings-range">
@@ -715,18 +711,18 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "language")}</span>
-                      <p>{tApp(shell.uiLocale, "languageHint")}</p>
+                      <span>{t("settings.application.language")}</span>
+                      <p>{t("settings.application.languageHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <Select
                         className="v2-select"
                         value={shell.uiLocale}
-                        ariaLabel={tApp(shell.uiLocale, "language")}
+                        ariaLabel={t("settings.application.language")}
                         options={[
-                          { value: "system", label: "Système" },
-                          { value: "fr", label: "Français" },
-                          { value: "en", label: "English" },
+                          { value: "system", label: t("common.system") },
+                          { value: "fr", label: t("common.french") },
+                          { value: "en", label: t("common.english") },
                         ]}
                         onChange={(v) =>
                           persistShellPrefs({ uiLocale: v as UiLocale })
@@ -735,14 +731,14 @@ export function SettingsView({
                     </div>
                   </div>
                 </SettingsGroup>
-                <SettingsGroup title={tApp(shell.uiLocale, "groupClicker")}>
+                <SettingsGroup title={t("settings.application.groupClicker")}>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "clickerMode")}</span>
-                      <p>{tApp(shell.uiLocale, "clickerModeHint")}</p>
+                      <span>{t("settings.application.clickerMode")}</span>
+                      <p>{t("settings.application.clickerModeHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
-                      <div className="v2-segmented" role="group" aria-label="Mode Clicker">
+                      <div className="v2-segmented" role="group" aria-label={t("settings.application.clickerModeAria")}>
                         <button
                           type="button"
                           className={["v2-segmented-btn", !advanced ? "active" : ""]
@@ -750,7 +746,7 @@ export function SettingsView({
                             .join(" ")}
                           onClick={() => setAdvanced(false)}
                         >
-                          Simple
+                          {t("common.simple")}
                         </button>
                         <button
                           type="button"
@@ -759,30 +755,33 @@ export function SettingsView({
                             .join(" ")}
                           onClick={() => setAdvanced(true)}
                         >
-                          Avancé
+                          {t("common.advanced")}
                         </button>
                       </div>
                     </div>
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "state")}</span>
+                      <span>{t("settings.application.state")}</span>
                     </div>
                     <div className="v2-settings-row-control">
                       <strong className="v2-settings-status">
-                        {running ? "En cours" : "Inactif"}
+                        {running ? t("common.running") : t("common.inactive")}
                       </strong>
                     </div>
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>{tApp(shell.uiLocale, "liveMetrics")}</span>
+                      <span>{t("settings.application.liveMetrics")}</span>
                     </div>
                     <div className="v2-settings-row-control">
                       <code className="v2-settings-mono">
                         {metrics
-                          ? `${metrics.measuredCps.toFixed(1)} cps · ${metrics.clicksEmitted} clics`
-                          : "—"}
+                          ? t("settings.application.clicksMetric", {
+                              cps: metrics.measuredCps.toFixed(1),
+                              n: metrics.clicksEmitted,
+                            })
+                          : t("common.empty")}
                       </code>
                     </div>
                   </div>
@@ -792,11 +791,11 @@ export function SettingsView({
 
             {section === "hotkeys" ? (
               <>
-                <h2 className="v2-settings-pane-title">Raccourcis</h2>
+                <h2 className="v2-settings-pane-title">{t("settings.hotkeys.paneTitle")}</h2>
                 <p className="v2-settings-pane-hint">
-                  Valables hors focus. Défauts : clicker F6 · macro F9 · urgence F8.
+                  {t("settings.hotkeys.paneHint")}
                 </p>
-                <SettingsGroup title="Raccourcis globaux">
+                <SettingsGroup title={t("settings.hotkeys.groupTitle")}>
                   <HotkeySettings onBindingsChange={onHotkeysChange} />
                 </SettingsGroup>
               </>
@@ -804,27 +803,25 @@ export function SettingsView({
 
             {section === "security" ? (
               <>
-                <h2 className="v2-settings-pane-title">Sécurité</h2>
+                <h2 className="v2-settings-pane-title">{t("settings.security.paneTitle")}</h2>
                 <p className="v2-settings-pane-hint">
-                  Limite où Caster peut agir, et quel écran utiliser.
-                  {running ? " Filtre désactivé pendant une session en cours." : ""}
+                  {t("settings.security.paneHint")}
+                  {running ? t("settings.security.filterDisabled") : ""}
                 </p>
-                <SettingsGroup title="Filtre applications">
+                <SettingsGroup title={t("settings.security.filterGroup")}>
                   <p className="v2-settings-group-hint">
-                    Selon l’application au premier plan (
-                    <code className="v2-settings-mono">nom.exe</code>
-                    ). La session continue même si un clic est ignoré.
+                    {t("settings.security.filterIntro")}
                   </p>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Premier plan actuel</span>
+                      <span>{t("settings.security.foreground")}</span>
                     </div>
                     <div className="v2-settings-row-control">
-                      <code className="v2-settings-mono">{foregroundExe ?? "—"}</code>
+                      <code className="v2-settings-mono">{foregroundExe ?? t("common.empty")}</code>
                       <button
                         type="button"
                         className="v2-btn v2-btn-ghost"
-                        title="Actualiser les processus visibles"
+                        title={t("settings.security.refreshProcesses")}
                         onClick={refreshLiveExes}
                       >
                         <RefreshCw size={14} aria-hidden />
@@ -833,13 +830,13 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Activer le filtre</span>
+                      <span>{t("settings.security.enableFilter")}</span>
                     </div>
                     <div className="v2-settings-row-control">
                       <SettingsToggle
                         checked={processFilter.enabled}
                         disabled={running}
-                        ariaLabel="Activer le filtre"
+                        ariaLabel={t("settings.security.enableFilter")}
                         onChange={(checked) =>
                           persistProcess({
                             ...processFilter,
@@ -851,10 +848,8 @@ export function SettingsView({
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Mode</span>
-                      <p>
-                        Choisissez si la liste bloque ou autorise les applications.
-                      </p>
+                      <span>{t("settings.security.mode")}</span>
+                      <p>{t("settings.security.modeHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <Select
@@ -864,11 +859,11 @@ export function SettingsView({
                         options={[
                           {
                             value: "deny",
-                            label: "Ne jamais agir dans ces apps",
+                            label: t("settings.security.modeDeny"),
                           },
                           {
                             value: "allow",
-                            label: "Agir seulement dans ces apps",
+                            label: t("settings.security.modeAllow"),
                           },
                         ]}
                         onChange={(v) =>
@@ -883,7 +878,7 @@ export function SettingsView({
                   {liveExes.length > 0 ? (
                     <div className="v2-settings-row v2-settings-row--stack">
                       <div className="v2-settings-row-label">
-                        <span>Ajouter depuis processus visibles</span>
+                        <span>{t("settings.security.addFromVisible")}</span>
                       </div>
                       <div className="v2-settings-row-control v2-settings-row-control--full">
                         <Select
@@ -891,7 +886,7 @@ export function SettingsView({
                           value=""
                           disabled={running || !processFilter.enabled}
                           options={[
-                            { value: "", label: "Choisir…" },
+                            { value: "", label: t("settings.security.choose") },
                             ...liveExes
                               .filter((x) => !processFilter.names.includes(x))
                               .map((x) => ({ value: x, label: x })),
@@ -909,7 +904,7 @@ export function SettingsView({
                   ) : null}
                   <div className="v2-settings-row v2-settings-row--stack">
                     <div className="v2-settings-row-label">
-                      <span>Ajouter manuellement</span>
+                      <span>{t("settings.security.addManual")}</span>
                     </div>
                     <div className="v2-settings-row-control v2-settings-row-control--full">
                       <div className="v2-field-row">
@@ -937,13 +932,13 @@ export function SettingsView({
                             });
                           }}
                         >
-                          Ajouter
+                          {t("settings.security.add")}
                         </button>
                       </div>
                     </div>
                   </div>
                   {processFilter.names.length === 0 ? (
-                    <p className="v2-settings-group-hint">Aucun processus listé.</p>
+                    <p className="v2-settings-group-hint">{t("settings.security.noneListed")}</p>
                   ) : (
                     <ul className="v2-settings-process-list">
                       {processFilter.names.map((n) => (
@@ -960,17 +955,17 @@ export function SettingsView({
                               })
                             }
                           >
-                            Retirer
+                            {t("settings.security.remove")}
                           </button>
                         </li>
                       ))}
                     </ul>
                   )}
                 </SettingsGroup>
-                <SettingsGroup title="Écran">
+                <SettingsGroup title={t("settings.security.displayGroup")}>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Moniteur pour overlays et coordonnées</span>
+                      <span>{t("settings.security.monitor")}</span>
                     </div>
                     <div className="v2-settings-row-control v2-settings-row-control--grow">
                       <div className="v2-field-row">
@@ -978,10 +973,10 @@ export function SettingsView({
                           className="v2-select"
                           value={displayId ?? ""}
                           options={[
-                            { value: "", label: "Principal (défaut)" },
+                            { value: "", label: t("settings.security.primaryDefault") },
                             ...displays.map((d) => ({
                               value: d.id,
-                              label: displayOptionLabel(d),
+                              label: displayOptionLabel(d, t("settings.security.primarySuffix")),
                             })),
                           ]}
                           onChange={(v) => {
@@ -994,7 +989,7 @@ export function SettingsView({
                         <button
                           type="button"
                           className="v2-btn v2-btn-ghost"
-                          title="Actualiser la liste"
+                          title={t("settings.security.refreshList")}
                           onClick={refreshDisplays}
                         >
                           <RefreshCw size={14} aria-hidden />
@@ -1008,17 +1003,14 @@ export function SettingsView({
 
             {section === "data" ? (
               <>
-                <h2 className="v2-settings-pane-title">Données</h2>
-                <p className="v2-settings-pane-hint">
-                  Fichiers locaux, sauvegarde des préférences, nettoyage.
-                </p>
-                <SettingsGroup title="Actions">
+                <h2 className="v2-settings-pane-title">{t("settings.data.paneTitle")}</h2>
+                <p className="v2-settings-pane-hint">{t("settings.data.paneHint")}</p>
+                <SettingsGroup title={t("settings.data.actionsGroup")}>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Ouvrir les fichiers de config</span>
+                      <span>{t("settings.data.openConfig")}</span>
                       <p>
-                        Dossier contenant{" "}
-                        <code className="v2-settings-mono">settings.json</code>
+                        {t("settings.data.openConfigHint")}
                         {paths?.settingsPath ? (
                           <>
                             {" "}
@@ -1029,7 +1021,6 @@ export function SettingsView({
                             )
                           </>
                         ) : null}
-                        .
                       </p>
                     </div>
                     <div className="v2-settings-row-control">
@@ -1041,13 +1032,13 @@ export function SettingsView({
                           paths && void invoke("open_path", { path: paths.configDir })
                         }
                       >
-                        Ouvrir
+                        {t("common.open")}
                       </button>
                     </div>
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Ouvrir les journaux</span>
+                      <span>{t("settings.data.openLogs")}</span>
                     </div>
                     <div className="v2-settings-row-control">
                       <button
@@ -1058,18 +1049,14 @@ export function SettingsView({
                           paths && void invoke("open_path", { path: paths.logDir })
                         }
                       >
-                        Ouvrir
+                        {t("common.open")}
                       </button>
                     </div>
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Exporter / importer</span>
-                      <p>
-                        Uniquement{" "}
-                        <code className="v2-settings-mono">settings.json</code> — pas
-                        macros ni Accueil.
-                      </p>
+                      <span>{t("settings.data.exportImport")}</span>
+                      <p>{t("settings.data.exportImportHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <button
@@ -1077,24 +1064,21 @@ export function SettingsView({
                         className="v2-btn"
                         onClick={() => void exportSettings()}
                       >
-                        Exporter
+                        {t("common.export")}
                       </button>
                       <button
                         type="button"
                         className="v2-btn v2-btn-ghost"
                         onClick={() => void importSettings()}
                       >
-                        Importer
+                        {t("common.import")}
                       </button>
                     </div>
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Vider la corbeille</span>
-                      <p>
-                        Supprime définitivement les macros et presets mis à la
-                        corbeille.
-                      </p>
+                      <span>{t("settings.data.purgeTrash")}</span>
+                      <p>{t("settings.data.purgeTrashHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <button
@@ -1102,17 +1086,14 @@ export function SettingsView({
                         className="v2-btn v2-btn-danger-ghost"
                         onClick={() => void purgeTrash()}
                       >
-                        Vider
+                        {t("settings.data.purge")}
                       </button>
                     </div>
                   </div>
                   <div className="v2-settings-row">
                     <div className="v2-settings-row-label">
-                      <span>Réinitialiser le clicker</span>
-                      <p>
-                        Remet entrée, timing, cible, limites et zones aux valeurs par
-                        défaut. Presets et raccourcis sont conservés.
-                      </p>
+                      <span>{t("settings.data.resetClicker")}</span>
+                      <p>{t("settings.data.resetClickerHint")}</p>
                     </div>
                     <div className="v2-settings-row-control">
                       <button
@@ -1121,32 +1102,31 @@ export function SettingsView({
                         disabled={running}
                         onClick={() => void resetClicker()}
                       >
-                        Réinitialiser
+                        {t("settings.data.reset")}
                       </button>
                     </div>
                   </div>
                 </SettingsGroup>
-                <SettingsGroup title="À propos">
+                <SettingsGroup title={t("settings.data.aboutGroup")}>
                   <div className="v2-settings-about">
                     <strong>Caster</strong>
-                    <p>Automatisation Windows — clicker et macros, 100 % local.</p>
+                    <p>{t("settings.data.aboutBlurb")}</p>
                     <dl className="v2-settings-about-meta">
                       <div>
-                        <dt>Version</dt>
-                        <dd>{paths?.version ?? "—"}</dd>
+                        <dt>{t("settings.data.version")}</dt>
+                        <dd>{paths?.version ?? t("common.empty")}</dd>
                       </div>
                       <div>
-                        <dt>Licence</dt>
+                        <dt>{t("settings.data.license")}</dt>
                         <dd>MIT</dd>
                       </div>
                       <div>
-                        <dt>Plateforme</dt>
+                        <dt>{t("settings.data.platform")}</dt>
                         <dd>Windows</dd>
                       </div>
                     </dl>
                     <p className="v2-settings-group-hint">
-                      Aucune télémétrie · données locales. Hotkeys globales, capture et
-                      injection d’entrée : Windows uniquement pour l’instant.
+                      {t("settings.data.aboutFooter")}
                     </p>
                   </div>
                 </SettingsGroup>
