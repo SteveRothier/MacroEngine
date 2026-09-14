@@ -1,12 +1,29 @@
 import { defineCatalog } from "../defineCatalog";
-/**
- * Run journal / dock — migrate progressively.
- */
+
+/** Run journal dock. */
 export const runs = defineCatalog({
   fr: {
-    _todo: "Migrer progressivement les chaînes journal ici.",
+    title: "Journal",
+    aria: "Journal",
+    filterAll: "Tout",
+    filterMacros: "Macros",
+    filterClicker: "Clicker",
+    filterSystem: "Système",
+    clear: "Vider",
+    close: "Fermer",
+    emptyTitle: "Aucune entrée",
+    emptyLead: "Les logs d’exécution apparaîtront ici.",
   },
   en: {
-    _todo: "Gradually migrate journal strings here.",
+    title: "Journal",
+    aria: "Journal",
+    filterAll: "All",
+    filterMacros: "Macros",
+    filterClicker: "Clicker",
+    filterSystem: "System",
+    clear: "Clear",
+    close: "Close",
+    emptyTitle: "No entries",
+    emptyLead: "Run logs will appear here.",
   },
 });
