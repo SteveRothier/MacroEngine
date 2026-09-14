@@ -826,6 +826,12 @@ fn update_tray_tooltip(app: &AppHandle, engine: &AppState) {
 fn show_main_window(app: &AppHandle) {
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.unminimize();
+        // If a previous bad save parked the window off-screen, bring it back.
+        if let Ok(pos) = main.outer_position() {
+            if pos.x <= -10_000 || pos.y <= -10_000 {
+                let _ = main.center();
+            }
+        }
         let _ = main.show();
         let _ = main.set_focus();
     }
@@ -918,6 +924,21 @@ fn session_is_active(engine: &AppState) -> bool {
     )
 }
 
+fn window_bounds_sane(b: &WindowBounds) -> bool {
+    // Windows reports ~(-32000,-32000) while minimized; never restore that.
+    if b.x <= -10_000 || b.y <= -10_000 {
+        return false;
+    }
+    if b.width < 200 || b.height < 200 {
+        return false;
+    }
+    // Guard against absurd sizes from bad saves.
+    if b.width > 16_000 || b.height > 16_000 {
+        return false;
+    }
+    true
+}
+
 fn apply_main_window_shell(app: &AppHandle, shell: &ShellPrefs, hide_for_autostart: bool) {
     let Some(main) = app.get_webview_window("main") else {
         return;
@@ -925,8 +946,21 @@ fn apply_main_window_shell(app: &AppHandle, shell: &ShellPrefs, hide_for_autosta
     let _ = main.set_always_on_top(shell.always_on_top);
     if shell.remember_window_bounds {
         if let Some(b) = &shell.window_bounds {
-            let _ = main.set_position(tauri::PhysicalPosition::new(b.x, b.y));
-            let _ = main.set_size(tauri::PhysicalSize::new(b.width.max(400), b.height.max(300)));
+            if window_bounds_sane(b) {
+                let _ = main.set_position(tauri::PhysicalPosition::new(b.x, b.y));
+                let _ = main.set_size(tauri::PhysicalSize::new(
+                    b.width.max(400),
+                    b.height.max(300),
+                ));
+            } else {
+                log::warn!(
+                    "ignoring invalid windowBounds ({}, {}) {}x{}",
+                    b.x,
+                    b.y,
+                    b.width,
+                    b.height
+                );
+            }
         }
     }
     if hide_for_autostart && shell.minimize_to_tray {
@@ -938,8 +972,8 @@ fn persist_main_window_bounds(app: &AppHandle, engine: &AppState) {
     let Some(main) = app.get_webview_window("main") else {
         return;
     };
-    // Avoid persisting garbage geometry while the window is hidden (close-to-tray).
-    if !main.is_visible().unwrap_or(false) {
+    // Avoid persisting garbage geometry while hidden or minimized.
+    if !main.is_visible().unwrap_or(false) || main.is_minimized().unwrap_or(false) {
         return;
     }
     let Some(prefs) = app.try_state::<Mutex<UiPrefs>>() else {
@@ -957,12 +991,16 @@ fn persist_main_window_bounds(app: &AppHandle, engine: &AppState) {
     let Ok(size) = main.outer_size() else {
         return;
     };
-    p.shell.window_bounds = Some(WindowBounds {
+    let next = WindowBounds {
         x: pos.x,
         y: pos.y,
         width: size.width,
         height: size.height,
-    });
+    };
+    if !window_bounds_sane(&next) {
+        return;
+    }
+    p.shell.window_bounds = Some(next);
     drop(p);
     persist(app, engine);
 }
