@@ -1,4 +1,5 @@
 import { MoreHorizontal } from "lucide-react";
+import { useT } from "../i18n";
 import { DropdownMenu, Tooltip } from "../ui/v2";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
@@ -37,7 +38,8 @@ export function AutomationRowMenu({
   moveFolders,
   onMoveToFolder,
 }: Props) {
-  const items = buildAutomationRowMenuItems(row, {
+  const t = useT();
+  const items = buildAutomationRowMenuItems(row, t, {
     onOpen,
     onLaunch,
     onRename,
@@ -53,11 +55,11 @@ export function AutomationRowMenu({
   });
 
   return (
-    <Tooltip content="Plus d'actions">
+    <Tooltip content={t("automations.menu.row.moreTip")}>
       <span className="v2-auto-row-menu-wrap">
         <DropdownMenu
-          label="Plus d'actions"
-          ariaLabel={`Actions pour ${row.name}`}
+          label={t("automations.menu.row.moreLabel")}
+          ariaLabel={t("automations.menu.row.actionsAria", { name: row.name })}
           open={open}
           onOpenChange={onOpenChange}
           align="end"

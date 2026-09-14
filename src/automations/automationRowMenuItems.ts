@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { TFunction } from "../i18n";
 import type { MenuItemDef } from "../ui/v2";
 import type { AutomationFolderOption, AutomationRow } from "./types";
 import { folderOptionKey } from "./types";
@@ -33,12 +34,13 @@ export type AutomationRowMenuActions = {
 /** Shared items for Accueil ⋯ menu and context menu. */
 export function buildAutomationRowMenuItems(
   row: AutomationRow,
+  t: TFunction,
   actions: AutomationRowMenuActions,
 ): MenuItemDef[] {
   const items: MenuItemDef[] = [
     {
       id: "open",
-      label: "Ouvrir",
+      label: t("common.open"),
       icon: actions.icons?.open,
       onSelect: actions.onOpen,
     },
@@ -46,7 +48,7 @@ export function buildAutomationRowMenuItems(
   if (actions.onRename && !row.locked) {
     items.push({
       id: "rename",
-      label: "Renommer",
+      label: t("automations.menu.row.rename"),
       icon: actions.icons?.rename,
       onSelect: actions.onRename,
     });
@@ -54,7 +56,7 @@ export function buildAutomationRowMenuItems(
   if (actions.onDuplicate && !row.locked) {
     items.push({
       id: "duplicate",
-      label: "Dupliquer",
+      label: t("automations.menu.row.duplicate"),
       icon: actions.icons?.duplicate,
       onSelect: actions.onDuplicate,
     });
@@ -62,14 +64,14 @@ export function buildAutomationRowMenuItems(
   if (row.kind !== "script") {
     items.push({
       id: "launch",
-      label: "Lancer",
+      label: t("automations.menu.row.launch"),
       icon: actions.icons?.launch,
       onSelect: actions.onLaunch,
     });
   } else {
     items.push({
       id: "launch",
-      label: "Exécuter",
+      label: t("automations.menu.row.execute"),
       icon: actions.icons?.launch,
       onSelect: actions.onLaunch,
     });
@@ -81,7 +83,9 @@ export function buildAutomationRowMenuItems(
     if (actions.onToggleFavorite) {
       items.push({
         id: "favorite",
-        label: row.favorite ? "Retirer des favoris" : "Ajouter aux favoris",
+        label: row.favorite
+          ? t("automations.menu.row.removeFavorite")
+          : t("automations.menu.row.addFavorite"),
         icon: actions.icons?.favorite,
         onSelect: actions.onToggleFavorite,
       });
@@ -89,14 +93,14 @@ export function buildAutomationRowMenuItems(
     if (row.locked && actions.onUnlock) {
       items.push({
         id: "unlock",
-        label: "Déverrouiller",
+        label: t("automations.menu.row.unlock"),
         icon: actions.icons?.unlock,
         onSelect: actions.onUnlock,
       });
     } else if (!row.locked && actions.onLock) {
       items.push({
         id: "lock",
-        label: "Verrouiller",
+        label: t("automations.menu.row.lock"),
         icon: actions.icons?.lock,
         onSelect: actions.onLock,
       });
@@ -106,7 +110,7 @@ export function buildAutomationRowMenuItems(
       const moveSub: MenuItemDef[] = [
         {
           id: "move-root",
-          label: "Sans dossier",
+          label: t("automations.menu.row.noFolder"),
           icon: actions.icons?.move,
           onSelect: () => actions.onMoveToFolder?.(null),
         },
@@ -119,7 +123,7 @@ export function buildAutomationRowMenuItems(
       ];
       items.push({
         id: "move",
-        label: "Déplacer vers",
+        label: t("automations.menu.row.moveTo"),
         icon: actions.icons?.move,
         submenu: moveSub,
       });
@@ -129,7 +133,7 @@ export function buildAutomationRowMenuItems(
   if (actions.onReveal) {
     items.push({
       id: "reveal",
-      label: "Afficher dans l’explorateur",
+      label: t("automations.menu.row.reveal"),
       icon: actions.icons?.reveal,
       onSelect: actions.onReveal,
     });
@@ -141,8 +145,8 @@ export function buildAutomationRowMenuItems(
       id: "delete",
       label:
         row.kind === "macro" || row.kind === "clicker"
-          ? "Mettre à la corbeille"
-          : "Supprimer",
+          ? t("automations.menu.row.trash")
+          : t("automations.menu.row.delete"),
       icon: actions.icons?.delete,
       danger: true,
       onSelect: actions.onDelete,

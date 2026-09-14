@@ -1,90 +1,140 @@
 import type { RecentEntry, RecentRunStatus } from "../quickAccess";
+import type { AppLocale, TFunction } from "../i18n";
 import type { AutomationRow } from "./types";
 
-/** Relative French label for a unix-ms timestamp. */
-export function formatRelativeRunFr(at: number, now = Date.now()): string {
-  if (!Number.isFinite(at) || at <= 0) return "—";
+function localeTag(locale: AppLocale): string {
+  return locale === "en" ? "en-US" : "fr-FR";
+}
+
+function decimalSep(locale: AppLocale): string {
+  return locale === "en" ? "." : ",";
+}
+
+/** Relative label for a unix-ms timestamp. */
+export function formatRelativeRun(
+  at: number,
+  t: TFunction,
+  now = Date.now(),
+  locale: AppLocale = "fr",
+): string {
+  if (!Number.isFinite(at) || at <= 0) return t("common.empty");
   const sec = Math.max(0, Math.floor((now - at) / 1000));
-  if (sec < 45) return "à l’instant";
+  if (sec < 45) return t("automations.relative.justNow");
   if (sec < 3600) {
     const m = Math.max(1, Math.floor(sec / 60));
-    return m === 1 ? "il y a 1 min" : `il y a ${m} min`;
+    return m === 1
+      ? t("automations.relative.minutesOne")
+      : t("automations.relative.minutes", { count: m });
   }
   if (sec < 86400) {
     const h = Math.max(1, Math.floor(sec / 3600));
-    return h === 1 ? "il y a 1 h" : `il y a ${h} h`;
+    return h === 1
+      ? t("automations.relative.hoursOne")
+      : t("automations.relative.hours", { count: h });
   }
   const d = Math.floor(sec / 86400);
-  if (d === 1) return "hier";
-  if (d < 7) return `il y a ${d} j`;
-  return new Date(at).toLocaleDateString("fr-FR");
+  if (d === 1) return t("automations.relative.yesterday");
+  if (d < 7) return t("automations.relative.days", { count: d });
+  return new Date(at).toLocaleDateString(localeTag(locale));
 }
 
-export function formatDurationFr(ms: number): string {
+export function formatDuration(
+  ms: number,
+  t: TFunction,
+  locale: AppLocale = "fr",
+): string {
   if (!Number.isFinite(ms) || ms < 0) return "";
-  if (ms < 1000) return `${Math.round(ms)} ms`;
+  if (ms < 1000) {
+    return t("automations.relative.durationMs", { ms: Math.round(ms) });
+  }
   const sec = ms / 1000;
   if (sec < 60) {
     const rounded = sec < 10 ? sec.toFixed(1) : String(Math.round(sec));
-    return `${rounded.replace(".", ",")} s`;
+    const sep = decimalSep(locale);
+    return t("automations.relative.durationSec", {
+      sec: rounded.replace(".", sep),
+    });
   }
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
-  return s > 0 ? `${m} min ${s} s` : `${m} min`;
+  return s > 0
+    ? t("automations.relative.durationMinSec", { m, s })
+    : t("automations.relative.durationMin", { m });
 }
 
-export function recentStatusLabelFr(status: RecentRunStatus): string {
+export function recentStatusLabel(
+  status: RecentRunStatus,
+  t: TFunction,
+): string {
   switch (status) {
     case "ok":
-      return "OK";
+      return t("automations.relative.statusOk");
     case "error":
-      return "Erreur";
+      return t("automations.relative.statusError");
     case "cancelled":
-      return "Annulé";
+      return t("automations.relative.statusCancelled");
   }
 }
 
 /** Compact Accueil cell: relative · duration · status (when known). */
-export function formatLastRunSummary(entry: RecentEntry, now = Date.now()): string {
-  const parts = [formatRelativeRunFr(entry.at, now)];
+export function formatLastRunSummary(
+  entry: RecentEntry,
+  t: TFunction,
+  now = Date.now(),
+  locale: AppLocale = "fr",
+): string {
+  const parts = [formatRelativeRun(entry.at, t, now, locale)];
   if (entry.durationMs != null && entry.durationMs >= 0) {
-    const d = formatDurationFr(entry.durationMs);
+    const d = formatDuration(entry.durationMs, t, locale);
     if (d) parts.push(d);
   }
-  if (entry.status) parts.push(recentStatusLabelFr(entry.status));
+  if (entry.status) parts.push(recentStatusLabel(entry.status, t));
   return parts.join(" · ");
 }
 
 /** Tooltip: statut · durée · relative. */
-export function formatLastRunTooltip(entry: RecentEntry, now = Date.now()): string {
+export function formatLastRunTooltip(
+  entry: RecentEntry,
+  t: TFunction,
+  now = Date.now(),
+  locale: AppLocale = "fr",
+): string {
   const parts: string[] = [];
-  if (entry.status) parts.push(recentStatusLabelFr(entry.status));
+  if (entry.status) parts.push(recentStatusLabel(entry.status, t));
   if (entry.durationMs != null && entry.durationMs >= 0) {
-    const d = formatDurationFr(entry.durationMs);
+    const d = formatDuration(entry.durationMs, t, locale);
     if (d) parts.push(d);
   }
-  parts.push(formatRelativeRunFr(entry.at, now));
+  parts.push(formatRelativeRun(entry.at, t, now, locale));
   return parts.join(" · ");
 }
 
-export function lastRunLabelMap(recent: RecentEntry[]): Map<string, string> {
+export function lastRunLabelMap(
+  recent: RecentEntry[],
+  t: TFunction,
+  locale: AppLocale = "fr",
+): Map<string, string> {
   const now = Date.now();
   const map = new Map<string, string>();
   for (const r of recent) {
     const key = `${r.kind}:${r.id}`;
     if (map.has(key)) continue;
-    map.set(key, formatLastRunSummary(r, now));
+    map.set(key, formatLastRunSummary(r, t, now, locale));
   }
   return map;
 }
 
-export function lastRunTooltipMap(recent: RecentEntry[]): Map<string, string> {
+export function lastRunTooltipMap(
+  recent: RecentEntry[],
+  t: TFunction,
+  locale: AppLocale = "fr",
+): Map<string, string> {
   const now = Date.now();
   const map = new Map<string, string>();
   for (const r of recent) {
     const key = `${r.kind}:${r.id}`;
     if (map.has(key)) continue;
-    map.set(key, formatLastRunTooltip(r, now));
+    map.set(key, formatLastRunTooltip(r, t, now, locale));
   }
   return map;
 }

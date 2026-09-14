@@ -1,87 +1,108 @@
+import type { TFunction } from "../i18n";
 import type { AutomationRow, AutomationStatus } from "./types";
 
-export function kindTooltip(row: AutomationRow): string {
+export function kindTooltip(row: AutomationRow, t: TFunction): string {
   const kind =
     row.kind === "macro"
-      ? "Macro"
+      ? t("automations.row.kindTipMacro")
       : row.kind === "clicker"
-        ? "Clicker preset"
-        : "Script";
-  if (row.folderLabel && row.folderLabel !== "—") {
-    return `${kind} · Dossier : ${row.folderLabel}`;
+        ? t("automations.row.kindTipClicker")
+        : t("automations.row.kindTipScript");
+  if (row.folderLabel && row.folderLabel !== t("common.empty")) {
+    return t("automations.row.kindTipWithFolder", {
+      kind,
+      folder: row.folderLabel,
+    });
   }
   return kind;
 }
 
-export function metaTooltip(row: AutomationRow): string {
+export function metaTooltip(row: AutomationRow, t: TFunction): string {
+  const empty = t("common.empty");
   const parts = [
     row.triggerLabel,
-    row.folderLabel !== "—" ? row.folderLabel : null,
+    row.folderLabel !== empty ? row.folderLabel : null,
     row.lastRunLabel,
   ].filter(Boolean);
   return parts.join(" · ");
 }
 
-export function statusTooltip(status: AutomationStatus): string {
+export function statusTooltip(
+  status: AutomationStatus,
+  t: TFunction,
+): string {
   switch (status) {
     case "attention":
-      return "Modifications non enregistrées";
+      return t("automations.status.tipAttention");
     case "locked":
-      return "Verrouillé";
+      return t("automations.status.tipLocked");
     case "failed":
-      return "Erreur d'exécution";
+      return t("automations.status.tipFailed");
     case "healthy":
-      return "OK";
+      return t("automations.status.tipHealthy");
   }
 }
 
-export function favoriteTooltip(favorite: boolean): string {
-  return favorite ? "Retirer des favoris" : "Ajouter aux favoris";
+export function favoriteTooltip(favorite: boolean, t: TFunction): string {
+  return favorite
+    ? t("automations.row.removeFavorite")
+    : t("automations.row.addFavorite");
 }
 
-export function sortByLabel(sortBy: "name" | "type" | "status"): string {
+export function sortByLabel(
+  sortBy: "name" | "type" | "status",
+  t: TFunction,
+): string {
   switch (sortBy) {
     case "name":
-      return "Nom";
+      return t("automations.row.sortName");
     case "type":
-      return "Type";
+      return t("automations.row.sortType");
     case "status":
-      return "Statut";
+      return t("automations.row.sortStatus");
   }
 }
 
 export function filterPillTooltip(
   filter: "all" | "favorites" | "recent" | "scripts",
+  t: TFunction,
 ): string {
   switch (filter) {
     case "all":
-      return "Toutes les automations";
+      return t("automations.filter.tipAll");
     case "favorites":
-      return "Favoris uniquement";
+      return t("automations.filter.tipFavorites");
     case "recent":
-      return "Dernières exécutions";
+      return t("automations.filter.tipRecent");
     case "scripts":
-      return "Scripts JavaScript réutilisables";
+      return t("automations.filter.tipScripts");
   }
 }
 
 /** Secondary line under the name (Linear-style) — never repeats the type badge. */
 export function rowSubtitle(
   row: AutomationRow,
+  t: TFunction,
   opts?: { running?: boolean },
 ): string | null {
-  if (opts?.running) return "En cours";
+  if (opts?.running) return t("common.running");
+  const empty = t("common.empty");
   if (row.kind === "script") {
     const n = row.permLabels?.length ?? 0;
-    if (n > 0) return `${n} accès`;
-    if (row.lastRunLabel !== "—") return row.lastRunLabel;
+    if (n > 0) return t("automations.row.permAccess", { count: n });
+    if (row.lastRunLabel !== empty) return row.lastRunLabel;
     return null;
   }
   const parts: string[] = [];
   if (row.meta?.trim()) parts.push(row.meta.trim());
-  if (row.folderLabel && row.folderLabel !== "—") parts.push(row.folderLabel);
+  if (row.folderLabel && row.folderLabel !== empty) parts.push(row.folderLabel);
   if (parts.length > 0) return parts.join(" · ");
-  if (row.lastRunLabel !== "—") return row.lastRunLabel;
-  if (row.triggerLabel && row.triggerLabel !== "Manuel") return row.triggerLabel;
+  if (row.lastRunLabel !== empty) return row.lastRunLabel;
+  if (
+    row.triggerLabel &&
+    row.triggerLabel !== t("automations.trigger.manual")
+  ) {
+    return row.triggerLabel;
+  }
   return null;
 }

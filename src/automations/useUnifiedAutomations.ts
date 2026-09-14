@@ -9,6 +9,7 @@ import type { LibraryFolder, LibraryIndexDto } from "../library/types";
 import type { QuickAccess } from "../quickAccess";
 import type { ScriptDoc } from "../scripts/types";
 import { activePermissionLabels } from "../scripts/ScriptPermissionsMenu";
+import { useLocale, useT, type TFunction } from "../i18n";
 import type {
   AutomationFilter,
   AutomationFolderOption,
@@ -33,9 +34,13 @@ type ClickerSummary = {
   mode: string;
 };
 
-function folderName(folders: LibraryFolder[], id: string | null): string {
-  if (!id) return "—";
-  return folders.find((f) => f.id === id)?.name ?? "—";
+function folderName(
+  folders: LibraryFolder[],
+  id: string | null,
+  t: TFunction,
+): string {
+  if (!id) return t("common.empty");
+  return folders.find((f) => f.id === id)?.name ?? t("common.empty");
 }
 
 function toFolderOptions(
@@ -45,9 +50,9 @@ function toFolderOptions(
   return folders.map((f) => ({ id: f.id, name: f.name, kind }));
 }
 
-function macroTriggerLabel(m: MacroSummary): string {
+function macroTriggerLabel(m: MacroSummary, t: TFunction): string {
   const key = m.triggerKey?.trim();
-  if (!key) return "Manuel";
+  if (!key) return t("automations.trigger.manual");
   const n = Number(key);
   if (!Number.isNaN(n) && n > 0) {
     return formatKeyChord(vkLabel(n), m.triggerMods ?? undefined);
@@ -74,6 +79,8 @@ export function useUnifiedAutomations(options: {
   folderKey?: string | null;
   setQuery?: (q: string) => void;
 }) {
+  const t = useT();
+  const { locale } = useLocale();
   const [rows, setRows] = useState<AutomationRow[]>([]);
   const [recentOrder, setRecentOrder] = useState<string[]>([]);
   const [folders, setFolders] = useState<AutomationFolderOption[]>([]);
@@ -107,8 +114,8 @@ export function useUnifiedAutomations(options: {
       const favMacros = qa.favorites.macros ?? [];
       const favClickers = qa.favorites.clickerPresets ?? [];
       setRecentOrder(qa.recent.map((r) => rowKey(r.kind, r.id)));
-      const runLabels = lastRunLabelMap(qa.recent);
-      const runTooltips = lastRunTooltipMap(qa.recent);
+      const runLabels = lastRunLabelMap(qa.recent, t, locale);
+      const runTooltips = lastRunTooltipMap(qa.recent, t, locale);
       setFolders([
         ...toFolderOptions("macro", macroIndex.folders),
         ...toFolderOptions("clicker", clickerIndex.folders),
@@ -116,6 +123,7 @@ export function useUnifiedAutomations(options: {
 
       const macroMap = new Map(macros.map((m) => [m.name, m]));
       const clickerMap = new Map(clickers.map((c) => [c.name, c]));
+      const empty = t("common.empty");
 
       const next: AutomationRow[] = [];
 
@@ -126,20 +134,24 @@ export function useUnifiedAutomations(options: {
           id: it.id,
           name: it.name,
           kind: "macro",
-          triggerLabel: m ? macroTriggerLabel(m) : "Manuel",
-          folderLabel: folderName(macroIndex.folders, it.folderId ?? null),
+          triggerLabel: m
+            ? macroTriggerLabel(m, t)
+            : t("automations.trigger.manual"),
+          folderLabel: folderName(macroIndex.folders, it.folderId ?? null, t),
           folderId: it.folderId ?? null,
           status: it.locked
             ? "locked"
             : options.dirtyMacroId === it.id
               ? "attention"
               : "healthy",
-          lastRunLabel: runLabels.get(rowKey("macro", it.id)) ?? "—",
+          lastRunLabel: runLabels.get(rowKey("macro", it.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("macro", it.id)),
           favorite: favMacros.includes(it.id),
           locked: it.locked,
           dirty: options.dirtyMacroId === it.id,
-          meta: m ? `${m.actionCount} actions` : undefined,
+          meta: m
+            ? t("automations.row.metaActions", { count: m.actionCount })
+            : undefined,
           sortOrder: it.sortOrder ?? 0,
         });
       }
@@ -152,19 +164,21 @@ export function useUnifiedAutomations(options: {
           name: it.name,
           kind: "clicker",
           triggerLabel: hk ? clickerTriggerLabel(hk) : "F6",
-          folderLabel: folderName(clickerIndex.folders, it.folderId ?? null),
+          folderLabel: folderName(clickerIndex.folders, it.folderId ?? null, t),
           folderId: it.folderId ?? null,
           status: it.locked
             ? "locked"
             : options.dirtyClickerId === it.id
               ? "attention"
               : "healthy",
-          lastRunLabel: runLabels.get(rowKey("clicker", it.id)) ?? "—",
+          lastRunLabel: runLabels.get(rowKey("clicker", it.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("clicker", it.id)),
           favorite: favClickers.includes(it.id),
           locked: it.locked,
           dirty: options.dirtyClickerId === it.id,
-          meta: c ? `${c.cps.toFixed(0)} CPS` : undefined,
+          meta: c
+            ? t("automations.row.metaCps", { cps: c.cps.toFixed(0) })
+            : undefined,
           sortOrder: it.sortOrder ?? 0,
         });
       }
@@ -175,11 +189,11 @@ export function useUnifiedAutomations(options: {
           id: s.id,
           name: s.name,
           kind: "script",
-          triggerLabel: "Script",
-          folderLabel: "—",
+          triggerLabel: t("automations.trigger.script"),
+          folderLabel: empty,
           folderId: null,
           status: options.dirtyScriptId === s.id ? "attention" : "healthy",
-          lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? "—",
+          lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("script", s.id)),
           favorite: false,
           locked: false,
@@ -197,7 +211,13 @@ export function useUnifiedAutomations(options: {
     } finally {
       setLoading(false);
     }
-  }, [options.dirtyMacroId, options.dirtyClickerId, options.dirtyScriptId]);
+  }, [
+    options.dirtyMacroId,
+    options.dirtyClickerId,
+    options.dirtyScriptId,
+    t,
+    locale,
+  ]);
 
   useEffect(() => {
     void refresh();

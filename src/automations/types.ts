@@ -1,3 +1,4 @@
+import type { TFunction } from "../i18n";
 import type { StatusKind } from "../ui/v2";
 import type { LibraryKind } from "../library/types";
 
@@ -25,19 +26,22 @@ export type AutomationRow = {
   permLabels?: string[];
 };
 
-export function statusToPill(status: AutomationStatus): {
+export function statusToPill(
+  status: AutomationStatus,
+  t: TFunction,
+): {
   kind: StatusKind;
   label: string;
 } {
   switch (status) {
     case "healthy":
-      return { kind: "healthy", label: "OK" };
+      return { kind: "healthy", label: t("automations.status.pillOk") };
     case "attention":
-      return { kind: "attention", label: "Modifié" };
+      return { kind: "attention", label: t("automations.status.pillModified") };
     case "locked":
-      return { kind: "paused", label: "Verrouillé" };
+      return { kind: "paused", label: t("automations.status.pillLocked") };
     case "failed":
-      return { kind: "failed", label: "Erreur" };
+      return { kind: "failed", label: t("automations.status.pillError") };
   }
 }
 
