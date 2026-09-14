@@ -184,7 +184,7 @@ export function useUnifiedAutomations(options: {
       }
 
       for (const s of scripts) {
-        const permLabels = activePermissionLabels(s);
+        const permLabels = activePermissionLabels(s, t);
         next.push({
           id: s.id,
           name: s.name,

@@ -1,11 +1,13 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useT, type AppLocale } from "../i18n";
 import {
   ContextMenu,
   useContextMenuState,
@@ -48,6 +50,10 @@ function readHeight(scriptId: string): number {
   }
 }
 
+function localeTag(locale: AppLocale): string {
+  return locale === "en" ? "en-US" : "fr-FR";
+}
+
 export function classifyConsoleMessage(msg: string): ConsoleLevel {
   if (/erreur|error|échoué|failed|disabled/i.test(msg)) return "error";
   if (
@@ -60,8 +66,11 @@ export function classifyConsoleMessage(msg: string): ConsoleLevel {
   return "info";
 }
 
-export function formatConsoleTime(d = new Date()): string {
-  return d.toLocaleTimeString("fr-FR", {
+export function formatConsoleTime(
+  d = new Date(),
+  locale: AppLocale = "fr",
+): string {
+  return d.toLocaleTimeString(localeTag(locale), {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
@@ -69,17 +78,19 @@ export function formatConsoleTime(d = new Date()): string {
   });
 }
 
-const CLEAR_ITEMS: MenuItemDef[] = [
-  { id: "clear", label: "Effacer la console" },
-];
-
 export function ScriptConsole({ scriptId, lines, onClear }: Props) {
+  const t = useT();
   const [collapsed, setCollapsed] = useState(() => readCollapsed(scriptId));
   const [height, setHeight] = useState(() => readHeight(scriptId));
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const stickRef = useRef(true);
   const layoutRef = useRef<HTMLDivElement | null>(null);
   const ctxMenu = useContextMenuState();
+
+  const clearItems = useMemo<MenuItemDef[]>(
+    () => [{ id: "clear", label: t("scripts.console.clearMenu") }],
+    [t],
+  );
 
   useEffect(() => {
     setCollapsed(readCollapsed(scriptId));
@@ -154,7 +165,7 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
           onPointerDown={onSplitterPointerDown}
           role="separator"
           aria-orientation="horizontal"
-          aria-label="Redimensionner la console"
+          aria-label={t("scripts.console.resizeAria")}
         />
       ) : null}
       <div
@@ -168,10 +179,13 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
         onContextMenu={ctxMenu.openFromEvent}
       >
         <div className="v2-script-console-head">
-          <span>Console</span>
+          <span>{t("scripts.console.title")}</span>
           <div className="v2-script-console-head-actions">
             {errorCount > 0 ? (
-              <span className="v2-script-console-errors" title="Erreurs">
+              <span
+                className="v2-script-console-errors"
+                title={t("scripts.console.errorsTip")}
+              >
                 ● {errorCount}
               </span>
             ) : null}
@@ -180,13 +194,17 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
               className="v2-btn v2-btn-ghost"
               onClick={onClear}
             >
-              Effacer
+              {t("scripts.console.clear")}
             </button>
             <button
               type="button"
               className="v2-btn v2-btn-ghost"
               aria-expanded={!collapsed}
-              aria-label={collapsed ? "Déplier la console" : "Replier la console"}
+              aria-label={
+                collapsed
+                  ? t("scripts.console.expand")
+                  : t("scripts.console.collapse")
+              }
               onClick={() => setCollapsed((v) => !v)}
             >
               {collapsed ? (
@@ -206,8 +224,7 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
           >
             {lines.length === 0 ? (
               <p className="v2-script-console-empty">
-                Aucune activité pour l’instant. Lancez le script pour voir les
-                logs ici.
+                {t("scripts.console.empty")}
               </p>
             ) : (
               lines.map((line) => (
@@ -227,12 +244,12 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
         open={ctxMenu.open}
         x={ctxMenu.x}
         y={ctxMenu.y}
-        items={CLEAR_ITEMS}
+        items={clearItems}
         onClose={ctxMenu.close}
         onSelect={(id) => {
           if (id === "clear") onClear();
         }}
-        ariaLabel="Actions de la console"
+        ariaLabel={t("scripts.console.menuAria")}
       />
     </div>
   );

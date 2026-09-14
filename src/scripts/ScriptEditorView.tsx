@@ -10,6 +10,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Code2, FileCode2 } from "lucide-react";
+import { useLocale, useT, type TFunction } from "../i18n";
 import { DropdownMenu, useToast } from "../ui/v2";
 import type { DropdownEntry } from "../ui/v2";
 import { useTitleBarSlot } from "../ui/v2/TitleBarContext";
@@ -20,7 +21,7 @@ import {
   SCRIPT_SNIPPET_SET,
 } from "./snippets";
 import {
-  SCRIPT_PRESETS,
+  getScriptPresets,
   presetPermissionPatch,
   type ScriptPreset,
 } from "./presets";
@@ -59,15 +60,17 @@ function normalizeDoc(doc: ScriptDoc): ScriptDoc {
   };
 }
 
-function humanizeRunError(raw: string): string {
+function humanizeRunError(raw: string, t: TFunction): string {
   const s = String(raw);
   if (/network|fetch disabled|allowNetwork|réseau/i.test(s)) {
-    return "Erreur : caster.fetch a échoué — le script n’a pas la permission Réseau. Activez-la dans Permissions si c’est voulu.";
+    return t("scripts.toast.networkDenied");
   }
   if (/engine already|already active|clicker is active|record is active/i.test(s)) {
     return s;
   }
-  return s.startsWith("Erreur") ? s : `Erreur : ${s}`;
+  return s.startsWith("Erreur") || s.startsWith("Error")
+    ? s
+    : t("scripts.toast.errorPrefix", { detail: s });
 }
 
 export function ScriptEditorView({
@@ -76,6 +79,8 @@ export function ScriptEditorView({
   onDirtyChange,
   onLabelChange,
 }: Props) {
+  const t = useT();
+  const { locale } = useLocale();
   const toast = useToast();
   const [draft, setDraft] = useState<ScriptDoc | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +100,8 @@ export function ScriptEditorView({
   const gutterRef = useRef<HTMLDivElement | null>(null);
   const pendingSelRef = useRef<number | null>(null);
 
+  const presets = useMemo(() => getScriptPresets(t), [t]);
+
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
@@ -107,18 +114,21 @@ export function ScriptEditorView({
     el.selectionStart = el.selectionEnd = pos;
   }, [draft?.source]);
 
-  const pushConsole = useCallback((text: string, level?: ConsoleLine["level"]) => {
-    const line: ConsoleLine = {
-      id: ++consoleIdRef.current,
-      time: formatConsoleTime(),
-      level: level ?? classifyConsoleMessage(text),
-      text,
-    };
-    setConsoleLines((prev) => {
-      const next = [...prev, line];
-      return next.length > MAX_CONSOLE ? next.slice(-MAX_CONSOLE) : next;
-    });
-  }, []);
+  const pushConsole = useCallback(
+    (text: string, level?: ConsoleLine["level"]) => {
+      const line: ConsoleLine = {
+        id: ++consoleIdRef.current,
+        time: formatConsoleTime(new Date(), locale),
+        level: level ?? classifyConsoleMessage(text),
+        text,
+      };
+      setConsoleLines((prev) => {
+        const next = [...prev, line];
+        return next.length > MAX_CONSOLE ? next.slice(-MAX_CONSOLE) : next;
+      });
+    },
+    [locale],
+  );
 
   useEffect(() => {
     let un: (() => void) | undefined;
@@ -314,10 +324,10 @@ export function ScriptEditorView({
       JSON.stringify(draftRef.current) !== baselineRef.current;
     if (dirtySource) {
       const ok = await confirmAction({
-        title: "Remplacer le code",
-        message: `Remplacer le code actuel par l’exemple « ${preset.name} » et aligner les permissions ?`,
-        confirmLabel: "Remplacer",
-        cancelLabel: "Annuler",
+        title: t("scripts.confirm.replaceTitle"),
+        message: t("scripts.confirm.replaceMessage", { name: preset.name }),
+        confirmLabel: t("scripts.confirm.replaceConfirm"),
+        cancelLabel: t("common.cancel"),
         danger: true,
       });
       if (!ok) return;
@@ -360,11 +370,11 @@ export function ScriptEditorView({
   async function onRun() {
     try {
       await flushAutosave();
-      pushConsole("Session · démarrage", "session");
+      pushConsole(t("scripts.console.sessionStart"), "session");
       await invoke("run_script_session_cmd", { id: scriptId });
       setRunning(true);
     } catch (e) {
-      const msg = humanizeRunError(String(e));
+      const msg = humanizeRunError(String(e), t);
       pushConsole(msg, "error");
       toast.error(msg);
       setRunning(false);
@@ -374,7 +384,7 @@ export function ScriptEditorView({
   async function onStop() {
     try {
       await invoke("request_cancel");
-      pushConsole("Annulation demandée (F8)", "session");
+      pushConsole(t("scripts.console.cancelRequested"), "session");
     } catch (e) {
       toast.error(String(e));
     }
@@ -416,7 +426,7 @@ export function ScriptEditorView({
         <div
           className="v2-skeleton-page v2-skeleton-page--center"
           aria-busy="true"
-          aria-label="Chargement du script"
+          aria-label={t("scripts.toolbar.loadingAria")}
         >
           <div
             className="v2-skeleton v2-skeleton-line v2-skeleton-line--lg"
@@ -435,7 +445,7 @@ export function ScriptEditorView({
     return (
       <div className="v2-page v2-script-editor">
         {titleBarPortal}
-        <div className="v2-scripts-hint">Script introuvable.</div>
+        <div className="v2-scripts-hint">{t("scripts.toolbar.notFound")}</div>
       </div>
     );
   }
@@ -466,12 +476,12 @@ export function ScriptEditorView({
             onKeyDown={onSourceKeyDown}
             onScroll={syncGutterScroll}
             onBlur={() => void flushAutosave()}
-            aria-label="Source JavaScript"
+            aria-label={t("scripts.toolbar.sourceAria")}
           />
           <div className="v2-script-snippets">
             <DropdownMenu
-              label="Snippets"
-              ariaLabel="Exemples et snippets"
+              label={t("scripts.toolbar.snippets")}
+              ariaLabel={t("scripts.toolbar.snippetsAria")}
               align="end"
               triggerClassName="v2-btn v2-btn-ghost v2-script-snippets-btn"
               menuClassName="v2-script-snippets-menu"
@@ -479,8 +489,8 @@ export function ScriptEditorView({
                 [
                   {
                     id: "examples",
-                    label: "Exemples",
-                    items: SCRIPT_PRESETS.map((p) => ({
+                    label: t("scripts.toolbar.examples"),
+                    items: presets.map((p) => ({
                       id: `ex-${p.id}`,
                       label: p.name,
                       icon: <FileCode2 size={14} />,
@@ -489,23 +499,23 @@ export function ScriptEditorView({
                   },
                   {
                     id: "snippets",
-                    label: "Snippets",
+                    label: t("scripts.toolbar.snippets"),
                     items: [
                       {
                         id: "snip-get",
-                        label: "GET JSON",
+                        label: t("scripts.toolbar.snipGet"),
                         icon: <Code2 size={14} />,
                         onSelect: () => patch({ source: SCRIPT_SNIPPET_GET }),
                       },
                       {
                         id: "snip-set",
-                        label: "get / set / return",
+                        label: t("scripts.toolbar.snipSet"),
                         icon: <Code2 size={14} />,
                         onSelect: () => patch({ source: SCRIPT_SNIPPET_SET }),
                       },
                       {
                         id: "snip-param",
-                        label: "Template @param",
+                        label: t("scripts.toolbar.snipParam"),
                         icon: <Code2 size={14} />,
                         onSelect: () => patch({ source: SCRIPT_SNIPPET_PARAM }),
                       },
