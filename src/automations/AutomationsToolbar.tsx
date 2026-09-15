@@ -2,14 +2,22 @@ import { useRef, type RefObject } from "react";
 import {
   ChevronDown,
   Code2,
+  FolderPlus,
   MousePointer2,
+  PenLine,
   Plus,
   Search,
+  Trash2,
   Workflow,
 } from "lucide-react";
 import { useT } from "../i18n";
-import { DropdownMenu, Tooltip } from "../ui/v2";
-import type { AutomationFilter, FilterCounts } from "./types";
+import { DropdownMenu, Select, Tooltip } from "../ui/v2";
+import type {
+  AutomationFilter,
+  AutomationFolderOption,
+  FilterCounts,
+} from "./types";
+import { folderOptionKey } from "./types";
 import { filterPillTooltip } from "./rowLabels";
 
 type Props = {
@@ -17,10 +25,16 @@ type Props = {
   onQueryChange: (q: string) => void;
   filter: AutomationFilter;
   onFilterChange: (f: AutomationFilter) => void;
+  folderKey: string | null;
+  onFolderKeyChange: (key: string | null) => void;
+  folders: AutomationFolderOption[];
   counts: FilterCounts;
   onCreateMacro: () => void;
   onCreateClicker: () => void;
   onCreateScript: () => void;
+  onCreateFolder?: (kind: "macro" | "clicker") => void;
+  onRenameFolder?: () => void;
+  onDeleteFolder?: () => void;
   searchInputRef?: RefObject<HTMLInputElement | null>;
   createOpen?: boolean;
   onCreateOpenChange?: (open: boolean) => void;
@@ -62,10 +76,16 @@ export function AutomationsToolbar({
   onQueryChange,
   filter,
   onFilterChange,
+  folderKey,
+  onFolderKeyChange,
+  folders,
   counts,
   onCreateMacro,
   onCreateClicker,
   onCreateScript,
+  onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
   searchInputRef,
   createOpen,
   onCreateOpenChange,
@@ -73,6 +93,90 @@ export function AutomationsToolbar({
   const t = useT();
   const localSearchRef = useRef<HTMLInputElement>(null);
   const searchRef = searchInputRef ?? localSearchRef;
+
+  const folderOptions = [
+    { value: "", label: t("automations.folder.chipAll") },
+    ...folders.map((f) => ({
+      value: folderOptionKey(f),
+      label:
+        folders.filter((o) => o.name === f.name).length > 1
+          ? t("automations.folder.namedWithKind", {
+              name: f.name,
+              kind:
+                f.kind === "macro"
+                  ? t("automations.folder.kindSuffixMacro")
+                  : t("automations.folder.kindSuffixClicker"),
+            })
+          : f.name,
+    })),
+  ];
+  const selectedFolderName =
+    folders.find((f) => folderOptionKey(f) === folderKey)?.name ?? null;
+  const folderTriggerLabel = folderKey
+    ? (selectedFolderName ?? "…")
+    : t("automations.folder.chipAll");
+
+  const createItems = [
+    {
+      id: "macro",
+      label: t("automations.create.macro"),
+      description: t("automations.create.macroDesc"),
+      icon: <Workflow size={14} />,
+      onSelect: onCreateMacro,
+    },
+    {
+      id: "clicker",
+      label: t("automations.create.clicker"),
+      description: t("automations.create.clickerDesc"),
+      icon: <MousePointer2 size={14} />,
+      onSelect: onCreateClicker,
+    },
+    {
+      id: "script",
+      label: t("automations.create.script"),
+      description: t("automations.create.scriptDesc"),
+      icon: <Code2 size={14} />,
+      onSelect: onCreateScript,
+    },
+    ...(onCreateFolder
+      ? [
+          { id: "sep-folders", label: "", separator: true as const },
+          {
+            id: "folder-macro",
+            label: t("automations.folder.createMacro"),
+            icon: <FolderPlus size={14} />,
+            onSelect: () => onCreateFolder("macro"),
+          },
+          {
+            id: "folder-clicker",
+            label: t("automations.folder.createClicker"),
+            icon: <FolderPlus size={14} />,
+            onSelect: () => onCreateFolder("clicker"),
+          },
+        ]
+      : []),
+    ...(folderKey && onRenameFolder
+      ? [
+          {
+            id: "rename-folder",
+            label: t("automations.folder.renameFiltered"),
+            icon: <PenLine size={14} />,
+            onSelect: () => onRenameFolder(),
+          },
+        ]
+      : []),
+    ...(folderKey && onDeleteFolder
+      ? [
+          {
+            id: "delete-folder",
+            label: t("automations.folder.delete"),
+            icon: <Trash2 size={14} />,
+            danger: true as const,
+            onSelect: () => onDeleteFolder(),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className="v2-automations-chrome">
@@ -104,6 +208,17 @@ export function AutomationsToolbar({
           ))}
         </div>
 
+        {folders.length > 0 ? (
+          <Select
+            className="v2-select v2-automations-folder-select"
+            value={folderKey ?? ""}
+            options={folderOptions}
+            triggerLabel={folderTriggerLabel}
+            ariaLabel={t("automations.folder.selectAria")}
+            onChange={(v) => onFolderKeyChange(v || null)}
+          />
+        ) : null}
+
         <label className="v2-automations-search">
           <Search
             size={12}
@@ -129,29 +244,7 @@ export function AutomationsToolbar({
             triggerClassName="v2-btn v2-btn-primary v2-automations-create-btn"
             open={createOpen}
             onOpenChange={onCreateOpenChange}
-            items={[
-              {
-                id: "macro",
-                label: t("automations.create.macro"),
-                description: t("automations.create.macroDesc"),
-                icon: <Workflow size={14} />,
-                onSelect: onCreateMacro,
-              },
-              {
-                id: "clicker",
-                label: t("automations.create.clicker"),
-                description: t("automations.create.clickerDesc"),
-                icon: <MousePointer2 size={14} />,
-                onSelect: onCreateClicker,
-              },
-              {
-                id: "script",
-                label: t("automations.create.script"),
-                description: t("automations.create.scriptDesc"),
-                icon: <Code2 size={14} />,
-                onSelect: onCreateScript,
-              },
-            ]}
+            items={createItems}
           >
             <Plus size={14} aria-hidden />
             {t("automations.create.label")}
