@@ -2,22 +2,14 @@ import { useRef, type RefObject } from "react";
 import {
   ChevronDown,
   Code2,
-  FolderPlus,
   MousePointer2,
-  PenLine,
   Plus,
   Search,
-  Trash2,
   Workflow,
 } from "lucide-react";
 import { useT } from "../i18n";
-import { DropdownMenu, Select, Tooltip } from "../ui/v2";
-import type {
-  AutomationFilter,
-  AutomationFolderOption,
-  FilterCounts,
-} from "./types";
-import { folderOptionKey } from "./types";
+import { DropdownMenu, Tooltip } from "../ui/v2";
+import type { AutomationFilter, FilterCounts } from "./types";
 import { filterPillTooltip } from "./rowLabels";
 
 type Props = {
@@ -25,16 +17,10 @@ type Props = {
   onQueryChange: (q: string) => void;
   filter: AutomationFilter;
   onFilterChange: (f: AutomationFilter) => void;
-  folderKey: string | null;
-  onFolderKeyChange: (key: string | null) => void;
-  folders: AutomationFolderOption[];
   counts: FilterCounts;
   onCreateMacro: () => void;
   onCreateClicker: () => void;
   onCreateScript: () => void;
-  onCreateFolder?: (kind: "macro" | "clicker") => void;
-  onRenameFolder?: () => void;
-  onDeleteFolder?: () => void;
   searchInputRef?: RefObject<HTMLInputElement | null>;
   createOpen?: boolean;
   onCreateOpenChange?: (open: boolean) => void;
@@ -76,16 +62,10 @@ export function AutomationsToolbar({
   onQueryChange,
   filter,
   onFilterChange,
-  folderKey,
-  onFolderKeyChange,
-  folders,
   counts,
   onCreateMacro,
   onCreateClicker,
   onCreateScript,
-  onCreateFolder,
-  onRenameFolder,
-  onDeleteFolder,
   searchInputRef,
   createOpen,
   onCreateOpenChange,
@@ -94,98 +74,35 @@ export function AutomationsToolbar({
   const localSearchRef = useRef<HTMLInputElement>(null);
   const searchRef = searchInputRef ?? localSearchRef;
 
-  const activeView =
-    FILTER_VIEW_DEFS.find((d) => d.value === filter) ?? FILTER_VIEW_DEFS[0];
-  const viewOptions = FILTER_VIEW_DEFS.map(({ value, labelKey, countKey }) => ({
-    value,
-    label: `${t(labelKey)} · ${counts[countKey]}`,
-  }));
-  const viewTriggerLabel = `${t(activeView.labelKey)} · ${counts[activeView.countKey]}`;
-
-  const folderOptions = [
-    { value: "", label: t("automations.folder.chipAll") },
-    ...folders.map((f) => ({
-      value: folderOptionKey(f),
-      label:
-        folders.filter((o) => o.name === f.name).length > 1
-          ? t("automations.folder.namedWithKind", {
-              name: f.name,
-              kind:
-                f.kind === "macro"
-                  ? t("automations.folder.kindSuffixMacro")
-                  : t("automations.folder.kindSuffixClicker"),
-            })
-          : f.name,
-    })),
-  ];
-  const selectedFolderName =
-    folders.find((f) => folderOptionKey(f) === folderKey)?.name ?? null;
-  const folderTriggerLabel = folderKey
-    ? t("automations.folder.selectTriggerNamed", {
-        name: selectedFolderName ?? "…",
-      })
-    : t("automations.folder.selectTrigger");
-
-  const folderMenuItems = [
-    {
-      id: "folder-macro",
-      label: t("automations.folder.createMacro"),
-      icon: <FolderPlus size={14} />,
-      onSelect: () => onCreateFolder?.("macro"),
-    },
-    {
-      id: "folder-clicker",
-      label: t("automations.folder.createClicker"),
-      icon: <FolderPlus size={14} />,
-      onSelect: () => onCreateFolder?.("clicker"),
-    },
-    ...(folderKey && onRenameFolder
-      ? [
-          { id: "sep-rename", label: "", separator: true as const },
-          {
-            id: "rename-folder",
-            label: t("automations.folder.renameFiltered"),
-            icon: <PenLine size={14} />,
-            onSelect: () => onRenameFolder(),
-          },
-        ]
-      : []),
-    ...(folderKey && onDeleteFolder
-      ? [
-          {
-            id: "delete-folder",
-            label: t("automations.folder.delete"),
-            icon: <Trash2 size={14} />,
-            danger: true as const,
-            onSelect: () => onDeleteFolder(),
-          },
-        ]
-      : []),
-  ];
-
   return (
     <div className="v2-automations-chrome">
       <div className="v2-automations-filter-bar">
-        <Select
-          className="v2-select v2-automations-view-select"
-          value={filter}
-          options={viewOptions}
-          triggerLabel={viewTriggerLabel}
-          ariaLabel={t("automations.filter.aria")}
-          title={filterPillTooltip(filter, t)}
-          onChange={(v) => onFilterChange(v as AutomationFilter)}
-        />
-
-        {folders.length > 0 ? (
-          <Select
-            className="v2-select v2-automations-folder-select"
-            value={folderKey ?? ""}
-            options={folderOptions}
-            triggerLabel={folderTriggerLabel}
-            ariaLabel={t("automations.folder.selectAria")}
-            onChange={(v) => onFolderKeyChange(v || null)}
-          />
-        ) : null}
+        <div
+          className="v2-segmented v2-segmented--compact v2-automations-view-segmented"
+          role="group"
+          aria-label={t("automations.filter.aria")}
+        >
+          {FILTER_VIEW_DEFS.map(({ value, labelKey, countKey }) => (
+            <Tooltip key={value} content={filterPillTooltip(value, t)}>
+              <button
+                type="button"
+                className={[
+                  "v2-segmented-btn",
+                  filter === value ? "active" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                aria-pressed={filter === value}
+                onClick={() => onFilterChange(value)}
+              >
+                {t(labelKey)}
+                <span className="v2-automations-view-count">
+                  {counts[countKey]}
+                </span>
+              </button>
+            </Tooltip>
+          ))}
+        </div>
 
         <label className="v2-automations-search">
           <Search
@@ -205,20 +122,6 @@ export function AutomationsToolbar({
         </label>
 
         <div className="v2-automations-filter-bar-end">
-          {onCreateFolder ? (
-            <Tooltip content={t("automations.folder.manageLabel")}>
-              <DropdownMenu
-                label={t("automations.folder.manageLabel")}
-                ariaLabel={t("automations.folder.manageAria")}
-                align="end"
-                triggerClassName="v2-btn v2-btn-ghost v2-automations-folder-manage-btn"
-                items={folderMenuItems}
-              >
-                <FolderPlus size={14} aria-hidden />
-                <ChevronDown size={12} aria-hidden />
-              </DropdownMenu>
-            </Tooltip>
-          ) : null}
           <DropdownMenu
             label={t("automations.create.label")}
             ariaLabel={t("automations.create.aria")}
