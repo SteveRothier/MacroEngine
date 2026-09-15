@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Minus, Square, X } from "lucide-react";
 import { getCurrentWindow, type Window } from "@tauri-apps/api/window";
+import { useT } from "../i18n";
 
 type Props = {
   className?: string;
@@ -15,6 +16,7 @@ function readTauriWindow(): Window | null {
 }
 
 export function WindowControls({ className = "" }: Props) {
+  const t = useT();
   const [win, setWin] = useState<Window | null>(() => readTauriWindow());
 
   useEffect(() => {
@@ -40,8 +42,8 @@ export function WindowControls({ className = "" }: Props) {
       <button
         type="button"
         className="win-btn"
-        title="Réduire"
-        aria-label="Réduire"
+        title={t("shell.minimize")}
+        aria-label={t("shell.minimize")}
         onClick={() => void win.minimize()}
       >
         <Minus size={14} strokeWidth={1.75} aria-hidden />
@@ -49,8 +51,8 @@ export function WindowControls({ className = "" }: Props) {
       <button
         type="button"
         className="win-btn"
-        title="Agrandir"
-        aria-label="Agrandir"
+        title={t("shell.maximize")}
+        aria-label={t("shell.maximize")}
         onClick={() => void win.toggleMaximize()}
       >
         <Square size={12} strokeWidth={1.75} aria-hidden />
@@ -58,8 +60,8 @@ export function WindowControls({ className = "" }: Props) {
       <button
         type="button"
         className="win-btn win-close"
-        title="Fermer"
-        aria-label="Fermer"
+        title={t("common.close")}
+        aria-label={t("common.close")}
         onClick={() => void win.close()}
       >
         <X size={14} strokeWidth={1.75} aria-hidden />

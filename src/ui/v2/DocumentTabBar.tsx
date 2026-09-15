@@ -23,6 +23,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
+import { useT, type TFunction } from "../../i18n";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { Tooltip } from "./Tooltip";
 import { useDocumentTabReorder } from "./useDocumentTabReorder";
@@ -105,107 +106,126 @@ const COMPACT_WIDTH = 56;
 const TAB_TOOLTIP_CLASS = "v2-tooltip--tab";
 const TAB_TOOLTIP_WRAP = "v2-doc-tab-tooltip-wrap";
 
-function tabTooltipText(tab: DocumentTabItem): string {
-  if (tab.kind === "home") return "Accueil";
-  if (tab.dirty) return `${tab.label} — non enregistré`;
+function tabTooltipText(tab: DocumentTabItem, t: TFunction): string {
+  if (tab.kind === "home") return t("shell.navHome");
+  if (tab.dirty) return t("shell.unsavedTab", { label: tab.label });
   return tab.label;
 }
 
-const HOME_CONTEXT_ITEMS: ContextMenuItem[] = [
-  {
-    id: "createMacro",
-    label: "Nouvelle macro",
-    icon: <Workflow size={MENU_ICON} aria-hidden />,
-  },
-  {
-    id: "createClicker",
-    label: "Nouveau preset clicker",
-    icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
-  },
-  {
-    id: "createScript",
-    label: "Nouveau script",
-    icon: <Code2 size={MENU_ICON} aria-hidden />,
-  },
-];
-
-function docTabContextItems(tab: DocumentTabItem): ContextMenuItem[] {
+function buildHomeContextItems(t: TFunction): ContextMenuItem[] {
   return [
-    { id: "close", label: "Fermer", icon: <X size={MENU_ICON} aria-hidden /> },
+    {
+      id: "createMacro",
+      label: t("shell.newMacro"),
+      icon: <Workflow size={MENU_ICON} aria-hidden />,
+    },
+    {
+      id: "createClicker",
+      label: t("shell.newClickerPreset"),
+      icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
+    },
+    {
+      id: "createScript",
+      label: t("shell.newScript"),
+      icon: <Code2 size={MENU_ICON} aria-hidden />,
+    },
+  ];
+}
+
+function buildDocTabContextItems(
+  tab: DocumentTabItem,
+  t: TFunction,
+): ContextMenuItem[] {
+  return [
+    {
+      id: "close",
+      label: t("common.close"),
+      icon: <X size={MENU_ICON} aria-hidden />,
+    },
     {
       id: "closeOthers",
-      label: "Fermer les autres",
+      label: t("shell.closeOthers"),
       icon: <ListMinus size={MENU_ICON} aria-hidden />,
     },
     {
       id: "closeToRight",
-      label: "Fermer à droite",
+      label: t("shell.closeToRight"),
       icon: <PanelRightClose size={MENU_ICON} aria-hidden />,
     },
     { id: "sep1", label: "", separator: true },
     {
       id: tab.pinned ? "unpin" : "pin",
-      label: tab.pinned ? "Désépingler" : "Épingler",
+      label: tab.pinned ? t("shell.unpin") : t("shell.pin"),
       icon: tab.pinned ? (
         <PinOff size={MENU_ICON} aria-hidden />
       ) : (
         <Pin size={MENU_ICON} aria-hidden />
       ),
     },
-    { id: "duplicate", label: "Dupliquer", icon: <Copy size={MENU_ICON} aria-hidden /> },
+    {
+      id: "duplicate",
+      label: t("shell.duplicate"),
+      icon: <Copy size={MENU_ICON} aria-hidden />,
+    },
     { id: "sep2", label: "", separator: true },
-    { id: "rename", label: "Renommer", icon: <PenLine size={MENU_ICON} aria-hidden /> },
+    {
+      id: "rename",
+      label: t("shell.renameTitle"),
+      icon: <PenLine size={MENU_ICON} aria-hidden />,
+    },
     {
       id: "reveal",
-      label: "Afficher dans l’explorateur",
+      label: t("automations.menu.row.reveal"),
       icon: <FolderOpen size={MENU_ICON} aria-hidden />,
     },
   ];
 }
 
-const barContextItems: ContextMenuItem[] = [
-  {
-    id: "createMacro",
-    label: "Nouvelle macro",
-    icon: <Workflow size={MENU_ICON} aria-hidden />,
-  },
-  {
-    id: "createClicker",
-    label: "Nouveau preset clicker",
-    icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
-  },
-  {
-    id: "createScript",
-    label: "Nouveau script",
-    icon: <Code2 size={MENU_ICON} aria-hidden />,
-  },
-  { id: "sep1", label: "", separator: true },
-  {
-    id: "closeAll",
-    label: "Fermer tous les onglets",
-    icon: <ListX size={MENU_ICON} aria-hidden />,
-  },
-];
+export function buildBarContextItems(t: TFunction): ContextMenuItem[] {
+  return [
+    {
+      id: "createMacro",
+      label: t("shell.newMacro"),
+      icon: <Workflow size={MENU_ICON} aria-hidden />,
+    },
+    {
+      id: "createClicker",
+      label: t("shell.newClickerPreset"),
+      icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
+    },
+    {
+      id: "createScript",
+      label: t("shell.newScript"),
+      icon: <Code2 size={MENU_ICON} aria-hidden />,
+    },
+    { id: "sep1", label: "", separator: true },
+    {
+      id: "closeAll",
+      label: t("shell.closeAllTabs"),
+      icon: <ListX size={MENU_ICON} aria-hidden />,
+    },
+  ];
+}
 
-export { barContextItems as BAR_CONTEXT_MENU_ITEMS };
-
-const CREATE_MENU_ITEMS: ContextMenuItem[] = [
-  {
-    id: "macro",
-    label: "Macro vierge",
-    icon: <Workflow size={MENU_ICON} aria-hidden />,
-  },
-  {
-    id: "clicker",
-    label: "Preset clicker",
-    icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
-  },
-  {
-    id: "script",
-    label: "Script",
-    icon: <Code2 size={MENU_ICON} aria-hidden />,
-  },
-];
+function buildCreateMenuItems(t: TFunction): ContextMenuItem[] {
+  return [
+    {
+      id: "macro",
+      label: t("shell.blankMacro"),
+      icon: <Workflow size={MENU_ICON} aria-hidden />,
+    },
+    {
+      id: "clicker",
+      label: t("shell.clickerPreset"),
+      icon: <MousePointer2 size={MENU_ICON} aria-hidden />,
+    },
+    {
+      id: "script",
+      label: t("labels.script"),
+      icon: <Code2 size={MENU_ICON} aria-hidden />,
+    },
+  ];
+}
 
 const TAB_CTX_ACTIONS = new Set<string>([
   "close",
@@ -231,9 +251,14 @@ export function DocumentTabBar({
   onTabReorder,
   onPinnedCloseAttempt,
 }: Props) {
+  const t = useT();
   const addBtnRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const tabElsRef = useRef(new Map<string, HTMLDivElement>());
+
+  const createMenuItems = useMemo(() => buildCreateMenuItems(t), [t]);
+  const homeContextItems = useMemo(() => buildHomeContextItems(t), [t]);
+  const barContextItems = useMemo(() => buildBarContextItems(t), [t]);
 
   const [createMenu, setCreateMenu] = useState<{ x: number; y: number } | null>(null);
   const [compactIds, setCompactIds] = useState<Set<string>>(() => new Set());
@@ -261,7 +286,7 @@ export function DocumentTabBar({
     });
 
   const scrollTabIds = useMemo(
-    () => displayTabs.filter((t) => t.kind !== "home").map((t) => t.id),
+    () => displayTabs.filter((tab) => tab.kind !== "home").map((tab) => tab.id),
     [displayTabs],
   );
 
@@ -341,7 +366,7 @@ export function DocumentTabBar({
         kind: "home",
         x: e.clientX,
         y: e.clientY,
-        items: HOME_CONTEXT_ITEMS,
+        items: homeContextItems,
       });
       return;
     }
@@ -350,7 +375,7 @@ export function DocumentTabBar({
       tabId: tab.id,
       x: e.clientX,
       y: e.clientY,
-      items: docTabContextItems(tab),
+      items: buildDocTabContextItems(tab, t),
     });
   };
 
@@ -407,8 +432,8 @@ export function DocumentTabBar({
     el.style.height = `${ghost.height}px`;
   }, [ghost, ghostElRef]);
 
-  const homeTab = displayTabs.find((t) => t.kind === "home");
-  const scrollTabs = displayTabs.filter((t) => t.kind !== "home");
+  const homeTab = displayTabs.find((tab) => tab.kind === "home");
+  const scrollTabs = displayTabs.filter((tab) => tab.kind !== "home");
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -434,7 +459,7 @@ export function DocumentTabBar({
     const draggable = canDragTab(tab);
     const frozenWidth = frozenTabWidths?.[tab.id];
 
-    const tooltipText = tabTooltipText(tab);
+    const tooltipText = tabTooltipText(tab, t);
     const tooltipProps = {
       side: "bottom" as const,
       align: "start" as const,
@@ -514,7 +539,7 @@ export function DocumentTabBar({
           <button
             type="button"
             className="v2-doc-tab-close"
-            aria-label={`Fermer ${tab.label}`}
+            aria-label={t("shell.closeTabAria", { label: tab.label })}
             onClick={(e) => {
               e.stopPropagation();
               tryCloseTab(tab);
@@ -546,7 +571,7 @@ export function DocumentTabBar({
           <div
             className="v2-doc-tabbar-strip"
             role="tablist"
-            aria-label="Automations ouvertes"
+            aria-label={t("shell.tabsListAria")}
           >
             {scrollTabs.map((tab) => renderDocTab(tab))}
             <div className="v2-doc-tabbar-add">
@@ -554,7 +579,7 @@ export function DocumentTabBar({
                 ref={addBtnRef}
                 type="button"
                 className="v2-doc-tab-add-btn"
-                aria-label="Créer une automation"
+                aria-label={t("shell.createAutomation")}
                 aria-expanded={createMenu != null}
                 aria-haspopup="menu"
                 onClick={toggleCreateMenu}
@@ -602,10 +627,10 @@ export function DocumentTabBar({
         open={createMenu != null}
         x={createMenu?.x ?? 0}
         y={createMenu?.y ?? 0}
-        items={CREATE_MENU_ITEMS}
+        items={createMenuItems}
         onClose={() => setCreateMenu(null)}
         onSelect={onCreateMenuSelect}
-        ariaLabel="Créer une automation"
+        ariaLabel={t("shell.createAutomation")}
       />
       <ContextMenu
         open={menu != null}
@@ -616,10 +641,10 @@ export function DocumentTabBar({
         onSelect={onMenuSelect}
         ariaLabel={
           menu?.kind === "tab"
-            ? "Actions onglet"
+            ? t("shell.tabActionsAria")
             : menu?.kind === "home"
-              ? "Actions Accueil"
-              : "Actions barre d’onglets"
+              ? t("shell.homeActionsAria")
+              : t("shell.tabBarActionsAria")
         }
       />
     </>

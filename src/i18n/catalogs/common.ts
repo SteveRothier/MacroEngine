@@ -4,6 +4,7 @@ export const common = defineCatalog({
   fr: {
     cancel: "Annuler",
     confirm: "Confirmer",
+    close: "Fermer",
     save: "Sauver",
     defaults: "Défauts",
     open: "Ouvrir",
@@ -23,6 +24,7 @@ export const common = defineCatalog({
   en: {
     cancel: "Cancel",
     confirm: "Confirm",
+    close: "Close",
     save: "Save",
     defaults: "Defaults",
     open: "Open",
