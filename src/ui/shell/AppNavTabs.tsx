@@ -20,12 +20,12 @@ export function AppNavTabs({ activeId, onSelect }: Props) {
   const tabs = useMemo(() => buildNavTabs(t), [t]);
 
   return (
-    <nav className="v2-titlebar-tabs" aria-label={t("shell.mainNavAria")}>
+    <nav className="caster-titlebar-tabs" aria-label={t("shell.mainNavAria")}>
       {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
-          className={["v2-titlebar-tab", activeId === tab.id ? "active" : ""]
+          className={["caster-titlebar-tab", activeId === tab.id ? "active" : ""]
             .filter(Boolean)
             .join(" ")}
           aria-current={activeId === tab.id ? "page" : undefined}

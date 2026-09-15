@@ -72,36 +72,36 @@ export function ConfirmHost() {
 
   return (
     <div
-      className="v2-dialog-overlay"
+      className="caster-dialog-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close("cancel");
       }}
     >
       <div
-        className="v2-dialog"
+        className="caster-dialog"
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-msg"
       >
-        <h2 id="confirm-dialog-title" className="v2-dialog-title">
+        <h2 id="confirm-dialog-title" className="caster-dialog-title">
           {current.title}
         </h2>
-        <div className="v2-dialog-body">
+        <div className="caster-dialog-body">
           <AlertTriangle
             className={
-              danger ? "v2-dialog-icon v2-dialog-icon--danger" : "v2-dialog-icon"
+              danger ? "caster-dialog-icon caster-dialog-icon--danger" : "caster-dialog-icon"
             }
             size={22}
             aria-hidden
           />
           <p id="confirm-dialog-msg">{current.message}</p>
         </div>
-        <div className="v2-dialog-actions">
+        <div className="caster-dialog-actions">
           <button
             type="button"
             className={
-              danger ? "v2-btn v2-btn-danger" : "v2-btn v2-btn-primary"
+              danger ? "caster-btn caster-btn-danger" : "caster-btn caster-btn-primary"
             }
             autoFocus
             onClick={() => close("confirm")}
@@ -111,7 +111,7 @@ export function ConfirmHost() {
           {discardLabel ? (
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               onClick={() => close("discard")}
             >
               {discardLabel}
@@ -119,7 +119,7 @@ export function ConfirmHost() {
           ) : null}
           <button
             type="button"
-            className="v2-btn v2-btn-ghost"
+            className="caster-btn caster-btn-ghost"
             onClick={() => close("cancel")}
           >
             {cancelLabel}

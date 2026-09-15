@@ -1,6 +1,6 @@
 import { ArrowLeft, Play, Square } from "lucide-react";
 import { useT, type TFunction } from "../i18n";
-import { EditorToolbar, Tooltip } from "../ui/v2";
+import { EditorToolbar, Tooltip } from "../ui/shell";
 import {
   ScriptPermissionsMenu,
   type ScriptPermissions,
@@ -61,19 +61,19 @@ export function ScriptTitleBarTools({
 
   return (
     <EditorToolbar
-      className="v2-script-toolbar"
+      className="caster-script-toolbar"
       start={
         <>
           <button
             type="button"
-            className="v2-titlebar-btn v2-btn v2-btn-ghost"
+            className="caster-titlebar-btn caster-btn caster-btn-ghost"
             onClick={onBack}
             title={t("scripts.toolbar.back")}
           >
             <ArrowLeft size={14} aria-hidden />
           </button>
           <input
-            className="v2-titlebar-name-input v2-titlebar-name-input--wide"
+            className="caster-titlebar-name-input caster-titlebar-name-input--wide"
             value={name}
             placeholder={t("scripts.toolbar.namePlaceholder")}
             aria-label={t("scripts.toolbar.nameAria")}
@@ -91,7 +91,7 @@ export function ScriptTitleBarTools({
               <Tooltip content={t("scripts.toolbar.saveErrorTip")}>
                 <button
                   type="button"
-                  className="v2-script-save-status is-error"
+                  className="caster-script-save-status is-error"
                   onClick={() => onRetrySave?.()}
                 >
                   {statusLabel}
@@ -100,7 +100,7 @@ export function ScriptTitleBarTools({
             ) : (
               <span
                 className={[
-                  "v2-script-save-status",
+                  "caster-script-save-status",
                   saveStatus === "saving" ? "is-saving" : "",
                 ]
                   .filter(Boolean)
@@ -111,7 +111,7 @@ export function ScriptTitleBarTools({
               </span>
             )
           ) : (
-            <span className="v2-script-save-status is-placeholder" aria-hidden>
+            <span className="caster-script-save-status is-placeholder" aria-hidden>
               {t("scripts.toolbar.saved")}
             </span>
           )}
@@ -122,7 +122,7 @@ export function ScriptTitleBarTools({
           <Tooltip content={t("scripts.toolbar.stopTip")}>
             <button
               type="button"
-              className="v2-btn v2-script-run-btn is-stop"
+              className="caster-btn caster-script-run-btn is-stop"
               onClick={onStop}
               aria-pressed={true}
               aria-label={t("scripts.toolbar.stop")}
@@ -141,7 +141,7 @@ export function ScriptTitleBarTools({
           >
             <button
               type="button"
-              className="v2-btn v2-btn-primary v2-script-run-btn"
+              className="caster-btn caster-btn-primary caster-script-run-btn"
               onClick={onRun}
               disabled={runBlocked}
               aria-pressed={false}

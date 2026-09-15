@@ -30,11 +30,11 @@ export function ClickerTargetSection({ editor: e }: Props) {
   };
 
   return (
-    <div className="v2-clicker-section v2-clicker-target-panel">
-      <p className="v2-clicker-hint">{t("clicker.target.priorityHint")}</p>
+    <div className="caster-clicker-section caster-clicker-target-panel">
+      <p className="caster-clicker-hint">{t("clicker.target.priorityHint")}</p>
 
       <div
-        className="v2-segmented v2-segmented--wide v2-clicker-target-modes"
+        className="caster-segmented caster-segmented--wide caster-clicker-target-modes"
         role="group"
         aria-label={t("clicker.target.modeAria")}
       >
@@ -48,7 +48,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
           <button
             key={value}
             type="button"
-            className={["v2-segmented-btn", mode === value ? "active" : ""]
+            className={["caster-segmented-btn", mode === value ? "active" : ""]
               .filter(Boolean)
               .join(" ")}
             disabled={
@@ -64,15 +64,15 @@ export function ClickerTargetSection({ editor: e }: Props) {
       </div>
 
       {mode === "fixed" ? (
-        <div className="v2-settings-row">
-          <div className="v2-settings-row-label">
+        <div className="caster-settings-row">
+          <div className="caster-settings-row-label">
             <span>{t("clicker.target.coordinates")}</span>
             <p>{t("clicker.target.pickDelay")}</p>
           </div>
-          <div className="v2-settings-row-control">
+          <div className="caster-settings-row-control">
             <button
               type="button"
-              className="v2-btn"
+              className="caster-btn"
               disabled={e.running || e.picking}
               onClick={() => void e.onPick()}
             >
@@ -86,12 +86,12 @@ export function ClickerTargetSection({ editor: e }: Props) {
 
       {mode === "sequence" ? (
         <>
-          <div className="v2-settings-row">
-            <div className="v2-settings-row-label">
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
               <span>{t("clicker.target.stopWhenComplete")}</span>
               <p>{t("clicker.target.stopWhenCompleteHint")}</p>
             </div>
-            <div className="v2-settings-row-control">
+            <div className="caster-settings-row-control">
               <input
                 type="checkbox"
                 checked={e.stopWhenComplete}
@@ -101,13 +101,13 @@ export function ClickerTargetSection({ editor: e }: Props) {
             </div>
           </div>
 
-          <div className="v2-clicker-points-head">
-            <span className="v2-clicker-points-title">
+          <div className="caster-clicker-points-head">
+            <span className="caster-clicker-points-title">
               {t("clicker.target.points")}
             </span>
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               disabled={e.editDisabled}
               onClick={() =>
                 e.setPoints((prev) => [
@@ -121,21 +121,21 @@ export function ClickerTargetSection({ editor: e }: Props) {
           </div>
 
           {e.points.length === 0 ? (
-            <p className="v2-clicker-hint">{t("clicker.target.emptyPoints")}</p>
+            <p className="caster-clicker-hint">{t("clicker.target.emptyPoints")}</p>
           ) : (
-            <ul className="v2-clicker-points-list">
+            <ul className="caster-clicker-points-list">
               {e.points.map((pt, i) => (
-                <li key={i} className="v2-clicker-point-row">
+                <li key={i} className="caster-clicker-point-row">
                   <button
                     type="button"
-                    className="v2-btn v2-btn-ghost v2-clicker-point-pick"
+                    className="caster-btn caster-btn-ghost caster-clicker-point-pick"
                     disabled={e.running || e.picking || e.editDisabled}
                     title={t("clicker.target.pickOnScreen")}
                     onClick={() => void e.onPickPoint(i)}
                   >
                     {e.picking && e.pickingPointIndex === i ? "…" : "Pick"}
                   </button>
-                  <label className="v2-clicker-point-coord">
+                  <label className="caster-clicker-point-coord">
                     <span className="sr-only">X</span>
                     <input
                       type="number"
@@ -150,7 +150,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
                       }
                     />
                   </label>
-                  <label className="v2-clicker-point-coord">
+                  <label className="caster-clicker-point-coord">
                     <span className="sr-only">Y</span>
                     <input
                       type="number"
@@ -166,7 +166,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
                     />
                   </label>
                   <label
-                    className="v2-clicker-point-mini"
+                    className="caster-clicker-point-mini"
                     title={t("clicker.target.clicksOnPoint")}
                   >
                     <span>×</span>
@@ -194,7 +194,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
                     />
                   </label>
                   <label
-                    className="v2-clicker-point-mini"
+                    className="caster-clicker-point-mini"
                     title={t("clicker.target.randomRadius")}
                   >
                     <span>R</span>
@@ -223,7 +223,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
                   </label>
                   <button
                     type="button"
-                    className="v2-btn v2-btn-ghost v2-clicker-point-remove"
+                    className="caster-btn caster-btn-ghost caster-clicker-point-remove"
                     disabled={e.editDisabled}
                     aria-label={t("clicker.target.removePoint")}
                     onClick={() =>

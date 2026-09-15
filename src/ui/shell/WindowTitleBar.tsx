@@ -67,8 +67,8 @@ export function WindowTitleBar({
   };
 
   return (
-    <div className="v2-titlebar">
-      <div className="v2-titlebar-start">
+    <div className="caster-titlebar">
+      <div className="caster-titlebar-start">
         <DocumentTabBar
           tabs={tabs}
           activeTabId={activeTabId}
@@ -84,17 +84,17 @@ export function WindowTitleBar({
         />
       </div>
       <div
-        className="v2-titlebar-drag"
+        className="caster-titlebar-drag"
         data-tauri-drag-region
         onContextMenu={openDragMenu}
       />
-      <div className="v2-titlebar-actions">
+      <div className="caster-titlebar-actions">
         {recentItems ? <RecentMenu items={recentItems} /> : null}
         {onSettingsClick ? (
           <button
             type="button"
             className={[
-              "v2-titlebar-btn v2-titlebar-icon-btn",
+              "caster-titlebar-btn caster-titlebar-icon-btn",
               settingsActive ? "active" : "",
             ]
               .filter(Boolean)
@@ -111,7 +111,7 @@ export function WindowTitleBar({
           <button
             type="button"
             className={[
-              "v2-titlebar-btn v2-titlebar-icon-btn",
+              "caster-titlebar-btn caster-titlebar-icon-btn",
               journalOpen ? "active" : "",
             ]
               .filter(Boolean)
@@ -125,17 +125,17 @@ export function WindowTitleBar({
           </button>
         ) : null}
         {sessionStatus || (showStop && onStop) ? (
-          <div className="v2-titlebar-session-slot">
-            <div className="v2-titlebar-session-pill">
+          <div className="caster-titlebar-session-slot">
+            <div className="caster-titlebar-session-pill">
               {sessionStatus ? (
                 <StatusPill kind={sessionStatus.kind} label={sessionStatus.label} />
               ) : null}
             </div>
-            <div className="v2-titlebar-session-stop">
+            <div className="caster-titlebar-session-stop">
               {showStop && onStop ? (
                 <button
                   type="button"
-                  className="v2-titlebar-btn v2-btn v2-btn-danger-ghost"
+                  className="caster-titlebar-btn caster-btn caster-btn-danger-ghost"
                   onClick={onStop}
                   title={t("shell.stopSession")}
                 >
@@ -145,7 +145,7 @@ export function WindowTitleBar({
             </div>
           </div>
         ) : null}
-        <WindowControls className="v2-titlebar-controls" />
+        <WindowControls className="caster-titlebar-controls" />
       </div>
       <ContextMenu
         open={dragMenu != null}

@@ -1,4 +1,4 @@
-import type { MenuItemDef } from "../ui/v2";
+import type { MenuItemDef } from "../ui/shell";
 import type { LibraryItemView } from "./types";
 
 export type LibraryItemMenuActions = {

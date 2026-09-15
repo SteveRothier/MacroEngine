@@ -50,9 +50,9 @@ type Props = {
 const VIEWPORT_PAD = 8;
 const SUBMENU_GAP_PX = 6;
 const PARENT_MENU_SEL =
-  ".v2-context-menu, .v2-menu-popover, .v2-menu-submenu";
+  ".caster-context-menu, .caster-menu-popover, .caster-menu-submenu";
 
-/** Flat list of v2-menu-item rows (separators + optional icons + submenu flyouts). */
+/** Flat list of caster-menu-item rows (separators + optional icons + submenu flyouts). */
 export function MenuItemsList({
   items,
   activeIdx,
@@ -66,12 +66,12 @@ export function MenuItemsList({
       {items.map((item, idx) => {
         if (item.separator) {
           return (
-            <div key={item.id} className="v2-menu-separator" role="separator" />
+            <div key={item.id} className="caster-menu-separator" role="separator" />
           );
         }
         if (item.groupHeader) {
           return (
-            <div key={item.id} className="v2-action-picker-group-label">
+            <div key={item.id} className="caster-action-picker-group-label">
               {item.label}
             </div>
           );
@@ -104,9 +104,9 @@ export function MenuItemsList({
             type="button"
             role="menuitem"
             className={[
-              "v2-menu-item",
-              item.description ? "v2-menu-item--rich" : "",
-              item.danger ? "v2-menu-item--danger" : "",
+              "caster-menu-item",
+              item.description ? "caster-menu-item--rich" : "",
+              item.danger ? "caster-menu-item--danger" : "",
               activeIdx === idx ? "is-active" : "",
             ]
               .filter(Boolean)
@@ -122,18 +122,18 @@ export function MenuItemsList({
             }}
           >
             {item.icon ? (
-              <span className="v2-menu-item-icon" aria-hidden>
+              <span className="caster-menu-item-icon" aria-hidden>
                 {item.icon}
               </span>
             ) : null}
-            <span className="v2-menu-item-text">
-              <span className="v2-menu-item-label">{item.label}</span>
+            <span className="caster-menu-item-text">
+              <span className="caster-menu-item-label">{item.label}</span>
               {item.description ? (
-                <span className="v2-menu-item-desc">{item.description}</span>
+                <span className="caster-menu-item-desc">{item.description}</span>
               ) : null}
             </span>
             {item.shortcut ? (
-              <span className="v2-menu-item-shortcut" aria-hidden>
+              <span className="caster-menu-item-shortcut" aria-hidden>
                 {item.shortcut}
               </span>
             ) : null}
@@ -241,7 +241,7 @@ function SubmenuRow({
   return (
     <div
       ref={wrapRef}
-      className="v2-menu-item-submenu-wrap"
+      className="caster-menu-item-submenu-wrap"
       onMouseEnter={() => {
         clearCloseTimer();
         if (!item.disabled) onOpen();
@@ -255,9 +255,9 @@ function SubmenuRow({
         aria-haspopup="menu"
         aria-expanded={open}
         className={[
-          "v2-menu-item",
-          "v2-menu-item--submenu",
-          item.description ? "v2-menu-item--rich" : "",
+          "caster-menu-item",
+          "caster-menu-item--submenu",
+          item.description ? "caster-menu-item--rich" : "",
           active || open ? "is-active" : "",
         ]
           .filter(Boolean)
@@ -270,28 +270,28 @@ function SubmenuRow({
         }}
       >
         {item.icon ? (
-          <span className="v2-menu-item-icon" aria-hidden>
+          <span className="caster-menu-item-icon" aria-hidden>
             {item.icon}
           </span>
         ) : null}
-        <span className="v2-menu-item-text">
-          <span className="v2-menu-item-label">{item.label}</span>
+        <span className="caster-menu-item-text">
+          <span className="caster-menu-item-label">{item.label}</span>
         </span>
-        <span className="v2-menu-item-chevron" aria-hidden>
+        <span className="caster-menu-item-chevron" aria-hidden>
           <ChevronRight size={14} />
         </span>
       </button>
       {open ? (
         <div
           ref={bridgeRef}
-          className="v2-menu-submenu-bridge"
+          className="caster-menu-submenu-bridge"
           aria-hidden
         />
       ) : null}
       {open && item.submenu ? (
         <div
           ref={flyoutRef}
-          className="v2-menu-submenu"
+          className="caster-menu-submenu"
           role="menu"
           style={{ visibility: "hidden" }}
           onMouseEnter={clearCloseTimer}

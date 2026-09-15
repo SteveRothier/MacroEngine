@@ -174,7 +174,7 @@ export function RunJournal() {
           aria-label="Journal d’exécution"
         >
           <div className="macro-run-log-head">
-            <span className="v2-meta-label">Journal</span>
+            <span className="caster-meta-label">Journal</span>
             <div className="macro-run-log-head-actions">
               <button
                 type="button"

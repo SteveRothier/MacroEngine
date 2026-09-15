@@ -3,8 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { FileCode2 } from "lucide-react";
 import { pickScreenPoint } from "../pick";
 import { Segmented } from "../ui";
-import { ActionPickerMenu, DropdownMenu, Select, Tooltip } from "../ui/v2";
-import type { ActionPickerEntry, DropdownEntry } from "../ui/v2";
+import { ActionPickerMenu, DropdownMenu, Select, Tooltip } from "../ui/shell";
+import type { ActionPickerEntry, DropdownEntry } from "../ui/shell";
 import type { CompareOp, KeyMods, MacroAction, MacroValue, Operand } from "./types";
 import type { ScriptDoc } from "../scripts/types";
 import { ScriptParamsFields } from "../scripts/ScriptParamsFields";
@@ -125,7 +125,7 @@ function PointFields({
   if (optional) {
     return (
       <>
-        <div className="v2-field" style={{ gridColumn: "1 / -1" }}>
+        <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
           <span>{t("macros.params.position")}</span>
           <Segmented
             ariaLabel={t("macros.params.positionModeAria")}
@@ -152,7 +152,7 @@ function PointFields({
           ) : null
         ) : (
           <>
-            <label className="v2-field">
+            <label className="caster-field">
               <span>{t("macros.params.coordX")}</span>
               <input
                 type="number"
@@ -168,7 +168,7 @@ function PointFields({
                 }}
               />
             </label>
-            <label className="v2-field">
+            <label className="caster-field">
               <span>{t("macros.params.coordY")}</span>
               <input
                 type="number"
@@ -185,7 +185,7 @@ function PointFields({
               />
             </label>
             <div
-              className="v2-field props-point-actions"
+              className="caster-field props-point-actions"
               style={{ gridColumn: "1 / -1" }}
             >
               <button
@@ -206,7 +206,7 @@ function PointFields({
 
   return (
     <>
-      <label className="v2-field">
+      <label className="caster-field">
         <span>{t("macros.params.coordX")}</span>
         <input
           type="number"
@@ -217,7 +217,7 @@ function PointFields({
           }}
         />
       </label>
-      <label className="v2-field">
+      <label className="caster-field">
         <span>{t("macros.params.coordY")}</span>
         <input
           type="number"
@@ -228,7 +228,7 @@ function PointFields({
           }}
         />
       </label>
-      <div className="v2-field props-point-actions" style={{ gridColumn: "1 / -1" }}>
+      <div className="caster-field props-point-actions" style={{ gridColumn: "1 / -1" }}>
         <button
           type="button"
           disabled={disabled || picking}
@@ -259,10 +259,10 @@ export function ActionProps({
   if (action.type === "mouse.click") {
     return (
       <div className="props-grid">
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.button")}</span>
           <Select
-            className="v2-select"
+            className="caster-select"
             value={action.button ?? "left"}
             disabled={disabled || picking}
             options={mouseButtonOpts(t)}
@@ -313,10 +313,10 @@ export function ActionProps({
     const kind = action.type;
     return (
       <div className="props-grid">
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.button")}</span>
           <Select
-            className="v2-select"
+            className="caster-select"
             value={action.button ?? "left"}
             disabled={disabled || picking}
             options={mouseButtonOpts(t)}
@@ -349,7 +349,7 @@ export function ActionProps({
   if (action.type === "mouse.wheel") {
     return (
       <div className="props-grid">
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.wheelDelta")}</span>
           <input
             type="number"
@@ -375,7 +375,7 @@ export function ActionProps({
 
   if (action.type === "delay") {
     return (
-      <label className="v2-field">
+      <label className="caster-field">
         <span>{t("macros.params.durationMs")}</span>
         <input
           type="number"
@@ -391,17 +391,17 @@ export function ActionProps({
   if (action.type === "http.request") {
     return (
       <div className="props-grid">
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.httpMethod")}</span>
           <Select
-            className="v2-select"
+            className="caster-select"
             value={action.method ?? "GET"}
             disabled={disabled}
             options={HTTP_METHOD_OPTS}
             onChange={(method) => onChange({ ...action, method })}
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.httpUrl")}</span>
           <input
             type="text"
@@ -410,7 +410,7 @@ export function ActionProps({
             onChange={(e) => onChange({ ...action, url: e.target.value })}
           />
         </label>
-        <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
+        <label className="caster-field" style={{ gridColumn: "1 / -1" }}>
           <span>{t("macros.params.httpBody")}</span>
           <textarea
             rows={4}
@@ -425,7 +425,7 @@ export function ActionProps({
             style={{ fontFamily: "ui-monospace, Consolas, monospace", width: "100%" }}
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.httpTimeout")}</span>
           <input
             type="number"
@@ -437,7 +437,7 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.httpFailOn4xx")}</span>
           <input
             type="checkbox"
@@ -448,7 +448,7 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.httpStatusVar")}</span>
           <input
             type="text"
@@ -463,7 +463,7 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.httpBodyVar")}</span>
           <input
             type="text"
@@ -478,7 +478,7 @@ export function ActionProps({
             }
           />
         </label>
-        <div className="v2-field" style={{ gridColumn: "1 / -1" }}>
+        <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
           <span>{t("macros.params.httpHeaders")}</span>
           {(action.headers ?? []).map((h, i) => (
             <div key={i} className="props-grid" style={{ marginTop: 6 }}>
@@ -560,7 +560,7 @@ export function ActionProps({
   if (action.type === "json.path") {
     return (
       <div className="props-grid">
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.jsonSourceVar")}</span>
           <input
             type="text"
@@ -569,7 +569,7 @@ export function ActionProps({
             onChange={(e) => onChange({ ...action, sourceVar: e.target.value })}
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.jsonPath")}</span>
           <input
             type="text"
@@ -578,7 +578,7 @@ export function ActionProps({
             onChange={(e) => onChange({ ...action, path: e.target.value })}
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.jsonDestVar")}</span>
           <input
             type="text"
@@ -616,7 +616,7 @@ export function ActionProps({
           : t("macros.params.key");
     return (
       <div className="props-grid">
-        <label className="v2-field">
+        <label className="caster-field">
           <span>
             {keyTitle} {t("macros.params.keyVarOk")}
           </span>
@@ -627,7 +627,7 @@ export function ActionProps({
             onChange={(e) => onChange({ ...action, key: e.target.value })}
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>Ctrl</span>
           <input
             type="checkbox"
@@ -638,7 +638,7 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>Alt</span>
           <input
             type="checkbox"
@@ -649,7 +649,7 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>Shift</span>
           <input
             type="checkbox"
@@ -693,7 +693,7 @@ export function ActionProps({
 
   if (action.type === "clipboard.set") {
     return (
-      <label className="v2-field">
+      <label className="caster-field">
         <span>{t("macros.params.clipboardText")}</span>
         <input
           type="text"
@@ -708,7 +708,7 @@ export function ActionProps({
 
   if (action.type === "clipboard.get") {
     return (
-      <label className="v2-field">
+      <label className="caster-field">
         <span>{t("macros.params.operandVar")}</span>
         <input
           type="text"
@@ -724,7 +724,7 @@ export function ActionProps({
   if (action.type === "var.set") {
     return (
       <div className="props-grid">
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.varName")}</span>
           <input
             type="text"
@@ -733,7 +733,7 @@ export function ActionProps({
             onChange={(e) => onChange({ ...action, name: e.target.value })}
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.varValue")}</span>
           <input
             type="text"
@@ -757,10 +757,10 @@ export function ActionProps({
     const right = action.condition.right;
     return (
       <div className="props-grid">
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.ifLeft")}</span>
           <Select
-            className="v2-select"
+            className="caster-select"
             disabled={disabled}
             value={operandMode(left)}
             options={operandModeOpts(t)}
@@ -775,7 +775,7 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>
             {operandMode(left) === "var"
               ? t("macros.params.operandVarShort")
@@ -799,10 +799,10 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.ifOperator")}</span>
           <Select
-            className="v2-select"
+            className="caster-select"
             disabled={disabled}
             value={action.condition.op}
             options={COMPARE_OP_OPTS}
@@ -817,10 +817,10 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>{t("macros.params.ifRight")}</span>
           <Select
-            className="v2-select"
+            className="caster-select"
             disabled={disabled}
             value={operandMode(right)}
             options={operandModeOpts(t)}
@@ -835,7 +835,7 @@ export function ActionProps({
             }
           />
         </label>
-        <label className="v2-field">
+        <label className="caster-field">
           <span>
             {operandMode(right) === "var"
               ? t("macros.params.operandVarShort")
@@ -885,7 +885,7 @@ export function ActionProps({
 
   return (
     <div className="props-grid">
-      <label className="v2-field">
+      <label className="caster-field">
         <span>{t("macros.params.processCommand")}</span>
         <input
           type="text"
@@ -894,7 +894,7 @@ export function ActionProps({
           onChange={(e) => onChange({ ...action, command: e.target.value })}
         />
       </label>
-      <label className="v2-field">
+      <label className="caster-field">
         <span>{t("macros.params.processArgs")}</span>
         <input
           type="text"
@@ -980,29 +980,29 @@ function ScriptRunProps({
   }
 
   return (
-    <div className="v2-scriptrun-props">
-      <div className="v2-scriptrun-props-title">
+    <div className="caster-scriptrun-props">
+      <div className="caster-scriptrun-props-title">
         {actionTitle("script.run", t)}
         {useLibrary && libDoc ? (
-          <span className="v2-scriptrun-props-sub">· {libDoc.name}</span>
+          <span className="caster-scriptrun-props-sub">· {libDoc.name}</span>
         ) : !useLibrary ? (
-          <span className="v2-scriptrun-props-sub">
+          <span className="caster-scriptrun-props-sub">
             · {t("macros.library.scriptSourceInline")}
           </span>
         ) : null}
       </div>
 
-      <section className="v2-scriptrun-section">
+      <section className="caster-scriptrun-section">
         <button
           type="button"
-          className="v2-scriptrun-section-head"
+          className="caster-scriptrun-section-head"
           onClick={() => setSourceOpen((v) => !v)}
         >
           {t("macros.params.scriptSectionSource")} {sourceOpen ? "▾" : "▸"}
         </button>
         {sourceOpen ? (
-          <div className="v2-scriptrun-section-body props-grid">
-            <div className="v2-field" style={{ gridColumn: "1 / -1" }}>
+          <div className="caster-scriptrun-section-body props-grid">
+            <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
               <Segmented
                 value={useLibrary ? "library" : "inline"}
                 onChange={(mode) => {
@@ -1029,10 +1029,10 @@ function ScriptRunProps({
             </div>
             {useLibrary ? (
               <>
-                <label className="v2-field" style={{ gridColumn: "1 / -1" }}>
+                <label className="caster-field" style={{ gridColumn: "1 / -1" }}>
                   <span>{t("macros.library.scriptSourceLibrary")}</span>
                   <Select
-                    className="v2-select"
+                    className="caster-select"
                     disabled={disabled}
                     value={action.scriptId ?? ""}
                     options={[
@@ -1051,11 +1051,11 @@ function ScriptRunProps({
                 </label>
                 {libDoc && permLabels.length > 0 ? (
                   <div
-                    className="v2-script-perm-chips"
+                    className="caster-script-perm-chips"
                     style={{ gridColumn: "1 / -1" }}
                   >
                     {permLabels.map((p) => (
-                      <span key={p} className="v2-script-perm-chip">
+                      <span key={p} className="caster-script-perm-chip">
                         {p}
                       </span>
                     ))}
@@ -1064,7 +1064,7 @@ function ScriptRunProps({
                 {action.scriptId && onOpenScript ? (
                   <button
                     type="button"
-                    className="v2-btn v2-btn-ghost"
+                    className="caster-btn caster-btn-ghost"
                     style={{ gridColumn: "1 / -1" }}
                     disabled={disabled}
                     onClick={() =>
@@ -1077,7 +1077,7 @@ function ScriptRunProps({
               </>
             ) : (
               <div style={{ gridColumn: "1 / -1" }}>
-                <label className="v2-field">
+                <label className="caster-field">
                   <span>{t("macros.params.scriptSourceJs")}</span>
                   <textarea
                     rows={7}
@@ -1086,15 +1086,15 @@ function ScriptRunProps({
                     onChange={(e) =>
                       onChange({ ...action, source: e.target.value })
                     }
-                    className="v2-script-inline-source"
+                    className="caster-script-inline-source"
                   />
                 </label>
-                <div className="v2-scriptrun-examples">
+                <div className="caster-scriptrun-examples">
                   <DropdownMenu
                     label={t("macros.params.scriptExamples")}
                     disabled={disabled}
-                    triggerClassName="v2-btn v2-btn-ghost"
-                    menuClassName="v2-scriptrun-examples-menu"
+                    triggerClassName="caster-btn caster-btn-ghost"
+                    menuClassName="caster-scriptrun-examples-menu"
                     items={
                       [
                         ...presets.map((p) => ({
@@ -1126,16 +1126,16 @@ function ScriptRunProps({
       </section>
 
       {defs.length > 0 ? (
-        <section className="v2-scriptrun-section">
+        <section className="caster-scriptrun-section">
           <button
             type="button"
-            className="v2-scriptrun-section-head"
+            className="caster-scriptrun-section-head"
             onClick={() => setParamsOpen((v) => !v)}
           >
             {t("macros.params.scriptSectionParams")} {paramsOpen ? "▾" : "▸"}
           </button>
           {paramsOpen ? (
-            <div className="v2-scriptrun-section-body">
+            <div className="caster-scriptrun-section-body">
               <ScriptParamsFields
                 defs={defs}
                 values={params}
@@ -1153,17 +1153,17 @@ function ScriptRunProps({
         </section>
       ) : null}
 
-      <section className="v2-scriptrun-section">
+      <section className="caster-scriptrun-section">
         <button
           type="button"
-          className="v2-scriptrun-section-head"
+          className="caster-scriptrun-section-head"
           onClick={() => setExecOpen((v) => !v)}
         >
           {t("macros.params.scriptSectionExec")} {execOpen ? "▾" : "▸"}
         </button>
         {execOpen ? (
-          <div className="v2-scriptrun-section-body props-grid">
-            <label className="v2-field">
+          <div className="caster-scriptrun-section-body props-grid">
+            <label className="caster-field">
               <span>{t("macros.params.httpTimeout")}</span>
               <input
                 type="number"
@@ -1175,7 +1175,7 @@ function ScriptRunProps({
                 }
               />
             </label>
-            <label className="v2-field">
+            <label className="caster-field">
               <span>{t("macros.params.scriptResultVar")}</span>
               <Tooltip content={t("macros.params.scriptResultVarTip")}>
                 <input

@@ -48,7 +48,22 @@ export type WorkspaceState = {
   shellView: ShellView;
 };
 
-const STORAGE_KEY = "v2-workspace-tabs";
+const STORAGE_KEY = "caster-workspace-tabs";
+const LEGACY_STORAGE_KEY = "v2-workspace-tabs";
+
+function readStorageRaw(): string | null {
+  try {
+    const raw =
+      localStorage.getItem(STORAGE_KEY) ??
+      localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (raw && !localStorage.getItem(STORAGE_KEY)) {
+      localStorage.setItem(STORAGE_KEY, raw);
+    }
+    return raw;
+  } catch {
+    return null;
+  }
+}
 
 type Persisted = {
   tabs: DocTab[];
@@ -84,7 +99,7 @@ export function initialWorkspace(): WorkspaceState {
 
 export function loadWorkspace(): WorkspaceState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readStorageRaw();
     if (!raw) return initialWorkspace();
     const data = JSON.parse(raw) as Persisted;
     const tabs = Array.isArray(data.tabs) ? data.tabs.filter(isValidTab) : [];

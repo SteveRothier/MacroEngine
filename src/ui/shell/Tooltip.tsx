@@ -173,7 +173,7 @@ export function Tooltip({
             ref={tipRef}
             id={tipId}
             role="tooltip"
-            className={["v2-tooltip", "v2-tooltip-portal", className]
+            className={["caster-tooltip", "caster-tooltip-portal", className]
               .filter(Boolean)
               .join(" ")}
             style={
@@ -192,7 +192,7 @@ export function Tooltip({
     <>
       <span
         ref={wrapRef}
-        className={["v2-tooltip-wrap", wrapClassName].filter(Boolean).join(" ")}
+        className={["caster-tooltip-wrap", wrapClassName].filter(Boolean).join(" ")}
         onMouseEnter={show}
         onMouseLeave={hide}
         onFocus={show}
@@ -238,14 +238,14 @@ export function TruncatedTooltip({
     const el = ref.current;
     if (!el) return;
     const check = () => {
-      const label = el.querySelector<HTMLElement>(".v2-doc-tab-label");
+      const label = el.querySelector<HTMLElement>(".caster-doc-tab-label");
       const target = label ?? el;
       setTruncated(target.scrollWidth > target.clientWidth + 1);
     };
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
-    const label = el.querySelector(".v2-doc-tab-label");
+    const label = el.querySelector(".caster-doc-tab-label");
     if (label) ro.observe(label);
     return () => ro.disconnect();
   }, [content]);

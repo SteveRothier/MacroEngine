@@ -9,7 +9,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { useT } from "../i18n";
-import { DropdownMenu, Tooltip } from "../ui/v2";
+import { DropdownMenu, Tooltip } from "../ui/shell";
 import type { AutomationFilter, FilterCounts } from "./types";
 import { filterPillTooltip } from "./rowLabels";
 
@@ -119,10 +119,10 @@ export function AutomationsToolbar({
   ];
 
   return (
-    <div className="v2-automations-chrome">
-      <div className="v2-automations-filter-bar">
+    <div className="caster-automations-chrome">
+      <div className="caster-automations-filter-bar">
         <div
-          className="v2-segmented v2-segmented--compact v2-automations-view-segmented"
+          className="caster-segmented caster-segmented--compact caster-automations-view-segmented"
           role="group"
           aria-label={t("automations.filter.aria")}
         >
@@ -131,7 +131,7 @@ export function AutomationsToolbar({
               <button
                 type="button"
                 className={[
-                  "v2-segmented-btn",
+                  "caster-segmented-btn",
                   filter === value ? "active" : "",
                 ]
                   .filter(Boolean)
@@ -140,7 +140,7 @@ export function AutomationsToolbar({
                 onClick={() => onFilterChange(value)}
               >
                 {t(labelKey)}
-                <span className="v2-automations-view-count">
+                <span className="caster-automations-view-count">
                   {counts[countKey]}
                 </span>
               </button>
@@ -148,11 +148,11 @@ export function AutomationsToolbar({
           ))}
         </div>
 
-        <label className="v2-automations-search">
+        <label className="caster-automations-search">
           <Search
             size={12}
             aria-hidden
-            className="v2-automations-search-icon"
+            className="caster-automations-search-icon"
           />
           <input
             ref={searchRef}
@@ -160,17 +160,17 @@ export function AutomationsToolbar({
             placeholder={t("automations.search.placeholder")}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            className="v2-search-inline v2-automations-filter-search"
+            className="caster-search-inline caster-automations-filter-search"
             aria-label={t("automations.search.aria")}
           />
         </label>
 
-        <div className="v2-automations-filter-bar-end">
+        <div className="caster-automations-filter-bar-end">
           <DropdownMenu
             label={t("automations.create.label")}
             ariaLabel={t("automations.create.aria")}
             align="end"
-            triggerClassName="v2-btn v2-btn-primary v2-automations-create-btn"
+            triggerClassName="caster-btn caster-btn-primary caster-automations-create-btn"
             open={createOpen}
             onOpenChange={onCreateOpenChange}
             items={createItems}

@@ -13,7 +13,7 @@ import {
   Variable,
 } from "lucide-react";
 import type { TFunction } from "../i18n";
-import type { ActionPickerEntry } from "../ui/v2/ActionPickerMenu";
+import type { ActionPickerEntry } from "../ui/shell/ActionPickerMenu";
 import { newActionId, type MacroAction } from "./types";
 
 export function makeAction(

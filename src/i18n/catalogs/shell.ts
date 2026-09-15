@@ -1,5 +1,5 @@
 import { defineCatalog } from "../defineCatalog";
-/** App chrome: toasts, palette, confirms in MainAppV2. */
+/** App chrome: toasts, palette, confirms in MainApp. */
 export const shell = defineCatalog({
   fr: {
     sessionEnded: "Session terminée",

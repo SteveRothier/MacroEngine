@@ -1,6 +1,6 @@
 import { MoreHorizontal } from "lucide-react";
 import { useT } from "../i18n";
-import { DropdownMenu, Tooltip } from "../ui/v2";
+import { DropdownMenu, Tooltip } from "../ui/shell";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import type { AutomationFolderOption, AutomationRow } from "./types";
@@ -56,14 +56,14 @@ export function AutomationRowMenu({
 
   return (
     <Tooltip content={t("automations.menu.row.moreTip")}>
-      <span className="v2-auto-row-menu-wrap">
+      <span className="caster-auto-row-menu-wrap">
         <DropdownMenu
           label={t("automations.menu.row.moreLabel")}
           ariaLabel={t("automations.menu.row.actionsAria", { name: row.name })}
           open={open}
           onOpenChange={onOpenChange}
           align="end"
-          triggerClassName="v2-auto-row-menu-btn"
+          triggerClassName="caster-auto-row-menu-btn"
           items={items}
         >
           <MoreHorizontal size={16} aria-hidden />

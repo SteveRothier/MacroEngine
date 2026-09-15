@@ -49,7 +49,7 @@ export function ScriptParamsFields({
   return (
     <div
       className={
-        compact ? "v2-script-params-bar" : "v2-script-params-fields"
+        compact ? "caster-script-params-bar" : "caster-script-params-fields"
       }
       ref={wrapRef}
     >
@@ -64,17 +64,17 @@ export function ScriptParamsFields({
         />
       ))}
       {hidden.length > 0 ? (
-        <div className="v2-script-params-overflow">
+        <div className="caster-script-params-overflow">
           <button
             type="button"
-            className="v2-btn v2-btn-ghost v2-script-params-more"
+            className="caster-btn caster-btn-ghost caster-script-params-more"
             disabled={disabled}
             onClick={() => setOverflowOpen((v) => !v)}
           >
             +{hidden.length} autres ▾
           </button>
           {overflowOpen ? (
-            <div className="v2-menu-popover v2-script-params-popover">
+            <div className="caster-menu-popover caster-script-params-popover">
               {hidden.map((def) => (
                 <ParamControl
                   key={def.name}
@@ -107,7 +107,7 @@ function ParamControl({
   onBlurField?: () => void;
 }) {
   return (
-    <label className="v2-script-param-field">
+    <label className="caster-script-param-field">
       <span>
         {def.name}
         <em>{def.type}</em>

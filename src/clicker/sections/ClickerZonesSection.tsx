@@ -17,7 +17,7 @@ import {
   useContextMenuState,
   usePointerReorder,
   type MenuItemDef,
-} from "../../ui/v2";
+} from "../../ui/shell";
 import { useT } from "../../i18n";
 import type { ClickerEditor } from "../useClickerEditor";
 
@@ -83,9 +83,9 @@ export function ClickerZonesSection({ editor: e }: Props) {
   }
 
   return (
-    <div className="v2-clicker-section v2-clicker-zones-panel">
-      <div className="v2-clicker-zones-block">
-        <div className="v2-clicker-zones-block-head">
+    <div className="caster-clicker-section caster-clicker-zones-panel">
+      <div className="caster-clicker-zones-block">
+        <div className="caster-clicker-zones-block-head">
           <span>{t("clicker.zones.corners")}</span>
           <input
             type="color"
@@ -97,9 +97,9 @@ export function ClickerZonesSection({ editor: e }: Props) {
             }
           />
         </div>
-        <div className="v2-clicker-zones-grid">
+        <div className="caster-clicker-zones-grid">
           {CORNER_LABELS.map((c) => (
-            <label key={c.id} className="v2-clicker-zone-toggle">
+            <label key={c.id} className="caster-clicker-zone-toggle">
               <input
                 type="checkbox"
                 checked={e.zoneModel.corners[c.id]}
@@ -117,13 +117,13 @@ export function ClickerZonesSection({ editor: e }: Props) {
         </div>
       </div>
 
-      <div className="v2-clicker-zones-block">
-        <div className="v2-clicker-zones-block-head">
+      <div className="caster-clicker-zones-block">
+        <div className="caster-clicker-zones-block-head">
           <span>{t("clicker.zones.edges")}</span>
         </div>
-        <div className="v2-clicker-zones-grid">
+        <div className="caster-clicker-zones-grid">
           {EDGES.map((edge) => (
-            <label key={edge.id} className="v2-clicker-zone-edge">
+            <label key={edge.id} className="caster-clicker-zone-edge">
               <input
                 type="checkbox"
                 checked={e.zoneModel.edges[edge.id]}
@@ -152,29 +152,29 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   }))
                 }
               />
-              <span className="v2-clicker-zone-px">px</span>
+              <span className="caster-clicker-zone-px">px</span>
             </label>
           ))}
         </div>
       </div>
 
-      <div className="v2-clicker-zones-block">
-        <div className="v2-clicker-zones-block-head">
+      <div className="caster-clicker-zones-block">
+        <div className="caster-clicker-zones-block-head">
           <span>{t("clicker.zones.custom")}</span>
-          <span className="v2-clicker-hint-inline">
+          <span className="caster-clicker-hint-inline">
             {t("clicker.zones.zoneCount", { n: zones.length })}
           </span>
         </div>
         {zones.length === 0 ? (
-          <p className="v2-clicker-hint">{t("clicker.zones.drawHint")}</p>
+          <p className="caster-clicker-hint">{t("clicker.zones.drawHint")}</p>
         ) : (
-          <ul className="v2-clicker-zone-list">
+          <ul className="caster-clicker-zone-list">
             {zones.map((z, index) => (
               <li
                 key={z.id}
                 data-reorder-id={z.id}
                 className={[
-                  "v2-clicker-zone-line",
+                  "caster-clicker-zone-line",
                   e.selectedZoneId === z.id ? "selected" : "",
                   reorder.draggingIndex === index ? "is-dragging" : "",
                   reorder.overIndex === index ? "is-drop-over" : "",
@@ -189,22 +189,22 @@ export function ClickerZonesSection({ editor: e }: Props) {
               >
                 <button
                   type="button"
-                  className="v2-clicker-zone-line-main"
+                  className="caster-clicker-zone-line-main"
                   onClick={() => e.setSelectedZoneId(z.id)}
                 >
                   <span
-                    className="v2-clicker-zone-swatch"
+                    className="caster-clicker-zone-swatch"
                     style={{ background: z.color }}
                     aria-hidden
                   />
-                  <span className="v2-clicker-zone-line-meta">
+                  <span className="caster-clicker-zone-line-meta">
                     {z.width}×{z.height} · {zoneKindLabel(t, z.kind)} ·{" "}
                     {zoneActionLabel(t, z.action)}
                   </span>
                 </button>
                 <button
                   type="button"
-                  className="v2-clicker-zone-line-remove"
+                  className="caster-clicker-zone-line-remove"
                   disabled={e.editDisabled}
                   aria-label={t("clicker.zones.delete")}
                   onClick={() => removeZone(z.id)}
@@ -217,12 +217,12 @@ export function ClickerZonesSection({ editor: e }: Props) {
         )}
 
         {selected ? (
-          <div className="v2-clicker-zone-detail">
-            <div className="v2-field-row">
-              <label className="v2-field v2-field--compact">
+          <div className="caster-clicker-zone-detail">
+            <div className="caster-field-row">
+              <label className="caster-field caster-field--compact">
                 <span>{t("clicker.zones.action")}</span>
                 <Select
-                  className="v2-select"
+                  className="caster-select"
                   value={selected.action}
                   disabled={e.editDisabled}
                   title={zoneActionHint(t, selected.action)}
@@ -234,10 +234,10 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   }
                 />
               </label>
-              <label className="v2-field v2-field--compact">
+              <label className="caster-field caster-field--compact">
                 <span>{t("clicker.zones.kind")}</span>
                 <Select
-                  className="v2-select"
+                  className="caster-select"
                   value={selected.kind}
                   disabled={e.editDisabled}
                   options={zoneKindOpts}
@@ -250,10 +250,10 @@ export function ClickerZonesSection({ editor: e }: Props) {
               </label>
             </div>
             {selected.kind === "click" ? (
-              <label className="v2-field v2-field--compact">
+              <label className="caster-field caster-field--compact">
                 <span>{t("clicker.zones.sample")}</span>
                 <Select
-                  className="v2-select"
+                  className="caster-select"
                   value={selected.clickMode}
                   disabled={e.editDisabled}
                   options={clickModeOpts}
@@ -265,7 +265,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
                 />
               </label>
             ) : null}
-            <label className="v2-field v2-field--compact">
+            <label className="caster-field caster-field--compact">
               <span>{t("clicker.zones.color")}</span>
               <input
                 type="color"
@@ -276,7 +276,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
                 }
               />
             </label>
-            <p className="v2-clicker-hint">
+            <p className="caster-clicker-hint">
               {zoneActionHint(t, selected.action)}
             </p>
           </div>

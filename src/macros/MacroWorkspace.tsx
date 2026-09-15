@@ -1,6 +1,6 @@
 /**
- * @deprecated Legacy shell — not mounted by MainAppV2.
- * Prefer ClickerStudio / MacroEditorView + AppShell v2.
+ * @deprecated Legacy shell — not mounted by MainApp.
+ * Prefer ClickerStudio / MacroEditorView + AppShell.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -1545,7 +1545,7 @@ export function MacroWorkspace({
                       </div>
                       <aside className="macro-props-panel" aria-label={t("macros.params.panelTitle")}>
                         <div className="macro-props-head">
-                          <span className="v2-meta-label">{t("macros.params.panelTitle")}</span>
+                          <span className="caster-meta-label">{t("macros.params.panelTitle")}</span>
                           {selectedAction ? (
                             <p className="macro-props-title">
                               <strong>{actionTitle(selectedAction.type, t)}</strong>

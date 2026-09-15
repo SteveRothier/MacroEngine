@@ -1,6 +1,6 @@
 /**
  * Menu d’actions ancré (trigger + portal).
- * Canon UI : v2-menu-popover + MenuItemsList (même look que ContextMenu).
+ * Canon UI : caster-menu-popover + MenuItemsList (même look que ContextMenu).
  */
 import {
   useEffect,
@@ -247,7 +247,7 @@ export function DropdownMenu({
           id={menuId}
           role="menu"
           aria-label={ariaLabel ?? (typeof label === "string" ? label : "Menu")}
-          className={["v2-menu-popover", menuClassName].filter(Boolean).join(" ")}
+          className={["caster-menu-popover", menuClassName].filter(Boolean).join(" ")}
           style={coords ?? { position: "fixed", visibility: "hidden" }}
           onKeyDown={onListKeyDown}
           onClick={(e) => e.stopPropagation()}
@@ -267,12 +267,12 @@ export function DropdownMenu({
     : null;
 
   return (
-    <div className="v2-dropdown-menu-root" ref={rootRef}>
+    <div className="caster-dropdown-menu-root" ref={rootRef}>
       <button
         ref={triggerRef}
         type="button"
         className={
-          triggerClassName ?? "v2-btn v2-btn-ghost v2-dropdown-menu-trigger"
+          triggerClassName ?? "caster-btn caster-btn-ghost caster-dropdown-menu-trigger"
         }
         disabled={disabled}
         aria-expanded={open}

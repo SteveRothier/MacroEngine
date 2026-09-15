@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { confirmAction } from "../../ui";
-import { ActionPickerMenu, useToast } from "../../ui/v2";
+import { ActionPickerMenu, useToast } from "../../ui/shell";
 import { ActionList } from "../ActionList";
 import { buildActionAddMenu, makeAction } from "../actionFactory";
 import { MacroMetaBar } from "../MacroMetaBar";
@@ -24,7 +24,7 @@ import {
 } from "../types";
 import type { MacroUiLayout } from "./macroToGraph";
 import { MacroTitleBarTools } from "./MacroTitleBarTools";
-import { useTitleBarSlot } from "../../ui/v2/TitleBarContext";
+import { useTitleBarSlot } from "../../ui/shell/TitleBarContext";
 import { mergeAutomationPrefs } from "../../settings/settingsTypes";
 import { useT, type TFunction } from "../../i18n";
 
@@ -748,22 +748,22 @@ export function MacroEditorView({
 
   if (loading) {
     return (
-      <div className="v2-page v2-macro-editor">
+      <div className="caster-page caster-macro-editor">
         {titleBarPortal}
         <div
-          className="v2-macro-loading"
+          className="caster-macro-loading"
           aria-busy="true"
           aria-label={t("macros.toolbar.loadingAria")}
         >
-          <div className="v2-skeleton-page v2-skeleton-page--center">
+          <div className="caster-skeleton-page caster-skeleton-page--center">
             <div
-              className="v2-skeleton v2-skeleton-line v2-skeleton-line--lg"
+              className="caster-skeleton caster-skeleton-line caster-skeleton-line--lg"
               style={{ width: "55%" }}
             />
-            <div className="v2-skeleton v2-skeleton-line" style={{ width: "88%" }} />
-            <div className="v2-skeleton v2-skeleton-line" style={{ width: "72%" }} />
-            <div className="v2-skeleton v2-skeleton-line" style={{ width: "80%" }} />
-            <div className="v2-skeleton v2-skeleton-line" style={{ width: "64%" }} />
+            <div className="caster-skeleton caster-skeleton-line" style={{ width: "88%" }} />
+            <div className="caster-skeleton caster-skeleton-line" style={{ width: "72%" }} />
+            <div className="caster-skeleton caster-skeleton-line" style={{ width: "80%" }} />
+            <div className="caster-skeleton caster-skeleton-line" style={{ width: "64%" }} />
           </div>
         </div>
       </div>
@@ -771,11 +771,11 @@ export function MacroEditorView({
   }
 
   return (
-    <div className="v2-page v2-macro-editor">
+    <div className="caster-page caster-macro-editor">
       {titleBarPortal}
-      <div className="v2-editor-layout">
-        <div className="v2-seq-panel">
-          <div className="v2-seq-toolbar">
+      <div className="caster-editor-layout">
+        <div className="caster-seq-panel">
+          <div className="caster-seq-toolbar">
             <ActionPickerMenu
               label={t("macros.toolbar.add")}
               disabled={editorLocked}
@@ -785,14 +785,14 @@ export function MacroEditorView({
             />
           </div>
           <div
-            className="v2-seq-scroll"
+            className="caster-seq-scroll"
             onContextMenu={
               editorLocked
                 ? undefined
                 : (e) => {
                     const t = e.target as HTMLElement;
                     if (t.closest(".action-list-item")) return;
-                    if (t.closest(".v2-context-menu")) return;
+                    if (t.closest(".caster-context-menu")) return;
                     // Let ActionList handle empty/list background; still block browser menu on padding
                     if (!t.closest(".action-list")) {
                       e.preventDefault();

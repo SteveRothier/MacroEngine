@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { Switch } from "../ui";
-import { Select } from "../ui/v2";
+import { Select } from "../ui/shell";
 import { useT } from "../i18n";
 import { ZoneMap } from "./ZoneMap";
 import type { ClickerEditor } from "./useClickerEditor";
@@ -18,11 +18,11 @@ export function ClickerZonePreview({ editor: e }: Props) {
     e.activeDisplayId ?? e.displays.find((d) => d.isPrimary)?.id ?? "";
 
   return (
-    <div className="v2-clicker-zone-stage">
-      <div className="v2-clicker-zone-toolbar v2-clicker-zone-toolbar--full">
+    <div className="caster-clicker-zone-stage">
+      <div className="caster-clicker-zone-toolbar caster-clicker-zone-toolbar--full">
         {e.displays.length > 0 ? (
           <Select
-            className="v2-clicker-zone-select"
+            className="caster-clicker-zone-select"
             value={displayValue}
             disabled={e.editDisabled}
             ariaLabel={t("clicker.zones.displayAria")}
@@ -33,7 +33,7 @@ export function ClickerZonePreview({ editor: e }: Props) {
             onChange={(v) => void e.onSelectDisplay(v)}
           />
         ) : (
-          <span className="v2-clicker-hint-inline">
+          <span className="caster-clicker-hint-inline">
             {e.screenGeom.width}×{e.screenGeom.height}
           </span>
         )}
@@ -43,10 +43,10 @@ export function ClickerZonePreview({ editor: e }: Props) {
           label={t("clicker.zones.overlay")}
           onChange={e.setZoneOverlayVisible}
         />
-        <span className="v2-clicker-zone-toolbar-spacer" />
+        <span className="caster-clicker-zone-toolbar-spacer" />
         <button
           type="button"
-          className="v2-btn v2-btn-ghost"
+          className="caster-btn caster-btn-ghost"
           disabled={e.editDisabled || e.drawing}
           onClick={() => void e.onDrawZone("safety")}
         >
@@ -54,14 +54,14 @@ export function ClickerZonePreview({ editor: e }: Props) {
         </button>
         <button
           type="button"
-          className="v2-btn v2-btn-ghost"
+          className="caster-btn caster-btn-ghost"
           disabled={e.editDisabled || e.drawing}
           onClick={() => void e.onDrawZone("click")}
         >
           {t("clicker.zones.drawClick")}
         </button>
       </div>
-      <div className="screen-preview-frame v2-clicker-zone-frame v2-bg-canvas">
+      <div className="screen-preview-frame caster-clicker-zone-frame caster-bg-canvas">
         <div className="screen-preview" style={previewAspectStyle}>
           <ZoneMap
             geom={e.screenGeom}

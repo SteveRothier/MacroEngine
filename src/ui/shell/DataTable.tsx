@@ -32,16 +32,16 @@ export function DataTable<T>({
   const t = useT();
 
   if (rows.length === 0 && empty) {
-    return <div className="v2-table-empty">{empty}</div>;
+    return <div className="caster-table-empty">{empty}</div>;
   }
 
   return (
-    <div className="v2-table-wrap">
-      <table className="v2-table">
+    <div className="caster-table-wrap">
+      <table className="caster-table">
         <thead>
           <tr>
             {onSelectRow ? (
-              <th className="v2-table-check" aria-label={t("shell.selectionAria")} />
+              <th className="caster-table-check" aria-label={t("shell.selectionAria")} />
             ) : null}
             {columns.map((c) => (
               <th key={c.id} style={c.width ? { width: c.width } : undefined}>
@@ -62,7 +62,7 @@ export function DataTable<T>({
                 onDoubleClick={() => onRowDoubleClick?.(row)}
               >
                 {onSelectRow ? (
-                  <td className="v2-table-check">
+                  <td className="caster-table-check">
                     <input
                       type="checkbox"
                       checked={!!selected}

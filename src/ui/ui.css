@@ -1668,9 +1668,9 @@ textarea:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *:not(.v2-sidebar):not(.v2-sidebar *):not(.v2-doc-tabbar-scroll):not(.v2-doc-tabbar-scroll *),
-  *:not(.v2-sidebar):not(.v2-sidebar *)::before,
-  *:not(.v2-sidebar):not(.v2-sidebar *)::after {
+  *:not(.caster-sidebar):not(.caster-sidebar *):not(.caster-doc-tabbar-scroll):not(.caster-doc-tabbar-scroll *),
+  *:not(.caster-sidebar):not(.caster-sidebar *)::before,
+  *:not(.caster-sidebar):not(.caster-sidebar *)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

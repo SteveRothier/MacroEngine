@@ -2,7 +2,7 @@ export const TAB_LAYOUT = {
   MIN_W: 36,
   MAX_W: 180,
   STRIP_GAP_PX: 4,
-  /** Min width of `.v2-doc-tabbar-drag-fill` (grows to fill leftover strip). */
+  /** Min width of `.caster-doc-tabbar-drag-fill` (grows to fill leftover strip). */
   DRAG_FILL_W: 24,
 } as const;
 

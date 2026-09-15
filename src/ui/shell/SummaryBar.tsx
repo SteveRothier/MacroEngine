@@ -13,9 +13,9 @@ type Props = {
 
 export function SummaryBar({ totalLabel, segments }: Props) {
   return (
-    <footer className="v2-summary-bar">
-      <span className="v2-summary-total">{totalLabel}</span>
-      <div className="v2-summary-segments">
+    <footer className="caster-summary-bar">
+      <span className="caster-summary-total">{totalLabel}</span>
+      <div className="caster-summary-segments">
         {segments
           .filter((s) => s.count > 0)
           .map((s) => (

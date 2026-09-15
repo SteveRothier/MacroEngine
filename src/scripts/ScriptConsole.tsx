@@ -12,7 +12,7 @@ import {
   ContextMenu,
   useContextMenuState,
   type MenuItemDef,
-} from "../ui/v2";
+} from "../ui/shell";
 
 export type ConsoleLevel = "info" | "error" | "session";
 
@@ -158,10 +158,10 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
   }
 
   return (
-    <div className="v2-script-console-wrap" ref={layoutRef}>
+    <div className="caster-script-console-wrap" ref={layoutRef}>
       {!collapsed ? (
         <div
-          className="v2-script-console-splitter"
+          className="caster-script-console-splitter"
           onPointerDown={onSplitterPointerDown}
           role="separator"
           aria-orientation="horizontal"
@@ -170,7 +170,7 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
       ) : null}
       <div
         className={[
-          "v2-script-console",
+          "caster-script-console",
           collapsed ? "is-collapsed" : "",
         ]
           .filter(Boolean)
@@ -178,12 +178,12 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
         style={collapsed ? undefined : { height }}
         onContextMenu={ctxMenu.openFromEvent}
       >
-        <div className="v2-script-console-head">
+        <div className="caster-script-console-head">
           <span>{t("scripts.console.title")}</span>
-          <div className="v2-script-console-head-actions">
+          <div className="caster-script-console-head-actions">
             {errorCount > 0 ? (
               <span
-                className="v2-script-console-errors"
+                className="caster-script-console-errors"
                 title={t("scripts.console.errorsTip")}
               >
                 ● {errorCount}
@@ -191,14 +191,14 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
             ) : null}
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               onClick={onClear}
             >
               {t("scripts.console.clear")}
             </button>
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               aria-expanded={!collapsed}
               aria-label={
                 collapsed
@@ -217,23 +217,23 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
         </div>
         {!collapsed ? (
           <div
-            className="v2-script-console-body"
+            className="caster-script-console-body"
             ref={bodyRef}
             onScroll={onBodyScroll}
             aria-live="polite"
           >
             {lines.length === 0 ? (
-              <p className="v2-script-console-empty">
+              <p className="caster-script-console-empty">
                 {t("scripts.console.empty")}
               </p>
             ) : (
               lines.map((line) => (
                 <div
                   key={line.id}
-                  className={`v2-script-console-line is-${line.level}`}
+                  className={`caster-script-console-line is-${line.level}`}
                 >
-                  <span className="v2-script-console-time">{line.time}</span>
-                  <span className="v2-script-console-msg">{line.text}</span>
+                  <span className="caster-script-console-time">{line.time}</span>
+                  <span className="caster-script-console-msg">{line.text}</span>
                 </div>
               ))
             )}

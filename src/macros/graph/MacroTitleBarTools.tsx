@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowLeft, Circle, Pause, Play, Redo2, Square, Undo2 } from "lucide-react";
 import { useT } from "../../i18n";
-import { EditorToolbar } from "../../ui/v2";
+import { EditorToolbar } from "../../ui/shell";
 
 type Props = {
   onBack: () => void;
@@ -54,7 +54,7 @@ export function MacroTitleBarTools({
         <>
           <button
             type="button"
-            className="v2-titlebar-btn v2-btn v2-btn-ghost"
+            className="caster-titlebar-btn caster-btn caster-btn-ghost"
             onClick={onBack}
             title={t("macros.toolbar.back")}
           >
@@ -67,7 +67,7 @@ export function MacroTitleBarTools({
         <>
           <button
             type="button"
-            className="v2-titlebar-btn v2-titlebar-icon-btn"
+            className="caster-titlebar-btn caster-titlebar-icon-btn"
             disabled={locked || busy || !canUndo || !onUndo}
             onClick={onUndo}
             title={t("macros.toolbar.undoTitle")}
@@ -77,7 +77,7 @@ export function MacroTitleBarTools({
           </button>
           <button
             type="button"
-            className="v2-titlebar-btn v2-titlebar-icon-btn"
+            className="caster-titlebar-btn caster-titlebar-icon-btn"
             disabled={locked || busy || !canRedo || !onRedo}
             onClick={onRedo}
             title={t("macros.toolbar.redoTitle")}
@@ -86,7 +86,7 @@ export function MacroTitleBarTools({
             <Redo2 size={14} aria-hidden />
           </button>
           {recording ? (
-            <span className="v2-titlebar-record-status" role="status">
+            <span className="caster-titlebar-record-status" role="status">
               {recordPaused
                 ? t("macros.toolbar.recordStatusPaused", { count: recordCount })
                 : t("macros.toolbar.recordStatus", { count: recordCount })}
@@ -95,7 +95,7 @@ export function MacroTitleBarTools({
           {!recording ? (
             <button
               type="button"
-              className="v2-titlebar-btn v2-btn v2-btn-ghost"
+              className="caster-titlebar-btn caster-btn caster-btn-ghost"
               disabled={locked || busy}
               onClick={onStartRecord}
               title={t("macros.toolbar.captureTitle")}
@@ -108,7 +108,7 @@ export function MacroTitleBarTools({
               {recordPaused ? (
                 <button
                   type="button"
-                  className="v2-titlebar-btn v2-btn v2-btn-ghost"
+                  className="caster-titlebar-btn caster-btn caster-btn-ghost"
                   onClick={onResumeRecord}
                   title={t("macros.toolbar.resumeCaptureTitle")}
                 >
@@ -118,7 +118,7 @@ export function MacroTitleBarTools({
               ) : (
                 <button
                   type="button"
-                  className="v2-titlebar-btn v2-btn v2-btn-ghost"
+                  className="caster-titlebar-btn caster-btn caster-btn-ghost"
                   onClick={onPauseRecord}
                   title={t("macros.toolbar.pauseCaptureTitle")}
                 >
@@ -128,7 +128,7 @@ export function MacroTitleBarTools({
               )}
               <button
                 type="button"
-                className="v2-titlebar-btn v2-btn"
+                className="caster-titlebar-btn caster-btn"
                 onClick={onStopRecord}
                 title={t("macros.toolbar.stopCaptureTitle")}
               >
@@ -140,7 +140,7 @@ export function MacroTitleBarTools({
           {onPlayFrom ? (
             <button
               type="button"
-              className="v2-titlebar-btn v2-btn v2-btn-ghost"
+              className="caster-titlebar-btn caster-btn caster-btn-ghost"
               disabled={locked || busy}
               onClick={onPlayFrom}
               title={t("macros.toolbar.playFromTitle")}
@@ -151,7 +151,7 @@ export function MacroTitleBarTools({
           ) : null}
           <button
             type="button"
-            className="v2-titlebar-btn v2-btn v2-btn-primary"
+            className="caster-titlebar-btn caster-btn caster-btn-primary"
             disabled={locked || busy}
             onClick={onPlay}
             title={t("macros.toolbar.testTitle")}
@@ -160,7 +160,7 @@ export function MacroTitleBarTools({
             {t("macros.toolbar.test")}
           </button>
           {locked ? (
-            <span className="v2-clicker-lock" title={t("macros.toolbar.lockedTitle")}>
+            <span className="caster-clicker-lock" title={t("macros.toolbar.lockedTitle")}>
               {t("macros.toolbar.locked")}
             </span>
           ) : null}

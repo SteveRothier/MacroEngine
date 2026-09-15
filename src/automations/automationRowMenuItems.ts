@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { TFunction } from "../i18n";
-import type { MenuItemDef } from "../ui/v2";
+import type { MenuItemDef } from "../ui/shell";
 import type { AutomationFolderOption, AutomationRow } from "./types";
 import { folderOptionKey } from "./types";
 

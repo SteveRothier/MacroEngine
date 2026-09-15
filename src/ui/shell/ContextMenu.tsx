@@ -80,7 +80,7 @@ export function ContextMenu({
   return createPortal(
     <div
       ref={menuRef}
-      className="v2-context-menu"
+      className="caster-context-menu"
       role="menu"
       aria-label={ariaLabel}
       style={{ left: x, top: y, visibility: "hidden" }}

@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useTitleBarSlot } from "../ui/v2/TitleBarContext";
+import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import type { EngineStatus, HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import { useT } from "../i18n";
@@ -71,7 +71,7 @@ export function ClickerStudio({
   );
 
   return (
-    <div className="v2-page v2-clicker-studio">
+    <div className="caster-page caster-clicker-studio">
       {titleBarPortal}
       <ClickerSessionStats
         samples={editor.cpsSamples}
@@ -79,23 +79,23 @@ export function ClickerStudio({
         running={editor.running}
         paused={editor.sessionPaused}
       />
-      <div className="v2-clicker-center">
-        <div className="v2-settings-pane-inner v2-clicker-settings">
-          <div className="v2-tabs v2-clicker-tabs" role="tablist">
+      <div className="caster-clicker-center">
+        <div className="caster-settings-pane-inner caster-clicker-settings">
+          <div className="caster-tabs caster-clicker-tabs" role="tablist">
             {tabs.map((item) => (
               <button
                 key={item.id}
                 type="button"
                 role="tab"
                 aria-selected={tab === item.id}
-                className={["v2-tab", tab === item.id ? "active" : ""].join(" ")}
+                className={["caster-tab", tab === item.id ? "active" : ""].join(" ")}
                 onClick={() => setTab(item.id)}
               >
                 {item.label}
               </button>
             ))}
           </div>
-          <div className="v2-clicker-inspector-pane" role="tabpanel">
+          <div className="caster-clicker-inspector-pane" role="tabpanel">
             {tab === "entry" ? (
               <ClickerEntrySection
                 editor={editor}
@@ -104,7 +104,7 @@ export function ClickerStudio({
             ) : null}
             {tab === "target" ? <ClickerTargetSection editor={editor} /> : null}
             {tab === "zones" ? (
-              <div className="v2-clicker-zones-split">
+              <div className="caster-clicker-zones-split">
                 <ClickerZonesSection editor={editor} />
                 <ClickerZonePreview editor={editor} />
               </div>

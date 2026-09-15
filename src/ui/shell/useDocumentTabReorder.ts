@@ -90,7 +90,7 @@ function applyFrozenWidths(
     const el = tabEls.get(id);
     if (!el) continue;
     const px = `${width}px`;
-    if (el.classList.contains("v2-doc-tab--home")) {
+    if (el.classList.contains("caster-doc-tab--home")) {
       el.style.flex = "0 0 auto";
       el.style.width = px;
       el.style.minWidth = px;
