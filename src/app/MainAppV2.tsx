@@ -119,14 +119,14 @@ export function MainAppV2() {
   const [uiLocalePref, setUiLocalePref] = useState(() => mergeShellPrefs().uiLocale);
   return (
     <TitleBarProvider>
-      <ToastProvider>
-        <LocaleProvider
-          preference={uiLocalePref}
-          onPreferenceChange={setUiLocalePref}
-        >
+      <LocaleProvider
+        preference={uiLocalePref}
+        onPreferenceChange={setUiLocalePref}
+      >
+        <ToastProvider>
           <MainAppV2Inner onUiLocalePrefChange={setUiLocalePref} />
-        </LocaleProvider>
-      </ToastProvider>
+        </ToastProvider>
+      </LocaleProvider>
     </TitleBarProvider>
   );
 }
