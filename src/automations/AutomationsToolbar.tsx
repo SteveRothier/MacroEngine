@@ -1,16 +1,12 @@
 import { useRef, type RefObject } from "react";
 import {
   ChevronDown,
-  Clock,
   Code2,
-  Folder,
   FolderPlus,
-  History,
   MousePointer2,
   PenLine,
   Plus,
   Search,
-  Star,
   Trash2,
   Workflow,
 } from "lucide-react";
@@ -19,7 +15,6 @@ import { DropdownMenu, Select, Tooltip } from "../ui/v2";
 import type {
   AutomationFilter,
   AutomationFolderOption,
-  AutomationRow,
   FilterCounts,
 } from "./types";
 import { folderOptionKey } from "./types";
@@ -40,10 +35,6 @@ type Props = {
   onCreateFolder?: (kind: "macro" | "clicker") => void;
   onRenameFolder?: () => void;
   onDeleteFolder?: () => void;
-  dragRow?: AutomationRow | null;
-  dropFolderKey?: string | null;
-  onDropFolderKeyChange?: (key: string | null) => void;
-  onDropOntoFolder?: (folder: AutomationFolderOption | null) => void;
   searchInputRef?: RefObject<HTMLInputElement | null>;
   createOpen?: boolean;
   onCreateOpenChange?: (open: boolean) => void;
@@ -56,31 +47,26 @@ const FILTER_VIEW_DEFS: {
     | "automations.filter.favorites"
     | "automations.filter.recent"
     | "automations.filter.scripts";
-  icon: typeof Clock;
   countKey: keyof FilterCounts;
 }[] = [
   {
     value: "all",
     labelKey: "automations.filter.all",
-    icon: Clock,
     countKey: "all",
   },
   {
     value: "favorites",
     labelKey: "automations.filter.favorites",
-    icon: Star,
     countKey: "favorites",
   },
   {
     value: "recent",
     labelKey: "automations.filter.recent",
-    icon: History,
     countKey: "recent",
   },
   {
     value: "scripts",
     labelKey: "automations.filter.scripts",
-    icon: Code2,
     countKey: "scripts",
   },
 ];
@@ -100,10 +86,6 @@ export function AutomationsToolbar({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
-  dragRow = null,
-  dropFolderKey = null,
-  onDropFolderKeyChange,
-  onDropOntoFolder,
   searchInputRef,
   createOpen,
   onCreateOpenChange,
@@ -111,21 +93,38 @@ export function AutomationsToolbar({
   const t = useT();
   const localSearchRef = useRef<HTMLInputElement>(null);
   const searchRef = searchInputRef ?? localSearchRef;
-  const dragging =
-    dragRow != null && dragRow.kind !== "script" && onDropOntoFolder != null;
-  const dropFolders = dragging
-    ? folders.filter((f) => f.kind === dragRow.kind)
-    : folders;
-  const showFolderChips = folders.length > 0 || dragging;
 
   const activeView =
     FILTER_VIEW_DEFS.find((d) => d.value === filter) ?? FILTER_VIEW_DEFS[0];
-  const ActiveViewIcon = activeView.icon;
   const viewOptions = FILTER_VIEW_DEFS.map(({ value, labelKey, countKey }) => ({
     value,
     label: `${t(labelKey)} · ${counts[countKey]}`,
   }));
   const viewTriggerLabel = `${t(activeView.labelKey)} · ${counts[activeView.countKey]}`;
+
+  const folderOptions = [
+    { value: "", label: t("automations.folder.chipAll") },
+    ...folders.map((f) => ({
+      value: folderOptionKey(f),
+      label:
+        folders.filter((o) => o.name === f.name).length > 1
+          ? t("automations.folder.namedWithKind", {
+              name: f.name,
+              kind:
+                f.kind === "macro"
+                  ? t("automations.folder.kindSuffixMacro")
+                  : t("automations.folder.kindSuffixClicker"),
+            })
+          : f.name,
+    })),
+  ];
+  const selectedFolderName =
+    folders.find((f) => folderOptionKey(f) === folderKey)?.name ?? null;
+  const folderTriggerLabel = folderKey
+    ? t("automations.folder.selectTriggerNamed", {
+        name: selectedFolderName ?? "…",
+      })
+    : t("automations.folder.selectTrigger");
 
   const folderMenuItems = [
     {
@@ -167,109 +166,25 @@ export function AutomationsToolbar({
   return (
     <div className="v2-automations-chrome">
       <div className="v2-automations-filter-bar">
-        <div className="v2-automations-view-select">
-          <ActiveViewIcon
-            size={13}
-            aria-hidden
-            className="v2-automations-view-select-icon"
-          />
-          <Select
-            className="v2-select v2-automations-view-select-control"
-            value={filter}
-            options={viewOptions}
-            triggerLabel={viewTriggerLabel}
-            ariaLabel={t("automations.filter.aria")}
-            title={filterPillTooltip(filter, t)}
-            onChange={(v) => onFilterChange(v as AutomationFilter)}
-          />
-        </div>
+        <Select
+          className="v2-select v2-automations-view-select"
+          value={filter}
+          options={viewOptions}
+          triggerLabel={viewTriggerLabel}
+          ariaLabel={t("automations.filter.aria")}
+          title={filterPillTooltip(filter, t)}
+          onChange={(v) => onFilterChange(v as AutomationFilter)}
+        />
 
-        {showFolderChips ? (
-          <div
-            className={[
-              "v2-auto-folder-chips",
-              dragging ? "is-drop-active" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            role="toolbar"
-            aria-label={
-              dragging
-                ? t("automations.folder.chipsDropAria", { name: dragRow.name })
-                : t("automations.folder.chipsAria")
-            }
-          >
-            <button
-              type="button"
-              className={[
-                "v2-auto-folder-chip",
-                !folderKey && !dragging ? "is-active" : "",
-                dragging && dropFolderKey === "root" ? "is-over" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => {
-                if (dragging) return;
-                onFolderKeyChange(null);
-              }}
-              onPointerEnter={() => {
-                if (dragging) onDropFolderKeyChange?.("root");
-              }}
-              onPointerLeave={() => {
-                if (dragging && dropFolderKey === "root")
-                  onDropFolderKeyChange?.(null);
-              }}
-              onPointerUp={() => {
-                if (!dragging) return;
-                onDropOntoFolder?.(null);
-              }}
-            >
-              <Folder size={13} aria-hidden />
-              {dragging
-                ? t("automations.folder.chipNoFolder")
-                : t("automations.folder.chipAll")}
-            </button>
-            {dropFolders.map((f) => {
-              const fKey = folderOptionKey(f);
-              const compatible = !dragging || f.kind === dragRow.kind;
-              return (
-                <button
-                  key={fKey}
-                  type="button"
-                  disabled={dragging && !compatible}
-                  className={[
-                    "v2-auto-folder-chip",
-                    folderKey === fKey && !dragging ? "is-active" : "",
-                    dragging && dropFolderKey === fKey ? "is-over" : "",
-                    dragging && !compatible ? "is-disabled" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onClick={() => {
-                    if (dragging) return;
-                    onFolderKeyChange(folderKey === fKey ? null : fKey);
-                  }}
-                  onPointerEnter={() => {
-                    if (dragging && compatible) onDropFolderKeyChange?.(fKey);
-                  }}
-                  onPointerLeave={() => {
-                    if (dragging && dropFolderKey === fKey)
-                      onDropFolderKeyChange?.(null);
-                  }}
-                  onPointerUp={() => {
-                    if (!dragging || !compatible) return;
-                    onDropOntoFolder?.(f);
-                  }}
-                >
-                  <Folder size={13} aria-hidden />
-                  {f.name}
-                  <span className="v2-auto-folder-chip-kind">
-                    {f.kind === "macro" ? "M" : "C"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+        {folders.length > 0 ? (
+          <Select
+            className="v2-select v2-automations-folder-select"
+            value={folderKey ?? ""}
+            options={folderOptions}
+            triggerLabel={folderTriggerLabel}
+            ariaLabel={t("automations.folder.selectAria")}
+            onChange={(v) => onFolderKeyChange(v || null)}
+          />
         ) : null}
 
         <div className="v2-automations-filter-bar-end">
