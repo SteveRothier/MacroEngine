@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
+import { useT } from "../i18n";
 
 export type ConfirmOptions = {
   title: string;
@@ -30,6 +31,7 @@ export function confirmChoice(opts: ConfirmOptions): Promise<ConfirmOutcome> {
 }
 
 export function ConfirmHost() {
+  const t = useT();
   const [pending, setPending] = useState<Pending | null>(null);
 
   useEffect(() => {
@@ -58,8 +60,8 @@ export function ConfirmHost() {
   if (!pending) return null;
 
   const current = pending;
-  const confirmLabel = current.confirmLabel ?? "Oui";
-  const cancelLabel = current.cancelLabel ?? "Non";
+  const confirmLabel = current.confirmLabel ?? t("common.yes");
+  const cancelLabel = current.cancelLabel ?? t("common.no");
   const discardLabel = current.discardLabel;
   const danger = current.danger !== false;
 

@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useT } from "../../i18n";
 
 export type ToastKind = "success" | "error" | "info";
 
@@ -30,6 +31,7 @@ const DISMISS_MS = 4200;
 let toastSeq = 0;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const t = useT();
   const [items, setItems] = useState<ToastItem[]>([]);
 
   const dismiss = useCallback((id: string) => {
@@ -62,18 +64,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       <div className="v2-toast-host" aria-live="polite" aria-relevant="additions">
-        {items.map((t) => (
+        {items.map((toast) => (
           <div
-            key={t.id}
-            className={["v2-toast", `v2-toast--${t.kind}`].join(" ")}
-            role={t.kind === "error" ? "alert" : "status"}
+            key={toast.id}
+            className={["v2-toast", `v2-toast--${toast.kind}`].join(" ")}
+            role={toast.kind === "error" ? "alert" : "status"}
           >
-            <span className="v2-toast-msg">{t.message}</span>
+            <span className="v2-toast-msg">{toast.message}</span>
             <button
               type="button"
               className="v2-toast-dismiss"
-              aria-label="Fermer"
-              onClick={() => dismiss(t.id)}
+              aria-label={t("common.close")}
+              onClick={() => dismiss(toast.id)}
             >
               ×
             </button>
