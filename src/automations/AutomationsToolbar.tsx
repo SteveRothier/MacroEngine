@@ -187,23 +187,24 @@ export function AutomationsToolbar({
           />
         ) : null}
 
+        <label className="v2-automations-search">
+          <Search
+            size={12}
+            aria-hidden
+            className="v2-automations-search-icon"
+          />
+          <input
+            ref={searchRef}
+            type="search"
+            placeholder={t("automations.search.placeholder")}
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            className="v2-search-inline v2-automations-filter-search"
+            aria-label={t("automations.search.aria")}
+          />
+        </label>
+
         <div className="v2-automations-filter-bar-end">
-          <label className="v2-automations-search">
-            <Search
-              size={12}
-              aria-hidden
-              className="v2-automations-search-icon"
-            />
-            <input
-              ref={searchRef}
-              type="search"
-              placeholder={t("automations.search.placeholder")}
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              className="v2-search-inline v2-automations-filter-search"
-              aria-label={t("automations.search.aria")}
-            />
-          </label>
           {onCreateFolder ? (
             <Tooltip content={t("automations.folder.manageLabel")}>
               <DropdownMenu
