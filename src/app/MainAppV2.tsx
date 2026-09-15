@@ -997,8 +997,6 @@ function MainAppV2Inner({
           query={automationsPage.query}
           onQueryChange={automationsPage.setQuery}
           filter={automationsPage.filter}
-          folderKey={automationsPage.folderKey}
-          onFolderKeyChange={automationsPage.setFolderKey}
           display={automationsPage.display}
           onDisplayChange={automationsPage.setDisplay}
           onFilterChange={automationsPage.setFilter}

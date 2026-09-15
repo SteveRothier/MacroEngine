@@ -10,7 +10,6 @@ const defaults = mergeAccueilPrefs();
 export function useAutomationsPageState() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<AutomationFilter>(defaults.defaultFilter);
-  const [folderKey, setFolderKey] = useState<string | null>(null);
   const [display, setDisplay] = useState<DisplayOptions>(() => ({
     sortBy: defaults.defaultSortBy,
     sortDir: defaults.defaultSortDir,
@@ -22,8 +21,6 @@ export function useAutomationsPageState() {
     setQuery,
     filter,
     setFilter,
-    folderKey,
-    setFolderKey,
     display,
     setDisplay,
     focusKey,
