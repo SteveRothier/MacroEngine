@@ -15,7 +15,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { useT } from "../i18n";
-import { DropdownMenu, Tooltip } from "../ui/v2";
+import { DropdownMenu, Select, Tooltip } from "../ui/v2";
 import type {
   AutomationFilter,
   AutomationFolderOption,
@@ -49,7 +49,7 @@ type Props = {
   onCreateOpenChange?: (open: boolean) => void;
 };
 
-const FILTER_PILL_DEFS: {
+const FILTER_VIEW_DEFS: {
   value: AutomationFilter;
   labelKey:
     | "automations.filter.all"
@@ -118,6 +118,15 @@ export function AutomationsToolbar({
     : folders;
   const showFolderChips = folders.length > 0 || dragging;
 
+  const activeView =
+    FILTER_VIEW_DEFS.find((d) => d.value === filter) ?? FILTER_VIEW_DEFS[0];
+  const ActiveViewIcon = activeView.icon;
+  const viewOptions = FILTER_VIEW_DEFS.map(({ value, labelKey, countKey }) => ({
+    value,
+    label: `${t(labelKey)} · ${counts[countKey]}`,
+  }));
+  const viewTriggerLabel = `${t(activeView.labelKey)} · ${counts[activeView.countKey]}`;
+
   const folderMenuItems = [
     {
       id: "folder-macro",
@@ -158,26 +167,21 @@ export function AutomationsToolbar({
   return (
     <div className="v2-automations-chrome">
       <div className="v2-automations-filter-bar">
-        <div
-          className="v2-filter-pills"
-          role="group"
-          aria-label={t("automations.filter.aria")}
-        >
-          {FILTER_PILL_DEFS.map(({ value, labelKey, icon: Icon, countKey }) => (
-            <Tooltip key={value} content={filterPillTooltip(value, t)}>
-              <button
-                type="button"
-                className={["v2-filter-pill", filter === value ? "active" : ""]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => onFilterChange(value)}
-              >
-                <Icon size={13} aria-hidden />
-                {t(labelKey)}
-                <span className="v2-filter-pill-count">{counts[countKey]}</span>
-              </button>
-            </Tooltip>
-          ))}
+        <div className="v2-automations-view-select">
+          <ActiveViewIcon
+            size={13}
+            aria-hidden
+            className="v2-automations-view-select-icon"
+          />
+          <Select
+            className="v2-select v2-automations-view-select-control"
+            value={filter}
+            options={viewOptions}
+            triggerLabel={viewTriggerLabel}
+            ariaLabel={t("automations.filter.aria")}
+            title={filterPillTooltip(filter, t)}
+            onChange={(v) => onFilterChange(v as AutomationFilter)}
+          />
         </div>
 
         {showFolderChips ? (
