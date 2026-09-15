@@ -4852,15 +4852,17 @@ body.v2-pointer-reorder-dragging {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 28px;
-  padding: 4px 20px;
+  min-height: 32px;
+  padding: 6px 20px;
   border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--v2-border-subtle);
   box-sizing: border-box;
-  color: var(--v2-text-muted);
+  color: var(--v2-text-secondary);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.02em;
   user-select: none;
-  background: var(--v2-bg-canvas);
+  background: color-mix(in srgb, var(--v2-bg-elevated) 92%, var(--v2-bg-canvas));
 }
 
 .v2-auto-colhead-check {
@@ -4888,18 +4890,19 @@ body.v2-pointer-reorder-dragging {
   margin: 0;
   border: none;
   background: transparent;
-  padding: 0;
+  padding: 2px 4px;
   height: auto;
   min-height: 0;
   font: inherit;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.2;
-  color: var(--v2-text-muted);
+  letter-spacing: 0.02em;
+  color: var(--v2-text-secondary);
   text-align: left;
   justify-content: flex-start;
   box-shadow: none;
-  border-radius: 0;
+  border-radius: var(--v2-radius-sm);
   appearance: none;
   -webkit-appearance: none;
 }
@@ -4910,36 +4913,36 @@ button.v2-auto-colhead-label {
   -webkit-appearance: none;
   height: auto;
   min-height: 0;
-  padding: 0;
+  padding: 2px 4px;
   border: none;
   background: transparent;
   box-shadow: none;
-  border-radius: 0;
+  border-radius: var(--v2-radius-sm);
   justify-content: flex-start;
-  color: var(--v2-text-muted);
+  color: var(--v2-text-secondary);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 button.v2-auto-colhead-label:hover,
 button.v2-auto-colhead-label.is-active,
 button.v2-auto-colhead-label:active,
 button.v2-auto-colhead-label:focus {
-  color: var(--v2-text-secondary);
-  background: transparent;
+  color: var(--v2-text-primary);
+  background: color-mix(in srgb, var(--v2-accent) 12%, transparent);
   border: none;
   box-shadow: none;
   outline: none;
 }
 
 button.v2-auto-colhead-label:focus-visible {
-  color: var(--v2-text-secondary);
-  background: transparent;
+  color: var(--v2-text-primary);
+  background: color-mix(in srgb, var(--v2-accent) 12%, transparent);
   border: none;
   box-shadow: none;
   outline: 2px solid var(--v2-accent);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: var(--v2-radius-sm);
 }
 
 .v2-auto-colhead-name {
@@ -4959,11 +4962,104 @@ button.v2-auto-colhead-label:focus-visible {
 }
 
 .v2-auto-colhead-props .v2-auto-colhead-label {
-  color: var(--v2-text-muted);
-  font-weight: 500;
+  color: var(--v2-text-secondary);
+  font-weight: 600;
 }
 
 .v2-auto-colhead-trail {
+  width: 88px;
+  flex-shrink: 0;
+}
+
+.v2-automations-list-body .v2-auto-skeleton-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
+}
+
+.v2-auto-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 20px;
+  border-left: 3px solid transparent;
+  box-sizing: border-box;
+  width: 100%;
+  pointer-events: none;
+}
+
+.v2-auto-skeleton-check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 3px;
+}
+
+.v2-auto-skeleton-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.v2-auto-skeleton-kind {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.v2-auto-skeleton-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.v2-auto-skeleton-type {
+  width: 64px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
+.v2-auto-skeleton-props {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.v2-auto-skeleton-prop {
+  height: 10px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.v2-auto-skeleton-prop--trigger {
+  width: 110px;
+}
+
+.v2-auto-skeleton-prop--secondary {
+  width: 100px;
+}
+
+.v2-auto-skeleton-prop--run {
+  width: 72px;
+}
+
+.v2-auto-skeleton-prop--status {
+  width: 72px;
+}
+
+.v2-auto-skeleton-trail {
   width: 88px;
   flex-shrink: 0;
 }

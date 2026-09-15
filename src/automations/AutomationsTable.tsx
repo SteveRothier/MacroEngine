@@ -55,7 +55,6 @@ import {
 } from "./accueilOrder";
 import { AutomationRowMenu } from "./AutomationRowMenu";
 import { AutomationsToolbar } from "./AutomationsToolbar";
-import { AccueilFolderRail } from "./AccueilFolderRail";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import {
@@ -852,13 +851,13 @@ export function AutomationsTable({
     }
   }
 
-  async function onRenameFolder(target?: AutomationFolderOption) {
-    const folder =
-      target ?? folders.find((f) => folderOptionKey(f) === folderKey);
-    if (!folder) {
+  async function onRenameFolder() {
+    if (!folderKey) {
       toast.info(t("automations.toast.filterFolderToRename"));
       return;
     }
+    const folder = folders.find((f) => folderOptionKey(f) === folderKey);
+    if (!folder) return;
     const nextName = await promptAction({
       title: t("automations.confirm.renameFolderTitle"),
       defaultValue: folder.name,
@@ -984,13 +983,13 @@ export function AutomationsTable({
     }
   }
 
-  async function onDeleteFolder(target?: AutomationFolderOption) {
-    const folder =
-      target ?? folders.find((f) => folderOptionKey(f) === folderKey);
-    if (!folder) {
+  async function onDeleteFolder() {
+    if (!folderKey) {
       toast.info(t("automations.toast.filterFolderToDelete"));
       return;
     }
+    const folder = folders.find((f) => folderOptionKey(f) === folderKey);
+    if (!folder) return;
     if (accueilPrefs.confirmDeleteFolder) {
       const ok = await confirmAction({
         title: t("automations.confirm.deleteFolderTitle"),
@@ -1007,7 +1006,7 @@ export function AutomationsTable({
         kind: folder.kind,
         id: folder.id,
       });
-      if (folderKey === folderOptionKey(folder)) onFolderKeyChange(null);
+      onFolderKeyChange(null);
       await refresh();
       onRefresh?.();
       toast.success(t("automations.toast.folderDeleted", { name: folder.name }));
@@ -1260,6 +1259,11 @@ export function AutomationsTable({
     return folders.filter((f) => kinds.has(f.kind));
   }, [folders, selectedRows]);
 
+  const dragFolders = useMemo(() => {
+    if (!dragRow || dragRow.kind === "script") return [];
+    return folders.filter((f) => f.kind === dragRow.kind);
+  }, [dragRow, folders]);
+
   const ctxMenuItems = useMemo(() => {
     if (!ctxRow) return [];
     const rowFolders =
@@ -1392,70 +1396,34 @@ export function AutomationsTable({
         onQueryChange={onQueryChange}
         filter={filter}
         onFilterChange={(f) => onFilterChange?.(f)}
+        folderKey={folderKey}
+        onFolderKeyChange={onFolderKeyChange}
+        folders={folders}
         counts={counts}
         onCreateMacro={onCreateMacro}
         onCreateClicker={onCreateClicker}
         onCreateScript={onCreateScript}
+        onCreateFolder={(kind) => void onCreateFolder(kind)}
+        onRenameFolder={() => void onRenameFolder()}
+        onDeleteFolder={() => void onDeleteFolder()}
         searchInputRef={searchInputRef}
         createOpen={createOpen}
         onCreateOpenChange={setCreateOpen}
       />
 
-      <div className="v2-automations-main">
-        <AccueilFolderRail
-          folderKey={folderKey}
-          onFolderKeyChange={onFolderKeyChange}
-          folders={folders}
-          onCreateFolder={(kind) => void onCreateFolder(kind)}
-          onRenameFolder={(folder) => void onRenameFolder(folder)}
-          onDeleteFolder={(folder) => void onDeleteFolder(folder)}
-          dragRow={dragRow}
-          dropFolderKey={dropFolderKey}
-          onDropFolderKeyChange={setDropFolderKey}
-          onDropOntoFolder={(folder) => {
-            if (!dragRow) return;
-            void moveRowToFolder(dragRow, folder);
-            clearFolderDrag();
-          }}
-        />
-
       <div
         className="v2-page-body v2-automations-list-body"
         ref={listScrollRef}
       >
-        {loading ? (
+        {loading || sorted.length > 0 ? (
           <div
-            className="v2-skeleton-page"
-            aria-busy="true"
-            aria-label={t("automations.empty.loadingAria")}
+            className="v2-automations-list"
+            role={loading ? undefined : "list"}
+            aria-busy={loading || undefined}
+            aria-label={
+              loading ? t("automations.empty.loadingAria") : undefined
+            }
           >
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="v2-skeleton-row">
-                <div className="v2-skeleton v2-skeleton-avatar" />
-                <div
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  <div
-                    className="v2-skeleton v2-skeleton-line v2-skeleton-line--lg"
-                    style={{ width: `${58 - i * 6}%` }}
-                  />
-                  <div
-                    className="v2-skeleton v2-skeleton-line"
-                    style={{ width: `${42 - i * 4}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : sorted.length === 0 ? (
-          emptyState
-        ) : (
-          <div className="v2-automations-list" role="list">
             <div className="v2-auto-colhead">
               <span className="v2-auto-colhead-check" aria-hidden />
               <div className="v2-auto-colhead-identity">
@@ -1556,6 +1524,37 @@ export function AutomationsTable({
               </div>
               <span className="v2-auto-colhead-trail" aria-hidden />
             </div>
+            {loading ? (
+              <div className="v2-auto-skeleton-page">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} className="v2-auto-skeleton-row">
+                    <div className="v2-skeleton v2-auto-skeleton-check" />
+                    <div className="v2-auto-skeleton-identity">
+                      <div className="v2-skeleton v2-auto-skeleton-kind" />
+                      <div className="v2-auto-skeleton-text">
+                        <div
+                          className="v2-skeleton v2-skeleton-line v2-skeleton-line--lg"
+                          style={{ width: `${52 - i * 5}%` }}
+                        />
+                        <div
+                          className="v2-skeleton v2-skeleton-line"
+                          style={{ width: `${36 - i * 3}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="v2-skeleton v2-auto-skeleton-type" />
+                    <div className="v2-auto-skeleton-props">
+                      <div className="v2-skeleton v2-auto-skeleton-prop v2-auto-skeleton-prop--trigger" />
+                      <div className="v2-skeleton v2-auto-skeleton-prop v2-auto-skeleton-prop--secondary" />
+                      <div className="v2-skeleton v2-auto-skeleton-prop v2-auto-skeleton-prop--run" />
+                      <div className="v2-skeleton v2-auto-skeleton-prop v2-auto-skeleton-prop--status" />
+                    </div>
+                    <div className="v2-auto-skeleton-trail" aria-hidden />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <>
             {sections.map((section) => {
               const collapsed = collapsedSections.has(section.id);
               return (
@@ -1778,7 +1777,7 @@ export function AutomationsTable({
                                   // Always suppress the synthetic click after an armed drag.
                                   suppressClickAfterDragRef.current = true;
                                   if (overFolder) {
-                                    // Accueil folder rail handles the move on its pointerUp.
+                                    // Folder chip/strip handles the move on its pointerUp.
                                     clearFolderDrag({ suppressClick: true });
                                     return;
                                   }
@@ -2066,9 +2065,12 @@ export function AutomationsTable({
                 </div>
               );
             })}
+              </>
+            )}
           </div>
+        ) : (
+          emptyState
         )}
-      </div>
       </div>
 
       {selected.size > 0 ? (
@@ -2185,6 +2187,73 @@ export function AutomationsTable({
               {t("common.cancel")}
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {dragRow && dragRow.kind !== "script" ? (
+        <div
+          className="v2-auto-folder-drop-strip"
+          role="toolbar"
+          aria-label={t("automations.folder.dropStripAria", {
+            name: dragRow.name,
+          })}
+        >
+          <span className="v2-auto-folder-drop-hint">
+            {t("automations.folder.dropHint", { name: dragRow.name })}
+          </span>
+          <button
+            type="button"
+            className={[
+              "v2-auto-folder-drop-chip",
+              dropFolderKey === "root" ? "is-over" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onPointerEnter={() => setDropFolderKey("root")}
+            onPointerLeave={() =>
+              setDropFolderKey((k) => (k === "root" ? null : k))
+            }
+            onPointerUp={() => {
+              void moveRowToFolder(dragRow, null);
+              clearFolderDrag();
+            }}
+          >
+            <Folder size={14} aria-hidden />
+            {t("automations.folder.chipNoFolder")}
+          </button>
+          {dragFolders.map((f) => {
+            const fKey = folderOptionKey(f);
+            return (
+              <button
+                key={fKey}
+                type="button"
+                className={[
+                  "v2-auto-folder-drop-chip",
+                  dropFolderKey === fKey ? "is-over" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                onPointerEnter={() => setDropFolderKey(fKey)}
+                onPointerLeave={() =>
+                  setDropFolderKey((k) => (k === fKey ? null : k))
+                }
+                onPointerUp={() => {
+                  void moveRowToFolder(dragRow, f);
+                  clearFolderDrag();
+                }}
+              >
+                <Folder size={14} aria-hidden />
+                {f.name}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="v2-btn v2-btn-ghost"
+            onClick={() => clearFolderDrag()}
+          >
+            {t("common.cancel")}
+          </button>
         </div>
       ) : null}
 
