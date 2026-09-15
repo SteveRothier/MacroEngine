@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useT } from "../i18n";
 
 export type PromptOptions = {
   title: string;
@@ -21,6 +22,7 @@ export function promptAction(opts: PromptOptions): Promise<string | null> {
 }
 
 export function PromptHost() {
+  const t = useT();
   const [pending, setPending] = useState<Pending | null>(null);
   const [value, setValue] = useState("");
 
@@ -107,7 +109,7 @@ export function PromptHost() {
             className="v2-btn v2-btn-ghost"
             onClick={() => close(null)}
           >
-            {current.cancelLabel ?? "Annuler"}
+            {current.cancelLabel ?? t("common.cancel")}
           </button>
         </div>
       </div>
