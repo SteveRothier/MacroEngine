@@ -497,9 +497,9 @@ export function AutomationsTable({
   const sections = useMemo(() => {
     type ListSection = {
       id: string;
-      label: string | null;
+      name: string | null;
       folder: AutomationFolderOption | null;
-      kind: "folder" | "unfiled" | "flat";
+      kind: "folder" | "flat";
       items: AutomationRow[];
     };
 
@@ -507,7 +507,7 @@ export function AutomationsTable({
       return [
         {
           id: "all",
-          label: null,
+          name: null,
           folder: null,
           kind: "flat" as const,
           items: sorted,
@@ -524,22 +524,9 @@ export function AutomationsTable({
           r.folderId != null &&
           folderOptionKey({ kind: r.kind, id: r.folderId }) === key,
       );
-      const dup = folders.filter((o) => o.name === f.name).length > 1;
-      const name = dup
-        ? t("automations.folder.namedWithKind", {
-            name: f.name,
-            kind:
-              f.kind === "macro"
-                ? t("automations.folder.kindSuffixMacro")
-                : t("automations.folder.kindSuffixClicker"),
-          })
-        : f.name;
       out.push({
         id: `folder:${key}`,
-        label: t("automations.sections.folder", {
-          name,
-          count: items.length,
-        }),
+        name: f.name,
         folder: f,
         kind: "folder",
         items,
@@ -549,18 +536,17 @@ export function AutomationsTable({
     const unfiled = sorted.filter(
       (r) => r.kind === "script" || r.folderId == null,
     );
-    out.push({
-      id: "unfiled",
-      label:
-        folders.length > 0
-          ? t("automations.sections.unfiled", { count: unfiled.length })
-          : null,
-      folder: null,
-      kind: "unfiled",
-      items: unfiled,
-    });
+    if (unfiled.length > 0) {
+      out.push({
+        id: "unfiled",
+        name: null,
+        folder: null,
+        kind: "flat",
+        items: unfiled,
+      });
+    }
     return out;
-  }, [sorted, filter, folders, t]);
+  }, [sorted, filter, folders]);
 
   const selectedRows = useMemo(() => {
     return sorted.filter((r) => selected.has(rowKey(r)));
@@ -1540,18 +1526,15 @@ export function AutomationsTable({
               const sectionDropKey =
                 section.kind === "folder" && section.folder
                   ? folderOptionKey(section.folder)
-                  : section.kind === "unfiled"
-                    ? "root"
-                    : null;
+                  : null;
               const dropCompatible =
                 dragRow != null &&
                 dragRow.kind !== "script" &&
-                (section.kind === "unfiled" ||
-                  (section.folder != null &&
-                    section.folder.kind === dragRow.kind));
+                section.folder != null &&
+                section.folder.kind === dragRow.kind;
               return (
                 <div key={section.id} className="v2-automations-section">
-                  {section.label ? (
+                  {section.kind === "folder" && section.folder && section.name ? (
                     <div
                       className={[
                         "v2-auto-folder-section",
@@ -1574,53 +1557,75 @@ export function AutomationsTable({
                         }
                       }}
                       onPointerUp={() => {
-                        if (!dropCompatible || !dragRow) return;
-                        if (section.kind === "unfiled") {
-                          void moveRowToFolder(dragRow, null);
-                        } else if (section.folder) {
-                          void moveRowToFolder(dragRow, section.folder);
-                        }
+                        if (!dropCompatible || !dragRow || !section.folder)
+                          return;
+                        void moveRowToFolder(dragRow, section.folder);
                         clearFolderDrag();
                       }}
                     >
+                      <span
+                        className="v2-auto-row-check v2-auto-folder-check-spacer"
+                        aria-hidden
+                      />
                       <button
                         type="button"
                         className="v2-auto-folder-section-toggle"
                         aria-expanded={!collapsed}
                         onClick={() => toggleSection(section.id)}
                       >
-                        <ChevronDown
-                          size={12}
-                          aria-hidden
-                          className={[
-                            "v2-automations-section-chevron",
-                            collapsed ? "is-collapsed" : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                        />
-                        <Folder
-                          size={13}
-                          aria-hidden
-                          className="v2-auto-folder-section-icon"
-                        />
-                        <span className="v2-auto-folder-section-label">
-                          {section.label}
+                        <span
+                          className={`v2-auto-kind v2-auto-kind--folder v2-auto-kind--${section.folder.kind}`}
+                        >
+                          <Folder size={16} aria-hidden />
                         </span>
-                        {section.folder ? (
-                          <span className="v2-auto-folder-section-kind">
-                            {section.folder.kind === "macro" ? "M" : "C"}
+                        <div className="v2-auto-row-main">
+                          <span className="v2-auto-row-name">{section.name}</span>
+                          <span className="v2-auto-row-sub">
+                            {t("automations.folder.itemCount", {
+                              count: section.items.length,
+                            })}
                           </span>
-                        ) : null}
+                        </div>
                       </button>
-                      {section.folder ? (
+                      <span
+                        className={`v2-auto-type-badge v2-auto-type-badge--${section.folder.kind}`}
+                      >
+                        {kindLabel(section.folder.kind, t)}
+                      </span>
+                      <div className="v2-auto-row-trail">
+                        <button
+                          type="button"
+                          className="v2-btn v2-btn-ghost v2-auto-folder-section-chevron-btn"
+                          aria-expanded={!collapsed}
+                          aria-label={
+                            collapsed
+                              ? t("automations.folder.expandAria", {
+                                  name: section.folder.name,
+                                })
+                              : t("automations.folder.collapseAria", {
+                                  name: section.folder.name,
+                                })
+                          }
+                          onClick={() => toggleSection(section.id)}
+                        >
+                          <ChevronDown
+                            size={14}
+                            aria-hidden
+                            className={[
+                              "v2-automations-section-chevron",
+                              collapsed ? "is-collapsed" : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          />
+                        </button>
                         <DropdownMenu
                           label={t("automations.folder.manageLabel")}
                           ariaLabel={t("automations.folder.sectionMenuAria", {
                             name: section.folder.name,
                           })}
                           align="end"
-                          triggerClassName="v2-btn v2-btn-ghost v2-auto-folder-section-menu"
+                          triggerClassName="v2-btn v2-btn-ghost v2-auto-row-menu-btn"
                           items={[
                             {
                               id: "rename",
@@ -1641,10 +1646,10 @@ export function AutomationsTable({
                         >
                           <MoreHorizontal size={14} aria-hidden />
                         </DropdownMenu>
-                      ) : null}
+                      </div>
                     </div>
                   ) : null}
-                  {collapsed
+                  {section.kind === "folder" && collapsed
                     ? null
                     : section.items.map((r) => {
                         const key = rowKey(r);
