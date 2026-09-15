@@ -27,7 +27,9 @@ export const automations = defineCatalog({
       createMacro: "Dossier macros",
       createClicker: "Dossier clickers",
       renameFiltered: "Renommer le dossier filtré",
+      rename: "Renommer",
       delete: "Supprimer le dossier",
+      sectionMenuAria: "Actions du dossier {name}",
       chipsAria: "Dossiers",
       chipsDropAria: "Déposer « {name} » dans un dossier",
       chipAll: "Tous",
@@ -62,6 +64,8 @@ export const automations = defineCatalog({
     sections: {
       favorites: "Favoris ({count})",
       all: "Toutes les automatisations ({count})",
+      folder: "{name} ({count})",
+      unfiled: "Sans dossier ({count})",
     },
     empty: {
       noResultsTitle: "Aucun résultat",
@@ -285,7 +289,9 @@ export const automations = defineCatalog({
       createMacro: "Macros folder",
       createClicker: "Clickers folder",
       renameFiltered: "Rename filtered folder",
+      rename: "Rename",
       delete: "Delete folder",
+      sectionMenuAria: "Folder actions for {name}",
       chipsAria: "Folders",
       chipsDropAria: "Drop “{name}” into a folder",
       chipAll: "All",
@@ -320,6 +326,8 @@ export const automations = defineCatalog({
     sections: {
       favorites: "Favorites ({count})",
       all: "All automations ({count})",
+      folder: "{name} ({count})",
+      unfiled: "No folder ({count})",
     },
     empty: {
       noResultsTitle: "No results",

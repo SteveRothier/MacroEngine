@@ -17,11 +17,13 @@ import {
   FolderPlus,
   Lock,
   LockOpen,
+  MoreHorizontal,
   MousePointer2,
   PenLine,
   Play,
   RefreshCw,
   Star,
+  Trash2,
   Workflow,
 } from "lucide-react";
 import {
@@ -110,8 +112,6 @@ type Props = {
   query: string;
   onQueryChange: (q: string) => void;
   filter: AutomationFilter;
-  folderKey: string | null;
-  onFolderKeyChange: (key: string | null) => void;
   display: DisplayOptions;
   onDisplayChange: (d: DisplayOptions) => void;
   onFilterChange?: (f: AutomationFilter) => void;
@@ -200,8 +200,6 @@ export function AutomationsTable({
   query,
   onQueryChange,
   filter,
-  folderKey,
-  onFolderKeyChange,
   display,
   onDisplayChange,
   onFilterChange,
@@ -227,7 +225,6 @@ export function AutomationsTable({
     refreshKey,
     query,
     filter,
-    folderKey,
   });
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuKey, setMenuKey] = useState<string | null>(null);
@@ -498,77 +495,91 @@ export function AutomationsTable({
   const flatKeys = useMemo(() => sorted.map(rowKey), [sorted]);
 
   const sections = useMemo(() => {
-    if (filter !== "all" || display.sortBy === "order") {
+    type ListSection = {
+      id: string;
+      label: string | null;
+      folder: AutomationFolderOption | null;
+      kind: "folder" | "unfiled" | "flat";
+      items: AutomationRow[];
+    };
+
+    if (filter !== "all") {
       return [
         {
           id: "all",
-          label: null as string | null,
-          icon: null as "star" | "list" | null,
+          label: null,
+          folder: null,
+          kind: "flat" as const,
           items: sorted,
         },
       ];
     }
-    const favs = sorted.filter((r) => r.favorite);
-    const rest = sorted.filter((r) => !r.favorite);
-    const out: {
-      id: string;
-      label: string | null;
-      icon: "star" | "list" | null;
-      items: AutomationRow[];
-    }[] = [];
-    if (favs.length > 0) {
+
+    const out: ListSection[] = [];
+    for (const f of folders) {
+      const key = folderOptionKey(f);
+      const items = sorted.filter(
+        (r) =>
+          r.kind === f.kind &&
+          r.folderId != null &&
+          folderOptionKey({ kind: r.kind, id: r.folderId }) === key,
+      );
+      const dup = folders.filter((o) => o.name === f.name).length > 1;
+      const name = dup
+        ? t("automations.folder.namedWithKind", {
+            name: f.name,
+            kind:
+              f.kind === "macro"
+                ? t("automations.folder.kindSuffixMacro")
+                : t("automations.folder.kindSuffixClicker"),
+          })
+        : f.name;
       out.push({
-        id: "favorites",
-        label: t("automations.sections.favorites", { count: favs.length }),
-        icon: "star",
-        items: favs,
+        id: `folder:${key}`,
+        label: t("automations.sections.folder", {
+          name,
+          count: items.length,
+        }),
+        folder: f,
+        kind: "folder",
+        items,
       });
     }
-    if (rest.length > 0 || favs.length === 0) {
-      out.push({
-        id: "all",
-        label:
-          favs.length > 0
-            ? t("automations.sections.all", { count: rest.length || sorted.length })
-            : null,
-        icon: favs.length > 0 ? "list" : null,
-        items: rest.length > 0 ? rest : sorted,
-      });
-    }
+
+    const unfiled = sorted.filter(
+      (r) => r.kind === "script" || r.folderId == null,
+    );
+    out.push({
+      id: "unfiled",
+      label:
+        folders.length > 0
+          ? t("automations.sections.unfiled", { count: unfiled.length })
+          : null,
+      folder: null,
+      kind: "unfiled",
+      items: unfiled,
+    });
     return out;
-  }, [sorted, filter, display.sortBy, t]);
+  }, [sorted, filter, folders, t]);
 
   const selectedRows = useMemo(() => {
     return sorted.filter((r) => selected.has(rowKey(r)));
   }, [sorted, selected]);
 
   const emptyState = useMemo(() => {
-    if (query.trim() || folderKey) {
+    if (query.trim()) {
       return (
         <EmptyState
           title={t("automations.empty.noResultsTitle")}
           lead={t("automations.empty.noResultsLead")}
           actions={
-            <>
-              {query.trim() ? (
-                <button
-                  type="button"
-                  className="v2-btn v2-btn-ghost"
-                  onClick={() => onQueryChange("")}
-                >
-                  {t("automations.empty.clearSearch")}
-                </button>
-              ) : null}
-              {folderKey ? (
-                <button
-                  type="button"
-                  className="v2-btn v2-btn-ghost"
-                  onClick={() => onFolderKeyChange(null)}
-                >
-                  {t("automations.empty.allFolders")}
-                </button>
-              ) : null}
-            </>
+            <button
+              type="button"
+              className="v2-btn v2-btn-ghost"
+              onClick={() => onQueryChange("")}
+            >
+              {t("automations.empty.clearSearch")}
+            </button>
           }
         />
       );
@@ -657,12 +668,10 @@ export function AutomationsTable({
     );
   }, [
     filter,
-    folderKey,
     onCreateClicker,
     onCreateMacro,
     onCreateScript,
     onFilterChange,
-    onFolderKeyChange,
     onQueryChange,
     query,
     t,
@@ -844,20 +853,19 @@ export function AutomationsTable({
       );
       await refresh();
       onRefresh?.();
-      onFolderKeyChange(folderOptionKey({ kind, id: created.id }));
+      setCollapsedSections((prev) => {
+        const next = new Set(prev);
+        next.delete(`folder:${folderOptionKey({ kind, id: created.id })}`);
+        return next;
+      });
       toast.success(t("automations.toast.folderCreated", { name: created.name }));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.folderCreateFail")));
     }
   }
 
-  async function onRenameFolder() {
-    if (!folderKey) {
-      toast.info(t("automations.toast.filterFolderToRename"));
-      return;
-    }
-    const folder = folders.find((f) => folderOptionKey(f) === folderKey);
-    if (!folder) return;
+  async function onRenameFolder(target: AutomationFolderOption) {
+    const folder = target;
     const nextName = await promptAction({
       title: t("automations.confirm.renameFolderTitle"),
       defaultValue: folder.name,
@@ -874,7 +882,6 @@ export function AutomationsTable({
       );
       await refresh();
       onRefresh?.();
-      onFolderKeyChange(folderOptionKey({ kind: folder.kind, id: renamed.id }));
       toast.success(t("automations.toast.folderRenamed", { name: renamed.name }));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.folderRenameFail")));
@@ -983,13 +990,8 @@ export function AutomationsTable({
     }
   }
 
-  async function onDeleteFolder() {
-    if (!folderKey) {
-      toast.info(t("automations.toast.filterFolderToDelete"));
-      return;
-    }
-    const folder = folders.find((f) => folderOptionKey(f) === folderKey);
-    if (!folder) return;
+  async function onDeleteFolder(target: AutomationFolderOption) {
+    const folder = target;
     if (accueilPrefs.confirmDeleteFolder) {
       const ok = await confirmAction({
         title: t("automations.confirm.deleteFolderTitle"),
@@ -1006,7 +1008,6 @@ export function AutomationsTable({
         kind: folder.kind,
         id: folder.id,
       });
-      onFolderKeyChange(null);
       await refresh();
       onRefresh?.();
       toast.success(t("automations.toast.folderDeleted", { name: folder.name }));
@@ -1259,11 +1260,6 @@ export function AutomationsTable({
     return folders.filter((f) => kinds.has(f.kind));
   }, [folders, selectedRows]);
 
-  const dragFolders = useMemo(() => {
-    if (!dragRow || dragRow.kind === "script") return [];
-    return folders.filter((f) => f.kind === dragRow.kind);
-  }, [dragRow, folders]);
-
   const ctxMenuItems = useMemo(() => {
     if (!ctxRow) return [];
     const rowFolders =
@@ -1326,16 +1322,6 @@ export function AutomationsTable({
           },
         ],
       },
-      ...(folderKey
-        ? [
-            {
-              id: "rename-folder",
-              label: t("automations.menu.empty.renameFolder"),
-              icon: <PenLine size={14} />,
-              onSelect: () => void onRenameFolder(),
-            },
-          ]
-        : []),
       { id: "sep-empty", label: "", separator: true },
       {
         id: "refresh",
@@ -1359,7 +1345,6 @@ export function AutomationsTable({
     ],
     [
       filter,
-      folderKey,
       onCreateClicker,
       onCreateMacro,
       onCreateScript,
@@ -1396,16 +1381,11 @@ export function AutomationsTable({
         onQueryChange={onQueryChange}
         filter={filter}
         onFilterChange={(f) => onFilterChange?.(f)}
-        folderKey={folderKey}
-        onFolderKeyChange={onFolderKeyChange}
-        folders={folders}
         counts={counts}
         onCreateMacro={onCreateMacro}
         onCreateClicker={onCreateClicker}
         onCreateScript={onCreateScript}
         onCreateFolder={(kind) => void onCreateFolder(kind)}
-        onRenameFolder={() => void onRenameFolder()}
-        onDeleteFolder={() => void onDeleteFolder()}
         searchInputRef={searchInputRef}
         createOpen={createOpen}
         onCreateOpenChange={setCreateOpen}
@@ -1557,40 +1537,112 @@ export function AutomationsTable({
               <>
             {sections.map((section) => {
               const collapsed = collapsedSections.has(section.id);
+              const sectionDropKey =
+                section.kind === "folder" && section.folder
+                  ? folderOptionKey(section.folder)
+                  : section.kind === "unfiled"
+                    ? "root"
+                    : null;
+              const dropCompatible =
+                dragRow != null &&
+                dragRow.kind !== "script" &&
+                (section.kind === "unfiled" ||
+                  (section.folder != null &&
+                    section.folder.kind === dragRow.kind));
               return (
                 <div key={section.id} className="v2-automations-section">
                   {section.label ? (
-                    <button
-                      type="button"
-                      className="v2-automations-section-label"
-                      aria-expanded={!collapsed}
-                      onClick={() => toggleSection(section.id)}
+                    <div
+                      className={[
+                        "v2-auto-folder-section",
+                        dropCompatible && dropFolderKey === sectionDropKey
+                          ? "is-drop-over"
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onPointerEnter={() => {
+                        if (dropCompatible && sectionDropKey) {
+                          setDropFolderKey(sectionDropKey);
+                        }
+                      }}
+                      onPointerLeave={() => {
+                        if (sectionDropKey) {
+                          setDropFolderKey((k) =>
+                            k === sectionDropKey ? null : k,
+                          );
+                        }
+                      }}
+                      onPointerUp={() => {
+                        if (!dropCompatible || !dragRow) return;
+                        if (section.kind === "unfiled") {
+                          void moveRowToFolder(dragRow, null);
+                        } else if (section.folder) {
+                          void moveRowToFolder(dragRow, section.folder);
+                        }
+                        clearFolderDrag();
+                      }}
                     >
-                      <ChevronDown
-                        size={12}
-                        aria-hidden
-                        className={[
-                          "v2-automations-section-chevron",
-                          collapsed ? "is-collapsed" : "",
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                      />
-                      {section.icon === "star" ? (
-                        <Star
-                          size={11}
+                      <button
+                        type="button"
+                        className="v2-auto-folder-section-toggle"
+                        aria-expanded={!collapsed}
+                        onClick={() => toggleSection(section.id)}
+                      >
+                        <ChevronDown
+                          size={12}
                           aria-hidden
-                          className="v2-automations-section-icon"
+                          className={[
+                            "v2-automations-section-chevron",
+                            collapsed ? "is-collapsed" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
                         />
-                      ) : section.icon === "list" ? (
-                        <Workflow
-                          size={11}
+                        <Folder
+                          size={13}
                           aria-hidden
-                          className="v2-automations-section-icon"
+                          className="v2-auto-folder-section-icon"
                         />
+                        <span className="v2-auto-folder-section-label">
+                          {section.label}
+                        </span>
+                        {section.folder ? (
+                          <span className="v2-auto-folder-section-kind">
+                            {section.folder.kind === "macro" ? "M" : "C"}
+                          </span>
+                        ) : null}
+                      </button>
+                      {section.folder ? (
+                        <DropdownMenu
+                          label={t("automations.folder.manageLabel")}
+                          ariaLabel={t("automations.folder.sectionMenuAria", {
+                            name: section.folder.name,
+                          })}
+                          align="end"
+                          triggerClassName="v2-btn v2-btn-ghost v2-auto-folder-section-menu"
+                          items={[
+                            {
+                              id: "rename",
+                              label: t("automations.folder.rename"),
+                              icon: <PenLine size={14} />,
+                              onSelect: () =>
+                                void onRenameFolder(section.folder!),
+                            },
+                            {
+                              id: "delete",
+                              label: t("automations.folder.delete"),
+                              icon: <Trash2 size={14} />,
+                              danger: true,
+                              onSelect: () =>
+                                void onDeleteFolder(section.folder!),
+                            },
+                          ]}
+                        >
+                          <MoreHorizontal size={14} aria-hidden />
+                        </DropdownMenu>
                       ) : null}
-                      {section.label}
-                    </button>
+                    </div>
                   ) : null}
                   {collapsed
                     ? null
@@ -2187,73 +2239,6 @@ export function AutomationsTable({
               {t("common.cancel")}
             </button>
           </div>
-        </div>
-      ) : null}
-
-      {dragRow && dragRow.kind !== "script" ? (
-        <div
-          className="v2-auto-folder-drop-strip"
-          role="toolbar"
-          aria-label={t("automations.folder.dropStripAria", {
-            name: dragRow.name,
-          })}
-        >
-          <span className="v2-auto-folder-drop-hint">
-            {t("automations.folder.dropHint", { name: dragRow.name })}
-          </span>
-          <button
-            type="button"
-            className={[
-              "v2-auto-folder-drop-chip",
-              dropFolderKey === "root" ? "is-over" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            onPointerEnter={() => setDropFolderKey("root")}
-            onPointerLeave={() =>
-              setDropFolderKey((k) => (k === "root" ? null : k))
-            }
-            onPointerUp={() => {
-              void moveRowToFolder(dragRow, null);
-              clearFolderDrag();
-            }}
-          >
-            <Folder size={14} aria-hidden />
-            {t("automations.folder.chipNoFolder")}
-          </button>
-          {dragFolders.map((f) => {
-            const fKey = folderOptionKey(f);
-            return (
-              <button
-                key={fKey}
-                type="button"
-                className={[
-                  "v2-auto-folder-drop-chip",
-                  dropFolderKey === fKey ? "is-over" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onPointerEnter={() => setDropFolderKey(fKey)}
-                onPointerLeave={() =>
-                  setDropFolderKey((k) => (k === fKey ? null : k))
-                }
-                onPointerUp={() => {
-                  void moveRowToFolder(dragRow, f);
-                  clearFolderDrag();
-                }}
-              >
-                <Folder size={14} aria-hidden />
-                {f.name}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            className="v2-btn v2-btn-ghost"
-            onClick={() => clearFolderDrag()}
-          >
-            {t("common.cancel")}
-          </button>
         </div>
       ) : null}
 

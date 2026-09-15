@@ -16,7 +16,6 @@ import type {
   AutomationRow,
   FilterCounts,
 } from "./types";
-import { folderOptionKey } from "./types";
 import { lastRunLabelMap, lastRunTooltipMap, rowKey } from "./relativeTime";
 
 type MacroSummary = {
@@ -76,7 +75,6 @@ export function useUnifiedAutomations(options: {
   refreshKey?: number;
   query?: string;
   filter?: AutomationFilter;
-  folderKey?: string | null;
   setQuery?: (q: string) => void;
 }) {
   const t = useT();
@@ -88,7 +86,6 @@ export function useUnifiedAutomations(options: {
   const [internalQuery, setInternalQuery] = useState("");
   const query = options.query ?? internalQuery;
   const filter = options.filter ?? "all";
-  const folderKey = options.folderKey ?? null;
   const setQuery = options.setQuery ?? setInternalQuery;
   const [hotkeys, setHotkeys] = useState<HotkeyBindings | null>(null);
   const refresh = useCallback(async () => {
@@ -249,12 +246,6 @@ export function useUnifiedAutomations(options: {
     } else if (filter === "scripts") {
       list = list.filter((r) => r.kind === "script");
     }
-    if (folderKey) {
-      list = list.filter((r) => {
-        if (r.kind === "script" || !r.folderId) return false;
-        return folderOptionKey({ kind: r.kind, id: r.folderId }) === folderKey;
-      });
-    }
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter(
@@ -264,7 +255,7 @@ export function useUnifiedAutomations(options: {
         r.folderLabel.toLowerCase().includes(q) ||
         (r.meta?.toLowerCase().includes(q) ?? false),
     );
-  }, [rows, query, filter, folderKey, recentOrder]);
+  }, [rows, query, filter, recentOrder]);
 
   return {
     rows: filtered,
