@@ -1942,7 +1942,16 @@ fn wire_engine_events(handle: AppHandle, engine: &AppState) {
 pub fn run() {
     let engine = AppState::new();
 
-    tauri::Builder::default()
+    // Register single-instance first so a second launch focuses the existing window.
+    let mut builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }));
+    }
+
+    builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(
