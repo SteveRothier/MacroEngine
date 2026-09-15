@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { resolveLocale, tStatic } from "../../i18n";
 
 type Props = {
   children: ReactNode;
@@ -21,16 +22,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
+      const t = (key: string) => tStatic(resolveLocale("system"), key);
       return (
         <div className="v2-root v2-fatal-error">
-          <h1>Erreur d’interface</h1>
+          <h1>{t("shell.errorTitle")}</h1>
           <p>{this.state.error.message}</p>
           <button
             type="button"
             className="v2-btn"
             onClick={() => this.setState({ error: null })}
           >
-            Réessayer
+            {t("shell.retry")}
           </button>
         </div>
       );

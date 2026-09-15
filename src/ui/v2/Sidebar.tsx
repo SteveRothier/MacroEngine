@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useT } from "../../i18n";
 
 export type SidebarItem = {
   id: string;
@@ -121,6 +122,7 @@ export function Sidebar({
   collapsed = false,
   onToggleCollapse,
 }: Props) {
+  const t = useT();
   const shellRef = useRef<HTMLElement>(null);
   const cancelAnimRef = useRef<(() => void) | null>(null);
   const animatingRef = useRef(false);
@@ -168,8 +170,8 @@ export function Sidebar({
   }, [collapsed, onToggleCollapse]);
 
   const toggleLabel = collapsed
-    ? "Déplier la barre latérale"
-    : "Replier la barre latérale";
+    ? t("shell.expandSidebar")
+    : t("shell.collapseSidebar");
   const hasRecent = Boolean(recent && recent.length > 0);
 
   return (
@@ -178,7 +180,7 @@ export function Sidebar({
       className={["v2-sidebar", collapsed ? "v2-sidebar--collapsed" : ""]
         .filter(Boolean)
         .join(" ")}
-      aria-label="Navigation"
+      aria-label={t("shell.navGroup")}
       aria-expanded={!collapsed}
     >
       <div className="v2-sidebar-inner">
@@ -216,7 +218,7 @@ export function Sidebar({
               .join(" ")}
             aria-hidden={collapsed}
           >
-            <span className="v2-sidebar-recent-head">Récents</span>
+            <span className="v2-sidebar-recent-head">{t("shell.recentLabel")}</span>
             {recent!.slice(0, 5).map((r) => (
               <button
                 key={r.id}

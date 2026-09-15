@@ -1,8 +1,9 @@
-import { useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { ScrollText, Settings } from "lucide-react";
+import { useT } from "../../i18n";
 import { WindowControls } from "../WindowControls";
 import {
-  BAR_CONTEXT_MENU_ITEMS,
+  buildBarContextItems,
   DocumentTabBar,
   type BarContextAction,
   type DocumentTabItem,
@@ -55,7 +56,9 @@ export function WindowTitleBar({
   onStop,
   recentItems,
 }: Props) {
+  const t = useT();
   const [dragMenu, setDragMenu] = useState<{ x: number; y: number } | null>(null);
+  const barItems = useMemo(() => buildBarContextItems(t), [t]);
 
   const openDragMenu = (e: MouseEvent) => {
     if (!onBarContextAction) return;
@@ -97,8 +100,8 @@ export function WindowTitleBar({
               .filter(Boolean)
               .join(" ")}
             onClick={onSettingsClick}
-            title="Paramètres"
-            aria-label="Paramètres"
+            title={t("shell.navSettings")}
+            aria-label={t("shell.navSettings")}
             aria-pressed={settingsActive}
           >
             <Settings size={14} aria-hidden />
@@ -114,8 +117,8 @@ export function WindowTitleBar({
               .filter(Boolean)
               .join(" ")}
             onClick={onJournalClick}
-            title="Journal d'exécution"
-            aria-label="Journal d'exécution"
+            title={t("shell.journalTitle")}
+            aria-label={t("shell.journalTitle")}
             aria-pressed={journalOpen}
           >
             <ScrollText size={14} aria-hidden />
@@ -134,9 +137,9 @@ export function WindowTitleBar({
                   type="button"
                   className="v2-titlebar-btn v2-btn v2-btn-danger-ghost"
                   onClick={onStop}
-                  title="Arrêter la session"
+                  title={t("shell.stopSession")}
                 >
-                  Arrêter
+                  {t("shell.stop")}
                 </button>
               ) : null}
             </div>
@@ -148,7 +151,7 @@ export function WindowTitleBar({
         open={dragMenu != null}
         x={dragMenu?.x ?? 0}
         y={dragMenu?.y ?? 0}
-        items={BAR_CONTEXT_MENU_ITEMS}
+        items={barItems}
         onClose={() => setDragMenu(null)}
         onSelect={(id) => {
           if (
@@ -161,7 +164,7 @@ export function WindowTitleBar({
             onBarContextAction(id);
           }
         }}
-        ariaLabel="Actions barre d’onglets"
+        ariaLabel={t("shell.tabBarActionsAria")}
       />
     </div>
   );

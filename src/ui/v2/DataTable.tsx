@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useT } from "../../i18n";
 
 export type Column<T> = {
   id: string;
@@ -28,6 +29,8 @@ export function DataTable<T>({
   onRowDoubleClick,
   empty,
 }: Props<T>) {
+  const t = useT();
+
   if (rows.length === 0 && empty) {
     return <div className="v2-table-empty">{empty}</div>;
   }
@@ -38,7 +41,7 @@ export function DataTable<T>({
         <thead>
           <tr>
             {onSelectRow ? (
-              <th className="v2-table-check" aria-label="Sélection" />
+              <th className="v2-table-check" aria-label={t("shell.selectionAria")} />
             ) : null}
             {columns.map((c) => (
               <th key={c.id} style={c.width ? { width: c.width } : undefined}>
@@ -67,7 +70,7 @@ export function DataTable<T>({
                         e.stopPropagation();
                         onSelectRow(id, e.shiftKey);
                       }}
-                      aria-label={`Sélectionner ${id}`}
+                      aria-label={t("shell.selectRowAria", { id })}
                     />
                   </td>
                 ) : null}

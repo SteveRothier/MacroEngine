@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useT } from "../../i18n";
 
 export type CommandItem = {
   id: string;
@@ -17,8 +18,10 @@ type Props = {
 type Grouped = { group: string; items: { item: CommandItem; index: number }[] };
 
 export function CommandPalette({ open, onClose, items }: Props) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
+  const defaultGroup = t("shell.commandGroup");
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -35,7 +38,7 @@ export function CommandPalette({ open, onClose, items }: Props) {
     const order: string[] = [];
     const map = new Map<string, { item: CommandItem; index: number }[]>();
     filtered.forEach((item, index) => {
-      const g = item.group?.trim() || "Commandes";
+      const g = item.group?.trim() || defaultGroup;
       if (!map.has(g)) {
         map.set(g, []);
         order.push(g);
@@ -43,7 +46,7 @@ export function CommandPalette({ open, onClose, items }: Props) {
       map.get(g)!.push({ item, index });
     });
     return order.map((group) => ({ group, items: map.get(group)! }));
-  }, [filtered]);
+  }, [filtered, defaultGroup]);
 
   useEffect(() => {
     if (!open) {
@@ -81,19 +84,29 @@ export function CommandPalette({ open, onClose, items }: Props) {
   if (!open) return null;
 
   return (
-    <div className="v2-cmd-overlay" role="dialog" aria-modal aria-label="Palette de commandes">
-      <button type="button" className="v2-cmd-backdrop" aria-label="Fermer" onClick={onClose} />
+    <div
+      className="v2-cmd-overlay"
+      role="dialog"
+      aria-modal
+      aria-label={t("shell.commandPalette")}
+    >
+      <button
+        type="button"
+        className="v2-cmd-backdrop"
+        aria-label={t("common.close")}
+        onClick={onClose}
+      />
       <div className="v2-cmd-panel">
         <input
           className="v2-cmd-input"
           autoFocus
-          placeholder="Rechercher une commande…"
+          placeholder={t("shell.searchCommand")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <ul className="v2-cmd-list" role="listbox">
           {filtered.length === 0 ? (
-            <li className="v2-cmd-empty">Aucun résultat</li>
+            <li className="v2-cmd-empty">{t("shell.noResults")}</li>
           ) : (
             grouped.map((g) => (
               <li key={g.group} className="v2-cmd-group">
@@ -123,9 +136,9 @@ export function CommandPalette({ open, onClose, items }: Props) {
           )}
         </ul>
         <div className="v2-cmd-footer">
-          <span>↑↓ naviguer</span>
-          <span>↵ ouvrir</span>
-          <span>esc fermer</span>
+          <span>{t("shell.cmdNavigate")}</span>
+          <span>{t("shell.cmdOpen")}</span>
+          <span>{t("shell.cmdClose")}</span>
         </div>
       </div>
     </div>

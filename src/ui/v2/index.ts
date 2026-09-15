@@ -1,7 +1,7 @@
 export { Tooltip, TruncatedTooltip, type TooltipSide, type TooltipAlign } from "./Tooltip";
 export {
   DocumentTabBar,
-  BAR_CONTEXT_MENU_ITEMS,
+  buildBarContextItems,
   type DocumentTabItem,
   type TabContextAction,
   type BarContextAction,

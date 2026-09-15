@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useT } from "../../i18n";
 
 export type ActionPickerItem = {
   id: string;
@@ -98,13 +99,15 @@ function flattenVisible(
 }
 
 export function ActionPickerMenu({
-  label = "+ Ajouter",
+  label,
   disabled,
   items,
   triggerClassName,
   open: openProp,
   onOpenChange,
 }: Props) {
+  const t = useT();
+  const triggerLabel = label ?? t("macros.toolbar.add");
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
   const controlled = openProp !== undefined;
   const open = controlled ? Boolean(openProp) : uncontrolledOpen;
@@ -231,16 +234,16 @@ export function ActionPickerMenu({
               ref={inputRef}
               type="search"
               className="v2-action-picker-input"
-              placeholder="Filtrer les actions…"
+              placeholder={t("shell.filterActions")}
               value={query}
-              aria-label="Filtrer les actions"
+              aria-label={t("shell.filterActionsAria")}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onListKeyDown}
             />
           </div>
           <div className="v2-action-picker-list">
             {flat.length === 0 ? (
-              <p className="v2-action-picker-empty">Aucune action</p>
+              <p className="v2-action-picker-empty">{t("shell.noActions")}</p>
             ) : (
               flat.map((row, idx) => {
                 const showGroup =
@@ -312,7 +315,7 @@ export function ActionPickerMenu({
         aria-controls={open ? menuId : undefined}
         onClick={() => setOpen(!open)}
       >
-        {label}
+        {triggerLabel}
       </button>
       {panel}
     </div>
