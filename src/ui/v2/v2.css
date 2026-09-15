@@ -4730,6 +4730,7 @@ body.v2-pointer-reorder-dragging {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
   margin-left: auto;
   min-width: 0;
 }
@@ -4738,7 +4739,9 @@ body.v2-pointer-reorder-dragging {
   position: relative;
   display: flex;
   align-items: center;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 140px;
+  max-width: 420px;
   height: 26px;
 }
 
@@ -4753,8 +4756,9 @@ body.v2-pointer-reorder-dragging {
 
 .v2-automations-filter-search {
   box-sizing: border-box;
-  max-width: 200px;
-  min-width: 140px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
   height: 26px;
   padding: 0 8px 0 26px !important;
   font-size: 12px;
