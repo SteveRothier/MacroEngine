@@ -4698,51 +4698,23 @@ body.v2-pointer-reorder-dragging {
   min-width: 0;
 }
 
-.v2-filter-pills {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.v2-filter-pill {
+.v2-automations-view-select {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
-  padding: 0 10px;
-  border: none;
-  border-radius: var(--v2-radius-sm);
-  background: transparent;
+  flex-shrink: 0;
+  min-width: 0;
   color: var(--v2-text-secondary);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
 }
 
-.v2-filter-pill:hover {
-  background: color-mix(in srgb, var(--v2-text-primary) 6%, transparent);
-  color: var(--v2-text-primary);
+.v2-automations-view-select-icon {
+  flex-shrink: 0;
+  color: var(--v2-text-secondary);
 }
 
-.v2-filter-pill.active {
-  background: var(--v2-accent);
-  color: #fff;
-}
-
-.v2-filter-pill.active svg {
-  color: #fff;
-}
-
-.v2-filter-pill-count {
-  font-variant-numeric: tabular-nums;
-  opacity: 0.72;
-  font-weight: 500;
-}
-
-.v2-filter-pill.active .v2-filter-pill-count {
-  opacity: 0.9;
+.v2-automations-view-select-control {
+  min-width: 112px;
+  max-width: 200px;
 }
 
 .v2-automations-folder-select {
