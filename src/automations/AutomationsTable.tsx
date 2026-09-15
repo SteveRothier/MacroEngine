@@ -1406,14 +1406,6 @@ export function AutomationsTable({
         onCreateFolder={(kind) => void onCreateFolder(kind)}
         onRenameFolder={() => void onRenameFolder()}
         onDeleteFolder={() => void onDeleteFolder()}
-        dragRow={dragRow}
-        dropFolderKey={dropFolderKey}
-        onDropFolderKeyChange={setDropFolderKey}
-        onDropOntoFolder={(folder) => {
-          if (!dragRow) return;
-          void moveRowToFolder(dragRow, folder);
-          clearFolderDrag();
-        }}
         searchInputRef={searchInputRef}
         createOpen={createOpen}
         onCreateOpenChange={setCreateOpen}

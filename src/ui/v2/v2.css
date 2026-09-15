@@ -4699,27 +4699,15 @@ body.v2-pointer-reorder-dragging {
 }
 
 .v2-automations-view-select {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  min-width: 0;
-  color: var(--v2-text-secondary);
-}
-
-.v2-automations-view-select-icon {
-  flex-shrink: 0;
-  color: var(--v2-text-secondary);
-}
-
-.v2-automations-view-select-control {
   min-width: 112px;
   max-width: 200px;
+  flex-shrink: 0;
 }
 
 .v2-automations-folder-select {
   min-width: 120px;
   max-width: 180px;
+  flex-shrink: 0;
 }
 
 .v2-automations-folder-manage-btn {
