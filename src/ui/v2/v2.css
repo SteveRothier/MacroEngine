@@ -4812,11 +4812,17 @@ body.v2-pointer-reorder-dragging {
 .v2-auto-folder-section {
   display: flex;
   align-items: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 4px 12px 4px 20px;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 20px;
   border-left: 3px solid transparent;
   box-sizing: border-box;
+  width: 100%;
+  transition: background var(--v2-dur-fast) var(--v2-ease);
+}
+
+.v2-auto-folder-section:hover {
+  background: color-mix(in srgb, var(--v2-text-primary) 5%, transparent);
 }
 
 .v2-auto-folder-section.is-drop-over {
@@ -4824,60 +4830,51 @@ body.v2-pointer-reorder-dragging {
   border-left-color: var(--v2-accent);
 }
 
+.v2-auto-folder-check-spacer {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .v2-auto-folder-section-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
   margin: 0;
-  padding: 4px 6px;
+  padding: 0;
   border: none;
-  border-radius: var(--v2-radius-sm);
+  border-radius: 0;
   background: transparent;
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--v2-text-secondary);
+  color: inherit;
   cursor: pointer;
   text-align: left;
 }
 
 .v2-auto-folder-section-toggle:hover {
-  color: var(--v2-text-primary);
-  background: color-mix(in srgb, var(--v2-text-primary) 5%, transparent);
+  background: transparent;
 }
 
-.v2-auto-folder-section-icon {
-  flex-shrink: 0;
-  opacity: 0.8;
+.v2-auto-kind--folder {
+  color: var(--v2-text-secondary);
+  background: color-mix(in srgb, var(--v2-text-primary) 8%, transparent);
 }
 
-.v2-auto-folder-section-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.v2-auto-folder-section-kind {
-  flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 600;
-  opacity: 0.65;
-  letter-spacing: 0.02em;
-}
-
-.v2-auto-folder-section-menu {
-  flex-shrink: 0;
+.v2-auto-folder-section-chevron-btn {
   width: 28px;
-  height: 26px;
+  height: 28px;
   padding: 0;
   opacity: 0.55;
 }
 
-.v2-auto-folder-section:hover .v2-auto-folder-section-menu,
-.v2-auto-folder-section:focus-within .v2-auto-folder-section-menu {
+.v2-auto-folder-section:hover .v2-auto-folder-section-chevron-btn,
+.v2-auto-folder-section:focus-within .v2-auto-folder-section-chevron-btn,
+.v2-auto-folder-section:hover .v2-auto-row-menu-btn,
+.v2-auto-folder-section:focus-within .v2-auto-row-menu-btn {
   opacity: 1;
 }
 
