@@ -17,11 +17,11 @@ export function EmptyState({
   className,
 }: Props) {
   return (
-    <div className={["v2-empty-state", className].filter(Boolean).join(" ")}>
+    <div className={["caster-empty-state", className].filter(Boolean).join(" ")}>
       <strong>{title}</strong>
       {lead ? <p>{lead}</p> : null}
       {children}
-      {actions ? <div className="v2-empty-actions">{actions}</div> : null}
+      {actions ? <div className="caster-empty-actions">{actions}</div> : null}
     </div>
   );
 }

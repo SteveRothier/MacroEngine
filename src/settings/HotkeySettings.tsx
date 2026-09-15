@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { chordLabel, eventToVk, type HotkeyBindings, vkLabel } from "../macros/types";
-import { useToast } from "../ui/v2";
+import { useToast } from "../ui/shell";
 import { useT } from "../i18n";
 
 const DEFAULTS: HotkeyBindings = {
@@ -116,17 +116,17 @@ export function HotkeySettings({ onBindingsChange }: Props) {
 
   return (
     <>
-      <p className="v2-settings-group-hint">{t("settings.hotkeys.groupHint")}</p>
-      {conflict ? <p className="v2-settings-warn">{conflict}</p> : null}
-      <div className="v2-hotkey-settings">
-        <div className="v2-hotkey-row v2-hotkey-row--featured">
-          <span className="v2-hotkey-label">{t("settings.hotkeys.clicker")}</span>
-          <code className="v2-settings-mono">{chordLabel(bindings)}</code>
+      <p className="caster-settings-group-hint">{t("settings.hotkeys.groupHint")}</p>
+      {conflict ? <p className="caster-settings-warn">{conflict}</p> : null}
+      <div className="caster-hotkey-settings">
+        <div className="caster-hotkey-row caster-hotkey-row--featured">
+          <span className="caster-hotkey-label">{t("settings.hotkeys.clicker")}</span>
+          <code className="caster-settings-mono">{chordLabel(bindings)}</code>
           <button
             type="button"
             className={[
-              "v2-btn",
-              capture === "action" ? "v2-btn-primary" : "v2-btn-ghost",
+              "caster-btn",
+              capture === "action" ? "caster-btn-primary" : "caster-btn-ghost",
             ].join(" ")}
             onClick={() => setCapture("action")}
           >
@@ -140,14 +140,14 @@ export function HotkeySettings({ onBindingsChange }: Props) {
             ["emergency", "settings.hotkeys.emergency", bindings.emergencyVk],
           ] as const
         ).map(([slot, labelKey, vk]) => (
-          <div className="v2-hotkey-row" key={slot}>
-            <span className="v2-hotkey-label">{t(labelKey)}</span>
-            <code className="v2-settings-mono">{vkLabel(vk)}</code>
+          <div className="caster-hotkey-row" key={slot}>
+            <span className="caster-hotkey-label">{t(labelKey)}</span>
+            <code className="caster-settings-mono">{vkLabel(vk)}</code>
             <button
               type="button"
               className={[
-                "v2-btn",
-                capture === slot ? "v2-btn-primary" : "v2-btn-ghost",
+                "caster-btn",
+                capture === slot ? "caster-btn-primary" : "caster-btn-ghost",
               ].join(" ")}
               onClick={() => setCapture(slot)}
             >
@@ -155,16 +155,16 @@ export function HotkeySettings({ onBindingsChange }: Props) {
             </button>
           </div>
         ))}
-        <div className="v2-field-row v2-hotkey-actions">
+        <div className="caster-field-row caster-hotkey-actions">
           <button
             type="button"
-            className="v2-btn v2-btn-primary"
+            className="caster-btn caster-btn-primary"
             disabled={Boolean(conflict)}
             onClick={() => void save()}
           >
             {t("common.save")}
           </button>
-          <button type="button" className="v2-btn v2-btn-ghost" onClick={resetDefaults}>
+          <button type="button" className="caster-btn caster-btn-ghost" onClick={resetDefaults}>
             {t("common.defaults")}
           </button>
         </div>

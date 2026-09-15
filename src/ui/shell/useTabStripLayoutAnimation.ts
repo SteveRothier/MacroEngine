@@ -39,7 +39,7 @@ function clearLockedWidth(el: HTMLDivElement): void {
   el.style.width = "";
   el.style.minWidth = "";
   el.style.maxWidth = "";
-  el.classList.remove("v2-doc-tab--width-animating");
+  el.classList.remove("caster-doc-tab--width-animating");
 }
 
 type AnimJob = { el: HTMLDivElement; from: number; to: number };
@@ -51,7 +51,7 @@ function runBatchAnimation(jobs: AnimJob[], onAllDone: () => void): void {
   cancelBatch?.();
 
   for (const { el, from } of jobs) {
-    el.classList.add("v2-doc-tab--width-animating");
+    el.classList.add("caster-doc-tab--width-animating");
     setLockedWidth(el, from);
   }
 
@@ -203,7 +203,7 @@ export function useTabStripLayoutAnimation({
 
     // Lock to start widths before paint so first frame isn't the flex snap.
     for (const { el, from } of jobs) {
-      el.classList.add("v2-doc-tab--width-animating");
+      el.classList.add("caster-doc-tab--width-animating");
       setLockedWidth(el, from);
     }
 

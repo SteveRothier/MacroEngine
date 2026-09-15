@@ -26,12 +26,12 @@ export function ClickerProcessFilterRow({ filter, onOpenSettings }: Props) {
   const summary = filterSummary(filter, t);
 
   return (
-    <div className="v2-clicker-process-row">
-      <span className="v2-clicker-process-label">{t("clicker.process.label")}</span>
+    <div className="caster-clicker-process-row">
+      <span className="caster-clicker-process-label">{t("clicker.process.label")}</span>
       <span
         className={[
-          "v2-clicker-process-badge",
-          filter.enabled ? "v2-clicker-process-badge--active" : "",
+          "caster-clicker-process-badge",
+          filter.enabled ? "caster-clicker-process-badge--active" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -42,7 +42,7 @@ export function ClickerProcessFilterRow({ filter, onOpenSettings }: Props) {
       {onOpenSettings ? (
         <button
           type="button"
-          className="v2-btn v2-btn-ghost v2-clicker-process-link"
+          className="caster-btn caster-btn-ghost caster-clicker-process-link"
           onClick={onOpenSettings}
         >
           {t("clicker.process.settings")}

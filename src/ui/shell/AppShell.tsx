@@ -30,17 +30,17 @@ export function AppShell({
 
   return (
     <div
-      className={["v2-root", rootClassName].filter(Boolean).join(" ")}
+      className={["caster-root", rootClassName].filter(Boolean).join(" ")}
       data-density={density}
       data-accent={accent}
       data-reduce-motion={reduceMotion ? "true" : undefined}
       style={{ fontSize: `${fontScale * 100}%` }}
     >
-      <div className="v2-titlebar-shell">{titleBar}</div>
-      <div className="v2-content">
-        <div className="v2-editor-toolbar-host" ref={subToolbarRef} />
-        <div className="v2-main">
-          <div className="v2-stage">{children}</div>
+      <div className="caster-titlebar-shell">{titleBar}</div>
+      <div className="caster-content">
+        <div className="caster-editor-toolbar-host" ref={subToolbarRef} />
+        <div className="caster-main">
+          <div className="caster-stage">{children}</div>
         </div>
       </div>
     </div>

@@ -31,8 +31,8 @@ import {
   type DocumentTabItem,
   type StatusKind,
   type TabContextAction,
-} from "../ui/v2";
-import { TitleBarProvider, useTitleBarContext } from "../ui/v2/TitleBarContext";
+} from "../ui/shell";
+import { TitleBarProvider, useTitleBarContext } from "../ui/shell/TitleBarContext";
 import { ConfirmHost, confirmAction, PromptHost, promptAction } from "../ui";
 import { applyTheme, readStoredTheme, subscribeSystemTheme, type ThemeMode } from "../theme";
 import { stateLabel, sessionLabel } from "../ui/labels";
@@ -69,11 +69,18 @@ import {
   type WorkspaceState,
 } from "./workspaces";
 
-const JOURNAL_OPEN_KEY = "v2-journal-open";
+const JOURNAL_OPEN_KEY = "caster-journal-open";
+const LEGACY_JOURNAL_OPEN_KEY = "v2-journal-open";
 
 function readJournalOpen(): boolean {
   try {
-    return localStorage.getItem(JOURNAL_OPEN_KEY) === "true";
+    const raw =
+      localStorage.getItem(JOURNAL_OPEN_KEY) ??
+      localStorage.getItem(LEGACY_JOURNAL_OPEN_KEY);
+    if (raw != null && localStorage.getItem(JOURNAL_OPEN_KEY) == null) {
+      localStorage.setItem(JOURNAL_OPEN_KEY, raw);
+    }
+    return raw === "true";
   } catch {
     return false;
   }
@@ -115,7 +122,7 @@ function playFinishBeep() {
   }
 }
 
-export function MainAppV2() {
+export function MainApp() {
   const [uiLocalePref, setUiLocalePref] = useState(() => mergeShellPrefs().uiLocale);
   return (
     <TitleBarProvider>
@@ -124,14 +131,14 @@ export function MainAppV2() {
         onPreferenceChange={setUiLocalePref}
       >
         <ToastProvider>
-          <MainAppV2Inner onUiLocalePrefChange={setUiLocalePref} />
+          <MainAppInner onUiLocalePrefChange={setUiLocalePref} />
         </ToastProvider>
       </LocaleProvider>
     </TitleBarProvider>
   );
 }
 
-function MainAppV2Inner({
+function MainAppInner({
   onUiLocalePrefChange,
 }: {
   onUiLocalePrefChange: (pref: ShellPrefs["uiLocale"]) => void;

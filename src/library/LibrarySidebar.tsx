@@ -20,7 +20,7 @@ import { Icons } from "../ui";
 import {
   ContextMenu,
   useContextMenuState,
-} from "../ui/v2";
+} from "../ui/shell";
 import type { LibraryItemView, LibraryKind } from "./types";
 import { buildLibraryItemMenuItems } from "./libraryItemMenuItems";
 import { useLibraryIndex } from "./useLibraryIndex";

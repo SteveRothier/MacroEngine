@@ -222,18 +222,18 @@ export function ActionPickerMenu({
   const panel = open
     ? createPortal(
         <div
-          className="v2-menu-popover v2-action-picker"
+          className="caster-menu-popover caster-action-picker"
           id={menuId}
           role="menu"
           ref={panelRef}
           style={coords ?? { position: "fixed", visibility: "hidden" }}
           onKeyDown={onListKeyDown}
         >
-          <div className="v2-action-picker-search">
+          <div className="caster-action-picker-search">
             <input
               ref={inputRef}
               type="search"
-              className="v2-action-picker-input"
+              className="caster-action-picker-input"
               placeholder={t("shell.filterActions")}
               value={query}
               aria-label={t("shell.filterActionsAria")}
@@ -241,9 +241,9 @@ export function ActionPickerMenu({
               onKeyDown={onListKeyDown}
             />
           </div>
-          <div className="v2-action-picker-list">
+          <div className="caster-action-picker-list">
             {flat.length === 0 ? (
-              <p className="v2-action-picker-empty">{t("shell.noActions")}</p>
+              <p className="caster-action-picker-empty">{t("shell.noActions")}</p>
             ) : (
               flat.map((row, idx) => {
                 const showGroup =
@@ -254,10 +254,10 @@ export function ActionPickerMenu({
                 return (
                   <div key={`${row.item.id}-${idx}`}>
                     {showSep ? (
-                      <div className="v2-menu-separator" role="separator" />
+                      <div className="caster-menu-separator" role="separator" />
                     ) : null}
                     {showGroup && row.groupLabel ? (
-                      <div className="v2-action-picker-group-label">
+                      <div className="caster-action-picker-group-label">
                         {row.groupLabel}
                       </div>
                     ) : null}
@@ -265,8 +265,8 @@ export function ActionPickerMenu({
                       type="button"
                       role="menuitem"
                       className={[
-                        "v2-menu-item",
-                        "v2-action-picker-item",
+                        "caster-menu-item",
+                        "caster-action-picker-item",
                         idx === activeIdx ? "is-active" : "",
                       ]
                         .filter(Boolean)
@@ -275,16 +275,16 @@ export function ActionPickerMenu({
                       onClick={() => pick(row.item)}
                     >
                       {row.item.icon ? (
-                        <span className="v2-menu-item-icon" aria-hidden>
+                        <span className="caster-menu-item-icon" aria-hidden>
                           {row.item.icon}
                         </span>
                       ) : null}
-                      <span className="v2-action-picker-item-text">
-                        <span className="v2-menu-item-label">
+                      <span className="caster-action-picker-item-text">
+                        <span className="caster-menu-item-label">
                           {row.item.label}
                         </span>
                         {row.item.hint ? (
-                          <span className="v2-action-picker-item-hint">
+                          <span className="caster-action-picker-item-hint">
                             {row.item.hint}
                           </span>
                         ) : null}
@@ -301,13 +301,13 @@ export function ActionPickerMenu({
     : null;
 
   return (
-    <div className="v2-action-picker-root" ref={rootRef}>
+    <div className="caster-action-picker-root" ref={rootRef}>
       <button
         ref={triggerRef}
         type="button"
         className={
           triggerClassName ??
-          "v2-btn v2-btn-ghost v2-action-picker-trigger"
+          "caster-btn caster-btn-ghost caster-action-picker-trigger"
         }
         disabled={disabled}
         aria-expanded={open}

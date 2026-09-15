@@ -4,7 +4,7 @@ import type { EngineStatus, HotkeyBindings } from "../macros/types";
 import { HotkeySettings } from "../settings/HotkeySettings";
 import { applyTheme, type ThemeMode } from "../theme";
 import { Card, Icons, RadioGroup, Segmented, Switch } from "../ui";
-import { Select } from "../ui/v2";
+import { Select } from "../ui/shell";
 import { useT } from "../i18n";
 import {
   DEFAULT_CLICKER,
@@ -266,7 +266,7 @@ export function ClickerPanel({
           <div className="actions wrap">
             {liveExes.length > 0 ? (
               <Select
-                className="v2-select"
+                className="caster-select"
                 value=""
                 disabled={running || !processFilter.enabled}
                 ariaLabel={t("clicker.panel.visibleProcesses")}

@@ -86,14 +86,14 @@ function TabFace({
 }) {
   return (
     <>
-      <span className="v2-doc-tab-icon">
+      <span className="caster-doc-tab-icon">
         <TabKindIcon kind={tab.kind} />
       </span>
       {!compact && tab.kind !== "home" ? (
-        <span className="v2-doc-tab-label">{tab.label}</span>
+        <span className="caster-doc-tab-label">{tab.label}</span>
       ) : null}
       {tab.pinned ? (
-        <span className="v2-doc-tab-pin" aria-hidden>
+        <span className="caster-doc-tab-pin" aria-hidden>
           <Pin size={10} />
         </span>
       ) : null}
@@ -103,8 +103,8 @@ function TabFace({
 
 const MENU_ICON = 14;
 const COMPACT_WIDTH = 56;
-const TAB_TOOLTIP_CLASS = "v2-tooltip--tab";
-const TAB_TOOLTIP_WRAP = "v2-doc-tab-tooltip-wrap";
+const TAB_TOOLTIP_CLASS = "caster-tooltip--tab";
+const TAB_TOOLTIP_WRAP = "caster-doc-tab-tooltip-wrap";
 
 function tabTooltipText(tab: DocumentTabItem, t: TFunction): string {
   if (tab.kind === "home") return t("shell.navHome");
@@ -294,7 +294,7 @@ export function DocumentTabBar({
     if (activeTabId === HOME_TAB_ID) return;
     const scroll = scrollRef.current;
     if (!scroll) return;
-    const active = scroll.querySelector(".v2-doc-tab.active");
+    const active = scroll.querySelector(".caster-doc-tab.active");
     if (active instanceof HTMLElement) {
       active.scrollIntoView({ inline: "nearest", block: "nearest" });
     }
@@ -474,8 +474,8 @@ export function DocumentTabBar({
         type="button"
         role="tab"
         className={[
-          "v2-doc-tab-main",
-          draggable ? "v2-doc-tab-main--draggable" : "",
+          "caster-doc-tab-main",
+          draggable ? "caster-doc-tab-main--draggable" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -509,14 +509,14 @@ export function DocumentTabBar({
             : undefined
         }
         className={[
-          "v2-doc-tab",
-          tab.kind === "home" ? "v2-doc-tab--home" : "",
-          tab.kind === "macro" ? "v2-doc-tab--macro" : "",
-          tab.kind === "clicker" ? "v2-doc-tab--clicker" : "",
-          tab.kind === "script" ? "v2-doc-tab--script" : "",
-          tab.pinned ? "v2-doc-tab--pinned" : "",
-          compact ? "v2-doc-tab--compact" : "",
-          isDragSource ? "v2-doc-tab--drag-source" : "",
+          "caster-doc-tab",
+          tab.kind === "home" ? "caster-doc-tab--home" : "",
+          tab.kind === "macro" ? "caster-doc-tab--macro" : "",
+          tab.kind === "clicker" ? "caster-doc-tab--clicker" : "",
+          tab.kind === "script" ? "caster-doc-tab--script" : "",
+          tab.pinned ? "caster-doc-tab--pinned" : "",
+          compact ? "caster-doc-tab--compact" : "",
+          isDragSource ? "caster-doc-tab--drag-source" : "",
           active ? "active" : "",
         ]
           .filter(Boolean)
@@ -538,7 +538,7 @@ export function DocumentTabBar({
         {closable && onClose ? (
           <button
             type="button"
-            className="v2-doc-tab-close"
+            className="caster-doc-tab-close"
             aria-label={t("shell.closeTabAria", { label: tab.label })}
             onClick={(e) => {
               e.stopPropagation();
@@ -554,14 +554,14 @@ export function DocumentTabBar({
 
   return (
     <>
-      <div className="v2-doc-tabbar" onContextMenu={openBarMenu}>
+      <div className="caster-doc-tabbar" onContextMenu={openBarMenu}>
         {homeTab ? (
-          <div className="v2-doc-tabbar-home">{renderDocTab(homeTab)}</div>
+          <div className="caster-doc-tabbar-home">{renderDocTab(homeTab)}</div>
         ) : null}
         <div
           ref={scrollRef}
           className={[
-            "v2-doc-tabbar-scroll",
+            "caster-doc-tabbar-scroll",
             dragUi.isDragging ? "is-tab-dragging" : "",
           ]
             .filter(Boolean)
@@ -569,16 +569,16 @@ export function DocumentTabBar({
           onContextMenu={openBarMenu}
         >
           <div
-            className="v2-doc-tabbar-strip"
+            className="caster-doc-tabbar-strip"
             role="tablist"
             aria-label={t("shell.tabsListAria")}
           >
             {scrollTabs.map((tab) => renderDocTab(tab))}
-            <div className="v2-doc-tabbar-add">
+            <div className="caster-doc-tabbar-add">
               <button
                 ref={addBtnRef}
                 type="button"
-                className="v2-doc-tab-add-btn"
+                className="caster-doc-tab-add-btn"
                 aria-label={t("shell.createAutomation")}
                 aria-expanded={createMenu != null}
                 aria-haspopup="menu"
@@ -588,7 +588,7 @@ export function DocumentTabBar({
               </button>
             </div>
             <div
-              className="v2-doc-tabbar-drag-fill"
+              className="caster-doc-tabbar-drag-fill"
               data-tauri-drag-region
               aria-hidden
               onContextMenu={openBarMenu}
@@ -602,20 +602,20 @@ export function DocumentTabBar({
             <div
               ref={ghostElRef}
               className={[
-                "v2-doc-tab",
-                "v2-doc-tab-ghost",
-                ghost.tab.kind === "macro" ? "v2-doc-tab--macro" : "",
-                ghost.tab.kind === "clicker" ? "v2-doc-tab--clicker" : "",
-                ghost.tab.kind === "script" ? "v2-doc-tab--script" : "",
-                ghost.tab.pinned ? "v2-doc-tab--pinned" : "",
-                ghostCompact ? "v2-doc-tab--compact" : "",
+                "caster-doc-tab",
+                "caster-doc-tab-ghost",
+                ghost.tab.kind === "macro" ? "caster-doc-tab--macro" : "",
+                ghost.tab.kind === "clicker" ? "caster-doc-tab--clicker" : "",
+                ghost.tab.kind === "script" ? "caster-doc-tab--script" : "",
+                ghost.tab.pinned ? "caster-doc-tab--pinned" : "",
+                ghostCompact ? "caster-doc-tab--compact" : "",
                 ghostActive ? "active" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}
               style={{ display: "none" }}
             >
-              <span className="v2-doc-tab-main v2-doc-tab-main--ghost">
+              <span className="caster-doc-tab-main caster-doc-tab-main--ghost">
                 <TabFace tab={ghost.tab} compact={ghostCompact} />
               </span>
             </div>,

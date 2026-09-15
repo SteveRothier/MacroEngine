@@ -24,12 +24,12 @@ export class ErrorBoundary extends Component<Props, State> {
     if (this.state.error) {
       const t = (key: string) => tStatic(resolveLocale("system"), key);
       return (
-        <div className="v2-root v2-fatal-error">
+        <div className="caster-root caster-fatal-error">
           <h1>{t("shell.errorTitle")}</h1>
           <p>{this.state.error.message}</p>
           <button
             type="button"
-            className="v2-btn"
+            className="caster-btn"
             onClick={() => this.setState({ error: null })}
           >
             {t("shell.retry")}

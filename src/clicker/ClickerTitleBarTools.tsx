@@ -10,8 +10,8 @@ import {
   Undo2,
   Upload,
 } from "lucide-react";
-import { DropdownMenu, EditorToolbar, useToast } from "../ui/v2";
-import type { DropdownEntry } from "../ui/v2";
+import { DropdownMenu, EditorToolbar, useToast } from "../ui/shell";
+import type { DropdownEntry } from "../ui/shell";
 import {
   chordLabel,
   triggerHotkeyLabel,
@@ -112,14 +112,14 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
         <>
           <button
             type="button"
-            className="v2-titlebar-btn v2-btn v2-btn-ghost"
+            className="caster-titlebar-btn caster-btn caster-btn-ghost"
             onClick={onBack}
             title={t("clicker.toolbar.back")}
           >
             <ArrowLeft size={14} aria-hidden />
           </button>
           <input
-            className="v2-titlebar-name-input"
+            className="caster-titlebar-name-input"
             value={editor.presetName}
             disabled={editor.editDisabled || !editor.selectedPreset}
             placeholder={t("clicker.toolbar.presetName")}
@@ -132,7 +132,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           />
           {editor.locked ? (
             <span
-              className="v2-clicker-lock"
+              className="caster-clicker-lock"
               title={t("clicker.toolbar.lockedTitle")}
             >
               {t("clicker.toolbar.locked")}
@@ -144,7 +144,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
         <>
           <button
             type="button"
-            className="v2-titlebar-btn v2-btn v2-btn-ghost"
+            className="caster-titlebar-btn caster-btn caster-btn-ghost"
             disabled={!editor.canUndo || editor.editDisabled}
             title={t("clicker.toolbar.undo")}
             onClick={() => editor.undoConfig()}
@@ -153,7 +153,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           </button>
           <button
             type="button"
-            className="v2-titlebar-btn v2-btn v2-btn-ghost"
+            className="caster-titlebar-btn caster-btn caster-btn-ghost"
             disabled={!editor.canRedo || editor.editDisabled}
             title={t("clicker.toolbar.redo")}
             onClick={() => editor.redoConfig()}
@@ -162,7 +162,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           </button>
           {editor.metrics ? (
             <span
-              className="v2-clicker-title-metrics"
+              className="caster-clicker-title-metrics"
               title={t("clicker.toolbar.targetCps", {
                 cps: editor.metrics.targetCps.toFixed(1),
               })}
@@ -174,7 +174,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           ) : null}
           <button
             type="button"
-            className="v2-titlebar-btn v2-btn v2-btn-primary"
+            className="caster-titlebar-btn caster-btn caster-btn-primary"
             disabled={editor.running}
             title={hotkeyHint}
             onClick={() => void editor.onStart()}
@@ -184,7 +184,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           {editor.running ? (
             <button
               type="button"
-              className="v2-titlebar-btn v2-btn v2-btn-ghost"
+              className="caster-titlebar-btn caster-btn caster-btn-ghost"
               title={
                 sessionPaused
                   ? t("clicker.toolbar.resumeSession")
@@ -206,7 +206,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           ) : null}
           <button
             type="button"
-            className="v2-titlebar-btn v2-btn v2-btn-danger-ghost"
+            className="caster-titlebar-btn caster-btn caster-btn-danger-ghost"
             onClick={() => void editor.onStop()}
           >
             {t("clicker.toolbar.stop")}
@@ -216,7 +216,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
             ariaLabel={t("clicker.toolbar.moreActions")}
             align="end"
             disabled={editor.running || editor.editDisabled}
-            triggerClassName="v2-titlebar-btn v2-btn v2-btn-ghost"
+            triggerClassName="caster-titlebar-btn caster-btn caster-btn-ghost"
             items={moreItems}
           >
             <MoreHorizontal size={16} aria-hidden />

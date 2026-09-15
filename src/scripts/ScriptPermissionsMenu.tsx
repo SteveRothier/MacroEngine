@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useT, type TFunction } from "../i18n";
-import { Tooltip } from "../ui/v2";
+import { Tooltip } from "../ui/shell";
 
 export type ScriptPermissions = {
   allowNetwork: boolean;
@@ -45,11 +45,11 @@ export function ScriptPermissionsMenu({ value, onChange, disabled }: Props) {
   }, [open]);
 
   return (
-    <div className="v2-script-perms-menu" ref={wrapRef}>
+    <div className="caster-script-perms-menu" ref={wrapRef}>
       <button
         type="button"
         className={[
-          "v2-titlebar-btn v2-titlebar-text-btn v2-script-perms-btn",
+          "caster-titlebar-btn caster-titlebar-text-btn caster-script-perms-btn",
           open ? "active" : "",
         ]
           .filter(Boolean)
@@ -63,7 +63,7 @@ export function ScriptPermissionsMenu({ value, onChange, disabled }: Props) {
         <ChevronDown size={12} aria-hidden />
       </button>
       {open ? (
-        <div className="v2-menu-popover v2-script-perms-popover" role="menu">
+        <div className="caster-menu-popover caster-script-perms-popover" role="menu">
           <PermRow
             label={t("scripts.permissions.network")}
             tip={t("scripts.permissions.networkTip")}
@@ -76,7 +76,7 @@ export function ScriptPermissionsMenu({ value, onChange, disabled }: Props) {
             checked={value.allowClipboard}
             onChange={(allowClipboard) => onChange({ allowClipboard })}
           />
-          <div className="v2-script-perms-sep" role="separator">
+          <div className="caster-script-perms-sep" role="separator">
             {t("scripts.permissions.advanced")}
           </div>
           <PermRow
@@ -111,11 +111,11 @@ function PermRow({
   return (
     <Tooltip content={tip}>
       <label
-        className="v2-menu-item v2-script-perms-row"
+        className="caster-menu-item caster-script-perms-row"
         role="menuitemcheckbox"
         aria-checked={checked}
       >
-        <span className="v2-menu-item-label">{label}</span>
+        <span className="caster-menu-item-label">{label}</span>
         <input
           type="checkbox"
           checked={checked}

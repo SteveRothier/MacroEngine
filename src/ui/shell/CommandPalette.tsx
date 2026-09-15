@@ -85,40 +85,40 @@ export function CommandPalette({ open, onClose, items }: Props) {
 
   return (
     <div
-      className="v2-cmd-overlay"
+      className="caster-cmd-overlay"
       role="dialog"
       aria-modal
       aria-label={t("shell.commandPalette")}
     >
       <button
         type="button"
-        className="v2-cmd-backdrop"
+        className="caster-cmd-backdrop"
         aria-label={t("common.close")}
         onClick={onClose}
       />
-      <div className="v2-cmd-panel">
+      <div className="caster-cmd-panel">
         <input
-          className="v2-cmd-input"
+          className="caster-cmd-input"
           autoFocus
           placeholder={t("shell.searchCommand")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <ul className="v2-cmd-list" role="listbox">
+        <ul className="caster-cmd-list" role="listbox">
           {filtered.length === 0 ? (
-            <li className="v2-cmd-empty">{t("shell.noResults")}</li>
+            <li className="caster-cmd-empty">{t("shell.noResults")}</li>
           ) : (
             grouped.map((g) => (
-              <li key={g.group} className="v2-cmd-group">
-                <div className="v2-cmd-group-label">{g.group}</div>
-                <ul className="v2-cmd-group-list">
+              <li key={g.group} className="caster-cmd-group">
+                <div className="caster-cmd-group-label">{g.group}</div>
+                <ul className="caster-cmd-group-list">
                   {g.items.map(({ item, index }) => (
                     <li key={item.id}>
                       <button
                         type="button"
                         role="option"
                         aria-selected={index === active}
-                        className={["v2-cmd-item", index === active ? "active" : ""].join(" ")}
+                        className={["caster-cmd-item", index === active ? "active" : ""].join(" ")}
                         onMouseEnter={() => setActive(index)}
                         onClick={() => {
                           item.onSelect();
@@ -126,7 +126,7 @@ export function CommandPalette({ open, onClose, items }: Props) {
                         }}
                       >
                         <span>{item.label}</span>
-                        {item.hint ? <span className="v2-cmd-hint">{item.hint}</span> : null}
+                        {item.hint ? <span className="caster-cmd-hint">{item.hint}</span> : null}
                       </button>
                     </li>
                   ))}
@@ -135,7 +135,7 @@ export function CommandPalette({ open, onClose, items }: Props) {
             ))
           )}
         </ul>
-        <div className="v2-cmd-footer">
+        <div className="caster-cmd-footer">
           <span>{t("shell.cmdNavigate")}</span>
           <span>{t("shell.cmdOpen")}</span>
           <span>{t("shell.cmdClose")}</span>
@@ -174,7 +174,7 @@ export function DisplayPopover({
     function onDoc(e: MouseEvent) {
       const el = anchorRef.current;
       if (el && !el.contains(e.target as Node)) {
-        const pop = document.querySelector(".v2-display-popover");
+        const pop = document.querySelector(".caster-display-popover");
         if (pop && pop.contains(e.target as Node)) return;
         onClose();
       }
@@ -185,7 +185,7 @@ export function DisplayPopover({
 
   if (!open) return null;
   return (
-    <div className="v2-display-popover" style={style}>
+    <div className="caster-display-popover" style={style}>
       {children}
     </div>
   );

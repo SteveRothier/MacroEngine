@@ -23,12 +23,12 @@ function MacroFlowNode({ data, selected }: NodeProps) {
   const d = data as MacroGraphNode & { onSelect?: () => void };
   const color =
     d.kind === "trigger"
-      ? "var(--v2-node-trigger)"
+      ? "var(--caster-node-trigger)"
       : d.kind === "if" || d.kind === "while"
-        ? "var(--v2-node-logic)"
+        ? "var(--caster-node-logic)"
         : d.kind === "action" && d.action?.type === "delay"
-          ? "var(--v2-node-delay)"
-          : "var(--v2-node-action)";
+          ? "var(--caster-node-delay)"
+          : "var(--caster-node-action)";
 
   return (
     <div
@@ -137,7 +137,7 @@ export function MacroCanvas({
   }, [nodes, edges, onGraphChange, readOnly]);
 
   return (
-    <div className="v2-canvas-wrap">
+    <div className="caster-canvas-wrap">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -153,14 +153,14 @@ export function MacroCanvas({
         nodesConnectable={false}
         panOnScroll
       >
-        <Background gap={16} size={1} color="var(--v2-border-subtle)" />
+        <Background gap={16} size={1} color="var(--caster-border-subtle)" />
         <Controls showInteractive={false} />
         <MiniMap
           nodeColor={(n) => {
             const k = (n.data as MacroGraphNode).kind;
-            if (k === "trigger") return "var(--v2-node-trigger)";
-            if (k === "if" || k === "while") return "var(--v2-node-logic)";
-            return "var(--v2-node-action)";
+            if (k === "trigger") return "var(--caster-node-trigger)";
+            if (k === "if" || k === "while") return "var(--caster-node-logic)";
+            return "var(--caster-node-action)";
           }}
         />
       </ReactFlow>

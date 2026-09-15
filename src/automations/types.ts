@@ -1,5 +1,5 @@
 import type { TFunction } from "../i18n";
-import type { StatusKind } from "../ui/v2";
+import type { StatusKind } from "../ui/shell";
 import type { LibraryKind } from "../library/types";
 
 export type AutomationKind = LibraryKind;

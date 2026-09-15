@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Trash2, X } from "lucide-react";
-import { EmptyState } from "../ui/v2";
+import { EmptyState } from "../ui/shell";
 import { useT } from "../i18n";
 
 type Filter = "all" | "macro" | "clicker" | "system";
@@ -33,15 +33,15 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
   });
 
   return (
-    <div className="v2-journal-overlay" role="region" aria-label={t("runs.aria")}>
-      <div className="v2-journal-head">
-        <span className="v2-journal-title">{t("runs.title")}</span>
-        <div className="v2-journal-filters">
+    <div className="caster-journal-overlay" role="region" aria-label={t("runs.aria")}>
+      <div className="caster-journal-head">
+        <span className="caster-journal-title">{t("runs.title")}</span>
+        <div className="caster-journal-filters">
           {(["all", "macro", "clicker", "system"] as Filter[]).map((f) => (
             <button
               key={f}
               type="button"
-              className={["v2-btn v2-btn-ghost", filter === f ? "active" : ""].join(" ")}
+              className={["caster-btn caster-btn-ghost", filter === f ? "active" : ""].join(" ")}
               style={{ fontSize: 11, padding: "2px 8px" }}
               onClick={() => setFilter(f)}
             >
@@ -50,7 +50,7 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
           ))}
           <button
             type="button"
-            className="v2-btn v2-btn-ghost"
+            className="caster-btn caster-btn-ghost"
             title={t("runs.clear")}
             onClick={onClear}
           >
@@ -58,7 +58,7 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
           </button>
           <button
             type="button"
-            className="v2-btn v2-btn-ghost"
+            className="caster-btn caster-btn-ghost"
             title={t("runs.close")}
             onClick={() => onOpenChange(false)}
           >
@@ -66,7 +66,7 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
           </button>
         </div>
       </div>
-      <div className="v2-journal-body">
+      <div className="caster-journal-body">
         {filtered.length === 0 ? (
           <EmptyState title={t("runs.emptyTitle")} lead={t("runs.emptyLead")} />
         ) : (
@@ -74,10 +74,10 @@ export function RunJournalDock({ lines, onClear, open, onOpenChange }: Props) {
             <div
               key={`${i}-${line.slice(0, 20)}`}
               className={[
-                "v2-journal-line",
-                /macro/i.test(line) ? "v2-journal-line--macro" : "",
-                /clicker/i.test(line) ? "v2-journal-line--clicker" : "",
-                /fail|error/i.test(line) ? "v2-journal-line--error" : "",
+                "caster-journal-line",
+                /macro/i.test(line) ? "caster-journal-line--macro" : "",
+                /clicker/i.test(line) ? "caster-journal-line--clicker" : "",
+                /fail|error/i.test(line) ? "caster-journal-line--error" : "",
               ]
                 .filter(Boolean)
                 .join(" ")}

@@ -3,14 +3,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { MainAppV2 } from "./app/MainAppV2";
-import { ErrorBoundary } from "./ui/v2/ErrorBoundary";
+import { MainApp } from "./app/MainApp";
+import { ErrorBoundary } from "./ui/shell/ErrorBoundary";
 import { ZoneOverlayView } from "./clicker/ZoneOverlayView";
 import { type EngineStatus } from "./macros/types";
 import { applyTheme, readStoredTheme } from "./theme";
 import "./App.css";
-import "./ui/v2/tokens.css";
-import "./ui/v2/v2.css";
+import "./ui/shell/tokens.css";
+import "./ui/shell/shell.css";
 
 type ClickerMetrics = {
   measuredCps: number;
@@ -62,7 +62,7 @@ function OverlayView() {
   }, []);
 
   return (
-    <div className="overlay v2-root" data-tauri-drag-region style={{ opacity }}>
+    <div className="overlay caster-root" data-tauri-drag-region style={{ opacity }}>
       <strong>{status.sessionKind ?? status.state}</strong>
       <span>{cps.toFixed(1)} CPS</span>
     </div>
@@ -153,7 +153,7 @@ export default function App() {
   }
   return (
     <ErrorBoundary>
-      <MainAppV2 />
+      <MainApp />
     </ErrorBoundary>
   );
 }

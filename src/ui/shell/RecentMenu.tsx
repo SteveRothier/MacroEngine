@@ -40,8 +40,8 @@ export function RecentMenu({ items }: Props) {
       label={t("shell.recentLabel")}
       ariaLabel={t("shell.recentAria")}
       align="end"
-      triggerClassName="v2-titlebar-btn v2-titlebar-text-btn"
-      menuClassName="v2-recent-menu-popover"
+      triggerClassName="caster-titlebar-btn caster-titlebar-text-btn"
+      menuClassName="caster-recent-menu-popover"
       items={entries}
     >
       {t("shell.recentLabel")}

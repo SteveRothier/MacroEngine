@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { KbdChip } from "../../ui";
-import { useToast } from "../../ui/v2";
+import { useToast } from "../../ui/shell";
 import { useT } from "../../i18n";
 import {
   eventToVk,
@@ -130,16 +130,16 @@ export function ClickerTriggerRow({ editor: e }: Props) {
   }, [e.locked]);
 
   return (
-    <div className="v2-settings-row">
-      <div className="v2-settings-row-label">
+    <div className="caster-settings-row">
+      <div className="caster-settings-row-label">
         <span>{t("clicker.trigger.label")}</span>
         <p>{t("clicker.trigger.hint")}</p>
       </div>
-      <div className="v2-settings-row-control">
+      <div className="caster-settings-row-control">
         <button
           type="button"
           className={[
-            "v2-btn v2-btn-ghost v2-clicker-trigger-btn",
+            "caster-btn caster-btn-ghost caster-clicker-trigger-btn",
             capturing ? "is-capturing" : "",
           ]
             .filter(Boolean)

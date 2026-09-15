@@ -63,17 +63,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="v2-toast-host" aria-live="polite" aria-relevant="additions">
+      <div className="caster-toast-host" aria-live="polite" aria-relevant="additions">
         {items.map((toast) => (
           <div
             key={toast.id}
-            className={["v2-toast", `v2-toast--${toast.kind}`].join(" ")}
+            className={["caster-toast", `caster-toast--${toast.kind}`].join(" ")}
             role={toast.kind === "error" ? "alert" : "status"}
           >
-            <span className="v2-toast-msg">{toast.message}</span>
+            <span className="caster-toast-msg">{toast.message}</span>
             <button
               type="button"
-              className="v2-toast-dismiss"
+              className="caster-toast-dismiss"
               aria-label={t("common.close")}
               onClick={() => dismiss(toast.id)}
             >

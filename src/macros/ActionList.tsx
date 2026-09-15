@@ -34,7 +34,7 @@ import {
   usePrefersReducedMotion,
   type ActionPickerEntry,
   type MenuItemDef,
-} from "../ui/v2";
+} from "../ui/shell";
 import { useT, type TFunction } from "../i18n";
 import { ActionParamCells } from "./ActionParamCells";
 import {
@@ -1013,13 +1013,13 @@ export function ActionList({
         })}
         {rows.length === 0 ? (
           <li className="action-list-empty">
-            <div className="v2-empty-state">
+            <div className="caster-empty-state">
               <strong>{t("macros.empty.noStepsTitle")}</strong>
               <p>{t("macros.empty.noStepsLead")}</p>
               {onEmptyAdd && !readOnly ? (
                 <button
                   type="button"
-                  className="v2-btn v2-btn-primary"
+                  className="caster-btn caster-btn-primary"
                   disabled={locked}
                   onClick={onEmptyAdd}
                 >

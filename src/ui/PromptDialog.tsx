@@ -61,25 +61,25 @@ export function PromptHost() {
 
   return (
     <div
-      className="v2-dialog-overlay"
+      className="caster-dialog-overlay"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close(null);
       }}
     >
       <div
-        className="v2-dialog"
+        className="caster-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="prompt-dialog-title"
       >
-        <h2 id="prompt-dialog-title" className="v2-dialog-title">
+        <h2 id="prompt-dialog-title" className="caster-dialog-title">
           {current.title}
         </h2>
-        <div className="v2-dialog-body v2-dialog-body--stack">
+        <div className="caster-dialog-body caster-dialog-body--stack">
           {current.message ? <p>{current.message}</p> : null}
           <input
             type="text"
-            className="v2-dialog-input"
+            className="caster-dialog-input"
             value={value}
             placeholder={current.placeholder}
             autoFocus
@@ -93,10 +93,10 @@ export function PromptHost() {
             }}
           />
         </div>
-        <div className="v2-dialog-actions">
+        <div className="caster-dialog-actions">
           <button
             type="button"
-            className="v2-btn v2-btn-primary"
+            className="caster-btn caster-btn-primary"
             onClick={() => {
               const trimmed = value.trim();
               if (trimmed) close(trimmed);
@@ -106,7 +106,7 @@ export function PromptHost() {
           </button>
           <button
             type="button"
-            className="v2-btn v2-btn-ghost"
+            className="caster-btn caster-btn-ghost"
             onClick={() => close(null)}
           >
             {current.cancelLabel ?? t("common.cancel")}

@@ -1,5 +1,5 @@
 /**
- * Select custom — liste ouverte = v2-menu-popover (comme DropdownMenu).
+ * Select custom — liste ouverte = caster-menu-popover (comme DropdownMenu).
  * Les <select> natifs Windows ne stylent pas la liste ouverte.
  */
 import {
@@ -26,7 +26,7 @@ type Props = {
   options: SelectOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
-  /** Classes on the trigger button (e.g. action-cell-select, v2-select) */
+  /** Classes on the trigger button (e.g. action-cell-select, caster-select) */
   className?: string;
   ariaLabel?: string;
   title?: string;
@@ -193,7 +193,7 @@ export function Select({
           id={listId}
           role="listbox"
           aria-label={ariaLabel ?? title ?? "Options"}
-          className="v2-menu-popover v2-select-menu"
+          className="caster-menu-popover caster-select-menu"
           style={coords ?? { position: "fixed", visibility: "hidden" }}
           onKeyDown={onListKeyDown}
         >
@@ -210,8 +210,8 @@ export function Select({
                 aria-selected={isSelected}
                 disabled={opt.disabled}
                 className={[
-                  "v2-menu-item",
-                  "v2-select-option",
+                  "caster-menu-item",
+                  "caster-select-option",
                   isActive ? "is-active" : "",
                 ]
                   .filter(Boolean)
@@ -224,7 +224,7 @@ export function Select({
                 }}
                 onClick={() => pick(opt)}
               >
-                <span className="v2-menu-item-label">{opt.label}</span>
+                <span className="caster-menu-item-label">{opt.label}</span>
               </button>
             );
           })}
@@ -234,11 +234,11 @@ export function Select({
     : null;
 
   return (
-    <div className="v2-select-root" ref={rootRef}>
+    <div className="caster-select-root" ref={rootRef}>
       <button
         ref={triggerRef}
         type="button"
-        className={["v2-select-trigger", className].filter(Boolean).join(" ")}
+        className={["caster-select-trigger", className].filter(Boolean).join(" ")}
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
@@ -250,10 +250,10 @@ export function Select({
           setOpen((v) => !v);
         }}
       >
-        <span className="v2-select-trigger-label">
+        <span className="caster-select-trigger-label">
           {triggerLabel ?? selected?.label ?? value}
         </span>
-        <ChevronDown size={12} className="v2-select-chevron" aria-hidden />
+        <ChevronDown size={12} className="caster-select-chevron" aria-hidden />
       </button>
       {panel}
     </div>

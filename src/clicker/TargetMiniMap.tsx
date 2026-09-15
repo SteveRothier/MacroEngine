@@ -39,23 +39,23 @@ export function TargetMiniMap({ geom, mode, fixed, points = [] }: Props) {
   }
 
   return (
-    <div className="v2-clicker-target-minimap">
-      <div className="v2-clicker-target-minimap-head">
+    <div className="caster-clicker-target-minimap">
+      <div className="caster-clicker-target-minimap-head">
         <span>{t("clicker.target.preview")}</span>
-        <span className="v2-clicker-hint-inline">
+        <span className="caster-clicker-hint-inline">
           {g.width}×{g.height}
         </span>
       </div>
-      <div className="screen-preview-frame v2-clicker-target-minimap-frame">
+      <div className="screen-preview-frame caster-clicker-target-minimap-frame">
         <div className="screen-preview" style={aspectStyle}>
-          <div className="v2-clicker-target-minimap-canvas" aria-hidden>
+          <div className="caster-clicker-target-minimap-canvas" aria-hidden>
             {mode === "cursor" && markers.length === 0 ? (
-              <span className="v2-clicker-target-minimap-hint">
+              <span className="caster-clicker-target-minimap-hint">
                 {t("clicker.target.liveCursor")}
               </span>
             ) : null}
             {markers.length === 0 && mode !== "cursor" ? (
-              <span className="v2-clicker-target-minimap-hint">
+              <span className="caster-clicker-target-minimap-hint">
                 {t("clicker.target.noPoint")}
               </span>
             ) : null}
@@ -69,7 +69,7 @@ export function TargetMiniMap({ geom, mode, fixed, points = [] }: Props) {
               return (
                 <span
                   key={i}
-                  className="v2-clicker-target-marker"
+                  className="caster-clicker-target-marker"
                   style={{
                     left: `${Math.min(100, Math.max(0, left))}%`,
                     top: `${Math.min(100, Math.max(0, top))}%`,
@@ -78,14 +78,14 @@ export function TargetMiniMap({ geom, mode, fixed, points = [] }: Props) {
                 >
                   {rPct > 0 ? (
                     <span
-                      className="v2-clicker-target-marker-radius"
+                      className="caster-clicker-target-marker-radius"
                       style={{
                         width: `${rPct * 2}%`,
                         height: `${rPct * 2}%`,
                       }}
                     />
                   ) : null}
-                  <span className="v2-clicker-target-marker-dot">{m.label}</span>
+                  <span className="caster-clicker-target-marker-dot">{m.label}</span>
                 </span>
               );
             })}

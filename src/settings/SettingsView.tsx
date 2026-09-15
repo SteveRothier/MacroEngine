@@ -17,7 +17,7 @@ import {
   type ProcessFilter,
 } from "../clicker/clickerTypes";
 import { useClickerSettingsApi } from "../clicker/useClickerSettings";
-import { Select, useToast } from "../ui/v2";
+import { Select, useToast } from "../ui/shell";
 import { confirmChoice } from "../ui";
 import type { HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
@@ -68,9 +68,9 @@ function SettingsGroup({
   children: ReactNode;
 }) {
   return (
-    <section className="v2-settings-group">
-      <h3 className="v2-settings-group-title">{title}</h3>
-      <div className="v2-settings-group-body">{children}</div>
+    <section className="caster-settings-group">
+      <h3 className="caster-settings-group-title">{title}</h3>
+      <div className="caster-settings-group-body">{children}</div>
     </section>
   );
 }
@@ -87,7 +87,7 @@ function SettingsToggle({
   ariaLabel: string;
 }) {
   return (
-    <label className={["v2-switch", disabled ? "is-disabled" : ""].filter(Boolean).join(" ")}>
+    <label className={["caster-switch", disabled ? "is-disabled" : ""].filter(Boolean).join(" ")}>
       <input
         type="checkbox"
         role="switch"
@@ -96,7 +96,7 @@ function SettingsToggle({
         aria-label={ariaLabel}
         onChange={(e) => onChange(e.target.checked)}
       />
-      <span className="v2-switch-track" aria-hidden />
+      <span className="caster-switch-track" aria-hidden />
     </label>
   );
 }
@@ -360,9 +360,9 @@ export function SettingsView({
   };
 
   return (
-    <div className="v2-page">
-      <div className="v2-settings-layout">
-        <nav className="v2-settings-rail" aria-label={t("settings.railAria")}>
+    <div className="caster-page">
+      <div className="caster-settings-layout">
+        <nav className="caster-settings-rail" aria-label={t("settings.railAria")}>
           {SECTIONS.map((s) => {
             const Icon = s.icon;
             return (
@@ -370,32 +370,32 @@ export function SettingsView({
                 key={s.id}
                 type="button"
                 className={[
-                  "v2-settings-rail-item",
+                  "caster-settings-rail-item",
                   section === s.id ? "active" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
                 onClick={() => onSectionChange(s.id)}
               >
-                <Icon size={16} aria-hidden className="v2-settings-rail-icon" />
+                <Icon size={16} aria-hidden className="caster-settings-rail-icon" />
                 <span>{t(s.labelKey)}</span>
               </button>
             );
           })}
         </nav>
-        <div className="v2-settings-pane">
-          <div className="v2-settings-pane-inner">
+        <div className="caster-settings-pane">
+          <div className="caster-settings-pane-inner">
             {section === "application" ? (
               <>
-                <h2 className="v2-settings-pane-title">{t("settings.application.paneTitle")}</h2>
-                <p className="v2-settings-pane-hint">{t("settings.application.paneHint")}</p>
+                <h2 className="caster-settings-pane-title">{t("settings.application.paneTitle")}</h2>
+                <p className="caster-settings-pane-hint">{t("settings.application.paneHint")}</p>
                 <SettingsGroup title={t("settings.application.groupStartup")}>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.startWithWindows")}</span>
                       <p>{t("settings.application.startWithWindowsHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={startWithWindows}
                         ariaLabel={t("settings.application.startWithWindows")}
@@ -406,12 +406,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.startInTray")}</span>
                       <p>{t("settings.application.startInTrayHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={shell.minimizeToTray}
                         ariaLabel={t("settings.application.startInTray")}
@@ -421,12 +421,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.closeToTray")}</span>
                       <p>{t("settings.application.closeToTrayHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={closeToTray}
                         ariaLabel={t("settings.application.closeToTray")}
@@ -437,12 +437,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.journalOnStart")}</span>
                       <p>{t("settings.application.journalOnStartHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={journalOpen}
                         ariaLabel={t("settings.application.journalOnStart")}
@@ -453,14 +453,14 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.startupView")}</span>
                       <p>{t("settings.application.startupViewHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <Select
-                        className="v2-select"
+                        className="caster-select"
                         value={shell.startupView}
                         ariaLabel={t("settings.application.startupView")}
                         options={[
@@ -473,12 +473,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.restoreTabs")}</span>
                       <p>{t("settings.application.restoreTabsHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={shell.restoreWorkspaceTabs}
                         ariaLabel={t("settings.application.restoreTabs")}
@@ -488,12 +488,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.alwaysOnTop")}</span>
                       <p>{t("settings.application.alwaysOnTopHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={shell.alwaysOnTop}
                         ariaLabel={t("settings.application.alwaysOnTop")}
@@ -503,12 +503,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.rememberBounds")}</span>
                       <p>{t("settings.application.rememberBoundsHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={shell.rememberWindowBounds}
                         ariaLabel={t("settings.application.rememberBounds")}
@@ -518,12 +518,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.confirmQuit")}</span>
                       <p>{t("settings.application.confirmQuitHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={shell.confirmQuitIfRunning}
                         ariaLabel={t("settings.application.confirmQuit")}
@@ -533,12 +533,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.goHomeAfterEmergency")}</span>
                       <p>{t("settings.application.goHomeAfterEmergencyHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={shell.goHomeAfterEmergency}
                         ariaLabel={t("settings.application.goHomeAfterEmergency")}
@@ -550,12 +550,12 @@ export function SettingsView({
                   </div>
                 </SettingsGroup>
                 <SettingsGroup title={t("settings.application.groupNotifications")}>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.toastOnFinish")}</span>
                       <p>{t("settings.application.toastOnFinishHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={shell.toastOnFinish}
                         ariaLabel={t("settings.application.toastOnFinish")}
@@ -565,12 +565,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.soundOnFinish")}</span>
                       <p>{t("settings.application.soundOnFinishHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={automation.soundOnFinish}
                         ariaLabel={t("settings.application.soundOnFinish")}
@@ -580,12 +580,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.focusJournal")}</span>
                       <p>{t("settings.application.focusJournalHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={automation.focusFollowsRun}
                         ariaLabel={t("settings.application.focusJournal")}
@@ -595,12 +595,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.trayRelaunch")}</span>
                       <p>{t("settings.application.trayRelaunchHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={shell.trayRelaunchLast}
                         ariaLabel={t("settings.application.trayRelaunch")}
@@ -612,13 +612,13 @@ export function SettingsView({
                   </div>
                 </SettingsGroup>
                 <SettingsGroup title={t("settings.application.groupAppearance")}>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.theme")}</span>
                       <p>{t("settings.application.themeHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
-                      <div className="v2-segmented" role="group" aria-label={t("settings.application.themeAria")}>
+                    <div className="caster-settings-row-control">
+                      <div className="caster-segmented" role="group" aria-label={t("settings.application.themeAria")}>
                         {(
                           [
                             ["light", "common.light"],
@@ -630,7 +630,7 @@ export function SettingsView({
                             key={value}
                             type="button"
                             className={[
-                              "v2-segmented-btn",
+                              "caster-segmented-btn",
                               theme === value ? "active" : "",
                             ]
                               .filter(Boolean)
@@ -643,13 +643,13 @@ export function SettingsView({
                       </div>
                     </div>
                   </div>
-                  <div className="v2-settings-row v2-settings-row--swatches">
-                    <div className="v2-theme-preview">
+                  <div className="caster-settings-row caster-settings-row--swatches">
+                    <div className="caster-theme-preview">
                       <button
                         type="button"
                         className={[
-                          "v2-theme-swatch",
-                          "v2-theme-swatch--dark",
+                          "caster-theme-swatch",
+                          "caster-theme-swatch--dark",
                           theme === "dark" ? "selected" : "",
                         ]
                           .filter(Boolean)
@@ -660,8 +660,8 @@ export function SettingsView({
                       <button
                         type="button"
                         className={[
-                          "v2-theme-swatch",
-                          "v2-theme-swatch--light",
+                          "caster-theme-swatch",
+                          "caster-theme-swatch--light",
                           theme === "light" ? "selected" : "",
                         ]
                           .filter(Boolean)
@@ -671,12 +671,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.hud")}</span>
                       <p>{t("settings.application.hudHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={overlayVisible}
                         ariaLabel={t("settings.application.hud")}
@@ -688,12 +688,12 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.hudOpacity")}</span>
                     </div>
-                    <div className="v2-settings-row-control v2-settings-row-control--grow">
-                      <label className="v2-settings-range">
+                    <div className="caster-settings-row-control caster-settings-row-control--grow">
+                      <label className="caster-settings-range">
                         <input
                           type="range"
                           min={40}
@@ -709,14 +709,14 @@ export function SettingsView({
                       </label>
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.language")}</span>
                       <p>{t("settings.application.languageHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <Select
-                        className="v2-select"
+                        className="caster-select"
                         value={shell.uiLocale}
                         ariaLabel={t("settings.application.language")}
                         options={[
@@ -731,16 +731,16 @@ export function SettingsView({
                   </div>
                 </SettingsGroup>
                 <SettingsGroup title={t("settings.application.groupClicker")}>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.clickerMode")}</span>
                       <p>{t("settings.application.clickerModeHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
-                      <div className="v2-segmented" role="group" aria-label={t("settings.application.clickerModeAria")}>
+                    <div className="caster-settings-row-control">
+                      <div className="caster-segmented" role="group" aria-label={t("settings.application.clickerModeAria")}>
                         <button
                           type="button"
-                          className={["v2-segmented-btn", !advanced ? "active" : ""]
+                          className={["caster-segmented-btn", !advanced ? "active" : ""]
                             .filter(Boolean)
                             .join(" ")}
                           onClick={() => setAdvanced(false)}
@@ -749,7 +749,7 @@ export function SettingsView({
                         </button>
                         <button
                           type="button"
-                          className={["v2-segmented-btn", advanced ? "active" : ""]
+                          className={["caster-segmented-btn", advanced ? "active" : ""]
                             .filter(Boolean)
                             .join(" ")}
                           onClick={() => setAdvanced(true)}
@@ -759,22 +759,22 @@ export function SettingsView({
                       </div>
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.state")}</span>
                     </div>
-                    <div className="v2-settings-row-control">
-                      <strong className="v2-settings-status">
+                    <div className="caster-settings-row-control">
+                      <strong className="caster-settings-status">
                         {running ? t("common.running") : t("common.inactive")}
                       </strong>
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.liveMetrics")}</span>
                     </div>
-                    <div className="v2-settings-row-control">
-                      <code className="v2-settings-mono">
+                    <div className="caster-settings-row-control">
+                      <code className="caster-settings-mono">
                         {metrics
                           ? t("settings.application.clicksMetric", {
                               cps: metrics.measuredCps.toFixed(1),
@@ -790,8 +790,8 @@ export function SettingsView({
 
             {section === "hotkeys" ? (
               <>
-                <h2 className="v2-settings-pane-title">{t("settings.hotkeys.paneTitle")}</h2>
-                <p className="v2-settings-pane-hint">
+                <h2 className="caster-settings-pane-title">{t("settings.hotkeys.paneTitle")}</h2>
+                <p className="caster-settings-pane-hint">
                   {t("settings.hotkeys.paneHint")}
                 </p>
                 <SettingsGroup title={t("settings.hotkeys.groupTitle")}>
@@ -802,24 +802,24 @@ export function SettingsView({
 
             {section === "security" ? (
               <>
-                <h2 className="v2-settings-pane-title">{t("settings.security.paneTitle")}</h2>
-                <p className="v2-settings-pane-hint">
+                <h2 className="caster-settings-pane-title">{t("settings.security.paneTitle")}</h2>
+                <p className="caster-settings-pane-hint">
                   {t("settings.security.paneHint")}
                   {running ? t("settings.security.filterDisabled") : ""}
                 </p>
                 <SettingsGroup title={t("settings.security.filterGroup")}>
-                  <p className="v2-settings-group-hint">
+                  <p className="caster-settings-group-hint">
                     {t("settings.security.filterIntro")}
                   </p>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.security.foreground")}</span>
                     </div>
-                    <div className="v2-settings-row-control">
-                      <code className="v2-settings-mono">{foregroundExe ?? t("common.empty")}</code>
+                    <div className="caster-settings-row-control">
+                      <code className="caster-settings-mono">{foregroundExe ?? t("common.empty")}</code>
                       <button
                         type="button"
-                        className="v2-btn v2-btn-ghost"
+                        className="caster-btn caster-btn-ghost"
                         title={t("settings.security.refreshProcesses")}
                         onClick={refreshLiveExes}
                       >
@@ -827,11 +827,11 @@ export function SettingsView({
                       </button>
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.security.enableFilter")}</span>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <SettingsToggle
                         checked={processFilter.enabled}
                         disabled={running}
@@ -845,14 +845,14 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.security.mode")}</span>
                       <p>{t("settings.security.modeHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <Select
-                        className="v2-select"
+                        className="caster-select"
                         value={processFilter.mode}
                         disabled={running || !processFilter.enabled}
                         options={[
@@ -875,13 +875,13 @@ export function SettingsView({
                     </div>
                   </div>
                   {liveExes.length > 0 ? (
-                    <div className="v2-settings-row v2-settings-row--stack">
-                      <div className="v2-settings-row-label">
+                    <div className="caster-settings-row caster-settings-row--stack">
+                      <div className="caster-settings-row-label">
                         <span>{t("settings.security.addFromVisible")}</span>
                       </div>
-                      <div className="v2-settings-row-control v2-settings-row-control--full">
+                      <div className="caster-settings-row-control caster-settings-row-control--full">
                         <Select
-                          className="v2-select"
+                          className="caster-select"
                           value=""
                           disabled={running || !processFilter.enabled}
                           options={[
@@ -901,12 +901,12 @@ export function SettingsView({
                       </div>
                     </div>
                   ) : null}
-                  <div className="v2-settings-row v2-settings-row--stack">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row caster-settings-row--stack">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.security.addManual")}</span>
                     </div>
-                    <div className="v2-settings-row-control v2-settings-row-control--full">
-                      <div className="v2-field-row">
+                    <div className="caster-settings-row-control caster-settings-row-control--full">
+                      <div className="caster-field-row">
                         <input
                           value={processDraft}
                           disabled={running || !processFilter.enabled}
@@ -915,7 +915,7 @@ export function SettingsView({
                         />
                         <button
                           type="button"
-                          className="v2-btn"
+                          className="caster-btn"
                           disabled={
                             running ||
                             !processFilter.enabled ||
@@ -937,15 +937,15 @@ export function SettingsView({
                     </div>
                   </div>
                   {processFilter.names.length === 0 ? (
-                    <p className="v2-settings-group-hint">{t("settings.security.noneListed")}</p>
+                    <p className="caster-settings-group-hint">{t("settings.security.noneListed")}</p>
                   ) : (
-                    <ul className="v2-settings-process-list">
+                    <ul className="caster-settings-process-list">
                       {processFilter.names.map((n) => (
                         <li key={n}>
                           <code>{n}</code>
                           <button
                             type="button"
-                            className="v2-btn v2-btn-ghost"
+                            className="caster-btn caster-btn-ghost"
                             disabled={running}
                             onClick={() =>
                               persistProcess({
@@ -962,14 +962,14 @@ export function SettingsView({
                   )}
                 </SettingsGroup>
                 <SettingsGroup title={t("settings.security.displayGroup")}>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.security.monitor")}</span>
                     </div>
-                    <div className="v2-settings-row-control v2-settings-row-control--grow">
-                      <div className="v2-field-row">
+                    <div className="caster-settings-row-control caster-settings-row-control--grow">
+                      <div className="caster-field-row">
                         <Select
-                          className="v2-select"
+                          className="caster-select"
                           value={displayId ?? ""}
                           options={[
                             { value: "", label: t("settings.security.primaryDefault") },
@@ -987,7 +987,7 @@ export function SettingsView({
                         />
                         <button
                           type="button"
-                          className="v2-btn v2-btn-ghost"
+                          className="caster-btn caster-btn-ghost"
                           title={t("settings.security.refreshList")}
                           onClick={refreshDisplays}
                         >
@@ -1002,11 +1002,11 @@ export function SettingsView({
 
             {section === "data" ? (
               <>
-                <h2 className="v2-settings-pane-title">{t("settings.data.paneTitle")}</h2>
-                <p className="v2-settings-pane-hint">{t("settings.data.paneHint")}</p>
+                <h2 className="caster-settings-pane-title">{t("settings.data.paneTitle")}</h2>
+                <p className="caster-settings-pane-hint">{t("settings.data.paneHint")}</p>
                 <SettingsGroup title={t("settings.data.actionsGroup")}>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.data.openConfig")}</span>
                       <p>
                         {t("settings.data.openConfigHint")}
@@ -1014,7 +1014,7 @@ export function SettingsView({
                           <>
                             {" "}
                             (
-                            <code className="v2-settings-mono">
+                            <code className="caster-settings-mono">
                               {paths.settingsPath}
                             </code>
                             )
@@ -1022,10 +1022,10 @@ export function SettingsView({
                         ) : null}
                       </p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <button
                         type="button"
-                        className="v2-btn v2-btn-ghost"
+                        className="caster-btn caster-btn-ghost"
                         disabled={!paths}
                         onClick={() =>
                           paths && void invoke("open_path", { path: paths.configDir })
@@ -1035,14 +1035,14 @@ export function SettingsView({
                       </button>
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.data.openLogs")}</span>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <button
                         type="button"
-                        className="v2-btn v2-btn-ghost"
+                        className="caster-btn caster-btn-ghost"
                         disabled={!paths}
                         onClick={() =>
                           paths && void invoke("open_path", { path: paths.logDir })
@@ -1052,52 +1052,52 @@ export function SettingsView({
                       </button>
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.data.exportImport")}</span>
                       <p>{t("settings.data.exportImportHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <button
                         type="button"
-                        className="v2-btn"
+                        className="caster-btn"
                         onClick={() => void exportSettings()}
                       >
                         {t("common.export")}
                       </button>
                       <button
                         type="button"
-                        className="v2-btn v2-btn-ghost"
+                        className="caster-btn caster-btn-ghost"
                         onClick={() => void importSettings()}
                       >
                         {t("common.import")}
                       </button>
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.data.purgeTrash")}</span>
                       <p>{t("settings.data.purgeTrashHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <button
                         type="button"
-                        className="v2-btn v2-btn-danger-ghost"
+                        className="caster-btn caster-btn-danger-ghost"
                         onClick={() => void purgeTrash()}
                       >
                         {t("settings.data.purge")}
                       </button>
                     </div>
                   </div>
-                  <div className="v2-settings-row">
-                    <div className="v2-settings-row-label">
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.data.resetClicker")}</span>
                       <p>{t("settings.data.resetClickerHint")}</p>
                     </div>
-                    <div className="v2-settings-row-control">
+                    <div className="caster-settings-row-control">
                       <button
                         type="button"
-                        className="v2-btn v2-btn-danger-ghost"
+                        className="caster-btn caster-btn-danger-ghost"
                         disabled={running}
                         onClick={() => void resetClicker()}
                       >
@@ -1107,10 +1107,10 @@ export function SettingsView({
                   </div>
                 </SettingsGroup>
                 <SettingsGroup title={t("settings.data.aboutGroup")}>
-                  <div className="v2-settings-about">
+                  <div className="caster-settings-about">
                     <strong>Caster</strong>
                     <p>{t("settings.data.aboutBlurb")}</p>
-                    <dl className="v2-settings-about-meta">
+                    <dl className="caster-settings-about-meta">
                       <div>
                         <dt>{t("settings.data.version")}</dt>
                         <dd>{paths?.version ?? t("common.empty")}</dd>
@@ -1124,7 +1124,7 @@ export function SettingsView({
                         <dd>Windows</dd>
                       </div>
                     </dl>
-                    <p className="v2-settings-group-hint">
+                    <p className="caster-settings-group-hint">
                       {t("settings.data.aboutFooter")}
                     </p>
                   </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Select } from "../../ui/v2";
+import { Select } from "../../ui/shell";
 import { useT } from "../../i18n";
 import type { ClickerEditor } from "../useClickerEditor";
 import {
@@ -84,15 +84,15 @@ export function ClickerLimitsSection({ editor: e }: Props) {
   const swatch = `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`;
 
   return (
-    <div className="v2-clicker-limits-panel">
-      <div className="v2-settings-row v2-settings-row--stack">
-        <div className="v2-settings-row-label">
+    <div className="caster-clicker-limits-panel">
+      <div className="caster-settings-row caster-settings-row--stack">
+        <div className="caster-settings-row-label">
           <span>{t("clicker.limits.sessionEnd")}</span>
           <p>{t("clicker.limits.sessionEndHint")}</p>
         </div>
-        <div className="v2-settings-row-control v2-settings-row-control--full">
+        <div className="caster-settings-row-control caster-settings-row-control--full">
           <div
-            className="v2-segmented v2-segmented--wide"
+            className="caster-segmented caster-segmented--wide"
             role="group"
             aria-label={t("clicker.limits.modeAria")}
           >
@@ -107,7 +107,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
               <button
                 key={value}
                 type="button"
-                className={["v2-segmented-btn", choice === value ? "active" : ""]
+                className={["caster-segmented-btn", choice === value ? "active" : ""]
                   .filter(Boolean)
                   .join(" ")}
                 disabled={e.editDisabled}
@@ -121,7 +121,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
       </div>
 
       {showClicks ? (
-        <label className="v2-field v2-clicker-limits-field">
+        <label className="caster-field caster-clicker-limits-field">
           <span>{t("clicker.limits.maxClicks")}</span>
           <input
             type="number"
@@ -135,7 +135,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
       ) : null}
 
       {showTime ? (
-        <label className="v2-field v2-clicker-limits-field">
+        <label className="caster-field caster-clicker-limits-field">
           <span>{t("clicker.limits.durationSec")}</span>
           <input
             type="number"
@@ -148,14 +148,14 @@ export function ClickerLimitsSection({ editor: e }: Props) {
         </label>
       ) : null}
 
-      <div className="v2-settings-row v2-settings-row--stack">
-        <div className="v2-settings-row-label">
+      <div className="caster-settings-row caster-settings-row--stack">
+        <div className="caster-settings-row-label">
           <span>{t("clicker.limits.chainMacro")}</span>
           <p>{t("clicker.limits.chainMacroHint")}</p>
         </div>
-        <div className="v2-settings-row-control v2-settings-row-control--full">
+        <div className="caster-settings-row-control caster-settings-row-control--full">
           <Select
-            className="v2-select"
+            className="caster-select"
             disabled={e.editDisabled}
             value={e.onCompleteMacro ?? ""}
             options={[
@@ -167,13 +167,13 @@ export function ClickerLimitsSection({ editor: e }: Props) {
         </div>
       </div>
 
-      <div className="v2-settings-row v2-settings-row--stack">
-        <div className="v2-settings-row-label">
+      <div className="caster-settings-row caster-settings-row--stack">
+        <div className="caster-settings-row-label">
           <span>{t("clicker.limits.pixelCondition")}</span>
           <p>{t("clicker.limits.pixelConditionHint")}</p>
         </div>
-        <div className="v2-settings-row-control v2-settings-row-control--full v2-clicker-pixel-controls">
-          <label className="v2-check">
+        <div className="caster-settings-row-control caster-settings-row-control--full caster-clicker-pixel-controls">
+          <label className="caster-check">
             <input
               type="checkbox"
               checked={pixel.enabled}
@@ -184,18 +184,18 @@ export function ClickerLimitsSection({ editor: e }: Props) {
           </label>
           <button
             type="button"
-            className="v2-btn v2-btn-ghost"
+            className="caster-btn caster-btn-ghost"
             disabled={e.editDisabled}
             onClick={() => void onPickPixel()}
           >
             {t("clicker.limits.pickColor")}
           </button>
           <span
-            className="v2-clicker-pixel-swatch"
+            className="caster-clicker-pixel-swatch"
             style={{ background: swatch }}
             title={`${pixel.x},${pixel.y} · ${swatch}`}
           />
-          <label className="v2-field v2-clicker-limits-field">
+          <label className="caster-field caster-clicker-limits-field">
             <span>{t("clicker.limits.tolerance")}</span>
             <input
               type="number"
@@ -209,7 +209,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
             />
           </label>
           <div
-            className="v2-segmented"
+            className="caster-segmented"
             role="group"
             aria-label={t("clicker.limits.pixelActionAria")}
           >
@@ -223,7 +223,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
                 key={value}
                 type="button"
                 className={[
-                  "v2-segmented-btn",
+                  "caster-segmented-btn",
                   pixel.action === value ? "active" : "",
                 ]
                   .filter(Boolean)

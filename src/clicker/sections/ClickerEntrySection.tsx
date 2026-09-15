@@ -9,7 +9,7 @@ import type {
   RateUnit,
   TimingMode,
 } from "../clickerTypes";
-import { Select } from "../../ui/v2";
+import { Select } from "../../ui/shell";
 import { useT } from "../../i18n";
 import { ClickerProcessFilterRow } from "./ClickerProcessFilterRow";
 import { ClickerTriggerRow } from "./ClickerTriggerRow";
@@ -23,20 +23,20 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
   const t = useT();
 
   return (
-    <div className="v2-clicker-section v2-clicker-entry-split">
+    <div className="caster-clicker-section caster-clicker-entry-split">
       <ClickerProcessFilterRow
         filter={e.processFilter}
         onOpenSettings={onOpenProcessSettings}
       />
-      <div className="v2-clicker-entry-col">
-        <h3 className="v2-clicker-entry-col-title">{t("clicker.entry.title")}</h3>
-        <div className="v2-settings-row">
-          <div className="v2-settings-row-label">
+      <div className="caster-clicker-entry-col">
+        <h3 className="caster-clicker-entry-col-title">{t("clicker.entry.title")}</h3>
+        <div className="caster-settings-row">
+          <div className="caster-settings-row-label">
             <span>{t("clicker.entry.inputKind")}</span>
           </div>
-          <div className="v2-settings-row-control">
+          <div className="caster-settings-row-control">
             <div
-              className="v2-segmented"
+              className="caster-segmented"
               role="group"
               aria-label={t("clicker.entry.inputKindAria")}
             >
@@ -50,7 +50,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                   key={value}
                   type="button"
                   className={[
-                    "v2-segmented-btn",
+                    "caster-segmented-btn",
                     e.inputKind === value ? "active" : "",
                   ]
                     .filter(Boolean)
@@ -67,13 +67,13 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
 
         {e.inputKind === "mouse" ? (
           <>
-            <div className="v2-settings-row">
-              <div className="v2-settings-row-label">
+            <div className="caster-settings-row">
+              <div className="caster-settings-row-label">
                 <span>{t("clicker.entry.button")}</span>
               </div>
-              <div className="v2-settings-row-control">
+              <div className="caster-settings-row-control">
                 <div
-                  className="v2-segmented"
+                  className="caster-segmented"
                   role="group"
                   aria-label={t("clicker.entry.buttonAria")}
                 >
@@ -88,7 +88,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                       key={value}
                       type="button"
                       className={[
-                        "v2-segmented-btn",
+                        "caster-segmented-btn",
                         e.button === value ? "active" : "",
                       ]
                         .filter(Boolean)
@@ -102,13 +102,13 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                 </div>
               </div>
             </div>
-            <div className="v2-settings-row">
-              <div className="v2-settings-row-label">
+            <div className="caster-settings-row">
+              <div className="caster-settings-row-label">
                 <span>{t("clicker.entry.clickKind")}</span>
               </div>
-              <div className="v2-settings-row-control">
+              <div className="caster-settings-row-control">
                 <Select
-                  className="v2-select"
+                  className="caster-select"
                   value={e.clickKind}
                   disabled={e.editDisabled}
                   options={[
@@ -122,7 +122,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           </>
         ) : (
           <>
-            <label className="v2-field">
+            <label className="caster-field">
               <span>{t("clicker.entry.key")}</span>
               <input
                 type="text"
@@ -132,11 +132,11 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                 onChange={(ev) => e.setKeyName(ev.target.value || "A")}
               />
             </label>
-            <div className="v2-settings-row">
-              <div className="v2-settings-row-label">
+            <div className="caster-settings-row">
+              <div className="caster-settings-row-label">
                 <span>{t("clicker.entry.keyShift")}</span>
               </div>
-              <div className="v2-settings-row-control">
+              <div className="caster-settings-row-control">
                 <input
                   type="checkbox"
                   checked={e.keyShift}
@@ -148,13 +148,13 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           </>
         )}
 
-        <div className="v2-settings-row">
-          <div className="v2-settings-row-label">
+        <div className="caster-settings-row">
+          <div className="caster-settings-row-label">
             <span>{t("clicker.entry.hotkeyMode")}</span>
           </div>
-          <div className="v2-settings-row-control">
+          <div className="caster-settings-row-control">
             <Select
-              className="v2-select"
+              className="caster-select"
               value={e.mode}
               disabled={e.editDisabled}
               options={[
@@ -168,17 +168,17 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
         <ClickerTriggerRow editor={e} />
       </div>
 
-      <div className="v2-clicker-entry-col">
-        <h3 className="v2-clicker-entry-col-title">
+      <div className="caster-clicker-entry-col">
+        <h3 className="caster-clicker-entry-col-title">
           {t("clicker.entry.timingTitle")}
         </h3>
-        <div className="v2-settings-row">
-          <div className="v2-settings-row-label">
+        <div className="caster-settings-row">
+          <div className="caster-settings-row-label">
             <span>{t("clicker.entry.timingMode")}</span>
           </div>
-          <div className="v2-settings-row-control">
+          <div className="caster-settings-row-control">
             <div
-              className="v2-segmented"
+              className="caster-segmented"
               role="group"
               aria-label={t("clicker.entry.timingAria")}
             >
@@ -192,7 +192,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                   key={value}
                   type="button"
                   className={[
-                    "v2-segmented-btn",
+                    "caster-segmented-btn",
                     e.timingMode === value ? "active" : "",
                   ]
                     .filter(Boolean)
@@ -209,13 +209,13 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
 
         {e.timingMode === "rate" ? (
           <>
-            <div className="v2-settings-row">
-              <div className="v2-settings-row-label">
+            <div className="caster-settings-row">
+              <div className="caster-settings-row-label">
                 <span>{t("clicker.entry.cadence")}</span>
                 <p>{e.cadenceDisplay}</p>
               </div>
-              <div className="v2-settings-row-control v2-settings-row-control--grow">
-                <label className="v2-settings-range">
+              <div className="caster-settings-row-control caster-settings-row-control--grow">
+                <label className="caster-settings-range">
                   <input
                     type="range"
                     min={1}
@@ -228,10 +228,10 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                 </label>
               </div>
             </div>
-            <label className="v2-field">
+            <label className="caster-field">
               <span>{t("clicker.entry.unit")}</span>
               <Select
-                className="v2-select"
+                className="caster-select"
                 value={e.rateUnit}
                 disabled={e.editDisabled}
                 options={[
@@ -251,13 +251,13 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
             </label>
           </>
         ) : (
-          <div className="v2-settings-row">
-            <div className="v2-settings-row-label">
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
               <span>{t("clicker.entry.interval")}</span>
               <p>{e.cadenceDisplay}</p>
             </div>
-            <div className="v2-settings-row-control v2-settings-row-control--grow">
-              <label className="v2-settings-range">
+            <div className="caster-settings-row-control caster-settings-row-control--grow">
+              <label className="caster-settings-range">
                 <input
                   type="range"
                   min={1}
@@ -272,12 +272,12 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           </div>
         )}
 
-        <div className="v2-settings-row">
-          <div className="v2-settings-row-label">
+        <div className="caster-settings-row">
+          <div className="caster-settings-row-label">
             <span>{t("clicker.entry.randomTiming")}</span>
             <p>±{e.randomPct}%</p>
           </div>
-          <div className="v2-settings-row-control">
+          <div className="caster-settings-row-control">
             <input
               type="checkbox"
               checked={e.randomEnabled}
@@ -287,12 +287,12 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           </div>
         </div>
         {e.randomEnabled ? (
-          <div className="v2-settings-row">
-            <div className="v2-settings-row-label">
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
               <span>{t("clicker.entry.percent")}</span>
             </div>
-            <div className="v2-settings-row-control v2-settings-row-control--grow">
-              <label className="v2-settings-range">
+            <div className="caster-settings-row-control caster-settings-row-control--grow">
+              <label className="caster-settings-range">
                 <input
                   type="range"
                   min={0}
@@ -308,22 +308,22 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           </div>
         ) : null}
 
-        <div className="v2-settings-row">
-          <div className="v2-settings-row-label">
+        <div className="caster-settings-row">
+          <div className="caster-settings-row-label">
             <span>{t("clicker.entry.effectiveCap")}</span>
           </div>
-          <div className="v2-settings-row-control">
+          <div className="caster-settings-row-control">
             <strong>{t("clicker.entry.capValue")}</strong>
           </div>
         </div>
 
-        <details className="v2-clicker-details">
+        <details className="caster-clicker-details">
           <summary>{t("clicker.entry.advancedTiming")}</summary>
-          <div className="v2-settings-row">
-            <div className="v2-settings-row-label">
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
               <span>{t("clicker.entry.cpsMin")}</span>
             </div>
-            <div className="v2-settings-row-control">
+            <div className="caster-settings-row-control">
               <input
                 type="number"
                 min={0}
@@ -334,11 +334,11 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
               />
             </div>
           </div>
-          <div className="v2-settings-row">
-            <div className="v2-settings-row-label">
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
               <span>{t("clicker.entry.cpsMax")}</span>
             </div>
-            <div className="v2-settings-row-control">
+            <div className="caster-settings-row-control">
               <input
                 type="number"
                 min={0}
@@ -349,13 +349,13 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
               />
             </div>
           </div>
-          <div className="v2-settings-row">
-            <div className="v2-settings-row-label">
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
               <span>{t("clicker.entry.clickZoneOrder")}</span>
             </div>
-            <div className="v2-settings-row-control">
+            <div className="caster-settings-row-control">
               <div
-                className="v2-segmented"
+                className="caster-segmented"
                 role="group"
                 aria-label={t("clicker.entry.clickZoneOrderAria")}
               >
@@ -369,7 +369,7 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                     key={value}
                     type="button"
                     className={[
-                      "v2-segmented-btn",
+                      "caster-segmented-btn",
                       e.clickZoneOrder === value ? "active" : "",
                     ]
                       .filter(Boolean)
@@ -385,12 +385,12 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
           </div>
         </details>
 
-        <details className="v2-clicker-details">
+        <details className="caster-clicker-details">
           <summary>{t("clicker.entry.dutyAdvanced")}</summary>
-          <label className="v2-field">
+          <label className="caster-field">
             <span>{t("clicker.entry.dutyMode")}</span>
             <Select
-              className="v2-select"
+              className="caster-select"
               value={e.dutyMode}
               disabled={e.editDisabled}
               options={[
@@ -400,12 +400,12 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
               onChange={(v) => e.setDutyMode(v as DutyMode)}
             />
           </label>
-          <div className="v2-settings-row">
-            <div className="v2-settings-row-label">
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
               <span>{t("clicker.entry.duty")}</span>
             </div>
-            <div className="v2-settings-row-control v2-settings-row-control--grow">
-              <label className="v2-settings-range">
+            <div className="caster-settings-row-control caster-settings-row-control--grow">
+              <label className="caster-settings-range">
                 <input
                   type="range"
                   min={5}

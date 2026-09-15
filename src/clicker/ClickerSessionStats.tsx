@@ -25,10 +25,10 @@ export function ClickerSessionStats({
   if (!running && samples.length === 0) return null;
 
   return (
-    <div className="v2-clicker-session-stats">
+    <div className="caster-clicker-session-stats">
       <button
         type="button"
-        className="v2-clicker-session-stats-toggle"
+        className="caster-clicker-session-stats-toggle"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -36,16 +36,16 @@ export function ClickerSessionStats({
         {paused ? t("clicker.session.paused") : ""}
       </button>
       {open ? (
-        <div className="v2-clicker-session-stats-body">
+        <div className="caster-clicker-session-stats-body">
           <svg
-            className="v2-clicker-sparkline"
+            className="caster-clicker-sparkline"
             viewBox="0 0 120 28"
             preserveAspectRatio="none"
             aria-hidden
           >
             <path d={path} fill="none" stroke="currentColor" strokeWidth="1.5" />
           </svg>
-          <div className="v2-clicker-session-stats-meta">
+          <div className="caster-clicker-session-stats-meta">
             <span>
               <strong>{latest.toFixed(1)}</strong> cps
             </span>

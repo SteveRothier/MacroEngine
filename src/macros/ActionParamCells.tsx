@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT, type TFunction } from "../i18n";
 import { pickScreenPoint } from "../pick";
-import { Select, type ActionPickerEntry } from "../ui/v2";
+import { Select, type ActionPickerEntry } from "../ui/shell";
 import { ActionProps } from "./ActionProps";
 import { actionDetail } from "./actionLabels";
 import type { KeyMods, MacroAction } from "./types";
@@ -179,18 +179,18 @@ function ComplexPopover({
   return createPortal(
     <div
       ref={panelRef}
-      className="v2-action-props-pop"
+      className="caster-action-props-pop"
       role="dialog"
       aria-labelledby={titleId}
       style={{ top, left }}
     >
-      <div className="v2-action-props-pop-head">
+      <div className="caster-action-props-pop-head">
         <strong id={titleId}>{t("macros.params.panelTitle")}</strong>
         <button type="button" className="action-cell-btn" onClick={onClose}>
           {t("shell.closeConfirm")}
         </button>
       </div>
-      <div className="v2-action-props-pop-body">
+      <div className="caster-action-props-pop-body">
         <ActionProps
           action={action}
           disabled={disabled}

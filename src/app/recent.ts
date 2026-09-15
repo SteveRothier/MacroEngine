@@ -11,15 +11,24 @@ export type LastStudio = {
   kind: "macro" | "clicker";
 };
 
-const RECENT_KEY = "caster-v2-recent";
-const LEGACY_RECENT_KEY = "macroengine-v2-recent";
-const LAST_STUDIO_KEY = "caster-v2-last-studio";
-const LEGACY_LAST_STUDIO_KEY = "macroengine-v2-last-studio";
+const RECENT_KEY = "caster-recent";
+const LEGACY_RECENT_KEYS = ["caster-v2-recent", "macroengine-v2-recent"] as const;
+const LAST_STUDIO_KEY = "caster-last-studio";
+const LEGACY_LAST_STUDIO_KEYS = [
+  "caster-v2-last-studio",
+  "macroengine-v2-last-studio",
+] as const;
 const MAX_RECENT = 8;
 
-function readJsonKey(key: string, legacyKey: string): string | null {
+function readJsonKey(key: string, legacyKeys: readonly string[]): string | null {
   try {
-    const raw = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
+    let raw = localStorage.getItem(key);
+    if (!raw) {
+      for (const legacyKey of legacyKeys) {
+        raw = localStorage.getItem(legacyKey);
+        if (raw) break;
+      }
+    }
     if (raw && !localStorage.getItem(key)) {
       localStorage.setItem(key, raw);
     }
@@ -31,7 +40,7 @@ function readJsonKey(key: string, legacyKey: string): string | null {
 
 export function loadRecent(): RecentAutomation[] {
   try {
-    const raw = readJsonKey(RECENT_KEY, LEGACY_RECENT_KEY);
+    const raw = readJsonKey(RECENT_KEY, LEGACY_RECENT_KEYS);
     if (!raw) return [];
     return JSON.parse(raw) as RecentAutomation[];
   } catch {
@@ -48,7 +57,7 @@ export function pushRecent(entry: RecentAutomation): RecentAutomation[] {
 
 export function loadLastStudio(): LastStudio | null {
   try {
-    const raw = readJsonKey(LAST_STUDIO_KEY, LEGACY_LAST_STUDIO_KEY);
+    const raw = readJsonKey(LAST_STUDIO_KEY, LEGACY_LAST_STUDIO_KEYS);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as LastStudio;
     if (

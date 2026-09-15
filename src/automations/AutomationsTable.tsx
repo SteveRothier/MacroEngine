@@ -35,7 +35,7 @@ import {
   TruncatedTooltip,
   useContextMenuState,
   useToast,
-} from "../ui/v2";
+} from "../ui/shell";
 import { confirmAction, promptAction } from "../ui";
 import type { AppRoute } from "../app/types";
 import { useLocale, useT, type TFunction } from "../i18n";
@@ -163,7 +163,7 @@ const KindIcon = memo(function KindIcon({ row }: { row: AutomationRow }) {
         : MousePointer2;
   return (
     <Tooltip content={tip}>
-      <span className={`v2-auto-kind v2-auto-kind--${row.kind}`} tabIndex={0}>
+      <span className={`caster-auto-kind caster-auto-kind--${row.kind}`} tabIndex={0}>
         <Icon size={16} aria-hidden />
       </span>
     </Tooltip>
@@ -321,10 +321,10 @@ export function AutomationsTable({
     if (displayRef.current.sortBy !== "order") return null;
     const el = document.elementFromPoint(x, y);
     if (!el || !(el instanceof Element)) return null;
-    if (el.closest(".v2-auto-folder-chip, .v2-auto-folder-drop-chip")) {
+    if (el.closest(".caster-auto-folder-chip, .caster-auto-folder-drop-chip")) {
       return null;
     }
-    const rowEl = el.closest(".v2-auto-row[data-row-key]");
+    const rowEl = el.closest(".caster-auto-row[data-row-key]");
     if (!(rowEl instanceof HTMLElement)) return null;
     const key = rowEl.getAttribute("data-row-key");
     if (!key || key === rowKey(drag)) return null;
@@ -536,15 +536,13 @@ export function AutomationsTable({
     const unfiled = sorted.filter(
       (r) => r.kind === "script" || r.folderId == null,
     );
-    if (unfiled.length > 0) {
-      out.push({
-        id: "unfiled",
-        name: null,
-        folder: null,
-        kind: "flat",
-        items: unfiled,
-      });
-    }
+    out.push({
+      id: "unfiled",
+      name: null,
+      folder: null,
+      kind: "flat",
+      items: unfiled,
+    });
     return out;
   }, [sorted, filter, folders]);
 
@@ -561,7 +559,7 @@ export function AutomationsTable({
           actions={
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               onClick={() => onQueryChange("")}
             >
               {t("automations.empty.clearSearch")}
@@ -578,7 +576,7 @@ export function AutomationsTable({
           actions={
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               onClick={() => onFilterChange?.("all")}
             >
               {t("automations.empty.seeAll")}
@@ -594,15 +592,15 @@ export function AutomationsTable({
           lead={t("automations.empty.noRecentLead")}
           actions={
             <>
-              <button type="button" className="v2-btn" onClick={onCreateClicker}>
+              <button type="button" className="caster-btn" onClick={onCreateClicker}>
                 {t("automations.empty.newClicker")}
               </button>
-              <button type="button" className="v2-btn" onClick={onCreateScript}>
+              <button type="button" className="caster-btn" onClick={onCreateScript}>
                 {t("automations.empty.newScript")}
               </button>
               <button
                 type="button"
-                className="v2-btn v2-btn-primary"
+                className="caster-btn caster-btn-primary"
                 onClick={onCreateMacro}
               >
                 {t("automations.empty.newMacro")}
@@ -620,7 +618,7 @@ export function AutomationsTable({
           actions={
             <button
               type="button"
-              className="v2-btn v2-btn-primary"
+              className="caster-btn caster-btn-primary"
               onClick={onCreateScript}
             >
               {t("automations.empty.createScript")}
@@ -635,15 +633,15 @@ export function AutomationsTable({
         lead={t("automations.empty.noAutomationsLead")}
         actions={
           <>
-            <button type="button" className="v2-btn" onClick={onCreateClicker}>
+            <button type="button" className="caster-btn" onClick={onCreateClicker}>
               {t("automations.create.clicker")}
             </button>
-            <button type="button" className="v2-btn" onClick={onCreateScript}>
+            <button type="button" className="caster-btn" onClick={onCreateScript}>
               {t("automations.create.script")}
             </button>
             <button
               type="button"
-              className="v2-btn v2-btn-primary"
+              className="caster-btn caster-btn-primary"
               onClick={onCreateMacro}
             >
               {t("automations.create.macro")}
@@ -1347,14 +1345,14 @@ export function AutomationsTable({
 
   return (
     <div
-      className="v2-page v2-automations-page"
+      className="caster-page caster-automations-page"
       ref={pageRef}
       onContextMenu={(e) => {
         e.preventDefault();
         const target = e.target as HTMLElement;
         if (
-          target.closest(".v2-auto-row") ||
-          target.closest(".v2-context-menu")
+          target.closest(".caster-auto-row") ||
+          target.closest(".caster-context-menu")
         )
           return;
         emptyCtx.openFromEvent(e);
@@ -1378,28 +1376,28 @@ export function AutomationsTable({
       />
 
       <div
-        className="v2-page-body v2-automations-list-body"
+        className="caster-page-body caster-automations-list-body"
         ref={listScrollRef}
       >
         {loading || sorted.length > 0 ? (
           <div
-            className="v2-automations-list"
+            className="caster-automations-list"
             role={loading ? undefined : "list"}
             aria-busy={loading || undefined}
             aria-label={
               loading ? t("automations.empty.loadingAria") : undefined
             }
           >
-            <div className="v2-auto-colhead">
-              <span className="v2-auto-colhead-check" aria-hidden />
-              <div className="v2-auto-colhead-identity">
-                <span className="v2-auto-colhead-kind" aria-hidden />
+            <div className="caster-auto-colhead">
+              <span className="caster-auto-colhead-check" aria-hidden />
+              <div className="caster-auto-colhead-identity">
+                <span className="caster-auto-colhead-kind" aria-hidden />
                 <button
                   type="button"
                   role="columnheader"
                   className={[
-                    "v2-auto-colhead-label",
-                    "v2-auto-colhead-order",
+                    "caster-auto-colhead-label",
+                    "caster-auto-colhead-order",
                     display.sortBy === "order" ? "is-active" : "",
                   ]
                     .filter(Boolean)
@@ -1415,8 +1413,8 @@ export function AutomationsTable({
                       aria-hidden
                       className={
                         display.sortDir === "desc"
-                          ? "v2-auto-colhead-sort-icon is-desc"
-                          : "v2-auto-colhead-sort-icon"
+                          ? "caster-auto-colhead-sort-icon is-desc"
+                          : "caster-auto-colhead-sort-icon"
                       }
                     />
                   ) : null}
@@ -1425,8 +1423,8 @@ export function AutomationsTable({
                   type="button"
                   role="columnheader"
                   className={[
-                    "v2-auto-colhead-label",
-                    "v2-auto-colhead-name",
+                    "caster-auto-colhead-label",
+                    "caster-auto-colhead-name",
                     display.sortBy === "name" ? "is-active" : "",
                   ]
                     .filter(Boolean)
@@ -1441,8 +1439,8 @@ export function AutomationsTable({
                       aria-hidden
                       className={
                         display.sortDir === "desc"
-                          ? "v2-auto-colhead-sort-icon is-desc"
-                          : "v2-auto-colhead-sort-icon"
+                          ? "caster-auto-colhead-sort-icon is-desc"
+                          : "caster-auto-colhead-sort-icon"
                       }
                     />
                   ) : null}
@@ -1452,8 +1450,8 @@ export function AutomationsTable({
                 type="button"
                 role="columnheader"
                 className={[
-                  "v2-auto-colhead-label",
-                  "v2-auto-colhead-type",
+                  "caster-auto-colhead-label",
+                  "caster-auto-colhead-type",
                   display.sortBy === "type" ? "is-active" : "",
                 ]
                   .filter(Boolean)
@@ -1468,54 +1466,54 @@ export function AutomationsTable({
                     aria-hidden
                     className={
                       display.sortDir === "desc"
-                        ? "v2-auto-colhead-sort-icon is-desc"
-                        : "v2-auto-colhead-sort-icon"
+                        ? "caster-auto-colhead-sort-icon is-desc"
+                        : "caster-auto-colhead-sort-icon"
                     }
                   />
                 ) : null}
               </button>
-              <div className="v2-auto-row-props v2-auto-colhead-props">
-                <span className="v2-auto-colhead-label v2-auto-row-prop v2-auto-row-prop--trigger">
+              <div className="caster-auto-row-props caster-auto-colhead-props">
+                <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--trigger">
                   {t("automations.columns.trigger")}
                 </span>
-                <span className="v2-auto-colhead-label v2-auto-row-prop v2-auto-row-prop--secondary">
+                <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--secondary">
                   {t("automations.columns.folderMeta")}
                 </span>
-                <span className="v2-auto-colhead-label v2-auto-row-prop v2-auto-row-prop--run">
+                <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--run">
                   {t("automations.columns.lastRun")}
                 </span>
-                <span className="v2-auto-colhead-label v2-auto-row-prop v2-auto-row-prop--status">
+                <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--status">
                   {t("automations.columns.status")}
                 </span>
               </div>
-              <span className="v2-auto-colhead-trail" aria-hidden />
+              <span className="caster-auto-colhead-trail" aria-hidden />
             </div>
             {loading ? (
-              <div className="v2-auto-skeleton-page">
+              <div className="caster-auto-skeleton-page">
                 {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="v2-auto-skeleton-row">
-                    <div className="v2-skeleton v2-auto-skeleton-check" />
-                    <div className="v2-auto-skeleton-identity">
-                      <div className="v2-skeleton v2-auto-skeleton-kind" />
-                      <div className="v2-auto-skeleton-text">
+                  <div key={i} className="caster-auto-skeleton-row">
+                    <div className="caster-skeleton caster-auto-skeleton-check" />
+                    <div className="caster-auto-skeleton-identity">
+                      <div className="caster-skeleton caster-auto-skeleton-kind" />
+                      <div className="caster-auto-skeleton-text">
                         <div
-                          className="v2-skeleton v2-skeleton-line v2-skeleton-line--lg"
+                          className="caster-skeleton caster-skeleton-line caster-skeleton-line--lg"
                           style={{ width: `${52 - i * 5}%` }}
                         />
                         <div
-                          className="v2-skeleton v2-skeleton-line"
+                          className="caster-skeleton caster-skeleton-line"
                           style={{ width: `${36 - i * 3}%` }}
                         />
                       </div>
                     </div>
-                    <div className="v2-skeleton v2-auto-skeleton-type" />
-                    <div className="v2-auto-skeleton-props">
-                      <div className="v2-skeleton v2-auto-skeleton-prop v2-auto-skeleton-prop--trigger" />
-                      <div className="v2-skeleton v2-auto-skeleton-prop v2-auto-skeleton-prop--secondary" />
-                      <div className="v2-skeleton v2-auto-skeleton-prop v2-auto-skeleton-prop--run" />
-                      <div className="v2-skeleton v2-auto-skeleton-prop v2-auto-skeleton-prop--status" />
+                    <div className="caster-skeleton caster-auto-skeleton-type" />
+                    <div className="caster-auto-skeleton-props">
+                      <div className="caster-skeleton caster-auto-skeleton-prop caster-auto-skeleton-prop--trigger" />
+                      <div className="caster-skeleton caster-auto-skeleton-prop caster-auto-skeleton-prop--secondary" />
+                      <div className="caster-skeleton caster-auto-skeleton-prop caster-auto-skeleton-prop--run" />
+                      <div className="caster-skeleton caster-auto-skeleton-prop caster-auto-skeleton-prop--status" />
                     </div>
-                    <div className="v2-auto-skeleton-trail" aria-hidden />
+                    <div className="caster-auto-skeleton-trail" aria-hidden />
                   </div>
                 ))}
               </div>
@@ -1523,129 +1521,138 @@ export function AutomationsTable({
               <>
             {sections.map((section) => {
               const collapsed = collapsedSections.has(section.id);
-              const sectionDropKey =
-                section.kind === "folder" && section.folder
-                  ? folderOptionKey(section.folder)
-                  : null;
-              const dropCompatible =
+              const sectionDropKey = (() => {
+                if (!dragRow || dragRow.kind === "script") return null;
+                if (section.kind === "folder" && section.folder) {
+                  if (section.folder.kind !== dragRow.kind) return null;
+                  const key = folderOptionKey(section.folder);
+                  const alreadyIn =
+                    dragRow.folderId != null &&
+                    folderOptionKey({
+                      kind: dragRow.kind,
+                      id: dragRow.folderId,
+                    }) === key;
+                  return alreadyIn ? null : key;
+                }
+                return null;
+              })();
+              const dropCompatible = sectionDropKey != null;
+              const sectionIsDropOver =
+                dropCompatible && dropFolderKey === sectionDropKey;
+              const unfiledDropActive =
+                section.id === "unfiled" &&
                 dragRow != null &&
                 dragRow.kind !== "script" &&
-                section.folder != null &&
-                section.folder.kind === dragRow.kind;
+                dragRow.folderId != null;
               return (
-                <div key={section.id} className="v2-automations-section">
+                <div
+                  key={section.id}
+                  className={[
+                    "caster-automations-section",
+                    sectionIsDropOver ? "is-drop-over" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  onPointerEnter={() => {
+                    if (dropCompatible && sectionDropKey) {
+                      setDropFolderKey(sectionDropKey);
+                    }
+                  }}
+                  onPointerLeave={() => {
+                    if (sectionDropKey) {
+                      setDropFolderKey((k) =>
+                        k === sectionDropKey ? null : k,
+                      );
+                    }
+                  }}
+                  onPointerUp={() => {
+                    if (!dropCompatible || !dragRow || !sectionDropKey) return;
+                    if (section.folder) {
+                      void moveRowToFolder(dragRow, section.folder);
+                    }
+                    clearFolderDrag();
+                  }}
+                >
                   {section.kind === "folder" && section.folder && section.name ? (
                     <div
                       className={[
-                        "v2-auto-folder-section",
-                        dropCompatible && dropFolderKey === sectionDropKey
-                          ? "is-drop-over"
-                          : "",
+                        "caster-auto-folder-section",
+                        sectionIsDropOver ? "is-drop-over" : "",
+                        menuKey === section.id ? "is-menu-open" : "",
                       ]
                         .filter(Boolean)
                         .join(" ")}
-                      onPointerEnter={() => {
-                        if (dropCompatible && sectionDropKey) {
-                          setDropFolderKey(sectionDropKey);
-                        }
-                      }}
-                      onPointerLeave={() => {
-                        if (sectionDropKey) {
-                          setDropFolderKey((k) =>
-                            k === sectionDropKey ? null : k,
-                          );
-                        }
-                      }}
-                      onPointerUp={() => {
-                        if (!dropCompatible || !dragRow || !section.folder)
-                          return;
-                        void moveRowToFolder(dragRow, section.folder);
-                        clearFolderDrag();
-                      }}
                     >
-                      <span
-                        className="v2-auto-row-check v2-auto-folder-check-spacer"
-                        aria-hidden
-                      />
                       <button
                         type="button"
-                        className="v2-auto-folder-section-toggle"
+                        className="caster-auto-folder-section-toggle"
                         aria-expanded={!collapsed}
                         onClick={() => toggleSection(section.id)}
                       >
+                        <ChevronDown
+                          size={14}
+                          aria-hidden
+                          className={[
+                            "caster-automations-section-chevron",
+                            collapsed ? "is-collapsed" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        />
                         <span
-                          className={`v2-auto-kind v2-auto-kind--folder v2-auto-kind--${section.folder.kind}`}
+                          className={`caster-auto-kind caster-auto-kind--folder caster-auto-kind--${section.folder.kind}`}
                         >
                           <Folder size={16} aria-hidden />
                         </span>
-                        <div className="v2-auto-row-main">
-                          <span className="v2-auto-row-name">{section.name}</span>
-                          <span className="v2-auto-row-sub">
+                        <div className="caster-auto-row-main">
+                          <span className="caster-auto-row-name">{section.name}</span>
+                          <span className="caster-auto-row-sub">
                             {t("automations.folder.itemCount", {
                               count: section.items.length,
                             })}
                           </span>
                         </div>
                       </button>
-                      <span
-                        className={`v2-auto-type-badge v2-auto-type-badge--${section.folder.kind}`}
+                      <div
+                        className="caster-auto-row-trail"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {kindLabel(section.folder.kind, t)}
-                      </span>
-                      <div className="v2-auto-row-trail">
-                        <button
-                          type="button"
-                          className="v2-btn v2-btn-ghost v2-auto-folder-section-chevron-btn"
-                          aria-expanded={!collapsed}
-                          aria-label={
-                            collapsed
-                              ? t("automations.folder.expandAria", {
-                                  name: section.folder.name,
-                                })
-                              : t("automations.folder.collapseAria", {
-                                  name: section.folder.name,
-                                })
-                          }
-                          onClick={() => toggleSection(section.id)}
-                        >
-                          <ChevronDown
-                            size={14}
-                            aria-hidden
-                            className={[
-                              "v2-automations-section-chevron",
-                              collapsed ? "is-collapsed" : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ")}
-                          />
-                        </button>
-                        <DropdownMenu
-                          label={t("automations.folder.manageLabel")}
-                          ariaLabel={t("automations.folder.sectionMenuAria", {
-                            name: section.folder.name,
-                          })}
-                          align="end"
-                          triggerClassName="v2-btn v2-btn-ghost v2-auto-row-menu-btn"
-                          items={[
-                            {
-                              id: "rename",
-                              label: t("automations.folder.rename"),
-                              icon: <PenLine size={14} />,
-                              onSelect: () =>
-                                void onRenameFolder(section.folder!),
-                            },
-                            {
-                              id: "delete",
-                              label: t("automations.folder.delete"),
-                              icon: <Trash2 size={14} />,
-                              danger: true,
-                              onSelect: () =>
-                                void onDeleteFolder(section.folder!),
-                            },
-                          ]}
-                        >
-                          <MoreHorizontal size={14} aria-hidden />
-                        </DropdownMenu>
+                        <Tooltip content={t("automations.menu.row.moreTip")}>
+                          <span className="caster-auto-row-menu-wrap">
+                            <DropdownMenu
+                              label={t("automations.menu.row.moreLabel")}
+                              ariaLabel={t(
+                                "automations.folder.sectionMenuAria",
+                                { name: section.folder.name },
+                              )}
+                              open={menuKey === section.id}
+                              onOpenChange={(open) =>
+                                setMenuKey(open ? section.id : null)
+                              }
+                              align="end"
+                              triggerClassName="caster-auto-row-menu-btn"
+                              items={[
+                                {
+                                  id: "rename",
+                                  label: t("automations.folder.rename"),
+                                  icon: <PenLine size={14} />,
+                                  onSelect: () =>
+                                    void onRenameFolder(section.folder!),
+                                },
+                                {
+                                  id: "delete",
+                                  label: t("automations.folder.delete"),
+                                  icon: <Trash2 size={14} />,
+                                  danger: true,
+                                  onSelect: () =>
+                                    void onDeleteFolder(section.folder!),
+                                },
+                              ]}
+                            >
+                              <MoreHorizontal size={16} aria-hidden />
+                            </DropdownMenu>
+                          </span>
+                        </Tooltip>
                       </div>
                     </div>
                   ) : null}
@@ -1681,7 +1688,7 @@ export function AutomationsTable({
                             role="listitem"
                             data-row-key={key}
                             className={[
-                              "v2-auto-row",
+                              "caster-auto-row",
                               isSelected ? "is-selected" : "",
                               menuKey === key ? "is-menu-open" : "",
                               scriptRunning ? "is-running" : "",
@@ -1735,7 +1742,7 @@ export function AutomationsTable({
                           >
                             <Tooltip content={t("automations.row.selectTip")}>
                               <label
-                                className="v2-auto-row-check"
+                                className="caster-auto-row-check"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <input
@@ -1757,7 +1764,7 @@ export function AutomationsTable({
                               </label>
                             </Tooltip>
                             <div
-                              className="v2-auto-row-identity"
+                              className="caster-auto-row-identity"
                               onPointerDown={(e) => {
                                 if (e.button !== 0) return;
                                 if (folderDragArmedRef.current) return;
@@ -1834,7 +1841,7 @@ export function AutomationsTable({
                                   // Always suppress the synthetic click after an armed drag.
                                   suppressClickAfterDragRef.current = true;
                                   if (overFolder) {
-                                    // Folder chip/strip handles the move on its pointerUp.
+                                    // Folder section handles the move on its pointerUp.
                                     clearFolderDrag({ suppressClick: true });
                                     return;
                                   }
@@ -1852,8 +1859,24 @@ export function AutomationsTable({
                                         edge.edge,
                                         sortedRef.current,
                                       );
+                                      const shouldUnfile =
+                                        s.row.folderId != null &&
+                                        s.row.kind !== "script" &&
+                                        (target.kind === "script" ||
+                                          target.folderId == null);
                                       clearFolderDrag({ suppressClick: true });
-                                      if (resolved) {
+                                      if (shouldUnfile) {
+                                        void moveRowToFolder(s.row, null).then(
+                                          () => {
+                                            if (resolved) {
+                                              reorderRow(
+                                                s.row,
+                                                resolved.beforeKey,
+                                              );
+                                            }
+                                          },
+                                        );
+                                      } else if (resolved) {
                                         reorderRow(
                                           s.row,
                                           resolved.beforeKey,
@@ -1871,12 +1894,12 @@ export function AutomationsTable({
                               }}
                             >
                               <KindIcon row={r} />
-                              <div className="v2-auto-row-main">
+                              <div className="caster-auto-row-main">
                                 <TruncatedTooltip content={r.name}>
-                                  <span className="v2-auto-row-name">
+                                  <span className="caster-auto-row-name">
                                     {scriptRunning ? (
                                       <span
-                                        className="v2-auto-row-run-dot"
+                                        className="caster-auto-row-run-dot"
                                         aria-hidden
                                       />
                                     ) : null}
@@ -1887,7 +1910,7 @@ export function AutomationsTable({
                                   <TruncatedTooltip content={subtitle}>
                                     <span
                                       className={[
-                                        "v2-auto-row-sub",
+                                        "caster-auto-row-sub",
                                         scriptRunning ? "is-running" : "",
                                       ]
                                         .filter(Boolean)
@@ -1900,13 +1923,13 @@ export function AutomationsTable({
                               </div>
                             </div>
                             <span
-                              className={`v2-auto-type-badge v2-auto-type-badge--${r.kind}`}
+                              className={`caster-auto-type-badge caster-auto-type-badge--${r.kind}`}
                             >
                               {kindLabel(r.kind, t)}
                             </span>
-                            <div className="v2-auto-row-props">
+                            <div className="caster-auto-row-props">
                               {scriptRunning ? (
-                                <span className="v2-auto-row-prop v2-auto-row-prop--trigger is-running">
+                                <span className="caster-auto-row-prop caster-auto-row-prop--trigger is-running">
                                   <Play size={11} aria-hidden />
                                   {t("common.running")}
                                 </span>
@@ -1919,17 +1942,17 @@ export function AutomationsTable({
                                   })}
                                 >
                                   <span
-                                    className="v2-auto-row-prop v2-auto-row-prop--trigger"
+                                    className="caster-auto-row-prop caster-auto-row-prop--trigger"
                                     tabIndex={0}
                                   >
-                                    <span className="v2-auto-row-perm-badge">
+                                    <span className="caster-auto-row-perm-badge">
                                       {t("automations.row.permAccess", { count: permCount })}
                                     </span>
                                   </span>
                                 </Tooltip>
                               ) : (
                                 <TruncatedTooltip content={metaTooltip(r, t)}>
-                                  <span className="v2-auto-row-prop v2-auto-row-prop--trigger">
+                                  <span className="caster-auto-row-prop caster-auto-row-prop--trigger">
                                     <Play size={11} aria-hidden />
                                     {r.triggerLabel}
                                   </span>
@@ -1940,65 +1963,11 @@ export function AutomationsTable({
                               >
                                 <span
                                   className={[
-                                    "v2-auto-row-prop",
-                                    "v2-auto-row-prop--secondary",
-                                    dragRow &&
-                                    dragRow.kind !== "script" &&
-                                    r.folderId &&
-                                    r.kind === dragRow.kind &&
-                                    dropFolderKey ===
-                                      folderOptionKey({
-                                        kind: r.kind,
-                                        id: r.folderId,
-                                      })
-                                      ? "is-drop-over"
-                                      : "",
+                                    "caster-auto-row-prop",
+                                    "caster-auto-row-prop--secondary",
                                   ]
                                     .filter(Boolean)
                                     .join(" ")}
-                                  onPointerEnter={() => {
-                                    if (
-                                      !dragRow ||
-                                      dragRow.kind === "script" ||
-                                      !r.folderId ||
-                                      r.kind !== dragRow.kind
-                                    ) {
-                                      return;
-                                    }
-                                    setDropFolderKey(
-                                      folderOptionKey({
-                                        kind: r.kind,
-                                        id: r.folderId,
-                                      }),
-                                    );
-                                  }}
-                                  onPointerLeave={() => {
-                                    if (!r.folderId) return;
-                                    const key = folderOptionKey({
-                                      kind: r.kind as "macro" | "clicker",
-                                      id: r.folderId,
-                                    });
-                                    setDropFolderKey((k) =>
-                                      k === key ? null : k,
-                                    );
-                                  }}
-                                  onPointerUp={(e) => {
-                                    if (
-                                      !dragRow ||
-                                      dragRow.kind === "script" ||
-                                      !r.folderId ||
-                                      r.kind !== dragRow.kind
-                                    ) {
-                                      return;
-                                    }
-                                    e.stopPropagation();
-                                    void moveRowToFolder(dragRow, {
-                                      id: r.folderId,
-                                      name: r.folderLabel,
-                                      kind: r.kind,
-                                    });
-                                    clearFolderDrag();
-                                  }}
                                 >
                                   {propSecondary ? (
                                     <>
@@ -2019,21 +1988,21 @@ export function AutomationsTable({
                                       : t("automations.row.neverRun")
                                 }
                               >
-                                <span className="v2-auto-row-prop v2-auto-row-prop--run">
+                                <span className="caster-auto-row-prop caster-auto-row-prop--run">
                                   {propLastRun ?? ""}
                                 </span>
                               </Tooltip>
                               <Tooltip content={statusTooltip(r.status, t)}>
                                 <span
                                   className={[
-                                    "v2-auto-row-prop",
-                                    "v2-auto-row-prop--status",
+                                    "caster-auto-row-prop",
+                                    "caster-auto-row-prop--status",
                                     `is-${pill.kind}`,
                                   ].join(" ")}
                                   tabIndex={0}
                                 >
                                   <span
-                                    className="v2-auto-status-dot"
+                                    className="caster-auto-status-dot"
                                     aria-hidden
                                   />
                                   {pill.label}
@@ -2041,7 +2010,7 @@ export function AutomationsTable({
                               </Tooltip>
                             </div>
                             <div
-                              className="v2-auto-row-trail"
+                              className="caster-auto-row-trail"
                               onClick={(e) => e.stopPropagation()}
                               onDoubleClick={(e) => e.stopPropagation()}
                             >
@@ -2054,7 +2023,7 @@ export function AutomationsTable({
                               >
                                   <button
                                     type="button"
-                                    className="v2-auto-row-play-btn"
+                                    className="caster-auto-row-play-btn"
                                     aria-label={
                                       r.kind === "script"
                                         ? t("automations.row.executeAria", {
@@ -2074,7 +2043,7 @@ export function AutomationsTable({
                                   <button
                                     type="button"
                                     className={[
-                                      "v2-automation-fav",
+                                      "caster-automation-fav",
                                       r.favorite ? "is-on" : "",
                                     ]
                                       .filter(Boolean)
@@ -2119,6 +2088,30 @@ export function AutomationsTable({
                           </div>
                         );
                       })}
+                  {section.kind === "folder" && !collapsed ? (
+                    <div className="caster-auto-folder-section-end" aria-hidden />
+                  ) : null}
+                  {section.id === "unfiled" &&
+                  unfiledDropActive &&
+                  section.items.length === 0 ? (
+                    <div
+                      className={[
+                        "caster-auto-unfiled-dropzone",
+                        dropFolderKey === "root" ? "is-drop-over" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onPointerEnter={() => setDropFolderKey("root")}
+                      onPointerLeave={() =>
+                        setDropFolderKey((k) => (k === "root" ? null : k))
+                      }
+                      onPointerUp={() => {
+                        if (!dragRow || dragRow.kind === "script") return;
+                        void moveRowToFolder(dragRow, null);
+                        clearFolderDrag();
+                      }}
+                    />
+                  ) : null}
                 </div>
               );
             })}
@@ -2132,33 +2125,33 @@ export function AutomationsTable({
 
       {selected.size > 0 ? (
         <div
-          className="v2-automations-selection-dock"
+          className="caster-automations-selection-dock"
           role="toolbar"
           aria-label={t("automations.selection.aria")}
         >
-          <span className="v2-automations-selection-count">
+          <span className="caster-automations-selection-count">
             {selected.size === 1
               ? t("automations.selection.countOne", { count: selected.size })
               : t("automations.selection.countMany", { count: selected.size })}
           </span>
-          <div className="v2-automations-selection-actions">
+          <div className="caster-automations-selection-actions">
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               onClick={onOpenSelected}
             >
               {t("common.open")}
             </button>
             <button
               type="button"
-              className="v2-btn v2-btn-primary"
+              className="caster-btn caster-btn-primary"
               onClick={onLaunchSelected}
             >
               {t("automations.selection.launch")}
             </button>
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               onClick={() => void onFavoriteSelected()}
             >
               {t("automations.selection.favorite")}
@@ -2166,7 +2159,7 @@ export function AutomationsTable({
             {canLock ? (
               <button
                 type="button"
-                className="v2-btn v2-btn-ghost"
+                className="caster-btn caster-btn-ghost"
                 onClick={() => void onLockSelected(true)}
               >
                 <Lock size={14} aria-hidden />
@@ -2176,7 +2169,7 @@ export function AutomationsTable({
             {canUnlock ? (
               <button
                 type="button"
-                className="v2-btn v2-btn-ghost"
+                className="caster-btn caster-btn-ghost"
                 onClick={() => void onLockSelected(false)}
               >
                 <LockOpen size={14} aria-hidden />
@@ -2188,7 +2181,7 @@ export function AutomationsTable({
                 label={t("automations.selection.folder")}
                 ariaLabel={t("automations.selection.folderAria")}
                 align="end"
-                triggerClassName="v2-btn v2-btn-ghost"
+                triggerClassName="caster-btn caster-btn-ghost"
                 items={[
                   ...(selectedRows.some((r) => r.kind === "macro")
                     ? [
@@ -2231,14 +2224,14 @@ export function AutomationsTable({
             ) : null}
             <button
               type="button"
-              className="v2-btn v2-btn-danger-ghost"
+              className="caster-btn caster-btn-danger-ghost"
               onClick={() => void onDeleteSelected()}
             >
               {t("automations.selection.trash")}
             </button>
             <button
               type="button"
-              className="v2-btn v2-btn-ghost"
+              className="caster-btn caster-btn-ghost"
               onClick={() => setSelected(new Set())}
             >
               {t("common.cancel")}
@@ -2279,18 +2272,18 @@ export function AutomationsTable({
       {dragGhost
         ? createPortal(
             <div
-              className="v2-auto-drag-ghost"
+              className="caster-auto-drag-ghost"
               style={{
                 transform: `translate(${dragGhost.x + 12}px, ${dragGhost.y + 12}px)`,
               }}
               aria-hidden
             >
               <span
-                className={`v2-auto-type-badge v2-auto-type-badge--${dragGhost.kind}`}
+                className={`caster-auto-type-badge caster-auto-type-badge--${dragGhost.kind}`}
               >
                 {kindLabel(dragGhost.kind, t)}
               </span>
-              <span className="v2-auto-drag-ghost-name">{dragGhost.name}</span>
+              <span className="caster-auto-drag-ghost-name">{dragGhost.name}</span>
             </div>,
             document.body,
           )

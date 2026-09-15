@@ -125,11 +125,11 @@ export function MacroMetaBar({
   }, [locked]);
 
   return (
-    <div className="v2-macro-meta">
-      <label className="v2-macro-meta-row">
-        <span className="v2-macro-meta-label">{t("macros.toolbar.metaName")}</span>
+    <div className="caster-macro-meta">
+      <label className="caster-macro-meta-row">
+        <span className="caster-macro-meta-label">{t("macros.toolbar.metaName")}</span>
         <input
-          className="v2-macro-meta-input v2-macro-meta-input--name"
+          className="caster-macro-meta-input caster-macro-meta-input--name"
           value={doc.name}
           disabled={locked}
           onChange={(e) => onChange({ ...doc, name: e.target.value })}
@@ -142,10 +142,10 @@ export function MacroMetaBar({
           }}
         />
       </label>
-      <label className="v2-macro-meta-row">
-        <span className="v2-macro-meta-label">{t("macros.toolbar.metaRepeat")}</span>
+      <label className="caster-macro-meta-row">
+        <span className="caster-macro-meta-label">{t("macros.toolbar.metaRepeat")}</span>
         <input
-          className="v2-macro-meta-input v2-macro-meta-input--repeat"
+          className="caster-macro-meta-input caster-macro-meta-input--repeat"
           type="number"
           min={0}
           value={doc.repeatCount}
@@ -155,12 +155,12 @@ export function MacroMetaBar({
           }
         />
       </label>
-      <div className="v2-macro-meta-row v2-macro-meta-row--hotkey">
-        <span className="v2-macro-meta-label">{t("macros.toolbar.metaHotkey")}</span>
+      <div className="caster-macro-meta-row caster-macro-meta-row--hotkey">
+        <span className="caster-macro-meta-label">{t("macros.toolbar.metaHotkey")}</span>
         <button
           type="button"
           className={[
-            "v2-macro-hotkey-btn",
+            "caster-macro-hotkey-btn",
             capturing ? "is-capturing" : "",
           ]
             .filter(Boolean)
@@ -182,7 +182,7 @@ export function MacroMetaBar({
             onChange({ ...doc, trigger: { type: "manual" } });
           }}
         >
-          <KbdChip className="v2-macro-hotkey-chip">
+          <KbdChip className="caster-macro-hotkey-chip">
             {capturing ? "…" : triggerLabel ?? t("macros.toolbar.metaHotkeyNone")}
           </KbdChip>
         </button>

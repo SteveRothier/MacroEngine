@@ -103,10 +103,10 @@
   --page-pad-x: clamp(1rem, 2.5vw, 1.75rem);
   --page-pad-bottom: 1.25rem;
 
-  /* Aliased to v2 motion tokens when loaded; fallbacks keep legacy sheets working alone. */
-  --ease-out: var(--v2-ease, cubic-bezier(0.22, 1, 0.36, 1));
-  --dur-fast: var(--v2-dur-fast, 110ms);
-  --dur: var(--v2-dur-med, 160ms);
+  /* Aliased to caster motion tokens when loaded; fallbacks keep legacy sheets working alone. */
+  --ease-out: var(--caster-ease, cubic-bezier(0.22, 1, 0.36, 1));
+  --dur-fast: var(--caster-dur-fast, 110ms);
+  --dur: var(--caster-dur-med, 160ms);
 
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath stroke='%235a6270' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M3 4.5L6 7.5L9 4.5'/%3E%3C/svg%3E");
 

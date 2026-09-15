@@ -11,9 +11,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Code2, FileCode2 } from "lucide-react";
 import { useLocale, useT, type TFunction } from "../i18n";
-import { DropdownMenu, useToast } from "../ui/v2";
-import type { DropdownEntry } from "../ui/v2";
-import { useTitleBarSlot } from "../ui/v2/TitleBarContext";
+import { DropdownMenu, useToast } from "../ui/shell";
+import type { DropdownEntry } from "../ui/shell";
+import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import { confirmAction } from "../ui";
 import {
   SCRIPT_SNIPPET_GET,
@@ -421,21 +421,21 @@ export function ScriptEditorView({
 
   if (loading) {
     return (
-      <div className="v2-page v2-script-editor">
+      <div className="caster-page caster-script-editor">
         {titleBarPortal}
         <div
-          className="v2-skeleton-page v2-skeleton-page--center"
+          className="caster-skeleton-page caster-skeleton-page--center"
           aria-busy="true"
           aria-label={t("scripts.toolbar.loadingAria")}
         >
           <div
-            className="v2-skeleton v2-skeleton-line v2-skeleton-line--lg"
+            className="caster-skeleton caster-skeleton-line caster-skeleton-line--lg"
             style={{ width: "40%" }}
           />
-          <div className="v2-skeleton v2-skeleton-line" style={{ width: "100%" }} />
-          <div className="v2-skeleton v2-skeleton-line" style={{ width: "92%" }} />
-          <div className="v2-skeleton v2-skeleton-line" style={{ width: "78%" }} />
-          <div className="v2-skeleton v2-skeleton-line" style={{ width: "85%" }} />
+          <div className="caster-skeleton caster-skeleton-line" style={{ width: "100%" }} />
+          <div className="caster-skeleton caster-skeleton-line" style={{ width: "92%" }} />
+          <div className="caster-skeleton caster-skeleton-line" style={{ width: "78%" }} />
+          <div className="caster-skeleton caster-skeleton-line" style={{ width: "85%" }} />
         </div>
       </div>
     );
@@ -443,32 +443,32 @@ export function ScriptEditorView({
 
   if (!draft) {
     return (
-      <div className="v2-page v2-script-editor">
+      <div className="caster-page caster-script-editor">
         {titleBarPortal}
-        <div className="v2-scripts-hint">{t("scripts.toolbar.notFound")}</div>
+        <div className="caster-scripts-hint">{t("scripts.toolbar.notFound")}</div>
       </div>
     );
   }
 
   return (
-    <div className="v2-page v2-script-editor">
+    <div className="caster-page caster-script-editor">
       {titleBarPortal}
-      <div className="v2-editor-layout v2-script-layout">
+      <div className="caster-editor-layout caster-script-layout">
         <ScriptParamsFields
           defs={paramDefs}
           values={draft.paramValues ?? {}}
           onChange={setParamValue}
           onBlurField={() => void flushAutosave()}
         />
-        <div className="v2-script-source-wrap">
-          <div className="v2-script-source-gutter" ref={gutterRef} aria-hidden>
+        <div className="caster-script-source-wrap">
+          <div className="caster-script-source-gutter" ref={gutterRef} aria-hidden>
             {Array.from({ length: lineCount }, (_, i) => (
               <span key={i}>{i + 1}</span>
             ))}
           </div>
           <textarea
             ref={sourceRef}
-            className="v2-script-source"
+            className="caster-script-source"
             spellCheck={false}
             value={draft.source}
             placeholder="// //@param name type default&#10;// caster.get / set / return / log / fetch"
@@ -478,13 +478,13 @@ export function ScriptEditorView({
             onBlur={() => void flushAutosave()}
             aria-label={t("scripts.toolbar.sourceAria")}
           />
-          <div className="v2-script-snippets">
+          <div className="caster-script-snippets">
             <DropdownMenu
               label={t("scripts.toolbar.snippets")}
               ariaLabel={t("scripts.toolbar.snippetsAria")}
               align="end"
-              triggerClassName="v2-btn v2-btn-ghost v2-script-snippets-btn"
-              menuClassName="v2-script-snippets-menu"
+              triggerClassName="caster-btn caster-btn-ghost caster-script-snippets-btn"
+              menuClassName="caster-script-snippets-menu"
               items={
                 [
                   {

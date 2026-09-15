@@ -37,7 +37,7 @@ function NavItem({
   return (
     <button
       type="button"
-      className={["v2-sidebar-item", active ? "active" : ""]
+      className={["caster-sidebar-item", active ? "active" : ""]
         .filter(Boolean)
         .join(" ")}
       onClick={onSelect}
@@ -45,12 +45,12 @@ function NavItem({
       aria-label={item.label}
       aria-current={active ? "page" : undefined}
     >
-      <span className="v2-sidebar-icon">{item.icon}</span>
+      <span className="caster-sidebar-icon">{item.icon}</span>
       {!railMode ? (
         <>
-          <span className="v2-sidebar-label">{item.label}</span>
+          <span className="caster-sidebar-label">{item.label}</span>
           {item.badge != null && item.badge > 0 ? (
-            <span className="v2-sidebar-badge">{item.badge}</span>
+            <span className="caster-sidebar-badge">{item.badge}</span>
           ) : null}
         </>
       ) : null}
@@ -68,7 +68,7 @@ function setShellWidth(el: HTMLElement, px: number) {
   el.style.width = v;
   el.style.minWidth = v;
   el.style.maxWidth = v;
-  document.documentElement.style.setProperty("--v2-sidebar-w", v);
+  document.documentElement.style.setProperty("--caster-sidebar-w", v);
 }
 
 function setLabelReveal(el: HTMLElement, widthPx: number) {
@@ -76,8 +76,8 @@ function setLabelReveal(el: HTMLElement, widthPx: number) {
   const t = (widthPx - SIDEBAR_COLLAPSED_PX) / span;
   // Fade labels in the first half of expand / last half of collapse
   const opacity = Math.min(1, Math.max(0, (t - 0.08) / 0.5));
-  el.style.setProperty("--v2-sidebar-label-opacity", String(opacity));
-  el.style.setProperty("--v2-sidebar-label-shift", `${(1 - opacity) * -8}px`);
+  el.style.setProperty("--caster-sidebar-label-opacity", String(opacity));
+  el.style.setProperty("--caster-sidebar-label-shift", `${(1 - opacity) * -8}px`);
 }
 
 function animateShellWidth(
@@ -177,18 +177,18 @@ export function Sidebar({
   return (
     <aside
       ref={shellRef}
-      className={["v2-sidebar", collapsed ? "v2-sidebar--collapsed" : ""]
+      className={["caster-sidebar", collapsed ? "caster-sidebar--collapsed" : ""]
         .filter(Boolean)
         .join(" ")}
       aria-label={t("shell.navGroup")}
       aria-expanded={!collapsed}
     >
-      <div className="v2-sidebar-inner">
+      <div className="caster-sidebar-inner">
         {onToggleCollapse ? (
-          <div className="v2-sidebar-toolbar">
+          <div className="caster-sidebar-toolbar">
             <button
               type="button"
-              className="v2-sidebar-toggle"
+              className="caster-sidebar-toggle"
               onClick={handleToggle}
               title={toggleLabel}
               aria-label={toggleLabel}
@@ -197,7 +197,7 @@ export function Sidebar({
             </button>
           </div>
         ) : null}
-        <nav className="v2-sidebar-nav">
+        <nav className="caster-sidebar-nav">
           {items.map((item) => (
             <NavItem
               key={item.id}
@@ -211,19 +211,19 @@ export function Sidebar({
         {hasRecent ? (
           <div
             className={[
-              "v2-sidebar-recent",
-              collapsed ? "v2-sidebar-recent--hidden" : "",
+              "caster-sidebar-recent",
+              collapsed ? "caster-sidebar-recent--hidden" : "",
             ]
               .filter(Boolean)
               .join(" ")}
             aria-hidden={collapsed}
           >
-            <span className="v2-sidebar-recent-head">{t("shell.recentLabel")}</span>
+            <span className="caster-sidebar-recent-head">{t("shell.recentLabel")}</span>
             {recent!.slice(0, 5).map((r) => (
               <button
                 key={r.id}
                 type="button"
-                className="v2-sidebar-recent-item"
+                className="caster-sidebar-recent-item"
                 onClick={r.onClick}
                 title={r.label}
                 tabIndex={collapsed ? -1 : undefined}
@@ -234,7 +234,7 @@ export function Sidebar({
           </div>
         ) : null}
         {bottomItems.length > 0 ? (
-          <nav className="v2-sidebar-bottom">
+          <nav className="caster-sidebar-bottom">
             {bottomItems.map((item) => (
               <NavItem
                 key={item.id}

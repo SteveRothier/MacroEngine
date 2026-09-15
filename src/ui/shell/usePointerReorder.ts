@@ -45,7 +45,7 @@ export function usePointerReorder<T>({
     session.current = null;
     setDraggingIndex(null);
     setOverIndex(null);
-    document.body.classList.remove("v2-pointer-reorder-dragging");
+    document.body.classList.remove("caster-pointer-reorder-dragging");
   }, []);
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export function usePointerReorder<T>({
           if (dy < thresholdPx) return;
           s.armed = true;
           setDraggingIndex(s.from);
-          document.body.classList.add("v2-pointer-reorder-dragging");
+          document.body.classList.add("caster-pointer-reorder-dragging");
         }
         const el = document.elementFromPoint(ev.clientX, ev.clientY);
         const row = el?.closest?.("[data-reorder-id]") as HTMLElement | null;

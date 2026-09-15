@@ -13,7 +13,7 @@ type Props = {
 
 /**
  * Shared editor chrome layout for Macro / Clicker / Script toolbars.
- * Portaled into `.v2-editor-toolbar-host` via TitleBarSlot.
+ * Portaled into `.caster-editor-toolbar-host` via TitleBarSlot.
  */
 export function EditorToolbar({
   start,
@@ -24,17 +24,17 @@ export function EditorToolbar({
 }: Props) {
   return (
     <div
-      className={["v2-editor-toolbar", className].filter(Boolean).join(" ")}
+      className={["caster-editor-toolbar", className].filter(Boolean).join(" ")}
       role="toolbar"
       aria-label={ariaLabel}
     >
-      {start ? <div className="v2-editor-toolbar-start">{start}</div> : null}
+      {start ? <div className="caster-editor-toolbar-start">{start}</div> : null}
       {center ? (
-        <div className="v2-editor-toolbar-center">{center}</div>
+        <div className="caster-editor-toolbar-center">{center}</div>
       ) : (
-        <div className="v2-editor-toolbar-spacer" aria-hidden />
+        <div className="caster-editor-toolbar-spacer" aria-hidden />
       )}
-      {end ? <div className="v2-editor-toolbar-end">{end}</div> : null}
+      {end ? <div className="caster-editor-toolbar-end">{end}</div> : null}
     </div>
   );
 }

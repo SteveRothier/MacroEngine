@@ -13,8 +13,8 @@ type Props = {
 
 export function StatusPill({ kind, label, dot = true }: Props) {
   return (
-    <span className={`v2-pill v2-pill--${kind}`}>
-      {dot ? <span className="v2-pill-dot" aria-hidden /> : null}
+    <span className={`caster-pill caster-pill--${kind}`}>
+      {dot ? <span className="caster-pill-dot" aria-hidden /> : null}
       {label}
     </span>
   );

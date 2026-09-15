@@ -5,11 +5,11 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import App from "./App";
 import { applyTheme, readStoredTheme } from "./theme";
 /* Legacy tokens/ui.css kept for overlays (App.tsx), shell window controls, and
-   residual Clicker/Macro preview classes still shared with v2. Prefer v2 tokens. */
+   residual Clicker/Macro preview classes still shared with the shell. Prefer caster tokens. */
 import "./styles/tokens.css";
-import "./ui/v2/tokens.css";
+import "./ui/shell/tokens.css";
 import "./ui/ui.css";
-import "./ui/v2/v2.css";
+import "./ui/shell/shell.css";
 import "./library/library.css";
 
 applyTheme(readStoredTheme());
