@@ -81,8 +81,6 @@ describe("rowLabels", () => {
   it("toolbar label helpers", () => {
     expect(sortByLabel("name", t)).toBe("Nom");
     expect(filterPillTooltip("recent", t)).toBe("Dernières exécutions");
-    expect(filterPillTooltip("scripts", t)).toBe(
-      "Scripts JavaScript réutilisables",
-    );
+    expect(filterPillTooltip("favorites", t)).toBe("Favoris uniquement");
   });
 });

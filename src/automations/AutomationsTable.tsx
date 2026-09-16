@@ -88,10 +88,8 @@ import {
   useAccueilDnd,
   type AccueilDropIntent,
 } from "./useAccueilDnd";
-import { AccueilTitleBarTools } from "./AccueilTitleBarTools";
 import { useAccueilUndo } from "./useAccueilUndo";
 import { useUnifiedAutomations } from "./useUnifiedAutomations";
-import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 
 type Props = {
   onNavigate: (route: AppRoute) => void;
@@ -246,23 +244,6 @@ export function AutomationsTable({
       });
     },
     [accueilUndo, t, toast],
-  );
-  const titleBarPortal = useTitleBarSlot(
-    undefined,
-    <AccueilTitleBarTools
-      canUndo={accueilUndo.canUndo}
-      canRedo={accueilUndo.canRedo}
-      onUndo={() => {
-        void accueilUndo.undo().catch(() => {
-          toast.error(t("automations.toast.undoFail"));
-        });
-      }}
-      onRedo={() => {
-        void accueilUndo.redo().catch(() => {
-          toast.error(t("automations.toast.redoFail"));
-        });
-      }}
-    />,
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuKey, setMenuKey] = useState<string | null>(null);
@@ -787,23 +768,6 @@ export function AutomationsTable({
                 {t("automations.empty.newMacro")}
               </button>
             </>
-          }
-        />
-      );
-    }
-    if (filter === "scripts") {
-      return (
-        <EmptyState
-          title={t("automations.empty.noScriptsTitle")}
-          lead={t("automations.empty.noScriptsLead")}
-          actions={
-            <button
-              type="button"
-              className="caster-btn caster-btn-primary"
-              onClick={onCreateScript}
-            >
-              {t("automations.empty.createScript")}
-            </button>
           }
         />
       );
@@ -1656,7 +1620,6 @@ export function AutomationsTable({
         setCtxRow(null);
       }}
     >
-      {titleBarPortal}
       <AutomationsToolbar
         query={query}
         onQueryChange={onQueryChange}
@@ -1670,6 +1633,18 @@ export function AutomationsTable({
         searchInputRef={searchInputRef}
         createOpen={createOpen}
         onCreateOpenChange={setCreateOpen}
+        canUndo={accueilUndo.canUndo}
+        canRedo={accueilUndo.canRedo}
+        onUndo={() => {
+          void accueilUndo.undo().catch(() => {
+            toast.error(t("automations.toast.undoFail"));
+          });
+        }}
+        onRedo={() => {
+          void accueilUndo.redo().catch(() => {
+            toast.error(t("automations.toast.redoFail"));
+          });
+        }}
       />
 
       <div

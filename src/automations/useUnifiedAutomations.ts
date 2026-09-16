@@ -290,8 +290,6 @@ export function useUnifiedAutomations(options: {
             (order.get(rowKey(a.kind, a.id)) ?? 0) -
             (order.get(rowKey(b.kind, b.id)) ?? 0),
         );
-    } else if (filter === "scripts") {
-      list = list.filter((r) => r.kind === "script");
     }
     const q = query.trim().toLowerCase();
     if (!q) return list;
