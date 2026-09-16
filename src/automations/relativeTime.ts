@@ -139,6 +139,19 @@ export function lastRunTooltipMap(
   return map;
 }
 
+/** Latest known run status per row key (`kind:id`). */
+export function lastRunStatusMap(
+  recent: RecentEntry[],
+): Map<string, RecentRunStatus> {
+  const map = new Map<string, RecentRunStatus>();
+  for (const r of recent) {
+    const key = `${r.kind}:${r.id}`;
+    if (map.has(key) || !r.status) continue;
+    map.set(key, r.status);
+  }
+  return map;
+}
+
 export function rowKey(kind: AutomationRow["kind"], id: string): string {
   return `${kind}:${id}`;
 }

@@ -568,7 +568,7 @@ function MainAppInner({
       try {
         const next = await invoke<EngineStatus>("launch_clicker_preset", { name });
         setStatus(next);
-        bumpRefresh();
+        // Accueil refreshes on engine://status busy→idle (last-run finalize).
         toast.success(t("shell.clickerLaunched", { name }));
         openJournalOnRun();
         void rememberLastRun("clicker", name);
@@ -576,7 +576,7 @@ function MainAppInner({
         toast.error(launchErr(e, t("shell.launchClickerFailed")));
       }
     },
-    [bumpRefresh, openJournalOnRun, rememberLastRun, t, toast],
+    [openJournalOnRun, rememberLastRun, t, toast],
   );
 
   const onLaunchMacro = useCallback(
@@ -584,7 +584,6 @@ function MainAppInner({
       try {
         const next = await invoke<EngineStatus>("launch_saved_macro", { name });
         setStatus(next);
-        bumpRefresh();
         toast.success(t("shell.macroLaunched", { name }));
         openJournalOnRun();
         void rememberLastRun("macro", name);
@@ -592,7 +591,7 @@ function MainAppInner({
         toast.error(launchErr(e, t("shell.launchMacroFailed")));
       }
     },
-    [bumpRefresh, openJournalOnRun, rememberLastRun, t, toast],
+    [openJournalOnRun, rememberLastRun, t, toast],
   );
 
   const onCreateMacro = useCallback(async () => {
