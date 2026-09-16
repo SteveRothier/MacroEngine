@@ -1174,38 +1174,46 @@ export function AutomationsTable({
     }
   }
 
-  async function onConvertOne(r: AutomationRow, toKind: AutomationRow["kind"]) {
-    try {
-      const result = await runLibraryConvert({
-        fromKind: r.kind,
-        id: r.id,
-        toKind,
-        name: r.name,
-        t,
-      });
-      if (!result) return;
-      setMenuKey(null);
-      await refresh({ silent: true });
-      onRefresh?.();
-      const open = await confirmAction({
-        title: t("automations.convert.success", {
-          name: result.newName,
-          kind: t(`automations.convert.kind.${result.toKind}`),
-        }),
-        message: convertSuccessMessage(result, t),
-        confirmLabel: t("automations.convert.openAfter"),
-      });
-      if (open) {
-        onNavigate({
-          name: "automation",
-          id: result.newId,
-          kind: result.toKind as AutomationRow["kind"],
-          label: result.newName,
-        });
-      }
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.convert.fail")));
-    }
+  function scheduleConvertOne(
+    r: AutomationRow,
+    toKind: AutomationRow["kind"],
+  ) {
+    // Let the row menu finish closing before opening confirm — avoids list flash.
+    queueMicrotask(() => {
+      void (async () => {
+        try {
+          const outcome = await runLibraryConvert({
+            fromKind: r.kind,
+            id: r.id,
+            toKind,
+            name: r.name,
+            t,
+          });
+          setMenuKey(null);
+          if (!outcome) return;
+          const { result, openAfter } = outcome;
+          if (openAfter) {
+            toast.success(
+              t("automations.convert.success", {
+                name: result.newName,
+                kind: t(`automations.convert.kind.${result.toKind}`),
+              }),
+            );
+            onNavigate({
+              name: "automation",
+              id: result.newId,
+              kind: result.toKind as AutomationRow["kind"],
+              label: result.newName,
+            });
+            return;
+          }
+          toast.success(convertSuccessMessage(result, t));
+        } catch (e) {
+          setMenuKey(null);
+          toast.error(errMessage(e, t("automations.convert.fail")));
+        }
+      })();
+    });
   }
 
   async function onRenameOne(r: AutomationRow) {
@@ -1516,7 +1524,7 @@ export function AutomationsTable({
       onReveal: () => void onRevealOne(ctxRow),
       moveFolders: rowFolders,
       onMoveToFolder: (folder) => void moveRowToFolder(ctxRow, folder),
-      onConvertTo: (to) => void onConvertOne(ctxRow, to),
+      onConvertTo: (to) => scheduleConvertOne(ctxRow, to),
       onDelete: () => void onDeleteOne(ctxRow),
       icons: automationRowMenuIcons(),
     });
@@ -2165,7 +2173,7 @@ export function AutomationsTable({
                                 onMoveToFolder={(folder) =>
                                   void moveRowToFolder(r, folder)
                                 }
-                                onConvertTo={(to) => void onConvertOne(r, to)}
+                                onConvertTo={(to) => scheduleConvertOne(r, to)}
                               />
                             </div>
                           </div>
