@@ -42,6 +42,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: var(--page-gap, 0.65rem);

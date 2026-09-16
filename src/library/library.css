@@ -126,6 +126,7 @@
   flex-direction: column;
   gap: 0.1rem;
   overflow: auto;
+  scrollbar-gutter: stable;
   min-height: 0;
   flex: 1;
 }
