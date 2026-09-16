@@ -219,8 +219,13 @@ export function AutomationsTable({
         ? loadCollapsedSections()
         : new Set(),
   );
-  const [liveScriptName, setLiveScriptName] = useState<string | null>(
-    runningScriptName,
+  const [liveSession, setLiveSession] = useState<{
+    kind: string;
+    name: string;
+  } | null>(
+    runningScriptName
+      ? { kind: "script", name: runningScriptName }
+      : null,
   );
   const [createOpen, setCreateOpen] = useState(false);
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
@@ -452,7 +457,11 @@ export function AutomationsTable({
   }, [collapsedSections, accueilPrefs.rememberCollapsedSections]);
 
   useEffect(() => {
-    setLiveScriptName(runningScriptName);
+    setLiveSession(
+      runningScriptName
+        ? { kind: "script", name: runningScriptName }
+        : null,
+    );
   }, [runningScriptName]);
 
   useEffect(() => {
@@ -465,10 +474,12 @@ export function AutomationsTable({
     }>("engine://status", (e) => {
       const busy =
         e.payload.state === "running" || e.payload.state === "paused";
-      if (busy && e.payload.sessionKind === "script") {
-        setLiveScriptName(e.payload.sessionName ?? null);
-      } else {
-        setLiveScriptName(null);
+      const kind = e.payload.sessionKind ?? null;
+      const name = e.payload.sessionName ?? null;
+      if (busy && kind && name) {
+        setLiveSession({ kind, name });
+      } else if (!busy) {
+        setLiveSession(null);
       }
       if (prevBusy && !busy) {
         void refresh();
@@ -521,8 +532,7 @@ export function AutomationsTable({
       await invoke("run_script_session_cmd", { id: r.id });
       toast.success(t("automations.toast.scriptLaunched", { name: r.name }));
       onLaunchFocusJournal?.();
-      await refresh();
-      onRefresh?.();
+      // last-run finalized on engine://status busy→idle
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.scriptLaunchFail")));
     }
@@ -1690,10 +1700,10 @@ export function AutomationsTable({
                         const key = rowKey(r);
                         const isSelected = selected.has(key);
                         const pill = statusToPill(r.status, t);
-                        const scriptRunning =
-                          r.kind === "script" &&
-                          liveScriptName != null &&
-                          liveScriptName === r.name;
+                        const rowRunning =
+                          liveSession != null &&
+                          liveSession.kind === r.kind &&
+                          liveSession.name === r.name;
                         const permCount = r.permLabels?.length ?? 0;
                         const propSecondary =
                           r.kind === "script"
@@ -1704,7 +1714,7 @@ export function AutomationsTable({
                         const propLastRun =
                           r.lastRunLabel !== empty ? r.lastRunLabel : null;
                         const subtitle = rowSubtitle(r, t, {
-                          running: scriptRunning,
+                          running: rowRunning,
                         });
                           const dropBefore =
                           dropEdge?.key === key && dropEdge.edge === "before";
@@ -1720,7 +1730,7 @@ export function AutomationsTable({
                               "caster-auto-row",
                               isSelected ? "is-selected" : "",
                               menuKey === key ? "is-menu-open" : "",
-                              scriptRunning ? "is-running" : "",
+                              rowRunning ? "is-running" : "",
                               focusKey === key ? "is-focused" : "",
                               dragRow && rowKey(dragRow) === key
                                 ? "is-drag-source"
@@ -1788,7 +1798,7 @@ export function AutomationsTable({
                               <div className="caster-auto-row-main">
                                 <TruncatedTooltip content={r.name}>
                                   <span className="caster-auto-row-name">
-                                    {scriptRunning ? (
+                                    {rowRunning ? (
                                       <span
                                         className="caster-auto-row-run-dot"
                                         aria-hidden
@@ -1802,7 +1812,7 @@ export function AutomationsTable({
                                     <span
                                       className={[
                                         "caster-auto-row-sub",
-                                        scriptRunning ? "is-running" : "",
+                                        rowRunning ? "is-running" : "",
                                       ]
                                         .filter(Boolean)
                                         .join(" ")}
@@ -1819,7 +1829,7 @@ export function AutomationsTable({
                               {kindLabel(r.kind, t)}
                             </span>
                             <div className="caster-auto-row-props">
-                              {scriptRunning ? (
+                              {rowRunning ? (
                                 <span className="caster-auto-row-prop caster-auto-row-prop--trigger is-running">
                                   <Play size={11} aria-hidden />
                                   {t("common.running")}

@@ -6,7 +6,7 @@ import {
   type HotkeyBindings,
 } from "../macros/types";
 import type { LibraryFolder, LibraryIndexDto } from "../library/types";
-import type { QuickAccess } from "../quickAccess";
+import type { QuickAccess, RecentRunStatus } from "../quickAccess";
 import type { ScriptDoc } from "../scripts/types";
 import { activePermissionLabels } from "../scripts/ScriptPermissionsMenu";
 import { useLocale, useT, type TFunction } from "../i18n";
@@ -14,9 +14,26 @@ import type {
   AutomationFilter,
   AutomationFolderOption,
   AutomationRow,
+  AutomationStatus,
   FilterCounts,
 } from "./types";
-import { lastRunLabelMap, lastRunTooltipMap, rowKey } from "./relativeTime";
+import {
+  lastRunLabelMap,
+  lastRunStatusMap,
+  lastRunTooltipMap,
+  rowKey,
+} from "./relativeTime";
+
+function rowEditorStatus(
+  locked: boolean,
+  dirty: boolean,
+  lastRun: RecentRunStatus | undefined,
+): AutomationStatus {
+  if (locked) return "locked";
+  if (dirty) return "attention";
+  if (lastRun === "error") return "failed";
+  return "healthy";
+}
 
 type MacroSummary = {
   name: string;
@@ -125,6 +142,7 @@ export function useUnifiedAutomations(options: {
       setRecentOrder(qa.recent.map((r) => rowKey(r.kind, r.id)));
       const runLabels = lastRunLabelMap(qa.recent, t, locale);
       const runTooltips = lastRunTooltipMap(qa.recent, t, locale);
+      const runStatuses = lastRunStatusMap(qa.recent);
       const allFolders = [
         ...macroIndex.folders,
         ...clickerIndex.folders,
@@ -153,11 +171,11 @@ export function useUnifiedAutomations(options: {
             : t("automations.trigger.manual"),
           folderLabel: folderName(allFolders, it.folderId ?? null, t),
           folderId: it.folderId ?? null,
-          status: it.locked
-            ? "locked"
-            : options.dirtyMacroId === it.id
-              ? "attention"
-              : "healthy",
+          status: rowEditorStatus(
+            !!it.locked,
+            options.dirtyMacroId === it.id,
+            runStatuses.get(rowKey("macro", it.id)),
+          ),
           lastRunLabel: runLabels.get(rowKey("macro", it.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("macro", it.id)),
           favorite: favMacros.includes(it.id),
@@ -180,11 +198,11 @@ export function useUnifiedAutomations(options: {
           triggerLabel: hk ? clickerTriggerLabel(hk) : "F6",
           folderLabel: folderName(allFolders, it.folderId ?? null, t),
           folderId: it.folderId ?? null,
-          status: it.locked
-            ? "locked"
-            : options.dirtyClickerId === it.id
-              ? "attention"
-              : "healthy",
+          status: rowEditorStatus(
+            !!it.locked,
+            options.dirtyClickerId === it.id,
+            runStatuses.get(rowKey("clicker", it.id)),
+          ),
           lastRunLabel: runLabels.get(rowKey("clicker", it.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("clicker", it.id)),
           favorite: favClickers.includes(it.id),
@@ -209,12 +227,11 @@ export function useUnifiedAutomations(options: {
           triggerLabel: t("automations.trigger.script"),
           folderLabel: folderName(allFolders, folderId, t),
           folderId,
-          status:
-            lib?.locked
-              ? "locked"
-              : options.dirtyScriptId === s.id
-                ? "attention"
-                : "healthy",
+          status: rowEditorStatus(
+            !!lib?.locked,
+            options.dirtyScriptId === s.id,
+            runStatuses.get(rowKey("script", s.id)),
+          ),
           lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("script", s.id)),
           favorite: false,

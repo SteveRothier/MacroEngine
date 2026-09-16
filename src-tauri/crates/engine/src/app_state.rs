@@ -465,7 +465,7 @@ impl AppState {
             } else if cancelled {
                 crate::quick_access::RecentRunStatus::Cancelled
             } else {
-                crate::quick_access::RecentRunStatus::Ok
+                crate::quick_access::RecentRunStatus::Error
             };
             app.finalize_recent_clicker(
                 status,
