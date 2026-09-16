@@ -11,6 +11,9 @@ export type LibraryItemMenuActions = {
   onTrash: () => void;
   onRestore: () => void;
   onDelete?: () => void;
+  /** When set, shows convert entries for this item kind. */
+  itemKind?: "macro" | "clicker" | "script";
+  onConvertTo?: (toKind: "macro" | "clicker" | "script") => void;
 };
 
 /** Shared items for LibrarySidebar ⋯ and context menu. */
@@ -28,6 +31,8 @@ export function buildLibraryItemMenuItems(
     onTrash,
     onRestore,
     onDelete,
+    itemKind,
+    onConvertTo,
   } = actions;
   const items: MenuItemDef[] = [];
   if (onRename && !item.locked) {
@@ -55,6 +60,21 @@ export function buildLibraryItemMenuItems(
         id: `move-${f.id}`,
         label: `Déplacer → ${f.name}`,
         onSelect: () => onMove(f.id),
+      });
+    }
+  }
+  if (onConvertTo && itemKind && !item.locked && !trashed) {
+    const targets =
+      itemKind === "script"
+        ? (["macro"] as const)
+        : itemKind === "macro"
+          ? (["script"] as const)
+          : (["macro", "script"] as const);
+    for (const to of targets) {
+      items.push({
+        id: `convert-${to}`,
+        label: `Convertir → ${to}`,
+        onSelect: () => onConvertTo(to),
       });
     }
   }

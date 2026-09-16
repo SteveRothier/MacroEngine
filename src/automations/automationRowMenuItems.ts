@@ -16,6 +16,8 @@ export type AutomationRowMenuActions = {
   /** Folders for « Déplacer vers > » (same kind). Null = Sans dossier. */
   moveFolders?: AutomationFolderOption[];
   onMoveToFolder?: (folder: AutomationFolderOption | null) => void;
+  /** Convert to another kind (submenu targets). */
+  onConvertTo?: (toKind: AutomationRow["kind"]) => void;
   onDelete: () => void;
   icons?: {
     open?: ReactNode;
@@ -143,6 +145,24 @@ export function buildAutomationRowMenuItems(
       label: t("automations.menu.row.reveal"),
       icon: actions.icons?.reveal,
       onSelect: actions.onReveal,
+    });
+  }
+
+  if (actions.onConvertTo && !row.locked) {
+    const targets =
+      row.kind === "script"
+        ? (["macro"] as const)
+        : row.kind === "macro"
+          ? (["script"] as const)
+          : (["macro", "script"] as const);
+    items.push({
+      id: "convert",
+      label: t("automations.menu.row.convertTo"),
+      submenu: targets.map((to) => ({
+        id: `convert-${to}`,
+        label: t(`automations.convert.kind.${to}`),
+        onSelect: () => actions.onConvertTo?.(to),
+      })),
     });
   }
 

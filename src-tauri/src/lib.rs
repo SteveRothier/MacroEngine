@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use caster_engine::{
-    assert_not_locked, create_library_folder, create_macro, delete_library_folder, delete_macro,
+    assert_not_locked, convert_library_item, create_library_folder, create_macro, delete_library_folder, delete_macro,
     delete_preset, delete_script, duplicate_macro, duplicate_preset, enrich_macro_summaries,
     export_preset_to_path, get_library_index, import_preset_from_path, list_library_items,
     list_macro_summaries, list_macros, list_preset_summaries, list_presets, list_scripts,
@@ -15,7 +15,7 @@ use caster_engine::{
     save_accueil_order, set_favorite, set_library_item_locked, trash_library_item,
     normalize_app_settings, AccueilPrefs, AppearancePrefs, AppSettings, AppState, AutomationPrefs,
     ClickerConfig, ClickerMetrics, ClickerPreset, ClickerPresetSummary, ConfirmationsPrefs,
-    DrawnRect, EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto,
+    ConvertMode, ConvertResult, DrawnRect, EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto,
     LibraryKind, ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs,
     NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind, RecordOptions,
     ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptsPrefs, ShellPrefs, StopZone, ThemeMode, Trigger,
@@ -399,6 +399,23 @@ fn move_library_item_cmd(
 ) -> Result<(), String> {
     let kind = LibraryKind::parse(&kind).map_err(|e| e.to_string())?;
     move_library_item(&dir.0, kind, id, folder_id, before_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn convert_library_item_cmd(
+    dir: State<'_, SettingsDir>,
+    from_kind: String,
+    id: String,
+    to_kind: String,
+    mode: String,
+) -> Result<ConvertResult, String> {
+    let from = LibraryKind::parse(&from_kind).map_err(|e| e.to_string())?;
+    let to = LibraryKind::parse(&to_kind).map_err(|e| e.to_string())?;
+    let mode = match mode.as_str() {
+        "transpile" => ConvertMode::Transpile,
+        _ => ConvertMode::Wrap,
+    };
+    convert_library_item(&dir.0, from, &id, to, mode).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2277,6 +2294,7 @@ pub fn run() {
             rename_library_folder_cmd,
             delete_library_folder_cmd,
             move_library_item_cmd,
+            convert_library_item_cmd,
             set_library_item_locked_cmd,
             trash_library_item_cmd,
             restore_library_item_cmd,
