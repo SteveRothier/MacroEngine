@@ -37,6 +37,7 @@ type DropPlacement = {
 };
 
 type Props = {
+  /** Macro or clicker tree. Script folder membership is managed on Accueil. */
   kind: LibraryKind;
   title: string;
   subtitle?: string;

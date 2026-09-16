@@ -10,6 +10,7 @@ use thiserror::Error;
 
 use crate::clicker_presets::{delete_preset, list_presets, presets_dir, PresetError};
 use crate::macro_library::{delete_macro, list_macros, macros_dir, MacroLibraryError};
+use crate::script_library::{delete_script, list_scripts, script_path, ScriptLibraryError};
 
 #[derive(Debug, Error)]
 pub enum LibraryIndexError {
@@ -21,6 +22,8 @@ pub enum LibraryIndexError {
     Macro(#[from] MacroLibraryError),
     #[error("preset: {0}")]
     Preset(#[from] PresetError),
+    #[error("script: {0}")]
+    Script(#[from] ScriptLibraryError),
     #[error("{0}")]
     Other(String),
 }
@@ -30,6 +33,7 @@ pub enum LibraryIndexError {
 pub enum LibraryKind {
     Macro,
     Clicker,
+    Script,
 }
 
 impl LibraryKind {
@@ -37,6 +41,7 @@ impl LibraryKind {
         match self {
             Self::Macro => "macro",
             Self::Clicker => "clicker",
+            Self::Script => "script",
         }
     }
 
@@ -44,6 +49,7 @@ impl LibraryKind {
         match s {
             "macro" => Ok(Self::Macro),
             "clicker" => Ok(Self::Clicker),
+            "script" => Ok(Self::Script),
             _ => Err(LibraryIndexError::Other(format!("unknown library kind: {s}"))),
         }
     }
@@ -87,10 +93,12 @@ impl Default for LibraryIndex {
             entries: HashMap::from([
                 ("macro".into(), HashMap::new()),
                 ("clicker".into(), HashMap::new()),
+                ("script".into(), HashMap::new()),
             ]),
             trash: HashMap::from([
                 ("macro".into(), Vec::new()),
                 ("clicker".into(), Vec::new()),
+                ("script".into(), Vec::new()),
             ]),
         }
     }
@@ -131,7 +139,7 @@ pub fn load_index(config_dir: &Path) -> Result<LibraryIndex, LibraryIndexError> 
     let raw = fs::read_to_string(&path)?;
     let value: serde_json::Value = serde_json::from_str(&raw)?;
     let (mut idx, dirty) = index_from_value(value)?;
-    for key in ["macro", "clicker"] {
+    for key in ["macro", "clicker", "script"] {
         idx.entries.entry(key.into()).or_default();
         idx.trash.entry(key.into()).or_default();
     }
@@ -268,6 +276,10 @@ fn list_disk_ids(config_dir: &Path, kind: LibraryKind) -> Result<Vec<String>, Li
     Ok(match kind {
         LibraryKind::Macro => list_macros(config_dir)?,
         LibraryKind::Clicker => list_presets(config_dir)?,
+        LibraryKind::Script => list_scripts(config_dir)?
+            .into_iter()
+            .map(|s| s.id)
+            .collect(),
     })
 }
 
@@ -275,6 +287,7 @@ fn disk_path(config_dir: &Path, kind: LibraryKind, id: &str) -> PathBuf {
     match kind {
         LibraryKind::Macro => macros_dir(config_dir).join(format!("{id}.json")),
         LibraryKind::Clicker => presets_dir(config_dir).join(format!("{id}.json")),
+        LibraryKind::Script => script_path(config_dir, id),
     }
 }
 
@@ -335,7 +348,7 @@ pub fn assert_not_locked(
 }
 
 fn prune_orphans(index: &mut LibraryIndex, config_dir: &Path) -> Result<(), LibraryIndexError> {
-    for kind in [LibraryKind::Macro, LibraryKind::Clicker] {
+    for kind in [LibraryKind::Macro, LibraryKind::Clicker, LibraryKind::Script] {
         let key = kind_key(kind);
         let disk = list_disk_ids(config_dir, kind)?;
         let disk_set: HashSet<_> = disk.iter().collect();
@@ -407,6 +420,14 @@ fn build_dto(
     let q_lower = query.map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty());
 
     let mut items = Vec::new();
+    let script_names: HashMap<String, String> = if kind == LibraryKind::Script {
+        list_scripts(config_dir)?
+            .into_iter()
+            .map(|s| (s.id, s.name))
+            .collect()
+    } else {
+        HashMap::new()
+    };
     for id in list_disk_ids(config_dir, kind)? {
         let trashed = is_trashed(index, kind, &id);
         if trashed && !include_trash {
@@ -427,9 +448,12 @@ fn build_dto(
                 }
             }
         }
-        let name = id.clone();
+        let name = script_names
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| id.clone());
         if let Some(ref q) = q_lower {
-            if !name.to_lowercase().contains(q) {
+            if !name.to_lowercase().contains(q) && !id.to_lowercase().contains(q) {
                 continue;
             }
         }
@@ -542,7 +566,7 @@ pub fn delete_library_folder(
         return Err(LibraryIndexError::Other("dossier introuvable".into()));
     }
     index.folders.retain(|f| f.id != id);
-    for key in ["macro", "clicker"] {
+    for key in ["macro", "clicker", "script"] {
         if let Some(entries) = index.entries.get_mut(key) {
             for meta in entries.values_mut() {
                 if meta.folder_id.as_deref() == Some(id.as_str()) {
@@ -683,7 +707,7 @@ pub fn trash_library_item(
 pub fn purge_library_trash(config_dir: &Path) -> Result<usize, LibraryIndexError> {
     let mut index = load_index(config_dir)?;
     let mut n = 0usize;
-    for kind in [LibraryKind::Macro, LibraryKind::Clicker] {
+    for kind in [LibraryKind::Macro, LibraryKind::Clicker, LibraryKind::Script] {
         let key = kind_key(kind).to_string();
         let ids = index.trash.get(&key).cloned().unwrap_or_default();
         for id in ids {
@@ -693,6 +717,9 @@ pub fn purge_library_trash(config_dir: &Path) -> Result<usize, LibraryIndexError
                 }
                 LibraryKind::Clicker => {
                     let _ = delete_preset(config_dir, &id);
+                }
+                LibraryKind::Script => {
+                    let _ = delete_script(config_dir, &id);
                 }
             }
             if let Some(entries) = index.entries.get_mut(&key) {
@@ -921,6 +948,39 @@ mod tests {
         assert_eq!(macro_dto.folders.len(), 1);
         assert_eq!(clicker_dto.folders.len(), 1);
         assert_eq!(macro_dto.folders[0].id, clicker_dto.folders[0].id);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn move_script_into_unified_folder() {
+        use crate::script_library::{save_script, ScriptDoc};
+        let dir = temp_dir();
+        let doc = ScriptDoc {
+            id: "s1".into(),
+            name: "Hello".into(),
+            source: "// test".into(),
+            allow_network: false,
+            allow_clipboard: false,
+            allow_fs: false,
+            allow_macro_control: false,
+            param_values: Default::default(),
+        };
+        save_script(&dir, &doc).unwrap();
+        let folder =
+            create_library_folder(&dir, LibraryKind::Macro, "Pack".into(), None).unwrap();
+        move_library_item(
+            &dir,
+            LibraryKind::Script,
+            "s1".into(),
+            Some(folder.id.clone()),
+            None,
+        )
+        .unwrap();
+        let dto = get_library_index(&dir, LibraryKind::Script).unwrap();
+        assert_eq!(dto.folders.len(), 1);
+        let item = dto.items.iter().find(|i| i.id == "s1").unwrap();
+        assert_eq!(item.folder_id.as_deref(), Some(folder.id.as_str()));
+        assert_eq!(item.name, "Hello");
         let _ = fs::remove_dir_all(&dir);
     }
 

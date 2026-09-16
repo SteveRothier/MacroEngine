@@ -50,11 +50,11 @@ fn default_network() -> bool {
     true
 }
 
-fn scripts_dir(config_dir: &Path) -> PathBuf {
+pub fn scripts_dir(config_dir: &Path) -> PathBuf {
     config_dir.join("scripts")
 }
 
-fn script_path(config_dir: &Path, id: &str) -> PathBuf {
+pub fn script_path(config_dir: &Path, id: &str) -> PathBuf {
     let safe: String = id
         .chars()
         .map(|c| {

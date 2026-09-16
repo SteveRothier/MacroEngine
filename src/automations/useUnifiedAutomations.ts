@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   formatKeyChord,
@@ -92,12 +92,15 @@ export function useUnifiedAutomations(options: {
   const filter = options.filter ?? "all";
   const setQuery = options.setQuery ?? setInternalQuery;
   const [hotkeys, setHotkeys] = useState<HotkeyBindings | null>(null);
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const hasLoadedRef = useRef(false);
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true || hasLoadedRef.current;
+    if (!silent) setLoading(true);
     try {
       const home = await invoke<{
         macros: LibraryIndexDto;
         clickers: LibraryIndexDto;
+        scriptsLibrary: LibraryIndexDto;
         macroSummaries: MacroSummary[];
         clickerSummaries: ClickerSummary[];
         scripts: ScriptDoc[];
@@ -106,6 +109,11 @@ export function useUnifiedAutomations(options: {
       }>("get_automations_home_cmd");
       const macroIndex = home.macros;
       const clickerIndex = home.clickers;
+      const scriptsLibrary = home.scriptsLibrary ?? {
+        folders: [],
+        items: [],
+        trash: [],
+      };
       const macros = home.macroSummaries;
       const clickers = home.clickerSummaries;
       const scripts = home.scripts ?? [];
@@ -117,12 +125,18 @@ export function useUnifiedAutomations(options: {
       setRecentOrder(qa.recent.map((r) => rowKey(r.kind, r.id)));
       const runLabels = lastRunLabelMap(qa.recent, t, locale);
       const runTooltips = lastRunTooltipMap(qa.recent, t, locale);
-      setFolders(
-        toFolderOptions([...macroIndex.folders, ...clickerIndex.folders]),
-      );
+      const allFolders = [
+        ...macroIndex.folders,
+        ...clickerIndex.folders,
+        ...scriptsLibrary.folders,
+      ];
+      setFolders(toFolderOptions(allFolders));
 
       const macroMap = new Map(macros.map((m) => [m.name, m]));
       const clickerMap = new Map(clickers.map((c) => [c.name, c]));
+      const scriptLibById = new Map(
+        scriptsLibrary.items.map((it) => [it.id, it]),
+      );
       const empty = t("common.empty");
 
       const next: AutomationRow[] = [];
@@ -137,7 +151,7 @@ export function useUnifiedAutomations(options: {
           triggerLabel: m
             ? macroTriggerLabel(m, t)
             : t("automations.trigger.manual"),
-          folderLabel: folderName(macroIndex.folders, it.folderId ?? null, t),
+          folderLabel: folderName(allFolders, it.folderId ?? null, t),
           folderId: it.folderId ?? null,
           status: it.locked
             ? "locked"
@@ -164,7 +178,7 @@ export function useUnifiedAutomations(options: {
           name: it.name,
           kind: "clicker",
           triggerLabel: hk ? clickerTriggerLabel(hk) : "F6",
-          folderLabel: folderName(clickerIndex.folders, it.folderId ?? null, t),
+          folderLabel: folderName(allFolders, it.folderId ?? null, t),
           folderId: it.folderId ?? null,
           status: it.locked
             ? "locked"
@@ -184,32 +198,43 @@ export function useUnifiedAutomations(options: {
       }
 
       for (const s of scripts) {
+        const lib = scriptLibById.get(s.id);
+        if (lib?.trashed) continue;
+        const folderId = lib?.folderId ?? null;
         const permLabels = activePermissionLabels(s, t);
         next.push({
           id: s.id,
           name: s.name,
           kind: "script",
           triggerLabel: t("automations.trigger.script"),
-          folderLabel: empty,
-          folderId: null,
-          status: options.dirtyScriptId === s.id ? "attention" : "healthy",
+          folderLabel: folderName(allFolders, folderId, t),
+          folderId,
+          status:
+            lib?.locked
+              ? "locked"
+              : options.dirtyScriptId === s.id
+                ? "attention"
+                : "healthy",
           lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("script", s.id)),
           favorite: false,
-          locked: false,
+          locked: lib?.locked ?? false,
           dirty: options.dirtyScriptId === s.id,
           meta: undefined,
-          sortOrder: 0,
+          sortOrder: lib?.sortOrder ?? 0,
           permLabels,
         });
       }
 
       setRows(next);
+      hasLoadedRef.current = true;
     } catch {
-      setRows([]);
-      setRecentOrder([]);
+      if (!silent) {
+        setRows([]);
+        setRecentOrder([]);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [
     options.dirtyMacroId,
@@ -220,7 +245,9 @@ export function useUnifiedAutomations(options: {
   ]);
 
   useEffect(() => {
-    void refresh();
+    // refreshKey bumps (sidebar / post-DnD) must stay silent once loaded —
+    // a loading skeleton mid-session breaks subsequent Accueil DnD gestures.
+    void refresh({ silent: hasLoadedRef.current });
   }, [refresh, options.refreshKey]);
 
   const counts: FilterCounts = useMemo(() => {

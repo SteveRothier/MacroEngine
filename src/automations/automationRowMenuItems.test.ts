@@ -48,4 +48,39 @@ describe("buildAutomationRowMenuItems", () => {
     );
     expect(scriptItems.find((i) => i.id === "launch")?.label).toBe("Exécuter");
   });
+
+  it("omits current folder and root when already unfiled", () => {
+    const onMove = vi.fn();
+    const folders = [
+      { id: "albion", name: "Albion" },
+      { id: "other", name: "Other" },
+    ];
+    const unfiled = buildAutomationRowMenuItems(
+      baseRow({ kind: "macro", id: "M", name: "M", folderId: null }),
+      t,
+      { onMoveToFolder: onMove, moveFolders: folders },
+    );
+    const moveUnfiled = unfiled.find((i) => i.id === "move");
+    expect(moveUnfiled?.submenu?.map((s) => s.id)).toEqual([
+      "move-albion",
+      "move-other",
+    ]);
+
+    const inAlbion = buildAutomationRowMenuItems(
+      baseRow({
+        kind: "macro",
+        id: "M",
+        name: "M",
+        folderId: "albion",
+        folderLabel: "Albion",
+      }),
+      t,
+      { onMoveToFolder: onMove, moveFolders: folders },
+    );
+    const moveIn = inAlbion.find((i) => i.id === "move");
+    expect(moveIn?.submenu?.map((s) => s.id)).toEqual([
+      "move-root",
+      "move-other",
+    ]);
+  });
 });

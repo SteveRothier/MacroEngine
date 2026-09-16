@@ -550,6 +550,7 @@ fn set_accueil_order_cmd(dir: State<'_, SettingsDir>, keys: Vec<String>) -> Resu
 struct AutomationsHomeDto {
     macros: LibraryIndexDto,
     clickers: LibraryIndexDto,
+    scripts_library: LibraryIndexDto,
     macro_summaries: Vec<MacroSummary>,
     clicker_summaries: Vec<ClickerPresetSummary>,
     scripts: Vec<ScriptDoc>,
@@ -571,7 +572,9 @@ fn get_automations_home_cmd(
     };
     let macros = list_library_items(&dir.0, LibraryKind::Macro, empty_q.clone())
         .map_err(|e| e.to_string())?;
-    let clickers = list_library_items(&dir.0, LibraryKind::Clicker, empty_q)
+    let clickers = list_library_items(&dir.0, LibraryKind::Clicker, empty_q.clone())
+        .map_err(|e| e.to_string())?;
+    let scripts_library = list_library_items(&dir.0, LibraryKind::Script, empty_q)
         .map_err(|e| e.to_string())?;
     let macro_summaries = enrich_macro_summaries_cmd(&dir.0)?;
     let clicker_summaries = list_preset_summaries(&dir.0).map_err(|e| e.to_string())?;
@@ -587,6 +590,7 @@ fn get_automations_home_cmd(
     Ok(AutomationsHomeDto {
         macros,
         clickers,
+        scripts_library,
         macro_summaries,
         clicker_summaries,
         scripts,

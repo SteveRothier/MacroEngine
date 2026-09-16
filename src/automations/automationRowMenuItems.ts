@@ -90,37 +90,44 @@ export function buildAutomationRowMenuItems(
         onSelect: actions.onToggleFavorite,
       });
     }
-    if (row.locked && actions.onUnlock) {
-      items.push({
-        id: "unlock",
-        label: t("automations.menu.row.unlock"),
-        icon: actions.icons?.unlock,
-        onSelect: actions.onUnlock,
-      });
-    } else if (!row.locked && actions.onLock) {
-      items.push({
-        id: "lock",
-        label: t("automations.menu.row.lock"),
-        icon: actions.icons?.lock,
-        onSelect: actions.onLock,
+  }
+  if (row.locked && actions.onUnlock) {
+    items.push({
+      id: "unlock",
+      label: t("automations.menu.row.unlock"),
+      icon: actions.icons?.unlock,
+      onSelect: actions.onUnlock,
+    });
+  } else if (!row.locked && actions.onLock) {
+    items.push({
+      id: "lock",
+      label: t("automations.menu.row.lock"),
+      icon: actions.icons?.lock,
+      onSelect: actions.onLock,
+    });
+  }
+  if (actions.onMoveToFolder && !row.locked) {
+    const folders = (actions.moveFolders ?? []).filter(
+      (f) => f.id !== row.folderId,
+    );
+    const moveSub: MenuItemDef[] = [];
+    if (row.folderId != null) {
+      moveSub.push({
+        id: "move-root",
+        label: t("automations.menu.row.noFolder"),
+        icon: actions.icons?.move,
+        onSelect: () => actions.onMoveToFolder?.(null),
       });
     }
-    if (actions.onMoveToFolder && !row.locked) {
-      const folders = actions.moveFolders ?? [];
-      const moveSub: MenuItemDef[] = [
-        {
-          id: "move-root",
-          label: t("automations.menu.row.noFolder"),
-          icon: actions.icons?.move,
-          onSelect: () => actions.onMoveToFolder?.(null),
-        },
-        ...folders.map((f) => ({
-          id: `move-${folderOptionKey(f)}`,
-          label: f.name,
-          icon: actions.icons?.move,
-          onSelect: () => actions.onMoveToFolder?.(f),
-        })),
-      ];
+    for (const f of folders) {
+      moveSub.push({
+        id: `move-${folderOptionKey(f)}`,
+        label: f.name,
+        icon: actions.icons?.move,
+        onSelect: () => actions.onMoveToFolder?.(f),
+      });
+    }
+    if (moveSub.length > 0) {
       items.push({
         id: "move",
         label: t("automations.menu.row.moveTo"),

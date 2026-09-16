@@ -42,12 +42,15 @@ export function buildLibraryItemMenuItems(
     onSelect: onToggleLock,
   });
   if (folders.length > 0 && !item.locked) {
-    items.push({
-      id: "move-root",
-      label: "Déplacer → Racine",
-      onSelect: () => onMove(null),
-    });
+    if (item.folderId != null) {
+      items.push({
+        id: "move-root",
+        label: "Déplacer → Racine",
+        onSelect: () => onMove(null),
+      });
+    }
     for (const f of folders) {
+      if (f.id === item.folderId) continue;
       items.push({
         id: `move-${f.id}`,
         label: `Déplacer → ${f.name}`,

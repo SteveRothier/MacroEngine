@@ -87,7 +87,8 @@ pub use schema::{
     SCHEMA_VERSION_V1, SCHEMA_VERSION_V4, SCHEMA_VERSION_V5,
 };
 pub use script_library::{
-    delete_script, list_scripts, load_script, save_script, ScriptDoc, ScriptLibraryError,
+    delete_script, list_scripts, load_script, save_script, script_path, scripts_dir, ScriptDoc,
+    ScriptLibraryError,
 };
 pub use script_params::{parse_param_defs, ScriptParamDef};
 pub use settings::{
