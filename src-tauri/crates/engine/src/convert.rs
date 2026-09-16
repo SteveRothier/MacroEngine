@@ -506,6 +506,7 @@ fn macro_to_script(
         allow_clipboard,
         allow_fs: false,
         allow_macro_control: allow_macro,
+        allow_input: false,
         param_values: Default::default(),
     };
     save_script(config_dir, &script).map_err(|e| ConvertError::Message(e.to_string()))?;
@@ -571,6 +572,7 @@ mod tests {
             allow_clipboard: false,
             allow_fs: false,
             allow_macro_control: false,
+            allow_input: false,
             param_values: Default::default(),
         };
         save_script(&dir, &doc).unwrap();
@@ -628,6 +630,7 @@ mod tests {
             allow_clipboard: false,
             allow_fs: false,
             allow_macro_control: false,
+            allow_input: false,
             param_values: Default::default(),
         };
         save_script(&dir, &doc).unwrap();

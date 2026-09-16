@@ -963,6 +963,7 @@ mod tests {
             allow_clipboard: false,
             allow_fs: false,
             allow_macro_control: false,
+            allow_input: false,
             param_values: Default::default(),
         };
         save_script(&dir, &doc).unwrap();

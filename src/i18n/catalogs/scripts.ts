@@ -54,6 +54,9 @@ export const scripts = defineCatalog({
         "Autorise caster.fetch — le script peut envoyer des requêtes réseau.",
       clipboard: "Presse-papiers",
       clipboardTip: "Le script peut lire et écrire le presse-papiers système.",
+      input: "Souris / clavier",
+      inputTip:
+        "Autorise caster.click, moveTo, keyTap, sleep — injection souris/clavier.",
       fs: "Fichiers (sandbox)",
       fsShort: "Fichiers",
       fsTip:
@@ -147,6 +150,9 @@ export const scripts = defineCatalog({
       networkTip: "Allows caster.fetch — the script can make network requests.",
       clipboard: "Clipboard",
       clipboardTip: "The script can read and write the system clipboard.",
+      input: "Mouse / keyboard",
+      inputTip:
+        "Allows caster.click, moveTo, keyTap, sleep — mouse/keyboard injection.",
       fs: "Files (sandbox)",
       fsShort: "Files",
       fsTip:

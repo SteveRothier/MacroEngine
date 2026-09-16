@@ -56,6 +56,7 @@ function normalizeDoc(doc: ScriptDoc): ScriptDoc {
     allowClipboard: doc.allowClipboard ?? false,
     allowFs: doc.allowFs ?? false,
     allowMacroControl: doc.allowMacroControl ?? false,
+    allowInput: doc.allowInput ?? false,
     paramValues: doc.paramValues ?? {},
   };
 }
@@ -404,6 +405,7 @@ export function ScriptEditorView({
           allowClipboard: !!draft.allowClipboard,
           allowFs: !!draft.allowFs,
           allowMacroControl: !!draft.allowMacroControl,
+          allowInput: !!draft.allowInput,
         }}
         onPermissionsChange={(partial) => patch(partial)}
         running={running}

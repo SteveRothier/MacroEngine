@@ -11,6 +11,7 @@ export type ScriptPreset = {
   allowClipboard?: boolean;
   allowFs?: boolean;
   allowMacroControl?: boolean;
+  allowInput?: boolean;
 };
 
 type ScriptPresetDef = Omit<ScriptPreset, "name" | "description"> & {
@@ -103,6 +104,7 @@ export function getScriptPresets(t: TFunction): ScriptPreset[] {
     allowClipboard: def.allowClipboard,
     allowFs: def.allowFs,
     allowMacroControl: def.allowMacroControl,
+    allowInput: def.allowInput,
   }));
 }
 
@@ -119,11 +121,13 @@ export function presetPermissionPatch(preset: ScriptPreset): {
   allowClipboard?: boolean;
   allowFs?: boolean;
   allowMacroControl?: boolean;
+  allowInput?: boolean;
 } {
   return {
     allowNetwork: preset.allowNetwork ?? false,
     allowClipboard: preset.allowClipboard ?? false,
     allowFs: preset.allowFs ?? false,
     allowMacroControl: preset.allowMacroControl ?? false,
+    allowInput: preset.allowInput ?? false,
   };
 }
