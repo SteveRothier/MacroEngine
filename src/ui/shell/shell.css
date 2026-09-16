@@ -4405,6 +4405,22 @@ button.caster-segmented-btn.active,
   line-height: 1.35;
 }
 
+.caster-toast-action {
+  border: none;
+  background: transparent;
+  color: var(--caster-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.caster-toast-action:hover {
+  text-decoration: underline;
+}
+
 .caster-toast-dismiss {
   border: none;
   background: transparent;
