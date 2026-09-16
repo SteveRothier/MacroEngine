@@ -4769,6 +4769,22 @@ body.caster-pointer-reorder-dragging {
   min-width: 0;
 }
 
+.caster-automations-history {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.caster-automations-history-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .caster-automations-search {
   position: relative;
   display: flex;

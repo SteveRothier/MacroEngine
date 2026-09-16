@@ -4,7 +4,7 @@ import type { UiLocalePref } from "../i18n/locales";
 
 export type AccueilSortBy = "order" | "name" | "type" | "status";
 export type AccueilSortDir = "asc" | "desc";
-export type AccueilFilter = "all" | "favorites" | "recent" | "scripts";
+export type AccueilFilter = "all" | "favorites" | "recent";
 export type StartupView = "home" | "lastDocument";
 export type UiDensity = "comfortable" | "compact";
 export type AccentTheme = "default" | "blue" | "teal";
@@ -154,7 +154,12 @@ export const DEFAULT_MAINTENANCE_PREFS: MaintenancePrefs = {
 export function mergeAccueilPrefs(
   partial?: Partial<AccueilPrefs> | null,
 ): AccueilPrefs {
-  return { ...DEFAULT_ACCUEIL_PREFS, ...partial };
+  const merged = { ...DEFAULT_ACCUEIL_PREFS, ...partial };
+  // Legacy: "scripts" filter pill removed from Accueil.
+  if ((merged.defaultFilter as string) === "scripts") {
+    merged.defaultFilter = "all";
+  }
+  return merged;
 }
 
 export function mergeShellPrefs(partial?: Partial<ShellPrefs> | null): ShellPrefs {

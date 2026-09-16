@@ -50,7 +50,7 @@ export type DisplayOptions = {
   sortDir: "asc" | "desc";
 };
 
-export type AutomationFilter = "all" | "favorites" | "recent" | "scripts";
+export type AutomationFilter = "all" | "favorites" | "recent";
 
 /** Shared folder option for Accueil / bulk move (macros + clickers). */
 export type AutomationFolderOption = {

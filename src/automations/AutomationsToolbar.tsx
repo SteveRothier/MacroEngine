@@ -5,7 +5,9 @@ import {
   FolderPlus,
   MousePointer2,
   Plus,
+  Redo2,
   Search,
+  Undo2,
   Workflow,
 } from "lucide-react";
 import { useT } from "../i18n";
@@ -26,6 +28,10 @@ type Props = {
   searchInputRef?: RefObject<HTMLInputElement | null>;
   createOpen?: boolean;
   onCreateOpenChange?: (open: boolean) => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 };
 
 const FILTER_VIEW_DEFS: {
@@ -33,8 +39,7 @@ const FILTER_VIEW_DEFS: {
   labelKey:
     | "automations.filter.all"
     | "automations.filter.favorites"
-    | "automations.filter.recent"
-    | "automations.filter.scripts";
+    | "automations.filter.recent";
   countKey: keyof FilterCounts;
 }[] = [
   {
@@ -52,11 +57,6 @@ const FILTER_VIEW_DEFS: {
     labelKey: "automations.filter.recent",
     countKey: "recent",
   },
-  {
-    value: "scripts",
-    labelKey: "automations.filter.scripts",
-    countKey: "scripts",
-  },
 ];
 
 export function AutomationsToolbar({
@@ -72,6 +72,10 @@ export function AutomationsToolbar({
   searchInputRef,
   createOpen,
   onCreateOpenChange,
+  canUndo = false,
+  canRedo = false,
+  onUndo,
+  onRedo,
 }: Props) {
   const t = useT();
   const localSearchRef = useRef<HTMLInputElement>(null);
@@ -160,6 +164,34 @@ export function AutomationsToolbar({
         </label>
 
         <div className="caster-automations-filter-bar-end">
+          {onUndo || onRedo ? (
+            <div
+              className="caster-automations-history"
+              role="group"
+              aria-label={t("automations.toolbar.aria")}
+            >
+              <button
+                type="button"
+                className="caster-btn caster-btn-ghost caster-automations-history-btn"
+                disabled={!canUndo}
+                onClick={onUndo}
+                title={t("automations.toolbar.undoTitle")}
+                aria-label={t("automations.toolbar.undo")}
+              >
+                <Undo2 size={14} aria-hidden />
+              </button>
+              <button
+                type="button"
+                className="caster-btn caster-btn-ghost caster-automations-history-btn"
+                disabled={!canRedo}
+                onClick={onRedo}
+                title={t("automations.toolbar.redoTitle")}
+                aria-label={t("automations.toolbar.redo")}
+              >
+                <Redo2 size={14} aria-hidden />
+              </button>
+            </div>
+          ) : null}
           <DropdownMenu
             label={t("automations.create.label")}
             ariaLabel={t("automations.create.aria")}
