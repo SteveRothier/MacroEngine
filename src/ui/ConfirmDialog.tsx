@@ -10,15 +10,24 @@ export type ConfirmOptions = {
   /** Third action (e.g. Abandonner) between confirm and cancel. */
   discardLabel?: string;
   danger?: boolean;
+  /** Non-interactive hold (no buttons / Escape). */
+  busy?: boolean;
 };
 
 export type ConfirmOutcome = "confirm" | "discard" | "cancel";
 
 type Pending = ConfirmOptions & {
   resolve: (outcome: ConfirmOutcome) => void;
+  token: number;
 };
 
+type PushPending = (
+  next: Pending | null | ((prev: Pending | null) => Pending | null),
+) => void;
+
 let askFn: ((opts: ConfirmOptions) => Promise<ConfirmOutcome>) | null = null;
+let pushPending: PushPending | null = null;
+let pendingSeq = 0;
 
 export function confirmAction(opts: ConfirmOptions): Promise<boolean> {
   return confirmChoice(opts).then((o) => o === "confirm");
@@ -30,27 +39,84 @@ export function confirmChoice(opts: ConfirmOptions): Promise<ConfirmOutcome> {
   return askFn(opts);
 }
 
+export type ConfirmHold = {
+  /** Drop the busy overlay (deferred-safe). */
+  release: () => void;
+  /** Replace busy overlay in-place with a normal choice dialog. */
+  replaceChoice: (opts: ConfirmOptions) => Promise<ConfirmOutcome>;
+};
+
+/**
+ * Keep the confirm overlay mounted with a busy (non-interactive) state.
+ * Use after a confirmChoice resolve so Accueil never flashes between steps.
+ */
+export function confirmBusy(opts: {
+  title: string;
+  message: string;
+}): ConfirmHold {
+  const token = ++pendingSeq;
+  if (!pushPending) {
+    return {
+      release: () => undefined,
+      replaceChoice: (o) => confirmChoice(o),
+    };
+  }
+  pushPending({
+    title: opts.title,
+    message: opts.message,
+    busy: true,
+    danger: false,
+    resolve: () => undefined,
+    token,
+  });
+  return {
+    release: () => {
+      pushPending?.((p) => (p?.token === token ? null : p));
+    },
+    replaceChoice: (opts) => {
+      if (!pushPending) return Promise.resolve("cancel" as const);
+      return new Promise((resolve) => {
+        pushPending!({
+          ...opts,
+          resolve,
+          token: ++pendingSeq,
+          busy: false,
+        });
+      });
+    },
+  };
+}
+
 export function ConfirmHost() {
   const t = useT();
   const [pending, setPending] = useState<Pending | null>(null);
 
   useEffect(() => {
+    pushPending = setPending;
     askFn = (opts) =>
       new Promise((resolve) => {
-        setPending({ ...opts, resolve });
+        setPending({
+          ...opts,
+          resolve,
+          token: ++pendingSeq,
+        });
       });
     return () => {
       askFn = null;
+      pushPending = null;
     };
   }, []);
 
   useEffect(() => {
-    if (!pending) return;
+    if (!pending || pending.busy) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        const token = pending.token;
         pending.resolve("cancel");
-        setPending(null);
+        queueMicrotask(() => {
+          setPending((p) => (p?.token === token ? null : p));
+        });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -64,16 +130,23 @@ export function ConfirmHost() {
   const cancelLabel = current.cancelLabel ?? t("common.no");
   const discardLabel = current.discardLabel;
   const danger = current.danger !== false;
+  const busy = current.busy === true;
 
   function close(outcome: ConfirmOutcome) {
+    const token = current.token;
     current.resolve(outcome);
-    setPending(null);
+    // Defer clear so the next confirmChoice/confirmBusy in the same turn
+    // can replace pending without unmounting the overlay.
+    queueMicrotask(() => {
+      setPending((p) => (p?.token === token ? null : p));
+    });
   }
 
   return (
     <div
       className="caster-dialog-overlay"
       onMouseDown={(e) => {
+        if (busy) return;
         if (e.target === e.currentTarget) close("cancel");
       }}
     >
@@ -83,6 +156,7 @@ export function ConfirmHost() {
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-msg"
+        aria-busy={busy || undefined}
       >
         <h2 id="confirm-dialog-title" className="caster-dialog-title">
           {current.title}
@@ -90,41 +164,47 @@ export function ConfirmHost() {
         <div className="caster-dialog-body">
           <AlertTriangle
             className={
-              danger ? "caster-dialog-icon caster-dialog-icon--danger" : "caster-dialog-icon"
+              danger && !busy
+                ? "caster-dialog-icon caster-dialog-icon--danger"
+                : "caster-dialog-icon"
             }
             size={22}
             aria-hidden
           />
           <p id="confirm-dialog-msg">{current.message}</p>
         </div>
-        <div className="caster-dialog-actions">
-          <button
-            type="button"
-            className={
-              danger ? "caster-btn caster-btn-danger" : "caster-btn caster-btn-primary"
-            }
-            autoFocus
-            onClick={() => close("confirm")}
-          >
-            {confirmLabel}
-          </button>
-          {discardLabel ? (
+        {busy ? null : (
+          <div className="caster-dialog-actions">
+            <button
+              type="button"
+              className={
+                danger
+                  ? "caster-btn caster-btn-danger"
+                  : "caster-btn caster-btn-primary"
+              }
+              autoFocus
+              onClick={() => close("confirm")}
+            >
+              {confirmLabel}
+            </button>
+            {discardLabel ? (
+              <button
+                type="button"
+                className="caster-btn caster-btn-ghost"
+                onClick={() => close("discard")}
+              >
+                {discardLabel}
+              </button>
+            ) : null}
             <button
               type="button"
               className="caster-btn caster-btn-ghost"
-              onClick={() => close("discard")}
+              onClick={() => close("cancel")}
             >
-              {discardLabel}
+              {cancelLabel}
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="caster-btn caster-btn-ghost"
-            onClick={() => close("cancel")}
-          >
-            {cancelLabel}
-          </button>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

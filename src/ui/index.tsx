@@ -618,7 +618,11 @@ export const Icons = {
   ),
 };
 
-export { ConfirmHost, confirmAction, confirmChoice } from "./ConfirmDialog";
-export type { ConfirmOptions, ConfirmOutcome } from "./ConfirmDialog";
+export { ConfirmHost, confirmAction, confirmBusy, confirmChoice } from "./ConfirmDialog";
+export type {
+  ConfirmHold,
+  ConfirmOptions,
+  ConfirmOutcome,
+} from "./ConfirmDialog";
 export { PromptHost, promptAction } from "./PromptDialog";
 export type { PromptOptions } from "./PromptDialog";
