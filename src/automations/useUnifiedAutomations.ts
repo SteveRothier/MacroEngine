@@ -42,11 +42,15 @@ function folderName(
   return folders.find((f) => f.id === id)?.name ?? t("common.empty");
 }
 
-function toFolderOptions(
-  kind: "macro" | "clicker",
-  folders: LibraryFolder[],
-): AutomationFolderOption[] {
-  return folders.map((f) => ({ id: f.id, name: f.name, kind }));
+function toFolderOptions(folders: LibraryFolder[]): AutomationFolderOption[] {
+  const seen = new Set<string>();
+  const out: AutomationFolderOption[] = [];
+  for (const f of folders) {
+    if (seen.has(f.id)) continue;
+    seen.add(f.id);
+    out.push({ id: f.id, name: f.name });
+  }
+  return out;
 }
 
 function macroTriggerLabel(m: MacroSummary, t: TFunction): string {
@@ -113,10 +117,9 @@ export function useUnifiedAutomations(options: {
       setRecentOrder(qa.recent.map((r) => rowKey(r.kind, r.id)));
       const runLabels = lastRunLabelMap(qa.recent, t, locale);
       const runTooltips = lastRunTooltipMap(qa.recent, t, locale);
-      setFolders([
-        ...toFolderOptions("macro", macroIndex.folders),
-        ...toFolderOptions("clicker", clickerIndex.folders),
-      ]);
+      setFolders(
+        toFolderOptions([...macroIndex.folders, ...clickerIndex.folders]),
+      );
 
       const macroMap = new Map(macros.map((m) => [m.name, m]));
       const clickerMap = new Map(clickers.map((c) => [c.name, c]));

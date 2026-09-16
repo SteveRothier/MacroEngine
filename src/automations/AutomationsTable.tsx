@@ -520,9 +520,9 @@ export function AutomationsTable({
       const key = folderOptionKey(f);
       const items = sorted.filter(
         (r) =>
-          r.kind === f.kind &&
+          r.kind !== "script" &&
           r.folderId != null &&
-          folderOptionKey({ kind: r.kind, id: r.folderId }) === key,
+          r.folderId === f.id,
       );
       out.push({
         id: `folder:${key}`,
@@ -766,10 +766,6 @@ export function AutomationsTable({
     folder: AutomationFolderOption | null,
   ) {
     if (r.kind === "script") return;
-    if (folder && folder.kind !== r.kind) {
-      toast.info(t("automations.toast.folderIncompatible"));
-      return;
-    }
     try {
       await invoke("move_library_item_cmd", {
         kind: r.kind,
@@ -818,12 +814,9 @@ export function AutomationsTable({
     toast.success(t("automations.toast.orderUpdated"));
   }
 
-  async function onCreateFolder(kind: "macro" | "clicker") {
+  async function onCreateFolder() {
     const name = await promptAction({
-      title:
-        kind === "macro"
-          ? t("automations.confirm.createFolderMacroTitle")
-          : t("automations.confirm.createFolderClickerTitle"),
+      title: t("automations.confirm.createFolderTitle"),
       defaultValue: "",
       confirmLabel: t("automations.confirm.createFolderConfirm"),
       placeholder: t("automations.confirm.createFolderPlaceholder"),
@@ -833,13 +826,13 @@ export function AutomationsTable({
     try {
       const created = await invoke<{ id: string; name: string }>(
         "create_library_folder_cmd",
-        { kind, name: trimmed, parentId: null },
+        { kind: "macro", name: trimmed, parentId: null },
       );
       await refresh();
       onRefresh?.();
       setCollapsedSections((prev) => {
         const next = new Set(prev);
-        next.delete(`folder:${folderOptionKey({ kind, id: created.id })}`);
+        next.delete(`folder:${folderOptionKey(created)}`);
         return next;
       });
       toast.success(t("automations.toast.folderCreated", { name: created.name }));
@@ -862,7 +855,7 @@ export function AutomationsTable({
     try {
       const renamed = await invoke<{ id: string; name: string }>(
         "rename_library_folder_cmd",
-        { kind: folder.kind, id: folder.id, name: trimmed },
+        { kind: "macro", id: folder.id, name: trimmed },
       );
       await refresh();
       onRefresh?.();
@@ -989,7 +982,7 @@ export function AutomationsTable({
     }
     try {
       await invoke("delete_library_folder_cmd", {
-        kind: folder.kind,
+        kind: "macro",
         id: folder.id,
       });
       await refresh();
@@ -1238,18 +1231,15 @@ export function AutomationsTable({
   }, [selected.size, createOpen, focusKey, sorted, flatKeys, dragRow]);
 
   const moveFolders = useMemo(() => {
-    const kinds = new Set(
-      selectedRows.filter((r) => r.kind !== "script").map((r) => r.kind),
+    const hasLibrary = selectedRows.some(
+      (r) => r.kind === "macro" || r.kind === "clicker",
     );
-    return folders.filter((f) => kinds.has(f.kind));
+    return hasLibrary ? folders : [];
   }, [folders, selectedRows]);
 
   const ctxMenuItems = useMemo(() => {
     if (!ctxRow) return [];
-    const rowFolders =
-      ctxRow.kind === "script"
-        ? []
-        : folders.filter((f) => f.kind === ctxRow.kind);
+    const rowFolders = ctxRow.kind === "script" ? [] : folders;
     return buildAutomationRowMenuItems(ctxRow, t, {
       onOpen: () => openRow(ctxRow),
       onLaunch: () => void launchRow(ctxRow),
@@ -1291,20 +1281,7 @@ export function AutomationsTable({
         id: "create-folder",
         label: t("automations.menu.empty.newFolder"),
         icon: <FolderPlus size={14} />,
-        submenu: [
-          {
-            id: "folder-macro",
-            label: t("automations.menu.empty.folderMacros"),
-            icon: <Workflow size={14} />,
-            onSelect: () => void onCreateFolder("macro"),
-          },
-          {
-            id: "folder-clicker",
-            label: t("automations.menu.empty.folderClickers"),
-            icon: <MousePointer2 size={14} />,
-            onSelect: () => void onCreateFolder("clicker"),
-          },
-        ],
+        onSelect: () => void onCreateFolder(),
       },
       { id: "sep-empty", label: "", separator: true },
       {
@@ -1369,7 +1346,7 @@ export function AutomationsTable({
         onCreateMacro={onCreateMacro}
         onCreateClicker={onCreateClicker}
         onCreateScript={onCreateScript}
-        onCreateFolder={(kind) => void onCreateFolder(kind)}
+        onCreateFolder={() => void onCreateFolder()}
         searchInputRef={searchInputRef}
         createOpen={createOpen}
         onCreateOpenChange={setCreateOpen}
@@ -1524,14 +1501,8 @@ export function AutomationsTable({
               const sectionDropKey = (() => {
                 if (!dragRow || dragRow.kind === "script") return null;
                 if (section.kind === "folder" && section.folder) {
-                  if (section.folder.kind !== dragRow.kind) return null;
                   const key = folderOptionKey(section.folder);
-                  const alreadyIn =
-                    dragRow.folderId != null &&
-                    folderOptionKey({
-                      kind: dragRow.kind,
-                      id: dragRow.folderId,
-                    }) === key;
+                  const alreadyIn = dragRow.folderId === section.folder.id;
                   return alreadyIn ? null : key;
                 }
                 return null;
@@ -1599,17 +1570,18 @@ export function AutomationsTable({
                             .filter(Boolean)
                             .join(" ")}
                         />
-                        <span
-                          className={`caster-auto-kind caster-auto-kind--folder caster-auto-kind--${section.folder.kind}`}
-                        >
+                        <span className="caster-auto-kind caster-auto-kind--folder">
                           <Folder size={16} aria-hidden />
                         </span>
                         <div className="caster-auto-row-main">
                           <span className="caster-auto-row-name">{section.name}</span>
                           <span className="caster-auto-row-sub">
-                            {t("automations.folder.itemCount", {
-                              count: section.items.length,
-                            })}
+                            {t(
+                              section.items.length === 1
+                                ? "automations.folder.itemCountOne"
+                                : "automations.folder.itemCount",
+                              { count: section.items.length },
+                            )}
                           </span>
                         </div>
                       </button>
@@ -2078,7 +2050,7 @@ export function AutomationsTable({
                                 moveFolders={
                                   r.kind === "script"
                                     ? []
-                                    : folders.filter((f) => f.kind === r.kind)
+                                    : folders
                                 }
                                 onMoveToFolder={(folder) =>
                                   void moveRowToFolder(r, folder)
@@ -2205,15 +2177,19 @@ export function AutomationsTable({
                     : []),
                   ...moveFolders.map((f) => ({
                     id: folderOptionKey(f),
-                    label: t("automations.folder.namedWithKind", {
-                      name: f.name,
-                      kind:
-                        f.kind === "macro"
-                          ? t("automations.folder.kindSuffixMacro")
-                          : t("automations.folder.kindSuffixClicker"),
-                    }),
+                    label: f.name,
                     icon: <Folder size={14} />,
-                    onSelect: () => void onMoveSelected(f.id, f.kind),
+                    onSelect: () => {
+                      const kinds = new Set<"macro" | "clicker">();
+                      for (const r of selectedRows) {
+                        if (r.kind === "macro" || r.kind === "clicker") {
+                          kinds.add(r.kind);
+                        }
+                      }
+                      for (const kind of kinds) {
+                        void onMoveSelected(f.id, kind);
+                      }
+                    },
                   })),
                 ]}
               >

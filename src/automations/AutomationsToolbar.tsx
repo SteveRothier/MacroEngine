@@ -22,7 +22,7 @@ type Props = {
   onCreateMacro: () => void;
   onCreateClicker: () => void;
   onCreateScript: () => void;
-  onCreateFolder?: (kind: "macro" | "clicker") => void;
+  onCreateFolder?: () => void;
   searchInputRef?: RefObject<HTMLInputElement | null>;
   createOpen?: boolean;
   onCreateOpenChange?: (open: boolean) => void;
@@ -103,16 +103,10 @@ export function AutomationsToolbar({
       ? [
           { id: "sep-folders", label: "", separator: true as const },
           {
-            id: "folder-macro",
-            label: t("automations.folder.createMacro"),
+            id: "folder",
+            label: t("automations.folder.create"),
             icon: <FolderPlus size={14} />,
-            onSelect: () => onCreateFolder("macro"),
-          },
-          {
-            id: "folder-clicker",
-            label: t("automations.folder.createClicker"),
-            icon: <FolderPlus size={14} />,
-            onSelect: () => onCreateFolder("clicker"),
+            onSelect: () => onCreateFolder(),
           },
         ]
       : []),
