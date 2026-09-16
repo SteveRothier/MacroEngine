@@ -295,6 +295,12 @@ export const automations = defineCatalog({
       confirmOnly: "Convertir seulement",
       workingTitle: "Conversion",
       workingMessage: "Conversion en cours…",
+      batch: "Convertir en…",
+      batchTitle: "Convertir la sélection",
+      batchMessage:
+        "Créer {count} nouvel(s) élément(s) « {to} » ? Les originaux sont conservés.",
+      batchSummary: "{ok} créé(s) · {fail} échec(s)",
+      batchMoreFails: "… et {count} autre(s)",
       wrapTitle: "Conversion partielle",
       wrapMessage:
         "Transpile impossible ({detail}). Créer un script qui lance la macro d’origine ?",
@@ -596,6 +602,12 @@ export const automations = defineCatalog({
       confirmOnly: "Convert only",
       workingTitle: "Converting",
       workingMessage: "Conversion in progress…",
+      batch: "Convert to…",
+      batchTitle: "Convert selection",
+      batchMessage:
+        "Create {count} new “{to}” item(s)? Originals are kept.",
+      batchSummary: "{ok} created · {fail} failed",
+      batchMoreFails: "… and {count} more",
       wrapTitle: "Partial conversion",
       wrapMessage:
         "Transpile not possible ({detail}). Create a script that runs the original macro?",

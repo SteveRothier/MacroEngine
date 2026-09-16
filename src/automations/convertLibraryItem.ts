@@ -19,6 +19,18 @@ export type ConvertRunOutcome = {
   openAfter: boolean;
 };
 
+export type ConvertBatchItem = {
+  fromKind: AutomationKind;
+  id: string;
+  name: string;
+};
+
+export type ConvertBatchOutcome = {
+  openAfter: boolean;
+  ok: ConvertResultDto[];
+  failed: { name: string; error: string }[];
+};
+
 export function convertTargetsFor(
   kind: AutomationKind,
 ): AutomationKind[] {
@@ -30,6 +42,22 @@ export function convertTargetsFor(
     case "clicker":
       return ["macro", "script"];
   }
+}
+
+/** Intersection of convert targets for unlocked rows (empty if none). */
+export function commonConvertTargets(
+  rows: { kind: AutomationKind; locked?: boolean }[],
+): AutomationKind[] {
+  const unlocked = rows.filter((r) => !r.locked);
+  if (unlocked.length === 0) return [];
+  let common: Set<AutomationKind> | null = null;
+  for (const r of unlocked) {
+    const targets = new Set(convertTargetsFor(r.kind));
+    common = common
+      ? new Set([...common].filter((k) => targets.has(k)))
+      : targets;
+  }
+  return common ? [...common] : [];
 }
 
 function formatReport(
@@ -67,6 +95,48 @@ const choiceLabels = (t: TFunction) => ({
   danger: false as const,
 });
 
+function preferredMode(
+  fromKind: AutomationKind,
+  toKind: AutomationKind,
+): "transpile" | "wrap" {
+  return fromKind === "macro" && toKind === "script" ? "transpile" : "wrap";
+}
+
+async function invokeConvert(
+  fromKind: AutomationKind,
+  id: string,
+  toKind: AutomationKind,
+  mode: "transpile" | "wrap",
+): Promise<ConvertResultDto> {
+  return invoke<ConvertResultDto>("convert_library_item_cmd", {
+    fromKind,
+    id,
+    toKind,
+    mode,
+  });
+}
+
+/** Transpile then auto-wrap on blocker (no dialog). */
+export async function convertOneSilent(opts: {
+  fromKind: AutomationKind;
+  id: string;
+  toKind: AutomationKind;
+}): Promise<ConvertResultDto> {
+  const mode = preferredMode(opts.fromKind, opts.toKind);
+  try {
+    return await invokeConvert(opts.fromKind, opts.id, opts.toKind, mode);
+  } catch (e) {
+    if (
+      mode === "transpile" &&
+      opts.fromKind === "macro" &&
+      opts.toKind === "script"
+    ) {
+      return await invokeConvert(opts.fromKind, opts.id, opts.toKind, "wrap");
+    }
+    throw e;
+  }
+}
+
 /** Ask Convert+open / Convert only / Cancel. Returns null if cancelled. */
 async function askConvertOpenChoice(
   t: TFunction,
@@ -89,8 +159,7 @@ export async function runLibraryConvert(opts: {
   t: TFunction;
 }): Promise<ConvertRunOutcome | null> {
   const { fromKind, id, toKind, name, t } = opts;
-  const preferredMode =
-    fromKind === "macro" && toKind === "script" ? "transpile" : "wrap";
+  const mode = preferredMode(fromKind, toKind);
 
   const openAfter = await askConvertOpenChoice(t, {
     title: t("automations.convert.confirmTitle"),
@@ -101,28 +170,18 @@ export async function runLibraryConvert(opts: {
   });
   if (openAfter == null) return null;
 
-  // Cover Accueil immediately so invoke / wrap dialog never flash the list.
   const hold = confirmBusy({
     title: t("automations.convert.workingTitle"),
     message: t("automations.convert.workingMessage"),
   });
 
   try {
-    const result = await invoke<ConvertResultDto>("convert_library_item_cmd", {
-      fromKind,
-      id,
-      toKind,
-      mode: preferredMode,
-    });
+    const result = await invokeConvert(fromKind, id, toKind, mode);
     hold.release();
     return { result, openAfter };
   } catch (e) {
     const msg = typeof e === "string" ? e : String(e);
-    if (
-      preferredMode === "transpile" &&
-      fromKind === "macro" &&
-      toKind === "script"
-    ) {
+    if (mode === "transpile" && fromKind === "macro" && toKind === "script") {
       const wrapOutcome = await hold.replaceChoice({
         title: t("automations.convert.wrapTitle"),
         message: t("automations.convert.wrapMessage", { detail: msg }),
@@ -136,15 +195,7 @@ export async function runLibraryConvert(opts: {
         message: t("automations.convert.workingMessage"),
       });
       try {
-        const result = await invoke<ConvertResultDto>(
-          "convert_library_item_cmd",
-          {
-            fromKind,
-            id,
-            toKind,
-            mode: "wrap",
-          },
-        );
+        const result = await invokeConvert(fromKind, id, toKind, "wrap");
         hold2.release();
         return { result, openAfter: wrapOpen };
       } catch (err) {
@@ -157,6 +208,55 @@ export async function runLibraryConvert(opts: {
   }
 }
 
+/** Convert several items with one confirm + hold overlay. */
+export async function runLibraryConvertBatch(opts: {
+  items: ConvertBatchItem[];
+  toKind: AutomationKind;
+  t: TFunction;
+}): Promise<ConvertBatchOutcome | null> {
+  const { items, toKind, t } = opts;
+  if (items.length === 0) return null;
+
+  const openAfter = await askConvertOpenChoice(t, {
+    title: t("automations.convert.batchTitle"),
+    message: t("automations.convert.batchMessage", {
+      count: items.length,
+      to: t(`automations.convert.kind.${toKind}`),
+    }),
+  });
+  if (openAfter == null) return null;
+
+  const hold = confirmBusy({
+    title: t("automations.convert.workingTitle"),
+    message: t("automations.convert.workingMessage"),
+  });
+
+  const ok: ConvertResultDto[] = [];
+  const failed: { name: string; error: string }[] = [];
+
+  try {
+    for (const item of items) {
+      try {
+        const result = await convertOneSilent({
+          fromKind: item.fromKind,
+          id: item.id,
+          toKind,
+        });
+        ok.push(result);
+      } catch (e) {
+        failed.push({
+          name: item.name,
+          error: typeof e === "string" ? e : String(e),
+        });
+      }
+    }
+  } finally {
+    hold.release();
+  }
+
+  return { openAfter, ok, failed };
+}
+
 export function convertSuccessMessage(
   result: ConvertResultDto,
   t: TFunction,
@@ -167,4 +267,38 @@ export function convertSuccessMessage(
   });
   const report = formatReport(result.report, t);
   return report ? `${base}\n${report}` : base;
+}
+
+export function convertBatchSummaryMessage(
+  outcome: ConvertBatchOutcome,
+  t: TFunction,
+): string {
+  const lines = [
+    t("automations.convert.batchSummary", {
+      ok: outcome.ok.length,
+      fail: outcome.failed.length,
+    }),
+  ];
+  for (const f of outcome.failed.slice(0, 3)) {
+    lines.push(`${f.name}: ${f.error}`);
+  }
+  if (outcome.failed.length > 3) {
+    lines.push(
+      t("automations.convert.batchMoreFails", {
+        count: outcome.failed.length - 3,
+      }),
+    );
+  }
+  const dropped = new Set<string>();
+  for (const r of outcome.ok) {
+    for (const d of r.report.dropped) dropped.add(d);
+  }
+  if (dropped.size) {
+    lines.push(
+      t("automations.convert.dropped", {
+        list: [...dropped].slice(0, 8).join(", "),
+      }),
+    );
+  }
+  return lines.join("\n");
 }

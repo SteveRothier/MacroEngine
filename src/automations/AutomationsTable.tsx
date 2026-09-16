@@ -57,8 +57,11 @@ import { AutomationsToolbar } from "./AutomationsToolbar";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import {
+  commonConvertTargets,
+  convertBatchSummaryMessage,
   convertSuccessMessage,
   runLibraryConvert,
+  runLibraryConvertBatch,
 } from "./convertLibraryItem";
 import {
   mergeAccueilPrefs,
@@ -1216,6 +1219,43 @@ export function AutomationsTable({
     });
   }
 
+  function scheduleConvertBatch(toKind: AutomationRow["kind"]) {
+    const items = selectedRows
+      .filter((r) => !r.locked)
+      .map((r) => ({ fromKind: r.kind, id: r.id, name: r.name }));
+    if (items.length === 0) return;
+    queueMicrotask(() => {
+      void (async () => {
+        try {
+          const outcome = await runLibraryConvertBatch({
+            items,
+            toKind,
+            t,
+          });
+          if (!outcome) return;
+          if (outcome.ok.length === 0 && outcome.failed.length > 0) {
+            toast.error(convertBatchSummaryMessage(outcome, t));
+            return;
+          }
+          toast.success(convertBatchSummaryMessage(outcome, t));
+          if (outcome.openAfter && outcome.ok.length > 0) {
+            for (const result of outcome.ok) {
+              onNavigate({
+                name: "automation",
+                id: result.newId,
+                kind: result.toKind as AutomationRow["kind"],
+                label: result.newName,
+              });
+            }
+          }
+          setSelected(new Set());
+        } catch (e) {
+          toast.error(errMessage(e, t("automations.convert.fail")));
+        }
+      })();
+    });
+  }
+
   async function onRenameOne(r: AutomationRow) {
     if (r.locked) {
       toast.info(t("automations.toast.unlockBeforeRename"));
@@ -1507,6 +1547,11 @@ export function AutomationsTable({
         (r) => r.kind === "script" && r.folderId != null,
       ),
     }),
+    [selectedRows],
+  );
+
+  const batchConvertTargets = useMemo(
+    () => commonConvertTargets(selectedRows),
     [selectedRows],
   );
 
@@ -2327,6 +2372,24 @@ export function AutomationsTable({
               >
                 <Folder size={14} aria-hidden />
                 {t("automations.selection.folder")}
+                <ChevronDown size={14} aria-hidden />
+              </DropdownMenu>
+            ) : null}
+            {batchConvertTargets.length > 0 ? (
+              <DropdownMenu
+                label={t("automations.convert.batch")}
+                ariaLabel={t("automations.convert.batch")}
+                align="end"
+                triggerClassName="caster-btn caster-btn-ghost"
+                items={batchConvertTargets.map((to) => ({
+                  id: `batch-convert-${to}`,
+                  label: t(`automations.convert.kind.${to}`),
+                  icon: <RefreshCw size={14} />,
+                  onSelect: () => scheduleConvertBatch(to),
+                }))}
+              >
+                <RefreshCw size={14} aria-hidden />
+                {t("automations.convert.batch")}
                 <ChevronDown size={14} aria-hidden />
               </DropdownMenu>
             ) : null}
