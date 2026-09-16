@@ -58,7 +58,13 @@ describe("buildAutomationRowMenuItems", () => {
     const unfiled = buildAutomationRowMenuItems(
       baseRow({ kind: "macro", id: "M", name: "M", folderId: null }),
       t,
-      { onMoveToFolder: onMove, moveFolders: folders },
+      {
+        onOpen: vi.fn(),
+        onLaunch: vi.fn(),
+        onDelete: vi.fn(),
+        onMoveToFolder: onMove,
+        moveFolders: folders,
+      },
     );
     const moveUnfiled = unfiled.find((i) => i.id === "move");
     expect(moveUnfiled?.submenu?.map((s) => s.id)).toEqual([
@@ -75,12 +81,53 @@ describe("buildAutomationRowMenuItems", () => {
         folderLabel: "Albion",
       }),
       t,
-      { onMoveToFolder: onMove, moveFolders: folders },
+      {
+        onOpen: vi.fn(),
+        onLaunch: vi.fn(),
+        onDelete: vi.fn(),
+        onMoveToFolder: onMove,
+        moveFolders: folders,
+      },
     );
     const moveIn = inAlbion.find((i) => i.id === "move");
     expect(moveIn?.submenu?.map((s) => s.id)).toEqual([
       "move-root",
       "move-other",
+    ]);
+  });
+
+  it("offers convert targets by kind", () => {
+    const onConvert = vi.fn();
+    const actions = {
+      onOpen: vi.fn(),
+      onLaunch: vi.fn(),
+      onDelete: vi.fn(),
+      onConvertTo: onConvert,
+    };
+    const macro = buildAutomationRowMenuItems(
+      baseRow({ kind: "macro", id: "M", name: "M" }),
+      t,
+      actions,
+    );
+    expect(macro.find((i) => i.id === "convert")?.submenu?.map((s) => s.id)).toEqual([
+      "convert-script",
+    ]);
+    const script = buildAutomationRowMenuItems(
+      baseRow({ kind: "script", id: "S", name: "S" }),
+      t,
+      actions,
+    );
+    expect(script.find((i) => i.id === "convert")?.submenu?.map((s) => s.id)).toEqual([
+      "convert-macro",
+    ]);
+    const clicker = buildAutomationRowMenuItems(
+      baseRow({ kind: "clicker", id: "C", name: "C" }),
+      t,
+      actions,
+    );
+    expect(clicker.find((i) => i.id === "convert")?.submenu?.map((s) => s.id)).toEqual([
+      "convert-macro",
+      "convert-script",
     ]);
   });
 });

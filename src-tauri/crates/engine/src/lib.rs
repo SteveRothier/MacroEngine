@@ -9,6 +9,7 @@ pub mod app_state;
 pub mod cancel;
 pub mod clicker;
 pub mod clicker_presets;
+pub mod convert;
 pub mod env;
 pub mod event_bus;
 pub mod hotkeys;
@@ -48,6 +49,9 @@ pub use clicker_presets::{
     delete_preset, duplicate_preset, export_preset_to_path, import_preset_from_path,
     list_preset_summaries, list_presets, load_preset, rename_preset, save_preset,
     save_preset_with_trigger, ClickerPreset, ClickerPresetSummary, PresetError,
+};
+pub use convert::{
+    convert_library_item, ConvertError, ConvertMode, ConvertReport, ConvertResult,
 };
 pub use library_index::{
     assert_not_locked, create_library_folder, delete_library_folder, enrich_macro_summaries,

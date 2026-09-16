@@ -20,6 +20,7 @@ type Props = {
   onReveal?: () => void;
   moveFolders?: AutomationFolderOption[];
   onMoveToFolder?: (folder: AutomationFolderOption | null) => void;
+  onConvertTo?: (toKind: AutomationRow["kind"]) => void;
 };
 
 export function AutomationRowMenu({
@@ -37,6 +38,7 @@ export function AutomationRowMenu({
   onReveal,
   moveFolders,
   onMoveToFolder,
+  onConvertTo,
 }: Props) {
   const t = useT();
   const items = buildAutomationRowMenuItems(row, t, {
@@ -51,6 +53,7 @@ export function AutomationRowMenu({
     onReveal,
     moveFolders,
     onMoveToFolder,
+    onConvertTo,
     icons: automationRowMenuIcons(),
   });
 

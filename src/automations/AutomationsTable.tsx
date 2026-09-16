@@ -57,6 +57,10 @@ import { AutomationsToolbar } from "./AutomationsToolbar";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import {
+  convertSuccessMessage,
+  runLibraryConvert,
+} from "./convertLibraryItem";
+import {
   mergeAccueilPrefs,
   mergeAutomationPrefs,
   mergeScriptsPrefs,
@@ -1170,6 +1174,40 @@ export function AutomationsTable({
     }
   }
 
+  async function onConvertOne(r: AutomationRow, toKind: AutomationRow["kind"]) {
+    try {
+      const result = await runLibraryConvert({
+        fromKind: r.kind,
+        id: r.id,
+        toKind,
+        name: r.name,
+        t,
+      });
+      if (!result) return;
+      setMenuKey(null);
+      await refresh({ silent: true });
+      onRefresh?.();
+      const open = await confirmAction({
+        title: t("automations.convert.success", {
+          name: result.newName,
+          kind: t(`automations.convert.kind.${result.toKind}`),
+        }),
+        message: convertSuccessMessage(result, t),
+        confirmLabel: t("automations.convert.openAfter"),
+      });
+      if (open) {
+        onNavigate({
+          name: "automation",
+          id: result.newId,
+          kind: result.toKind as AutomationRow["kind"],
+          label: result.newName,
+        });
+      }
+    } catch (e) {
+      toast.error(errMessage(e, t("automations.convert.fail")));
+    }
+  }
+
   async function onRenameOne(r: AutomationRow) {
     if (r.locked) {
       toast.info(t("automations.toast.unlockBeforeRename"));
@@ -1478,6 +1516,7 @@ export function AutomationsTable({
       onReveal: () => void onRevealOne(ctxRow),
       moveFolders: rowFolders,
       onMoveToFolder: (folder) => void moveRowToFolder(ctxRow, folder),
+      onConvertTo: (to) => void onConvertOne(ctxRow, to),
       onDelete: () => void onDeleteOne(ctxRow),
       icons: automationRowMenuIcons(),
     });
@@ -2126,6 +2165,7 @@ export function AutomationsTable({
                                 onMoveToFolder={(folder) =>
                                   void moveRowToFolder(r, folder)
                                 }
+                                onConvertTo={(to) => void onConvertOne(r, to)}
                               />
                             </div>
                           </div>

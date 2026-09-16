@@ -112,6 +112,7 @@ export const automations = defineCatalog({
         moveTo: "Déplacer vers",
         noFolder: "Sans dossier",
         reveal: "Afficher dans l’explorateur",
+        convertTo: "Convertir en",
         trash: "Mettre à la corbeille",
         delete: "Supprimer",
       },
@@ -280,6 +281,26 @@ export const automations = defineCatalog({
       redo: "Rétablir",
       redoTitle: "Rétablir (Ctrl+Y)",
     },
+    convert: {
+      kind: {
+        macro: "Macro",
+        clicker: "Clicker",
+        script: "Script",
+      },
+      confirmTitle: "Convertir",
+      confirmMessage:
+        "Créer un nouvel élément « {to} » à partir de « {name} » ? L’original est conservé.",
+      confirm: "Convertir",
+      wrapTitle: "Conversion partielle",
+      wrapMessage:
+        "Transpile impossible ({detail}). Créer un script qui lance la macro d’origine ?",
+      wrapConfirm: "Créer un script référence",
+      success: "Créé · {name} ({kind})",
+      fail: "Conversion impossible",
+      kept: "Conservé : {list}",
+      dropped: "Non converti : {list}",
+      openAfter: "Ouvrir",
+    },
   },
   en: {
     filter: {
@@ -388,6 +409,7 @@ export const automations = defineCatalog({
         moveTo: "Move to",
         noFolder: "No folder",
         reveal: "Show in Explorer",
+        convertTo: "Convert to",
         trash: "Move to trash",
         delete: "Delete",
       },
@@ -555,6 +577,26 @@ export const automations = defineCatalog({
       undoTitle: "Undo (Ctrl+Z)",
       redo: "Redo",
       redoTitle: "Redo (Ctrl+Y)",
+    },
+    convert: {
+      kind: {
+        macro: "Macro",
+        clicker: "Clicker",
+        script: "Script",
+      },
+      confirmTitle: "Convert",
+      confirmMessage:
+        "Create a new “{to}” from “{name}”? The original is kept.",
+      confirm: "Convert",
+      wrapTitle: "Partial conversion",
+      wrapMessage:
+        "Transpile not possible ({detail}). Create a script that runs the original macro?",
+      wrapConfirm: "Create reference script",
+      success: "Created · {name} ({kind})",
+      fail: "Conversion failed",
+      kept: "Kept: {list}",
+      dropped: "Not converted: {list}",
+      openAfter: "Open",
     },
   },
 });
