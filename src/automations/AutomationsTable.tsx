@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -42,12 +43,8 @@ import { useLocale, useT, type TFunction } from "../i18n";
 import type { ScriptDoc } from "../scripts/types";
 import { newScriptId } from "../scripts/ScriptEditorView";
 import {
-  canReorderAccueilRows,
-  resolveAccueilReorderDrop,
-  type AccueilDropEdge,
-} from "./accueilDrop";
-import {
   applyAccueilOrder,
+  beforeKeyForEndOfFolder,
   loadAccueilOrder,
   mergeAccueilOrder,
   nearestSameKindBeforeId,
@@ -80,23 +77,11 @@ import {
   type AutomationRow,
   type DisplayOptions,
 } from "./types";
+import {
+  useAccueilDnd,
+  type AccueilDropIntent,
+} from "./useAccueilDnd";
 import { useUnifiedAutomations } from "./useUnifiedAutomations";
-
-const EDGE_HYSTERESIS_PX = 6;
-const AUTO_SCROLL_EDGE_PX = 48;
-const AUTO_SCROLL_MAX_PX = 18;
-
-type RowDropEdge = {
-  key: string;
-  edge: AccueilDropEdge;
-};
-
-type DragGhost = {
-  name: string;
-  kind: AutomationRow["kind"];
-  x: number;
-  y: number;
-};
 
 type Props = {
   onNavigate: (route: AppRoute) => void;
@@ -247,100 +232,212 @@ export function AutomationsTable({
   const ctxMenu = useContextMenuState();
   const [ctxRow, setCtxRow] = useState<AutomationRow | null>(null);
   const emptyCtx = useContextMenuState();
-  const [dragRow, setDragRow] = useState<AutomationRow | null>(null);
-  const [dropFolderKey, setDropFolderKey] = useState<string | null>(null);
-  const [dropEdge, setDropEdge] = useState<RowDropEdge | null>(null);
-  const [dragGhost, setDragGhost] = useState<DragGhost | null>(null);
-  /** True once folder-move drag has passed the threshold (sync for click race). */
-  const folderDragArmedRef = useRef(false);
-  /** Swallow the click that follows a completed drag (pointerup → click). */
-  const suppressClickAfterDragRef = useRef(false);
-  const folderDragSessionRef = useRef<{
-    row: AutomationRow;
-    pointerId: number;
-    startX: number;
-    startY: number;
-  } | null>(null);
-  const dropEdgeRef = useRef<RowDropEdge | null>(null);
-  const dropFolderKeyRef = useRef<string | null>(null);
   const listScrollRef = useRef<HTMLDivElement | null>(null);
   const sortedRef = useRef<AutomationRow[]>([]);
+  const foldersRef = useRef(folders);
   const displayRef = useRef(display);
+  const sortByRef = useRef(display.sortBy);
   displayRef.current = display;
-  dropFolderKeyRef.current = dropFolderKey;
+  sortByRef.current = display.sortBy;
+  foldersRef.current = folders;
 
-  function clearFolderDrag(opts?: { suppressClick?: boolean }) {
-    const suppress =
-      opts?.suppressClick === true || folderDragArmedRef.current;
-    folderDragSessionRef.current = null;
-    folderDragArmedRef.current = false;
-    dropEdgeRef.current = null;
-    setDragRow(null);
-    setDropFolderKey(null);
-    setDropEdge(null);
-    setDragGhost(null);
-    if (suppress) {
-      suppressClickAfterDragRef.current = true;
-      const swallow = (ev: Event) => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        suppressClickAfterDragRef.current = false;
-        window.removeEventListener("click", swallow, true);
-      };
-      window.addEventListener("click", swallow, true);
-      window.setTimeout(() => {
-        window.removeEventListener("click", swallow, true);
-        suppressClickAfterDragRef.current = false;
-      }, 400);
+  const [manualOrder, setManualOrder] = useState<string[]>([]);
+  const manualOrderRef = useRef(manualOrder);
+  manualOrderRef.current = manualOrder;
+
+  /** Optimistic folder membership until silent refresh reconciles. */
+  const [folderOverrides, setFolderOverrides] = useState<
+    Map<string, { folderId: string | null; folderLabel: string }>
+  >(() => new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadAccueilOrder().then((keys) => {
+      if (!cancelled) setManualOrder(keys);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const ensureOrderSort = useCallback(() => {
+    if (displayRef.current.sortBy !== "order") {
+      onDisplayChange({
+        ...displayRef.current,
+        sortBy: "order",
+        sortDir: "asc",
+      });
     }
-  }
+  }, [onDisplayChange]);
 
-  function autoScrollNearEdges(clientY: number) {
-    const list = listScrollRef.current;
-    if (!list) return;
-    const rect = list.getBoundingClientRect();
-    if (clientY < rect.top + AUTO_SCROLL_EDGE_PX) {
-      const t = 1 - (clientY - rect.top) / AUTO_SCROLL_EDGE_PX;
-      list.scrollTop -= Math.ceil(
-        AUTO_SCROLL_MAX_PX * Math.min(1, Math.max(0, t)),
+  const applyOptimisticOrder = useCallback(
+    (fromKey: string, beforeKey: string | null) => {
+      const presentKeys = sortedRef.current.map(rowOrderKey);
+      const base = mergeAccueilOrder(manualOrderRef.current, presentKeys);
+      const next = reorderAccueilKeys(base, fromKey, beforeKey);
+      if (!next) return null;
+      manualOrderRef.current = next;
+      setManualOrder(next);
+      void saveAccueilOrder(next);
+      ensureOrderSort();
+      return next;
+    },
+    [ensureOrderSort],
+  );
+
+  const applyOptimisticFolder = useCallback(
+    (r: AutomationRow, folder: AutomationFolderOption | null) => {
+      const key = rowOrderKey(r);
+      const folderId = folder?.id ?? null;
+      const folderLabel = folder?.name ?? t("common.empty");
+      setFolderOverrides((prev) => {
+        const next = new Map(prev);
+        next.set(key, { folderId, folderLabel });
+        return next;
+      });
+
+      const fromKey = key;
+      const presentKeys = sortedRef.current.map(rowOrderKey);
+      const base = mergeAccueilOrder(manualOrderRef.current, presentKeys);
+      const projected = sortedRef.current.map((row) =>
+        rowOrderKey(row) === fromKey ? { ...row, folderId } : row,
       );
-    } else if (clientY > rect.bottom - AUTO_SCROLL_EDGE_PX) {
-      const t = 1 - (rect.bottom - clientY) / AUTO_SCROLL_EDGE_PX;
-      list.scrollTop += Math.ceil(
-        AUTO_SCROLL_MAX_PX * Math.min(1, Math.max(0, t)),
-      );
-    }
-  }
+      const beforeKey = folder
+        ? beforeKeyForEndOfFolder(
+            base,
+            projected,
+            fromKey,
+            folder.id,
+            foldersRef.current.map((f) => f.id),
+          )
+        : null;
+      applyOptimisticOrder(fromKey, beforeKey);
+    },
+    [applyOptimisticOrder, t],
+  );
 
-  function hitTestRowDrop(
-    x: number,
-    y: number,
-    drag: AutomationRow,
-    prev: RowDropEdge | null,
-  ): RowDropEdge | null {
-    if (displayRef.current.sortBy !== "order") return null;
-    const el = document.elementFromPoint(x, y);
-    if (!el || !(el instanceof Element)) return null;
-    if (el.closest(".caster-auto-folder-chip, .caster-auto-folder-drop-chip")) {
-      return null;
-    }
-    const rowEl = el.closest(".caster-auto-row[data-row-key]");
-    if (!(rowEl instanceof HTMLElement)) return null;
-    const key = rowEl.getAttribute("data-row-key");
-    if (!key || key === rowKey(drag)) return null;
-    const target = sortedRef.current.find((r) => rowKey(r) === key);
-    if (!target || !canReorderAccueilRows(drag, target)) return null;
-    const rect = rowEl.getBoundingClientRect();
-    const mid = rect.top + rect.height / 2;
-    const prevEdge = prev?.key === key ? prev.edge : null;
-    let edge: AccueilDropEdge;
-    if (prevEdge && Math.abs(y - mid) < EDGE_HYSTERESIS_PX) {
-      edge = prevEdge;
-    } else {
-      edge = y < mid ? "before" : "after";
-    }
-    return { key, edge };
-  }
+  const commitAccueilDrop = useCallback(
+    async (intent: AccueilDropIntent) => {
+      const { row } = intent;
+      try {
+        if (intent.type === "move-folder") {
+          const folder =
+            foldersRef.current.find((f) => f.id === intent.folderId) ?? null;
+          if (!folder) return;
+          applyOptimisticFolder(row, folder);
+          await invoke("move_library_item_cmd", {
+            kind: row.kind,
+            id: row.id,
+            folderId: folder.id,
+            beforeId: null,
+          });
+          await refresh({ silent: true });
+          setFolderOverrides(new Map());
+          onRefresh?.();
+          toast.success(t("automations.toast.moved"));
+          return;
+        }
+
+        if (intent.type === "unfile") {
+          applyOptimisticFolder(row, null);
+          await invoke("move_library_item_cmd", {
+            kind: row.kind,
+            id: row.id,
+            folderId: null,
+            beforeId: null,
+          });
+          await refresh({ silent: true });
+          setFolderOverrides(new Map());
+          onRefresh?.();
+          toast.success(t("automations.toast.moved"));
+          return;
+        }
+
+        // reorder
+        if (intent.unfile) {
+          applyOptimisticFolder(row, null);
+          await invoke("move_library_item_cmd", {
+            kind: row.kind,
+            id: row.id,
+            folderId: null,
+            beforeId: null,
+          });
+        } else if (intent.folderId) {
+          const folder =
+            foldersRef.current.find((f) => f.id === intent.folderId) ?? null;
+          if (folder) {
+            applyOptimisticFolder(row, folder);
+            await invoke("move_library_item_cmd", {
+              kind: row.kind,
+              id: row.id,
+              folderId: folder.id,
+              beforeId: null,
+            });
+          }
+        }
+
+        const fromKey = rowOrderKey(row);
+        const next = applyOptimisticOrder(fromKey, intent.beforeKey);
+        if (next && accueilPrefs.syncLibrarySortOnReorder) {
+          const beforeId = nearestSameKindBeforeId(next, fromKey, row.kind);
+          const folderId = intent.unfile
+            ? null
+            : (intent.folderId ?? row.folderId ?? null);
+          try {
+            await invoke("move_library_item_cmd", {
+              kind: row.kind,
+              id: row.id,
+              folderId,
+              beforeId,
+            });
+          } catch {
+            /* Accueil order already saved; library sync best-effort */
+          }
+        }
+
+        await refresh({ silent: true });
+        setFolderOverrides(new Map());
+        onRefresh?.();
+        toast.success(
+          intent.unfile || intent.folderId
+            ? t("automations.toast.moved")
+            : t("automations.toast.orderUpdated"),
+        );
+      } catch (e) {
+        setFolderOverrides(new Map());
+        await refresh({ silent: true });
+        toast.error(errMessage(e, t("automations.toast.moveFail")));
+      }
+    },
+    [
+      accueilPrefs.syncLibrarySortOnReorder,
+      applyOptimisticFolder,
+      applyOptimisticOrder,
+      onRefresh,
+      refresh,
+      t,
+      toast,
+    ],
+  );
+
+  const {
+    dragRow,
+    dropFolderKey,
+    dropEdge,
+    dragGhost,
+    armedRef: folderDragArmedRef,
+    suppressClickRef: suppressClickAfterDragRef,
+    onRowPointerDown,
+    clearDrag: clearFolderDrag,
+  } = useAccueilDnd({
+    listScrollRef,
+    sortedRef,
+    sortByRef,
+    dragThresholdPx: accueilPrefs.dragThresholdPx,
+    onCommit: (intent) => {
+      void commitAccueilDrop(intent);
+    },
+  });
 
   useEffect(() => {
     if (!accueilPrefs.rememberCollapsedSections) return;
@@ -431,24 +528,21 @@ export function AutomationsTable({
     }
   }
 
-  const [manualOrder, setManualOrder] = useState<string[]>([]);
-  const manualOrderRef = useRef(manualOrder);
-  manualOrderRef.current = manualOrder;
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadAccueilOrder().then((keys) => {
-      if (!cancelled) setManualOrder(keys);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const sorted = useMemo(() => {
     let baseRows = rows;
     if (filter === "all" && !accueilPrefs.showScriptsInAll) {
       baseRows = rows.filter((r) => r.kind !== "script");
+    }
+    if (folderOverrides.size > 0) {
+      baseRows = baseRows.map((r) => {
+        const ov = folderOverrides.get(rowOrderKey(r));
+        if (!ov) return r;
+        return {
+          ...r,
+          folderId: ov.folderId,
+          folderLabel: ov.folderLabel,
+        };
+      });
     }
     if (filter === "recent") return baseRows;
     const list = [...baseRows];
@@ -487,6 +581,7 @@ export function AutomationsTable({
     display.sortDir,
     filter,
     manualOrder,
+    folderOverrides,
     accueilPrefs.showScriptsInAll,
     locale,
   ]);
@@ -519,10 +614,7 @@ export function AutomationsTable({
     for (const f of folders) {
       const key = folderOptionKey(f);
       const items = sorted.filter(
-        (r) =>
-          r.kind !== "script" &&
-          r.folderId != null &&
-          r.folderId === f.id,
+        (r) => r.folderId != null && r.folderId === f.id,
       );
       out.push({
         id: `folder:${key}`,
@@ -533,9 +625,7 @@ export function AutomationsTable({
       });
     }
 
-    const unfiled = sorted.filter(
-      (r) => r.kind === "script" || r.folderId == null,
-    );
+    const unfiled = sorted.filter((r) => r.folderId == null);
     out.push({
       id: "unfiled",
       name: null,
@@ -724,11 +814,8 @@ export function AutomationsTable({
   }
 
   async function onLockSelected(locked: boolean) {
-    const targets = selectedRows.filter((r) => r.kind !== "script");
-    if (targets.length === 0) {
-      toast.info(t("automations.toast.scriptsNoLock"));
-      return;
-    }
+    const targets = selectedRows;
+    if (targets.length === 0) return;
     try {
       for (const r of targets) {
         if (r.locked === locked) continue;
@@ -738,7 +825,7 @@ export function AutomationsTable({
           locked,
         });
       }
-      await refresh();
+      await refresh({ silent: true });
       onRefresh?.();
       toast.success(locked ? t("automations.toast.locked") : t("automations.toast.unlocked"));
     } catch (e) {
@@ -747,14 +834,13 @@ export function AutomationsTable({
   }
 
   async function setRowLocked(r: AutomationRow, locked: boolean) {
-    if (r.kind === "script") return;
     try {
       await invoke("set_library_item_locked_cmd", {
         kind: r.kind,
         id: r.id,
         locked,
       });
-      await refresh();
+      await refresh({ silent: true });
       onRefresh?.();
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.lockFail")));
@@ -765,53 +851,15 @@ export function AutomationsTable({
     r: AutomationRow,
     folder: AutomationFolderOption | null,
   ) {
-    if (r.kind === "script") return;
-    try {
-      await invoke("move_library_item_cmd", {
-        kind: r.kind,
-        id: r.id,
-        folderId: folder?.id ?? null,
-        beforeId: null,
+    if (folder) {
+      await commitAccueilDrop({
+        type: "move-folder",
+        row: r,
+        folderId: folder.id,
       });
-      await refresh();
-      onRefresh?.();
-      toast.success(t("automations.toast.moved"));
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
+    } else {
+      await commitAccueilDrop({ type: "unfile", row: r });
     }
-  }
-
-  async function reorderRow(from: AutomationRow, beforeKey: string | null) {
-    const presentKeys = sortedRef.current.map(rowOrderKey);
-    const base = mergeAccueilOrder(manualOrderRef.current, presentKeys);
-    const fromKey = rowOrderKey(from);
-    const next = reorderAccueilKeys(base, fromKey, beforeKey);
-    if (!next) return;
-    setManualOrder(next);
-    void saveAccueilOrder(next);
-    if (display.sortBy !== "order") {
-      onDisplayChange({ ...display, sortBy: "order", sortDir: "asc" });
-    }
-    // Same-kind: also sync library sort_order via nearest same-kind sibling
-    if (
-      accueilPrefs.syncLibrarySortOnReorder &&
-      (from.kind === "macro" || from.kind === "clicker")
-    ) {
-      const beforeId = nearestSameKindBeforeId(next, fromKey, from.kind);
-      try {
-        await invoke("move_library_item_cmd", {
-          kind: from.kind,
-          id: from.id,
-          folderId: from.folderId ?? null,
-          beforeId,
-        });
-        await refresh();
-        onRefresh?.();
-      } catch {
-        /* Accueil order already saved; library sync best-effort */
-      }
-    }
-    toast.success(t("automations.toast.orderUpdated"));
   }
 
   async function onCreateFolder() {
@@ -865,7 +913,10 @@ export function AutomationsTable({
     }
   }
 
-  async function onMoveSelected(folderId: string | null, kind: "macro" | "clicker") {
+  async function onMoveSelected(
+    folderId: string | null,
+    kind: "macro" | "clicker" | "script",
+  ) {
     const targets = selectedRows.filter((r) => r.kind === kind);
     if (targets.length === 0) return;
     try {
@@ -877,7 +928,7 @@ export function AutomationsTable({
           beforeId: null,
         });
       }
-      await refresh();
+      await refresh({ silent: true });
       onRefresh?.();
       toast.success(t("automations.toast.moved"));
     } catch (e) {
@@ -1231,15 +1282,36 @@ export function AutomationsTable({
   }, [selected.size, createOpen, focusKey, sorted, flatKeys, dragRow]);
 
   const moveFolders = useMemo(() => {
-    const hasLibrary = selectedRows.some(
-      (r) => r.kind === "macro" || r.kind === "clicker",
+    const movable = selectedRows.filter(
+      (r) =>
+        r.kind === "macro" || r.kind === "clicker" || r.kind === "script",
     );
-    return hasLibrary ? folders : [];
+    if (movable.length === 0) return [];
+    const commonFolderId = (() => {
+      const first = movable[0]?.folderId ?? null;
+      return movable.every((r) => (r.folderId ?? null) === first)
+        ? first
+        : undefined;
+    })();
+    return folders.filter((f) => f.id !== commonFolderId);
   }, [folders, selectedRows]);
+
+  const selectionHasFiled = useMemo(
+    () => ({
+      macro: selectedRows.some((r) => r.kind === "macro" && r.folderId != null),
+      clicker: selectedRows.some(
+        (r) => r.kind === "clicker" && r.folderId != null,
+      ),
+      script: selectedRows.some(
+        (r) => r.kind === "script" && r.folderId != null,
+      ),
+    }),
+    [selectedRows],
+  );
 
   const ctxMenuItems = useMemo(() => {
     if (!ctxRow) return [];
-    const rowFolders = ctxRow.kind === "script" ? [] : folders;
+    const rowFolders = folders;
     return buildAutomationRowMenuItems(ctxRow, t, {
       onOpen: () => openRow(ctxRow),
       onLaunch: () => void launchRow(ctxRow),
@@ -1316,7 +1388,7 @@ export function AutomationsTable({
     ],
   );
 
-  const lockTargets = selectedRows.filter((r) => r.kind !== "script");
+  const lockTargets = selectedRows;
   const canLock = lockTargets.some((r) => !r.locked);
   const canUnlock = lockTargets.some((r) => r.locked);
 
@@ -1498,61 +1570,45 @@ export function AutomationsTable({
               <>
             {sections.map((section) => {
               const collapsed = collapsedSections.has(section.id);
-              const sectionDropKey = (() => {
-                if (!dragRow || dragRow.kind === "script") return null;
-                if (section.kind === "folder" && section.folder) {
-                  const key = folderOptionKey(section.folder);
-                  const alreadyIn = dragRow.folderId === section.folder.id;
-                  return alreadyIn ? null : key;
-                }
-                return null;
-              })();
-              const dropCompatible = sectionDropKey != null;
-              const sectionIsDropOver =
-                dropCompatible && dropFolderKey === sectionDropKey;
+              const folderKey =
+                section.kind === "folder" && section.folder
+                  ? folderOptionKey(section.folder)
+                  : null;
+              const droppingOnFolder =
+                folderKey != null && dropFolderKey === folderKey;
+              // Folder header/end drop → blue line at end of block (not full wash).
+              const headerIsDropOver = droppingOnFolder;
+              const folderEndLine =
+                droppingOnFolder && !collapsed && section.items.length > 0;
+              const folderHeaderLine =
+                droppingOnFolder && (collapsed || section.items.length === 0);
+              const lastFolderItemKey =
+                folderEndLine && section.items.length > 0
+                  ? rowKey(section.items[section.items.length - 1]!)
+                  : null;
               const unfiledDropActive =
                 section.id === "unfiled" &&
                 dragRow != null &&
-                dragRow.kind !== "script" &&
                 dragRow.folderId != null;
               return (
                 <div
                   key={section.id}
-                  className={[
-                    "caster-automations-section",
-                    sectionIsDropOver ? "is-drop-over" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  onPointerEnter={() => {
-                    if (dropCompatible && sectionDropKey) {
-                      setDropFolderKey(sectionDropKey);
-                    }
-                  }}
-                  onPointerLeave={() => {
-                    if (sectionDropKey) {
-                      setDropFolderKey((k) =>
-                        k === sectionDropKey ? null : k,
-                      );
-                    }
-                  }}
-                  onPointerUp={() => {
-                    if (!dropCompatible || !dragRow || !sectionDropKey) return;
-                    if (section.folder) {
-                      void moveRowToFolder(dragRow, section.folder);
-                    }
-                    clearFolderDrag();
-                  }}
+                  className="caster-automations-section"
+                  {...(folderKey
+                    ? { "data-folder-drop-id": folderKey }
+                    : {})}
                 >
                   {section.kind === "folder" && section.folder && section.name ? (
                     <div
                       className={[
                         "caster-auto-folder-section",
-                        sectionIsDropOver ? "is-drop-over" : "",
+                        headerIsDropOver ? "is-drop-target" : "",
+                        folderHeaderLine ? "drop-after" : "",
                         menuKey === section.id ? "is-menu-open" : "",
                       ]
                         .filter(Boolean)
                         .join(" ")}
+                      data-folder-drop-id={folderKey ?? undefined}
                     >
                       <button
                         type="button"
@@ -1650,10 +1706,11 @@ export function AutomationsTable({
                         const subtitle = rowSubtitle(r, t, {
                           running: scriptRunning,
                         });
-                        const dropBefore =
+                          const dropBefore =
                           dropEdge?.key === key && dropEdge.edge === "before";
-                        const dropAfter =
-                          dropEdge?.key === key && dropEdge.edge === "after";
+                          const dropAfter =
+                          (dropEdge?.key === key && dropEdge.edge === "after") ||
+                          lastFolderItemKey === key;
                         return (
                           <div
                             key={key}
@@ -1681,19 +1738,9 @@ export function AutomationsTable({
                                 return;
                               }
                               if (dragRow || folderDragArmedRef.current) return;
-                              if (e.shiftKey || e.metaKey || e.ctrlKey) {
-                                e.preventDefault();
-                                toggleSelect(key, {
-                                  multi: e.metaKey || e.ctrlKey,
-                                  range: e.shiftKey,
-                                });
-                                return;
-                              }
+                              setFocusKey(key);
                               if (accueilPrefs.openOnSingleClick) {
                                 openRow(r);
-                              } else {
-                                setFocusKey(key);
-                                toggleSelect(key, { multi: false, range: false });
                               }
                             }}
                             onDoubleClick={(e) => {
@@ -1737,133 +1784,7 @@ export function AutomationsTable({
                             </Tooltip>
                             <div
                               className="caster-auto-row-identity"
-                              onPointerDown={(e) => {
-                                if (e.button !== 0) return;
-                                if (folderDragArmedRef.current) return;
-                                const pointerId = e.pointerId;
-                                folderDragSessionRef.current = {
-                                  row: r,
-                                  pointerId,
-                                  startX: e.clientX,
-                                  startY: e.clientY,
-                                };
-
-                                const onMove = (ev: PointerEvent) => {
-                                  const s = folderDragSessionRef.current;
-                                  if (!s || ev.pointerId !== s.pointerId) return;
-                                  if (!folderDragArmedRef.current) {
-                                    const dx = ev.clientX - s.startX;
-                                    const dy = ev.clientY - s.startY;
-                                    if (
-                                      Math.hypot(dx, dy) <
-                                      accueilPrefs.dragThresholdPx
-                                    ) {
-                                      return;
-                                    }
-                                    folderDragArmedRef.current = true;
-                                    setDragRow(s.row);
-                                    setDragGhost({
-                                      name: s.row.name,
-                                      kind: s.row.kind,
-                                      x: ev.clientX,
-                                      y: ev.clientY,
-                                    });
-                                  }
-                                  autoScrollNearEdges(ev.clientY);
-                                  setDragGhost((g) =>
-                                    g
-                                      ? {
-                                          ...g,
-                                          x: ev.clientX,
-                                          y: ev.clientY,
-                                        }
-                                      : g,
-                                  );
-                                  if (dropFolderKeyRef.current) {
-                                    dropEdgeRef.current = null;
-                                    setDropEdge(null);
-                                    return;
-                                  }
-                                  const hit = hitTestRowDrop(
-                                    ev.clientX,
-                                    ev.clientY,
-                                    s.row,
-                                    dropEdgeRef.current,
-                                  );
-                                  dropEdgeRef.current = hit;
-                                  setDropEdge(hit);
-                                };
-
-                                const onUp = (ev: PointerEvent) => {
-                                  if (ev.pointerId !== pointerId) return;
-                                  window.removeEventListener("pointermove", onMove);
-                                  window.removeEventListener("pointerup", onUp);
-                                  window.removeEventListener(
-                                    "pointercancel",
-                                    onUp,
-                                  );
-                                  const s = folderDragSessionRef.current;
-                                  const armed = folderDragArmedRef.current;
-                                  const edge = dropEdgeRef.current;
-                                  const overFolder = dropFolderKeyRef.current;
-                                  if (!armed || !s) {
-                                    clearFolderDrag();
-                                    return;
-                                  }
-                                  // Always suppress the synthetic click after an armed drag.
-                                  suppressClickAfterDragRef.current = true;
-                                  if (overFolder) {
-                                    // Folder section handles the move on its pointerUp.
-                                    clearFolderDrag({ suppressClick: true });
-                                    return;
-                                  }
-                                  if (
-                                    edge &&
-                                    displayRef.current.sortBy === "order"
-                                  ) {
-                                    const target = sortedRef.current.find(
-                                      (row) => rowKey(row) === edge.key,
-                                    );
-                                    if (target) {
-                                      const resolved = resolveAccueilReorderDrop(
-                                        s.row,
-                                        target,
-                                        edge.edge,
-                                        sortedRef.current,
-                                      );
-                                      const shouldUnfile =
-                                        s.row.folderId != null &&
-                                        s.row.kind !== "script" &&
-                                        (target.kind === "script" ||
-                                          target.folderId == null);
-                                      clearFolderDrag({ suppressClick: true });
-                                      if (shouldUnfile) {
-                                        void moveRowToFolder(s.row, null).then(
-                                          () => {
-                                            if (resolved) {
-                                              reorderRow(
-                                                s.row,
-                                                resolved.beforeKey,
-                                              );
-                                            }
-                                          },
-                                        );
-                                      } else if (resolved) {
-                                        reorderRow(
-                                          s.row,
-                                          resolved.beforeKey,
-                                        );
-                                      }
-                                      return;
-                                    }
-                                  }
-                                  clearFolderDrag({ suppressClick: true });
-                                };
-
-                                window.addEventListener("pointermove", onMove);
-                                window.addEventListener("pointerup", onUp);
-                                window.addEventListener("pointercancel", onUp);
-                              }}
+                              onPointerDown={(e) => onRowPointerDown(r, e)}
                             >
                               <KindIcon row={r} />
                               <div className="caster-auto-row-main">
@@ -2047,11 +1968,7 @@ export function AutomationsTable({
                                 onLock={() => void setRowLocked(r, true)}
                                 onUnlock={() => void setRowLocked(r, false)}
                                 onReveal={() => void onRevealOne(r)}
-                                moveFolders={
-                                  r.kind === "script"
-                                    ? []
-                                    : folders
-                                }
+                                moveFolders={folders}
                                 onMoveToFolder={(folder) =>
                                   void moveRowToFolder(r, folder)
                                 }
@@ -2061,7 +1978,11 @@ export function AutomationsTable({
                         );
                       })}
                   {section.kind === "folder" && !collapsed ? (
-                    <div className="caster-auto-folder-section-end" aria-hidden />
+                    <div
+                      className="caster-auto-folder-section-end"
+                      data-folder-drop-id={folderKey ?? undefined}
+                      aria-hidden
+                    />
                   ) : null}
                   {section.id === "unfiled" &&
                   unfiledDropActive &&
@@ -2073,15 +1994,7 @@ export function AutomationsTable({
                       ]
                         .filter(Boolean)
                         .join(" ")}
-                      onPointerEnter={() => setDropFolderKey("root")}
-                      onPointerLeave={() =>
-                        setDropFolderKey((k) => (k === "root" ? null : k))
-                      }
-                      onPointerUp={() => {
-                        if (!dragRow || dragRow.kind === "script") return;
-                        void moveRowToFolder(dragRow, null);
-                        clearFolderDrag();
-                      }}
+                      data-folder-drop="root"
                     />
                   ) : null}
                 </div>
@@ -2148,14 +2061,17 @@ export function AutomationsTable({
                 {t("automations.selection.unlock")}
               </button>
             ) : null}
-            {moveFolders.length > 0 ? (
+            {moveFolders.length > 0 ||
+            selectionHasFiled.macro ||
+            selectionHasFiled.clicker ||
+            selectionHasFiled.script ? (
               <DropdownMenu
                 label={t("automations.selection.folder")}
                 ariaLabel={t("automations.selection.folderAria")}
                 align="end"
                 triggerClassName="caster-btn caster-btn-ghost"
                 items={[
-                  ...(selectedRows.some((r) => r.kind === "macro")
+                  ...(selectionHasFiled.macro
                     ? [
                         {
                           id: "root-macro",
@@ -2165,7 +2081,7 @@ export function AutomationsTable({
                         },
                       ]
                     : []),
-                  ...(selectedRows.some((r) => r.kind === "clicker")
+                  ...(selectionHasFiled.clicker
                     ? [
                         {
                           id: "root-clicker",
@@ -2175,14 +2091,28 @@ export function AutomationsTable({
                         },
                       ]
                     : []),
+                  ...(selectionHasFiled.script
+                    ? [
+                        {
+                          id: "root-script",
+                          label: t("automations.selection.noFolderScripts"),
+                          icon: <Folder size={14} />,
+                          onSelect: () => void onMoveSelected(null, "script"),
+                        },
+                      ]
+                    : []),
                   ...moveFolders.map((f) => ({
                     id: folderOptionKey(f),
                     label: f.name,
                     icon: <Folder size={14} />,
                     onSelect: () => {
-                      const kinds = new Set<"macro" | "clicker">();
+                      const kinds = new Set<"macro" | "clicker" | "script">();
                       for (const r of selectedRows) {
-                        if (r.kind === "macro" || r.kind === "clicker") {
+                        if (
+                          r.kind === "macro" ||
+                          r.kind === "clicker" ||
+                          r.kind === "script"
+                        ) {
                           kinds.add(r.kind);
                         }
                       }

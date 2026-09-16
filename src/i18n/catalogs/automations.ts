@@ -142,6 +142,7 @@ export const automations = defineCatalog({
       folderAria: "Déplacer vers un dossier",
       noFolderMacros: "Sans dossier (macros)",
       noFolderClickers: "Sans dossier (clickers)",
+      noFolderScripts: "Sans dossier (scripts)",
       trash: "Corbeille",
     },
     confirm: {
@@ -407,6 +408,7 @@ export const automations = defineCatalog({
       folderAria: "Move to folder",
       noFolderMacros: "No folder (macros)",
       noFolderClickers: "No folder (clickers)",
+      noFolderScripts: "No folder (scripts)",
       trash: "Trash",
     },
     confirm: {

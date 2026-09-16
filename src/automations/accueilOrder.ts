@@ -135,3 +135,46 @@ export function nearestSameKindBeforeId(
   }
   return null;
 }
+
+/**
+ * Accueil `beforeKey` so `fromKey` lands at the end of `folderId`'s block
+ * (after current members; empty folder → before the next section / unfiled).
+ */
+export function beforeKeyForEndOfFolder(
+  orderedKeys: string[],
+  rows: Pick<AutomationRow, "kind" | "id" | "folderId">[],
+  fromKey: string,
+  folderId: string,
+  folderIdsInOrder: string[],
+): string | null {
+  const byKey = new Map(rows.map((r) => [rowOrderKey(r), r]));
+  const folderRank = new Map(folderIdsInOrder.map((id, i) => [id, i]));
+  const targetRank = folderRank.get(folderId) ?? 0;
+
+  const inFolder: string[] = [];
+  for (const k of orderedKeys) {
+    if (k === fromKey) continue;
+    const row = byKey.get(k);
+    if (!row) continue;
+    if (row.folderId === folderId) inFolder.push(k);
+  }
+
+  if (inFolder.length > 0) {
+    const last = inFolder[inFolder.length - 1]!;
+    const idx = orderedKeys.indexOf(last);
+    for (let i = idx + 1; i < orderedKeys.length; i++) {
+      if (orderedKeys[i] !== fromKey) return orderedKeys[i]!;
+    }
+    return null;
+  }
+
+  for (const k of orderedKeys) {
+    if (k === fromKey) continue;
+    const row = byKey.get(k);
+    if (!row) continue;
+    if (row.folderId == null) return k;
+    const rank = folderRank.get(row.folderId);
+    if (rank != null && rank > targetRank) return k;
+  }
+  return null;
+}
