@@ -181,6 +181,9 @@ export const automations = defineCatalog({
       trashed: "Mis à la corbeille",
       deleted: "Suppression effectuée",
       deleteFail: "Échec de la suppression",
+      undo: "Annuler",
+      undoFail: "Impossible d’annuler",
+      redoFail: "Impossible de rétablir",
       scriptsNoFavorite: "Les scripts n’ont pas de favori",
       favoritesFail: "Impossible de modifier les favoris",
       scriptsNoLock: "Les scripts ne peuvent pas être verrouillés",
@@ -269,6 +272,13 @@ export const automations = defineCatalog({
     trigger: {
       manual: "Manuel",
       script: "Script",
+    },
+    toolbar: {
+      aria: "Barre d’outils Accueil",
+      undo: "Annuler",
+      undoTitle: "Annuler (Ctrl+Z)",
+      redo: "Rétablir",
+      redoTitle: "Rétablir (Ctrl+Y)",
     },
   },
   en: {
@@ -447,6 +457,9 @@ export const automations = defineCatalog({
       trashed: "Moved to trash",
       deleted: "Deleted",
       deleteFail: "Delete failed",
+      undo: "Undo",
+      undoFail: "Could not undo",
+      redoFail: "Could not redo",
       scriptsNoFavorite: "Scripts cannot be favorited",
       favoritesFail: "Could not update favorites",
       scriptsNoLock: "Scripts cannot be locked",
@@ -535,6 +548,13 @@ export const automations = defineCatalog({
     trigger: {
       manual: "Manual",
       script: "Script",
+    },
+    toolbar: {
+      aria: "Home toolbar",
+      undo: "Undo",
+      undoTitle: "Undo (Ctrl+Z)",
+      redo: "Redo",
+      redoTitle: "Redo (Ctrl+Y)",
     },
   },
 });

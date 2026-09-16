@@ -10,23 +10,35 @@ import { useT } from "../../i18n";
 
 export type ToastKind = "success" | "error" | "info";
 
+export type ToastAction = {
+  label: string;
+  onClick: () => void;
+};
+
 export type ToastItem = {
   id: string;
   kind: ToastKind;
   message: string;
+  action?: ToastAction;
+};
+
+type ToastPushOptions = {
+  action?: ToastAction;
+  durationMs?: number;
 };
 
 type ToastApi = {
-  push: (kind: ToastKind, message: string) => void;
-  success: (message: string) => void;
-  error: (message: string) => void;
-  info: (message: string) => void;
+  push: (kind: ToastKind, message: string, opts?: ToastPushOptions) => void;
+  success: (message: string, opts?: ToastPushOptions) => void;
+  error: (message: string, opts?: ToastPushOptions) => void;
+  info: (message: string, opts?: ToastPushOptions) => void;
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
 
 const MAX_TOASTS = 3;
 const DISMISS_MS = 4200;
+const ACTION_DISMISS_MS = 8000;
 
 let toastSeq = 0;
 
@@ -35,17 +47,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
 
   const dismiss = useCallback((id: string) => {
-    setItems((prev) => prev.filter((t) => t.id !== id));
+    setItems((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
   const push = useCallback(
-    (kind: ToastKind, message: string) => {
+    (kind: ToastKind, message: string, opts?: ToastPushOptions) => {
       const id = `toast-${++toastSeq}`;
       setItems((prev) => {
-        const next = [...prev, { id, kind, message }];
+        const next = [
+          ...prev,
+          { id, kind, message, action: opts?.action },
+        ];
         return next.slice(-MAX_TOASTS);
       });
-      window.setTimeout(() => dismiss(id), DISMISS_MS);
+      const ms =
+        opts?.durationMs ??
+        (opts?.action ? ACTION_DISMISS_MS : DISMISS_MS);
+      window.setTimeout(() => dismiss(id), ms);
     },
     [dismiss],
   );
@@ -53,9 +71,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const api = useMemo<ToastApi>(
     () => ({
       push,
-      success: (m) => push("success", m),
-      error: (m) => push("error", m),
-      info: (m) => push("info", m),
+      success: (m, o) => push("success", m, o),
+      error: (m, o) => push("error", m, o),
+      info: (m, o) => push("info", m, o),
     }),
     [push],
   );
@@ -71,6 +89,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             role={toast.kind === "error" ? "alert" : "status"}
           >
             <span className="caster-toast-msg">{toast.message}</span>
+            {toast.action ? (
+              <button
+                type="button"
+                className="caster-toast-action"
+                onClick={() => {
+                  toast.action?.onClick();
+                  dismiss(toast.id);
+                }}
+              >
+                {toast.action.label}
+              </button>
+            ) : null}
             <button
               type="button"
               className="caster-toast-dismiss"

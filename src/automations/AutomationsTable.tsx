@@ -81,7 +81,10 @@ import {
   useAccueilDnd,
   type AccueilDropIntent,
 } from "./useAccueilDnd";
+import { AccueilTitleBarTools } from "./AccueilTitleBarTools";
+import { useAccueilUndo } from "./useAccueilUndo";
 import { useUnifiedAutomations } from "./useUnifiedAutomations";
+import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 
 type Props = {
   onNavigate: (route: AppRoute) => void;
@@ -211,6 +214,49 @@ export function AutomationsTable({
     query,
     filter,
   });
+  const afterUndoRef = useRef(async () => {
+    await refresh({ silent: true });
+    onRefresh?.();
+  });
+  afterUndoRef.current = async () => {
+    await refresh({ silent: true });
+    onRefresh?.();
+  };
+  const accueilUndo = useAccueilUndo({
+    onAfterUndo: () => afterUndoRef.current(),
+  });
+  const undoToast = useCallback(
+    (message: string) => {
+      toast.success(message, {
+        action: {
+          label: t("automations.toast.undo"),
+          onClick: () => {
+            void accueilUndo.undo().catch(() => {
+              toast.error(t("automations.toast.undoFail"));
+            });
+          },
+        },
+      });
+    },
+    [accueilUndo, t, toast],
+  );
+  const titleBarPortal = useTitleBarSlot(
+    undefined,
+    <AccueilTitleBarTools
+      canUndo={accueilUndo.canUndo}
+      canRedo={accueilUndo.canRedo}
+      onUndo={() => {
+        void accueilUndo.undo().catch(() => {
+          toast.error(t("automations.toast.undoFail"));
+        });
+      }}
+      onRedo={() => {
+        void accueilUndo.redo().catch(() => {
+          toast.error(t("automations.toast.redoFail"));
+        });
+      }}
+    />,
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
@@ -339,7 +385,15 @@ export function AutomationsTable({
           await refresh({ silent: true });
           setFolderOverrides(new Map());
           onRefresh?.();
-          toast.success(t("automations.toast.moved"));
+          accueilUndo.push({
+            type: "move-item",
+            kind: row.kind,
+            id: row.id,
+            fromFolderId: row.folderId ?? null,
+            toFolderId: folder.id,
+            label: row.name,
+          });
+          undoToast(t("automations.toast.moved"));
           return;
         }
 
@@ -354,7 +408,15 @@ export function AutomationsTable({
           await refresh({ silent: true });
           setFolderOverrides(new Map());
           onRefresh?.();
-          toast.success(t("automations.toast.moved"));
+          accueilUndo.push({
+            type: "move-item",
+            kind: row.kind,
+            id: row.id,
+            fromFolderId: row.folderId ?? null,
+            toFolderId: null,
+            label: row.name,
+          });
+          undoToast(t("automations.toast.moved"));
           return;
         }
 
@@ -403,11 +465,21 @@ export function AutomationsTable({
         await refresh({ silent: true });
         setFolderOverrides(new Map());
         onRefresh?.();
-        toast.success(
-          intent.unfile || intent.folderId
-            ? t("automations.toast.moved")
-            : t("automations.toast.orderUpdated"),
-        );
+        if (intent.unfile || intent.folderId) {
+          accueilUndo.push({
+            type: "move-item",
+            kind: row.kind,
+            id: row.id,
+            fromFolderId: row.folderId ?? null,
+            toFolderId: intent.unfile
+              ? null
+              : (intent.folderId ?? row.folderId ?? null),
+            label: row.name,
+          });
+          undoToast(t("automations.toast.moved"));
+        } else {
+          toast.success(t("automations.toast.orderUpdated"));
+        }
       } catch (e) {
         setFolderOverrides(new Map());
         await refresh({ silent: true });
@@ -416,12 +488,14 @@ export function AutomationsTable({
     },
     [
       accueilPrefs.syncLibrarySortOnReorder,
+      accueilUndo,
       applyOptimisticFolder,
       applyOptimisticOrder,
       onRefresh,
       refresh,
       t,
       toast,
+      undoToast,
     ],
   );
 
@@ -893,7 +967,12 @@ export function AutomationsTable({
         next.delete(`folder:${folderOptionKey(created)}`);
         return next;
       });
-      toast.success(t("automations.toast.folderCreated", { name: created.name }));
+      accueilUndo.push({
+        type: "create-folder",
+        id: created.id,
+        name: created.name,
+      });
+      undoToast(t("automations.toast.folderCreated", { name: created.name }));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.folderCreateFail")));
     }
@@ -917,7 +996,13 @@ export function AutomationsTable({
       );
       await refresh();
       onRefresh?.();
-      toast.success(t("automations.toast.folderRenamed", { name: renamed.name }));
+      accueilUndo.push({
+        type: "rename-folder",
+        id: folder.id,
+        fromName: folder.name,
+        toName: renamed.name,
+      });
+      undoToast(t("automations.toast.folderRenamed", { name: renamed.name }));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.folderRenameFail")));
     }
@@ -937,10 +1022,18 @@ export function AutomationsTable({
           folderId,
           beforeId: null,
         });
+        accueilUndo.push({
+          type: "move-item",
+          kind: r.kind,
+          id: r.id,
+          fromFolderId: r.folderId ?? null,
+          toFolderId: folderId,
+          label: r.name,
+        });
       }
       await refresh({ silent: true });
       onRefresh?.();
-      toast.success(t("automations.toast.moved"));
+      undoToast(t("automations.toast.moved"));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.moveFail")));
     }
@@ -998,7 +1091,17 @@ export function AutomationsTable({
         setMenuKey(null);
         await refresh();
         onRefresh?.();
-        toast.success(t("automations.toast.trashed"));
+        if (r.kind === "macro" || r.kind === "clicker") {
+          accueilUndo.push({
+            type: "trash-item",
+            kind: r.kind,
+            id: r.id,
+            label: r.name,
+          });
+          undoToast(t("automations.toast.trashed"));
+        } else {
+          toast.success(t("automations.toast.deleted"));
+        }
       } catch (e) {
         toast.error(errMessage(e, t("automations.toast.deleteFail")));
       }
@@ -1022,7 +1125,19 @@ export function AutomationsTable({
       setMenuKey(null);
       await refresh();
       onRefresh?.();
-      toast.success(toTrash ? t("automations.toast.trashed") : t("automations.toast.deleted"));
+      if (toTrash && (r.kind === "macro" || r.kind === "clicker")) {
+        accueilUndo.push({
+          type: "trash-item",
+          kind: r.kind,
+          id: r.id,
+          label: r.name,
+        });
+        undoToast(t("automations.toast.trashed"));
+      } else {
+        toast.success(
+          toTrash ? t("automations.toast.trashed") : t("automations.toast.deleted"),
+        );
+      }
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.deleteFail")));
     }
@@ -1048,7 +1163,8 @@ export function AutomationsTable({
       });
       await refresh();
       onRefresh?.();
-      toast.success(t("automations.toast.folderDeleted", { name: folder.name }));
+      accueilUndo.push({ type: "delete-folder", name: folder.name });
+      undoToast(t("automations.toast.folderDeleted", { name: folder.name }));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.folderDeleteFail")));
     }
@@ -1089,7 +1205,14 @@ export function AutomationsTable({
       setMenuKey(null);
       await refresh();
       onRefresh?.();
-      toast.success(t("automations.toast.renamed", { name: trimmed }));
+      accueilUndo.push({
+        type: "rename-item",
+        kind: r.kind,
+        id: r.kind === "script" ? r.id : trimmed,
+        fromName: r.name,
+        toName: trimmed,
+      });
+      undoToast(t("automations.toast.renamed", { name: trimmed }));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.renameFail")));
     }
@@ -1252,6 +1375,28 @@ export function AutomationsTable({
 
       if (typing) return;
 
+      if ((e.key === "z" || e.key === "Z") && (e.ctrlKey || e.metaKey) && !e.altKey) {
+        e.preventDefault();
+        if (e.shiftKey) {
+          void accueilUndo.redo().catch(() => {
+            toast.error(t("automations.toast.redoFail"));
+          });
+        } else {
+          void accueilUndo.undo().catch(() => {
+            toast.error(t("automations.toast.undoFail"));
+          });
+        }
+        return;
+      }
+
+      if ((e.key === "y" || e.key === "Y") && (e.ctrlKey || e.metaKey) && !e.altKey) {
+        e.preventDefault();
+        void accueilUndo.redo().catch(() => {
+          toast.error(t("automations.toast.redoFail"));
+        });
+        return;
+      }
+
       if (e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         searchInputRef.current?.focus();
@@ -1289,7 +1434,7 @@ export function AutomationsTable({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectAllVisible/sorted via closure refresh
-  }, [selected.size, createOpen, focusKey, sorted, flatKeys, dragRow]);
+  }, [selected.size, createOpen, focusKey, sorted, flatKeys, dragRow, accueilUndo, t, toast]);
 
   const moveFolders = useMemo(() => {
     const movable = selectedRows.filter(
@@ -1419,6 +1564,7 @@ export function AutomationsTable({
         setCtxRow(null);
       }}
     >
+      {titleBarPortal}
       <AutomationsToolbar
         query={query}
         onQueryChange={onQueryChange}
