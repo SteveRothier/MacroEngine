@@ -4770,15 +4770,16 @@ body.caster-pointer-reorder-dragging {
 }
 
 .caster-automations-history {
-  display: flex;
-  align-items: center;
-  gap: 2px;
   flex-shrink: 0;
+  height: 26px;
+  padding: 1px;
+  align-items: center;
 }
 
-.caster-automations-history-btn {
+.caster-automations-history .caster-automations-history-btn {
   width: 26px;
-  height: 26px;
+  min-width: 26px;
+  height: 22px;
   padding: 0;
   display: inline-flex;
   align-items: center;

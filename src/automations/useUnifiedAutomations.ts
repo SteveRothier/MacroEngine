@@ -273,7 +273,6 @@ export function useUnifiedAutomations(options: {
       all: rows.length,
       favorites: rows.filter((r) => r.favorite).length,
       recent: rows.filter((r) => recentSet.has(rowKey(r.kind, r.id))).length,
-      scripts: rows.filter((r) => r.kind === "script").length,
     };
   }, [rows, recentOrder]);
 
