@@ -127,20 +127,46 @@ fn macro_value_js(v: &MacroValue) -> String {
 
 fn action_blocks_transpile(a: &ActionNode) -> Option<&'static str> {
     match a {
-        ActionNode::MouseClick { .. }
-        | ActionNode::MouseMove { .. }
-        | ActionNode::MouseDown { .. }
-        | ActionNode::MouseUp { .. }
-        | ActionNode::MouseWheel { .. } => Some("mouse.*"),
-        ActionNode::Delay { .. } => Some("delay"),
-        ActionNode::KeyTap { .. } | ActionNode::KeyDown { .. } | ActionNode::KeyUp { .. } => {
-            Some("key.*")
-        }
         ActionNode::ProcessRun { .. } => Some("process.run"),
         ActionNode::ControlIf { .. } => Some("control.if"),
         ActionNode::ControlWhile { .. } => Some("control.while"),
         _ => None,
     }
+}
+
+fn action_needs_input(a: &ActionNode) -> bool {
+    matches!(
+        a,
+        ActionNode::MouseClick { .. }
+            | ActionNode::MouseMove { .. }
+            | ActionNode::MouseDown { .. }
+            | ActionNode::MouseUp { .. }
+            | ActionNode::MouseWheel { .. }
+            | ActionNode::Delay { .. }
+            | ActionNode::KeyTap { .. }
+            | ActionNode::KeyDown { .. }
+            | ActionNode::KeyUp { .. }
+    )
+}
+
+fn mouse_opts_js(button: &str, x: Option<i32>, y: Option<i32>) -> String {
+    let mut parts = vec![format!("button: {}", js_string_literal(button))];
+    if let Some(x) = x {
+        parts.push(format!("x: {x}"));
+    }
+    if let Some(y) = y {
+        parts.push(format!("y: {y}"));
+    }
+    format!("{{ {} }}", parts.join(", "))
+}
+
+fn key_mods_js(mods: &crate::schema::KeyMods) -> String {
+    format!(
+        "{{ ctrl: {}, alt: {}, shift: {} }}",
+        if mods.ctrl { "true" } else { "false" },
+        if mods.alt { "true" } else { "false" },
+        if mods.shift { "true" } else { "false" },
+    )
 }
 
 fn transpile_action(a: &ActionNode, out: &mut String, report: &mut ConvertReport) {
@@ -231,6 +257,67 @@ fn transpile_action(a: &ActionNode, out: &mut String, report: &mut ConvertReport
                 }
                 report.kept.push("script.run:inline".into());
             }
+        }
+        ActionNode::Delay { ms, .. } => {
+            out.push_str(&format!("caster.sleep({ms});\n"));
+            report.kept.push("delay".into());
+        }
+        ActionNode::MouseClick { button, x, y, .. } => {
+            out.push_str(&format!(
+                "caster.click({});\n",
+                mouse_opts_js(button, *x, *y)
+            ));
+            report.kept.push("mouse.click".into());
+        }
+        ActionNode::MouseMove { x, y, .. } => {
+            out.push_str(&format!("caster.moveTo({x}, {y});\n"));
+            report.kept.push("mouse.move".into());
+        }
+        ActionNode::MouseDown { button, x, y, .. } => {
+            out.push_str(&format!(
+                "caster.mouseDown({});\n",
+                mouse_opts_js(button, *x, *y)
+            ));
+            report.kept.push("mouse.down".into());
+        }
+        ActionNode::MouseUp { button, x, y, .. } => {
+            out.push_str(&format!(
+                "caster.mouseUp({});\n",
+                mouse_opts_js(button, *x, *y)
+            ));
+            report.kept.push("mouse.up".into());
+        }
+        ActionNode::MouseWheel { delta, x, y, .. } => {
+            let opts = match (*x, *y) {
+                (Some(x), Some(y)) => format!(", {{ x: {x}, y: {y} }}"),
+                _ => String::new(),
+            };
+            out.push_str(&format!("caster.wheel({delta}{opts});\n"));
+            report.kept.push("mouse.wheel".into());
+        }
+        ActionNode::KeyTap { key, mods, .. } => {
+            out.push_str(&format!(
+                "caster.keyTap({}, {});\n",
+                js_string_literal(key),
+                key_mods_js(mods)
+            ));
+            report.kept.push("key.tap".into());
+        }
+        ActionNode::KeyDown { key, mods, .. } => {
+            out.push_str(&format!(
+                "caster.keyDown({}, {});\n",
+                js_string_literal(key),
+                key_mods_js(mods)
+            ));
+            report.kept.push("key.down".into());
+        }
+        ActionNode::KeyUp { key, mods, .. } => {
+            out.push_str(&format!(
+                "caster.keyUp({}, {});\n",
+                js_string_literal(key),
+                key_mods_js(mods)
+            ));
+            report.kept.push("key.up".into());
         }
         other => {
             if let Some(label) = action_blocks_transpile(other) {
@@ -455,7 +542,7 @@ fn macro_to_script(
     }
 
     let name = unique_script_name(config_dir, &format!("{} (script)", doc.name))?;
-    let (source, report, allow_network, allow_clipboard, allow_macro) =
+    let (source, report, allow_network, allow_clipboard, allow_macro, allow_input) =
         if mode == ConvertMode::Wrap || !blockers.is_empty() {
             let src = format!(
                 "// Reference wrap — runs the original macro\ncaster.runMacro({});\n",
@@ -473,9 +560,10 @@ fn macro_to_script(
                 false,
                 false,
                 true,
+                false,
             )
         } else {
-            let mut src = String::from("// Transpiled from macro (data actions)\n");
+            let mut src = String::from("// Transpiled from macro\n");
             let mut report = ConvertReport {
                 kept: Vec::new(),
                 dropped: Vec::new(),
@@ -483,6 +571,7 @@ fn macro_to_script(
             };
             let mut allow_net = false;
             let mut allow_clip = false;
+            let mut allow_inp = false;
             for a in &doc.actions {
                 if matches!(a, ActionNode::HttpRequest { .. }) {
                     allow_net = true;
@@ -493,9 +582,12 @@ fn macro_to_script(
                 ) {
                     allow_clip = true;
                 }
+                if action_needs_input(a) {
+                    allow_inp = true;
+                }
                 transpile_action(a, &mut src, &mut report);
             }
-            (src, report, allow_net, allow_clip, false)
+            (src, report, allow_net, allow_clip, false, allow_inp)
         };
 
     let script = ScriptDoc {
@@ -506,7 +598,7 @@ fn macro_to_script(
         allow_clipboard,
         allow_fs: false,
         allow_macro_control: allow_macro,
-        allow_input: false,
+        allow_input,
         param_values: Default::default(),
     };
     save_script(config_dir, &script).map_err(|e| ConvertError::Message(e.to_string()))?;
@@ -600,22 +692,67 @@ mod tests {
     fn macro_data_to_script_transpile() {
         let dir = temp_dir();
         let mut m = create_macro(&dir, Some("Data")).unwrap();
+        let id = m.name.clone();
         m.actions = vec![ActionNode::VarSet {
             id: "v1".into(),
             name: "n".into(),
             value: MacroValue::Number(1.0),
         }];
-        save_macro(&dir, "Data", &m).unwrap();
+        save_macro(&dir, &id, &m).unwrap();
         let r = convert_library_item(
             &dir,
             LibraryKind::Macro,
-            "Data",
+            &id,
             LibraryKind::Script,
             ConvertMode::Transpile,
         )
         .unwrap();
         let s = load_script(&dir, &r.new_id).unwrap();
         assert!(s.source.contains("caster.set"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn macro_input_to_script_transpile() {
+        let dir = temp_dir();
+        let mut m = create_macro(&dir, Some("Click")).unwrap();
+        let id = m.name.clone();
+        m.actions = vec![
+            ActionNode::MouseClick {
+                id: "c1".into(),
+                button: "left".into(),
+                x: Some(10),
+                y: Some(20),
+            },
+            ActionNode::Delay {
+                id: "d1".into(),
+                ms: 100,
+            },
+            ActionNode::KeyTap {
+                id: "k1".into(),
+                key: "A".into(),
+                mods: crate::schema::KeyMods {
+                    ctrl: false,
+                    alt: false,
+                    shift: true,
+                },
+            },
+        ];
+        save_macro(&dir, &id, &m).unwrap();
+        let r = convert_library_item(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Script,
+            ConvertMode::Transpile,
+        )
+        .unwrap();
+        let s = load_script(&dir, &r.new_id).unwrap();
+        assert!(s.source.contains("caster.click"));
+        assert!(s.source.contains("caster.sleep(100)"));
+        assert!(s.source.contains("caster.keyTap"));
+        assert!(s.allow_input);
+        assert!(!s.source.contains("runMacro"));
         let _ = fs::remove_dir_all(&dir);
     }
 
