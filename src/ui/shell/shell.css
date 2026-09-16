@@ -4813,7 +4813,8 @@ body.caster-pointer-reorder-dragging {
 .caster-automations-list-body {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   scrollbar-gutter: stable;
   padding: var(--caster-space-2) 0 72px;
 }
