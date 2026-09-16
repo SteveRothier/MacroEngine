@@ -73,7 +73,8 @@ pub struct LibraryEntryMeta {
 #[serde(rename_all = "camelCase")]
 pub struct LibraryIndex {
     pub version: u32,
-    pub folders: HashMap<String, Vec<LibraryFolder>>,
+    /// Shared folders for macros and clickers (unified since version 2).
+    pub folders: Vec<LibraryFolder>,
     pub entries: HashMap<String, HashMap<String, LibraryEntryMeta>>,
     pub trash: HashMap<String, Vec<String>>,
 }
@@ -81,11 +82,8 @@ pub struct LibraryIndex {
 impl Default for LibraryIndex {
     fn default() -> Self {
         Self {
-            version: 1,
-            folders: HashMap::from([
-                ("macro".into(), Vec::new()),
-                ("clicker".into(), Vec::new()),
-            ]),
+            version: 2,
+            folders: Vec::new(),
             entries: HashMap::from([
                 ("macro".into(), HashMap::new()),
                 ("clicker".into(), HashMap::new()),
@@ -130,17 +128,120 @@ pub fn load_index(config_dir: &Path) -> Result<LibraryIndex, LibraryIndexError> 
     if !path.exists() {
         return Ok(LibraryIndex::default());
     }
-    let raw = fs::read_to_string(path)?;
-    let mut idx: LibraryIndex = serde_json::from_str(&raw)?;
-    if idx.version == 0 {
-        idx.version = 1;
-    }
+    let raw = fs::read_to_string(&path)?;
+    let value: serde_json::Value = serde_json::from_str(&raw)?;
+    let (mut idx, dirty) = index_from_value(value)?;
     for key in ["macro", "clicker"] {
-        idx.folders.entry(key.into()).or_default();
         idx.entries.entry(key.into()).or_default();
         idx.trash.entry(key.into()).or_default();
     }
+    if dirty {
+        save_index(config_dir, &idx)?;
+    }
     Ok(idx)
+}
+
+/// Parse library.json, migrating v1 per-kind folders into a unified list when needed.
+/// Returns `(index, dirty)` — dirty means the on-disk file should be rewritten.
+fn index_from_value(
+    value: serde_json::Value,
+) -> Result<(LibraryIndex, bool), LibraryIndexError> {
+    let version = value
+        .get("version")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(1) as u32;
+    let entries: HashMap<String, HashMap<String, LibraryEntryMeta>> = value
+        .get("entries")
+        .cloned()
+        .map(serde_json::from_value)
+        .transpose()?
+        .unwrap_or_default();
+    let trash: HashMap<String, Vec<String>> = value
+        .get("trash")
+        .cloned()
+        .map(serde_json::from_value)
+        .transpose()?
+        .unwrap_or_default();
+    let folders_val = value.get("folders").cloned().unwrap_or(serde_json::Value::Null);
+
+    if folders_val.is_array() {
+        let folders: Vec<LibraryFolder> = serde_json::from_value(folders_val)?;
+        let mut idx = LibraryIndex {
+            version: version.max(2),
+            folders,
+            entries,
+            trash,
+        };
+        let dirty = version < 2;
+        if dirty {
+            idx.version = 2;
+        }
+        return Ok((idx, dirty));
+    }
+
+    // v1: folders keyed by kind
+    let legacy: HashMap<String, Vec<LibraryFolder>> = if folders_val.is_object() {
+        serde_json::from_value(folders_val)?
+    } else {
+        HashMap::new()
+    };
+    let (folders, remap) = unify_legacy_folders(&legacy);
+    let mut entries = entries;
+    apply_folder_id_remap(&mut entries, &remap);
+    Ok((
+        LibraryIndex {
+            version: 2,
+            folders,
+            entries,
+            trash,
+        },
+        true,
+    ))
+}
+
+/// Merge per-kind folders by case-insensitive name. Returns unified list + id remap
+/// (old id → canonical id when duplicates are collapsed).
+fn unify_legacy_folders(
+    legacy: &HashMap<String, Vec<LibraryFolder>>,
+) -> (Vec<LibraryFolder>, HashMap<String, String>) {
+    let mut folders: Vec<LibraryFolder> = Vec::new();
+    let mut by_name: HashMap<String, String> = HashMap::new();
+    let mut remap: HashMap<String, String> = HashMap::new();
+    for key in ["macro", "clicker"] {
+        let Some(list) = legacy.get(key) else {
+            continue;
+        };
+        for folder in list {
+            let name_key = folder.name.to_ascii_lowercase();
+            if let Some(canon_id) = by_name.get(&name_key) {
+                if canon_id != &folder.id {
+                    remap.insert(folder.id.clone(), canon_id.clone());
+                }
+            } else {
+                by_name.insert(name_key, folder.id.clone());
+                folders.push(folder.clone());
+            }
+        }
+    }
+    (folders, remap)
+}
+
+fn apply_folder_id_remap(
+    entries: &mut HashMap<String, HashMap<String, LibraryEntryMeta>>,
+    remap: &HashMap<String, String>,
+) {
+    if remap.is_empty() {
+        return;
+    }
+    for kind_entries in entries.values_mut() {
+        for meta in kind_entries.values_mut() {
+            if let Some(fid) = meta.folder_id.as_ref() {
+                if let Some(canon) = remap.get(fid) {
+                    meta.folder_id = Some(canon.clone());
+                }
+            }
+        }
+    }
 }
 
 pub fn save_index(config_dir: &Path, index: &LibraryIndex) -> Result<(), LibraryIndexError> {
@@ -301,7 +402,7 @@ fn build_dto(
     include_trash: bool,
 ) -> Result<LibraryIndexDto, LibraryIndexError> {
     let key = kind_key(kind);
-    let folders = index.folders.get(key).cloned().unwrap_or_default();
+    let folders = index.folders.clone();
     let trash = index.trash.get(key).cloned().unwrap_or_default();
     let q_lower = query.map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty());
 
@@ -367,7 +468,7 @@ fn new_folder_id() -> String {
 
 pub fn create_library_folder(
     config_dir: &Path,
-    kind: LibraryKind,
+    _kind: LibraryKind,
     name: String,
     parent_id: Option<String>,
 ) -> Result<LibraryFolder, LibraryIndexError> {
@@ -376,15 +477,17 @@ pub fn create_library_folder(
         return Err(LibraryIndexError::Other("nom de dossier invalide".into()));
     }
     let mut index = load_index(config_dir)?;
-    let key = kind_key(kind);
-    let folders = index.folders.entry(key.to_string()).or_default();
-    if folders.iter().any(|f| f.name.eq_ignore_ascii_case(trimmed)) {
+    if index
+        .folders
+        .iter()
+        .any(|f| f.name.eq_ignore_ascii_case(trimmed))
+    {
         return Err(LibraryIndexError::Other(format!(
             "dossier « {trimmed} » existe déjà"
         )));
     }
     if let Some(ref pid) = parent_id {
-        if !folders.iter().any(|f| &f.id == pid) {
+        if !index.folders.iter().any(|f| &f.id == pid) {
             return Err(LibraryIndexError::Other("dossier parent introuvable".into()));
         }
     }
@@ -393,14 +496,14 @@ pub fn create_library_folder(
         name: trimmed.to_string(),
         parent_id,
     };
-    folders.push(folder.clone());
+    index.folders.push(folder.clone());
     save_index(config_dir, &index)?;
     Ok(folder)
 }
 
 pub fn rename_library_folder(
     config_dir: &Path,
-    kind: LibraryKind,
+    _kind: LibraryKind,
     id: String,
     name: String,
 ) -> Result<LibraryFolder, LibraryIndexError> {
@@ -409,12 +512,17 @@ pub fn rename_library_folder(
         return Err(LibraryIndexError::Other("nom de dossier invalide".into()));
     }
     let mut index = load_index(config_dir)?;
-    let key = kind_key(kind);
-    let folders = index
+    if index
         .folders
-        .get_mut(key)
-        .ok_or_else(|| LibraryIndexError::Other("kind".into()))?;
-    let folder = folders
+        .iter()
+        .any(|f| f.id != id && f.name.eq_ignore_ascii_case(trimmed))
+    {
+        return Err(LibraryIndexError::Other(format!(
+            "dossier « {trimmed} » existe déjà"
+        )));
+    }
+    let folder = index
+        .folders
         .iter_mut()
         .find(|f| f.id == id)
         .ok_or_else(|| LibraryIndexError::Other("dossier introuvable".into()))?;
@@ -426,20 +534,20 @@ pub fn rename_library_folder(
 
 pub fn delete_library_folder(
     config_dir: &Path,
-    kind: LibraryKind,
+    _kind: LibraryKind,
     id: String,
 ) -> Result<(), LibraryIndexError> {
     let mut index = load_index(config_dir)?;
-    let key = kind_key(kind);
-    let folders = index.folders.get_mut(key).unwrap();
-    if !folders.iter().any(|f| f.id == id) {
+    if !index.folders.iter().any(|f| f.id == id) {
         return Err(LibraryIndexError::Other("dossier introuvable".into()));
     }
-    folders.retain(|f| f.id != id);
-    if let Some(entries) = index.entries.get_mut(key) {
-        for meta in entries.values_mut() {
-            if meta.folder_id.as_deref() == Some(id.as_str()) {
-                meta.folder_id = None;
+    index.folders.retain(|f| f.id != id);
+    for key in ["macro", "clicker"] {
+        if let Some(entries) = index.entries.get_mut(key) {
+            for meta in entries.values_mut() {
+                if meta.folder_id.as_deref() == Some(id.as_str()) {
+                    meta.folder_id = None;
+                }
             }
         }
     }
@@ -484,8 +592,7 @@ pub fn move_library_item(
     }
     if let Some(ref fid) = folder_id {
         let index = load_index(config_dir)?;
-        let folders = index.folders.get(kind_key(kind)).cloned().unwrap_or_default();
-        if !folders.iter().any(|f| f.id == *fid) {
+        if !index.folders.iter().any(|f| f.id == *fid) {
             return Err(LibraryIndexError::Other("dossier introuvable".into()));
         }
     }
@@ -788,6 +895,68 @@ mod tests {
         assert!(dto.folders.iter().all(|f| f.id != folder.id));
         let item = dto.items.iter().find(|i| i.id == "Demo").unwrap();
         assert!(item.folder_id.is_none());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unified_folders_shared_across_kinds() {
+        let dir = temp_dir();
+        create_macro(&dir, Some("M1")).unwrap();
+        let folder =
+            create_library_folder(&dir, LibraryKind::Macro, "Shared".into(), None).unwrap();
+        // Same name must fail globally (even for clicker kind arg).
+        let err = create_library_folder(&dir, LibraryKind::Clicker, "shared".into(), None)
+            .unwrap_err();
+        assert!(err.to_string().contains("existe déjà"));
+        move_library_item(
+            &dir,
+            LibraryKind::Macro,
+            "M1".into(),
+            Some(folder.id.clone()),
+            None,
+        )
+        .unwrap();
+        let macro_dto = get_library_index(&dir, LibraryKind::Macro).unwrap();
+        let clicker_dto = get_library_index(&dir, LibraryKind::Clicker).unwrap();
+        assert_eq!(macro_dto.folders.len(), 1);
+        assert_eq!(clicker_dto.folders.len(), 1);
+        assert_eq!(macro_dto.folders[0].id, clicker_dto.folders[0].id);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn migrate_v1_merges_same_name_folders() {
+        let dir = temp_dir();
+        let path = library_path(&dir);
+        let raw = r#"{
+          "version": 1,
+          "folders": {
+            "macro": [{"id": "fm1", "name": "Pack"}],
+            "clicker": [{"id": "fc1", "name": "pack"}]
+          },
+          "entries": {
+            "macro": {"M1": {"folderId": "fm1", "locked": false, "sortOrder": 0}},
+            "clicker": {"C1": {"folderId": "fc1", "locked": false, "sortOrder": 0}}
+          },
+          "trash": {"macro": [], "clicker": []}
+        }"#;
+        fs::write(&path, raw).unwrap();
+        let idx = load_index(&dir).unwrap();
+        assert_eq!(idx.version, 2);
+        assert_eq!(idx.folders.len(), 1);
+        assert_eq!(idx.folders[0].id, "fm1");
+        assert_eq!(
+            idx.entries["macro"]["M1"].folder_id.as_deref(),
+            Some("fm1")
+        );
+        assert_eq!(
+            idx.entries["clicker"]["C1"].folder_id.as_deref(),
+            Some("fm1")
+        );
+        // Persisted as unified array
+        let saved: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(saved["folders"].is_array());
         let _ = fs::remove_dir_all(&dir);
     }
 }

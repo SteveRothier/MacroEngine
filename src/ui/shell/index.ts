@@ -1,3 +1,7 @@
+/**
+ * Caster UI shell (AppShell, menus, tabs, Accueil primitives).
+ * CSS: `./tokens.css` + `./shell.css` with class/token prefix `caster-`.
+ */
 export { Tooltip, TruncatedTooltip, type TooltipSide, type TooltipAlign } from "./Tooltip";
 export {
   DocumentTabBar,

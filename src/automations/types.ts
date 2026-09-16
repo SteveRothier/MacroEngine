@@ -52,17 +52,16 @@ export type DisplayOptions = {
 
 export type AutomationFilter = "all" | "favorites" | "recent" | "scripts";
 
-/** Folder option for Accueil filter / bulk move (`kind` scopes library index). */
+/** Shared folder option for Accueil / bulk move (macros + clickers). */
 export type AutomationFolderOption = {
   id: string;
   name: string;
-  kind: "macro" | "clicker";
 };
 
 export function folderOptionKey(
-  f: Pick<AutomationFolderOption, "kind" | "id">,
+  f: Pick<AutomationFolderOption, "id"> | { id: string },
 ): string {
-  return `${f.kind}:${f.id}`;
+  return f.id;
 }
 
 export type FilterCounts = {
