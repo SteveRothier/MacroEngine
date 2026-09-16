@@ -6,5 +6,6 @@ export type ScriptDoc = {
   allowClipboard?: boolean;
   allowFs?: boolean;
   allowMacroControl?: boolean;
+  allowInput?: boolean;
   paramValues?: Record<string, boolean | number | string>;
 };

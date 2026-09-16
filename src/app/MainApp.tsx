@@ -632,6 +632,7 @@ function MainAppInner({
         allowClipboard: false,
         allowFs: false,
         allowMacroControl: false,
+        allowInput: false,
         paramValues: {},
       };
       await invoke("save_script_cmd", { doc });

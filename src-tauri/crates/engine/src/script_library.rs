@@ -41,6 +41,8 @@ pub struct ScriptDoc {
     pub allow_fs: bool,
     #[serde(default)]
     pub allow_macro_control: bool,
+    #[serde(default)]
+    pub allow_input: bool,
     /// Saved UI defaults for `//@param` values.
     #[serde(default)]
     pub param_values: HashMap<String, MacroValue>,
@@ -170,6 +172,7 @@ mod tests {
             allow_clipboard: false,
             allow_fs: false,
             allow_macro_control: false,
+            allow_input: false,
             param_values: HashMap::new(),
         };
         save_script(&dir, &doc).unwrap();

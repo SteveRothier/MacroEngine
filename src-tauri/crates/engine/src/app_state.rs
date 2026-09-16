@@ -1395,6 +1395,7 @@ impl AppState {
                 allow_clipboard: doc.allow_clipboard,
                 allow_fs: doc.allow_fs,
                 allow_macro_control: doc.allow_macro_control,
+                allow_input: doc.allow_input,
                 config_dir: config_dir.clone(),
                 injector: Some(Arc::clone(&injector)),
                 run_macro: None,

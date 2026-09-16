@@ -8,6 +8,7 @@ export type ScriptPermissions = {
   allowClipboard: boolean;
   allowFs: boolean;
   allowMacroControl: boolean;
+  allowInput: boolean;
 };
 
 type Props = {
@@ -22,6 +23,7 @@ function countActive(v: ScriptPermissions): number {
     v.allowClipboard,
     v.allowFs,
     v.allowMacroControl,
+    v.allowInput,
   ].filter(Boolean).length;
 }
 
@@ -75,6 +77,12 @@ export function ScriptPermissionsMenu({ value, onChange, disabled }: Props) {
             tip={t("scripts.permissions.clipboardTip")}
             checked={value.allowClipboard}
             onChange={(allowClipboard) => onChange({ allowClipboard })}
+          />
+          <PermRow
+            label={t("scripts.permissions.input")}
+            tip={t("scripts.permissions.inputTip")}
+            checked={value.allowInput}
+            onChange={(allowInput) => onChange({ allowInput })}
           />
           <div className="caster-script-perms-sep" role="separator">
             {t("scripts.permissions.advanced")}
@@ -132,12 +140,14 @@ export function activePermissionLabels(
     allowClipboard?: boolean;
     allowFs?: boolean;
     allowMacroControl?: boolean;
+    allowInput?: boolean;
   },
   t: TFunction,
 ): string[] {
   const out: string[] = [];
   if (doc.allowNetwork) out.push(t("scripts.permissions.network"));
   if (doc.allowClipboard) out.push(t("scripts.permissions.clipboard"));
+  if (doc.allowInput) out.push(t("scripts.permissions.input"));
   if (doc.allowFs) out.push(t("scripts.permissions.fsShort"));
   if (doc.allowMacroControl) out.push(t("scripts.permissions.macrosShort"));
   return out;
