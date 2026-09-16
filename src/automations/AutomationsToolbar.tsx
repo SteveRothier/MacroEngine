@@ -166,13 +166,13 @@ export function AutomationsToolbar({
         <div className="caster-automations-filter-bar-end">
           {onUndo || onRedo ? (
             <div
-              className="caster-automations-history"
+              className="caster-segmented caster-segmented--compact caster-automations-history"
               role="group"
               aria-label={t("automations.toolbar.aria")}
             >
               <button
                 type="button"
-                className="caster-btn caster-btn-ghost caster-automations-history-btn"
+                className="caster-segmented-btn caster-automations-history-btn"
                 disabled={!canUndo}
                 onClick={onUndo}
                 title={t("automations.toolbar.undoTitle")}
@@ -182,7 +182,7 @@ export function AutomationsToolbar({
               </button>
               <button
                 type="button"
-                className="caster-btn caster-btn-ghost caster-automations-history-btn"
+                className="caster-segmented-btn caster-automations-history-btn"
                 disabled={!canRedo}
                 onClick={onRedo}
                 title={t("automations.toolbar.redoTitle")}

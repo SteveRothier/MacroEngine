@@ -40,7 +40,37 @@ export type AccueilUndoEntry =
   | {
       type: "delete-folder";
       name: string;
+    }
+  | {
+      type: "convert-item";
+      kind: AutomationKind;
+      id: string;
+      label: string;
+    }
+  | {
+      type: "convert-batch";
+      items: { kind: AutomationKind; id: string }[];
     };
+
+function isUndoOnly(entry: AccueilUndoEntry): boolean {
+  return (
+    entry.type === "create-folder" ||
+    entry.type === "delete-folder" ||
+    entry.type === "convert-item" ||
+    entry.type === "convert-batch"
+  );
+}
+
+async function removeCreatedItem(
+  kind: AutomationKind,
+  id: string,
+): Promise<void> {
+  if (kind === "script") {
+    await invoke("delete_script_cmd", { id });
+    return;
+  }
+  await invoke("trash_library_item_cmd", { kind, id });
+}
 
 async function applyInverse(entry: AccueilUndoEntry): Promise<void> {
   switch (entry.type) {
@@ -99,6 +129,14 @@ async function applyInverse(entry: AccueilUndoEntry): Promise<void> {
         parentId: null,
       });
       return;
+    case "convert-item":
+      await removeCreatedItem(entry.kind, entry.id);
+      return;
+    case "convert-batch":
+      for (const item of entry.items) {
+        await removeCreatedItem(item.kind, item.id);
+      }
+      return;
   }
 }
 
@@ -130,8 +168,8 @@ export function useAccueilUndo(opts: {
     pastRef.current = pastRef.current.slice(0, -1);
     try {
       await applyInverse(entry);
-      // Folder create/delete redo is ambiguous (new ids) — undo-only.
-      if (entry.type !== "create-folder" && entry.type !== "delete-folder") {
+      // Folder create/delete + convert redo is ambiguous (new ids) — undo-only.
+      if (!isUndoOnly(entry)) {
         futureRef.current = [...futureRef.current, entry];
       } else {
         futureRef.current = [];
@@ -218,7 +256,9 @@ async function applyForward(entry: AccueilUndoEntry): Promise<void> {
       });
       return;
     case "delete-folder":
-      // Forward delete needs id; we only kept name. Skip redo for folder delete.
+    case "convert-item":
+    case "convert-batch":
+      // Undo-only entries — never re-applied via redo.
       return;
   }
 }

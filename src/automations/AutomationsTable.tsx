@@ -1159,8 +1159,14 @@ export function AutomationsTable({
           setMenuKey(null);
           if (!outcome) return;
           const { result, openAfter } = outcome;
+          accueilUndo.push({
+            type: "convert-item",
+            kind: result.toKind as AutomationRow["kind"],
+            id: result.newId,
+            label: result.newName,
+          });
           if (openAfter) {
-            toast.success(
+            undoToast(
               t("automations.convert.success", {
                 name: result.newName,
                 kind: t(`automations.convert.kind.${result.toKind}`),
@@ -1174,7 +1180,7 @@ export function AutomationsTable({
             });
             return;
           }
-          toast.success(convertSuccessMessage(result, t));
+          undoToast(convertSuccessMessage(result, t));
         } catch (e) {
           setMenuKey(null);
           toast.error(errMessage(e, t("automations.convert.fail")));
@@ -1201,7 +1207,16 @@ export function AutomationsTable({
             toast.error(convertBatchSummaryMessage(outcome, t));
             return;
           }
-          toast.success(convertBatchSummaryMessage(outcome, t));
+          if (outcome.ok.length > 0) {
+            accueilUndo.push({
+              type: "convert-batch",
+              items: outcome.ok.map((r) => ({
+                kind: r.toKind as AutomationRow["kind"],
+                id: r.newId,
+              })),
+            });
+          }
+          undoToast(convertBatchSummaryMessage(outcome, t));
           if (outcome.openAfter && outcome.ok.length > 0) {
             for (const result of outcome.ok) {
               onNavigate({

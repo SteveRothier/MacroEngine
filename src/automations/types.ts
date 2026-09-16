@@ -68,7 +68,6 @@ export type FilterCounts = {
   all: number;
   favorites: number;
   recent: number;
-  scripts: number;
 };
 
 export const DEFAULT_DISPLAY: DisplayOptions = {
