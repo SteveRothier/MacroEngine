@@ -1759,29 +1759,27 @@ export function AutomationsTable({
                             onKeyDown={(e) => onRowKeyDown(e, r)}
                             tabIndex={0}
                           >
-                            <Tooltip content={t("automations.row.selectTip")}>
-                              <label
-                                className="caster-auto-row-check"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    toggleSelect(key, {
-                                      multi: true,
-                                      range: e.shiftKey,
-                                    });
-                                  }}
-                                  onChange={() => {
-                                    /* controlled via onClick */
-                                  }}
-                                  aria-label={t("automations.row.selectAria", { name: r.name })}
-                                />
-                              </label>
-                            </Tooltip>
+                            <label
+                              className="caster-auto-row-check"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.preventDefault();
+                                  toggleSelect(key, {
+                                    multi: true,
+                                    range: e.shiftKey,
+                                  });
+                                }}
+                                onChange={() => {
+                                  /* controlled via onClick */
+                                }}
+                                aria-label={t("automations.row.selectAria", { name: r.name })}
+                              />
+                            </label>
                             <div
                               className="caster-auto-row-identity"
                               onPointerDown={(e) => onRowPointerDown(r, e)}

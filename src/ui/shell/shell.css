@@ -1154,7 +1154,6 @@ button.caster-sidebar-item,
   flex: 1;
   min-height: 0;
   overflow: auto;
-  scrollbar-gutter: stable;
 }
 
 .caster-stage > * {
@@ -4803,10 +4802,17 @@ body.caster-pointer-reorder-dragging {
   padding: var(--caster-space-2) 0 72px;
 }
 
+/* Bleed into reserved gutter so rows reach the window edge;
+   scrollbar paints over the bleed; gutter keeps layout stable. */
+.caster-automations-list-body .caster-automations-list {
+  width: calc(100% + var(--caster-scrollbar-size, 6px));
+  box-sizing: border-box;
+}
+
 .caster-automations-list {
   display: flex;
   flex-direction: column;
-  gap: var(--caster-space-3);
+  gap: 0;
 }
 
 .caster-automations-section {
@@ -4898,9 +4904,11 @@ body.caster-pointer-reorder-dragging {
 }
 
 .caster-auto-folder-section-end {
-  height: 10px;
-  margin: 0 20px 4px;
+  height: 0;
+  margin: 0;
+  padding: 0;
   border: none;
+  border-bottom: 1px solid var(--caster-border-subtle);
   box-sizing: border-box;
 }
 
