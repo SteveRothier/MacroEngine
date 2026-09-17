@@ -20,7 +20,8 @@ type ScriptPresetDef = Omit<ScriptPreset, "name" | "description"> & {
     | "httpGet"
     | "clipRoundtrip"
     | "fsNote"
-    | "runMacro";
+    | "runMacro"
+    | "clickSleep";
 };
 
 const SCRIPT_PRESET_DEFS: ScriptPresetDef[] = [
@@ -90,6 +91,18 @@ if (!id) {
   caster.log("macro lancée: " + id);
   caster.return(true);
 }
+`,
+  },
+  {
+    id: "click-sleep",
+    catalogKey: "clickSleep",
+    allowInput: true,
+    source: `//@param x number 100
+//@param y number 100
+//@param pauseMs number 200
+caster.click({ button: "left", x: caster.get("x"), y: caster.get("y") });
+caster.sleep(Number(caster.get("pauseMs") || 200));
+caster.log("click ok");
 `,
   },
 ];

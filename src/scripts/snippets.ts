@@ -19,3 +19,12 @@ export const SCRIPT_SNIPPET_PARAM = `//@param label string world
 caster.log("hello " + caster.get("label"));
 caster.return(caster.get("label"));
 `;
+
+export const SCRIPT_SNIPPET_CLICK = `// Click + pause (nécessite permission Souris / clavier)
+caster.click({ button: "left", x: 100, y: 100 });
+caster.sleep(200);
+`;
+
+export const SCRIPT_SNIPPET_KEY = `// Touche (nécessite permission Souris / clavier)
+caster.keyTap("A", { ctrl: false, alt: false, shift: false });
+`;
