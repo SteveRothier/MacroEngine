@@ -10,7 +10,6 @@ import {
   type TabContextAction,
 } from "./DocumentTabBar";
 import { ContextMenu } from "./ContextMenu";
-import { RecentMenu, type RecentMenuItem } from "./RecentMenu";
 import { StatusPill, type StatusKind } from "./StatusPill";
 
 type Props = {
@@ -32,7 +31,6 @@ type Props = {
   sessionStatus?: { kind: StatusKind; label: string } | null;
   showStop?: boolean;
   onStop?: () => void;
-  recentItems?: RecentMenuItem[];
 };
 
 export function WindowTitleBar({
@@ -54,7 +52,6 @@ export function WindowTitleBar({
   sessionStatus,
   showStop,
   onStop,
-  recentItems,
 }: Props) {
   const t = useT();
   const [dragMenu, setDragMenu] = useState<{ x: number; y: number } | null>(null);
@@ -89,7 +86,6 @@ export function WindowTitleBar({
         onContextMenu={openDragMenu}
       />
       <div className="caster-titlebar-actions">
-        {recentItems ? <RecentMenu items={recentItems} /> : null}
         {onSettingsClick ? (
           <button
             type="button"

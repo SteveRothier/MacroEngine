@@ -191,6 +191,7 @@
 }
 
 .caster-doc-tab {
+  position: relative;
   display: flex;
   align-items: stretch;
   height: var(--caster-tab-h);
@@ -207,7 +208,7 @@
   flex: 1 1 0;
   width: 0;
   min-width: var(--caster-tab-abs-min-w, 36px);
-  max-width: var(--caster-tab-max-w);
+  max-width: none;
 }
 
 .caster-doc-tab:hover {
@@ -385,14 +386,18 @@
 }
 
 .caster-doc-tab-close {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  align-self: center;
   width: 20px;
   min-width: 20px;
   height: 20px;
-  margin-right: 4px;
+  margin: 0;
   padding: 0;
   border: none;
   border-radius: 4px;
@@ -400,12 +405,14 @@
   color: var(--caster-text-muted);
   cursor: pointer;
   opacity: 0;
+  pointer-events: none;
   flex-shrink: 0;
 }
 
 .caster-doc-tab:hover .caster-doc-tab-close,
-.caster-doc-tab.active .caster-doc-tab-close {
+.caster-doc-tab:focus-within .caster-doc-tab-close {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .caster-doc-tab-close:hover {
@@ -423,7 +430,8 @@
 }
 
 .caster-doc-tabbar-drag-fill {
-  flex: 1 1 0;
+  flex: 0 0 24px;
+  width: 24px;
   min-width: 24px;
   height: 100%;
   margin-bottom: -1px;
@@ -587,8 +595,9 @@ button.caster-titlebar-text-btn.active,
 }
 
 .caster-titlebar-drag {
-  flex: 0 1 auto;
-  min-width: 24px;
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
   align-self: stretch;
   -webkit-app-region: drag;
 }

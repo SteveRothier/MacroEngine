@@ -72,9 +72,8 @@
   --caster-tab-h: 30px;
   --caster-tab-min-w: 72px;
   --caster-tab-abs-min-w: 36px;
-  --caster-tab-max-w: 180px;
+  --caster-tab-max-w: none;
   --caster-tab-compact-w: 56px;
-  --caster-tabbar-max: 80%;
   --caster-editor-toolbar-h: 36px;
   --caster-inspector-w: 360px;
   --caster-journal-h: 160px;
