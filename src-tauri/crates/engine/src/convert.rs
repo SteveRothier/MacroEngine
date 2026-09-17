@@ -113,6 +113,195 @@ fn js_string_literal(s: &str) -> String {
     serde_json::to_string(s).unwrap_or_else(|_| "\"\"".into())
 }
 
+fn py_string_literal(s: &str) -> String {
+    js_string_literal(s) // JSON string literals are valid Python
+}
+
+fn macro_value_py(v: &MacroValue) -> String {
+    match v {
+        MacroValue::String(s) => py_string_literal(s),
+        MacroValue::Number(n) => {
+            if n.fract() == 0.0 && n.abs() < 1e15 {
+                format!("{}", *n as i64)
+            } else {
+                format!("{n}")
+            }
+        }
+        MacroValue::Bool(b) => if *b { "True" } else { "False" }.into(),
+    }
+}
+
+fn mouse_opts_py(button: &str, x: Option<i32>, y: Option<i32>) -> String {
+    let mut parts = vec![format!("\"button\": {}", py_string_literal(button))];
+    if let Some(x) = x {
+        parts.push(format!("\"x\": {x}"));
+    }
+    if let Some(y) = y {
+        parts.push(format!("\"y\": {y}"));
+    }
+    format!("{{ {} }}", parts.join(", "))
+}
+
+fn key_mods_py(mods: &crate::schema::KeyMods) -> String {
+    format!(
+        "{{ \"ctrl\": {}, \"alt\": {}, \"shift\": {} }}",
+        if mods.ctrl { "True" } else { "False" },
+        if mods.alt { "True" } else { "False" },
+        if mods.shift { "True" } else { "False" },
+    )
+}
+
+fn transpile_action_py(a: &ActionNode, out: &mut String, report: &mut ConvertReport) {
+    match a {
+        ActionNode::VarSet { name, value, .. } => {
+            out.push_str(&format!(
+                "caster.set({}, {})\n",
+                py_string_literal(name),
+                macro_value_py(value)
+            ));
+            report.kept.push(format!("var.set:{name}"));
+        }
+        ActionNode::ClipboardSet { text, .. } => {
+            out.push_str(&format!(
+                "caster.clipboardWrite({})\n",
+                py_string_literal(text)
+            ));
+            report.kept.push("clipboard.set".into());
+        }
+        ActionNode::ClipboardGet { name, .. } => {
+            out.push_str(&format!(
+                "caster.set({}, caster.clipboardRead())\n",
+                py_string_literal(name)
+            ));
+            report.kept.push("clipboard.get".into());
+        }
+        ActionNode::HttpRequest {
+            method,
+            url,
+            body,
+            body_var,
+            ..
+        } => {
+            let body_py = body
+                .as_ref()
+                .map(|b| py_string_literal(b))
+                .unwrap_or_else(|| "None".into());
+            if let Some(bv) = body_var {
+                out.push_str(&format!(
+                    "caster.set({}, caster.fetch({{ \"method\": {}, \"url\": {}, \"body\": {} }}))\n",
+                    py_string_literal(bv),
+                    py_string_literal(method),
+                    py_string_literal(url),
+                    body_py
+                ));
+            } else {
+                out.push_str(&format!(
+                    "caster.fetch({{ \"method\": {}, \"url\": {}, \"body\": {} }})\n",
+                    py_string_literal(method),
+                    py_string_literal(url),
+                    body_py
+                ));
+            }
+            report.kept.push("http.request".into());
+        }
+        ActionNode::ProcessRun {
+            command,
+            args,
+            wait,
+            timeout_ms,
+            ..
+        } => {
+            let args_py = args
+                .iter()
+                .map(|a| py_string_literal(a))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let timeout = timeout_ms
+                .map(|ms| format!(", \"timeoutMs\": {ms}"))
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "caster.runProcess({{ \"command\": {}, \"args\": [{args_py}], \"wait\": {}{timeout} }})\n",
+                py_string_literal(command),
+                if *wait { "True" } else { "False" },
+            ));
+            report.kept.push("process.run".into());
+        }
+        ActionNode::Delay { ms, .. } => {
+            out.push_str(&format!("caster.sleep({ms})\n"));
+            report.kept.push("delay".into());
+        }
+        ActionNode::MouseClick { button, x, y, .. } => {
+            out.push_str(&format!(
+                "caster.click({})\n",
+                mouse_opts_py(button, *x, *y)
+            ));
+            report.kept.push("mouse.click".into());
+        }
+        ActionNode::MouseMove { x, y, .. } => {
+            out.push_str(&format!("caster.moveTo({x}, {y})\n"));
+            report.kept.push("mouse.move".into());
+        }
+        ActionNode::MouseDown { button, x, y, .. } => {
+            out.push_str(&format!(
+                "caster.mouseDown({})\n",
+                mouse_opts_py(button, *x, *y)
+            ));
+            report.kept.push("mouse.down".into());
+        }
+        ActionNode::MouseUp { button, x, y, .. } => {
+            out.push_str(&format!(
+                "caster.mouseUp({})\n",
+                mouse_opts_py(button, *x, *y)
+            ));
+            report.kept.push("mouse.up".into());
+        }
+        ActionNode::MouseWheel { delta, .. } => {
+            out.push_str(&format!("caster.wheel(0, {delta})\n"));
+            report.kept.push("mouse.wheel".into());
+        }
+        ActionNode::KeyTap { key, mods, .. } => {
+            out.push_str(&format!(
+                "caster.keyTap({}, {})\n",
+                py_string_literal(key),
+                key_mods_py(mods)
+            ));
+            report.kept.push("key.tap".into());
+        }
+        ActionNode::KeyDown { key, mods, .. } => {
+            out.push_str(&format!(
+                "caster.keyDown({}, {})\n",
+                py_string_literal(key),
+                key_mods_py(mods)
+            ));
+            report.kept.push("key.down".into());
+        }
+        ActionNode::KeyUp { key, mods, .. } => {
+            out.push_str(&format!(
+                "caster.keyUp({}, {})\n",
+                py_string_literal(key),
+                key_mods_py(mods)
+            ));
+            report.kept.push("key.up".into());
+        }
+        ActionNode::ScriptRun { script_id, .. } => {
+            if let Some(sid) = script_id {
+                out.push_str(&format!(
+                    "# script.run:{sid} — use a JS script for runScript\ncaster.log(\"skipped runScript\")\n"
+                ));
+                report.dropped.push(format!("script.run:{sid}"));
+            } else {
+                report.dropped.push("script.run:inline".into());
+            }
+        }
+        ActionNode::ControlIf { .. } | ActionNode::ControlWhile { .. } => {
+            report.dropped.push("control.*".into());
+        }
+        _ => {
+            report.dropped.push("unsupported".into());
+        }
+    }
+}
+
 fn macro_value_js(v: &MacroValue) -> String {
     match v {
         MacroValue::String(s) => js_string_literal(s),
@@ -733,6 +922,7 @@ fn macro_to_script(
     }
 
     let name = unique_script_name(config_dir, &format!("{} (script)", doc.name))?;
+    let py = language == ScriptLanguage::Python;
     let (
         mut source,
         report,
@@ -742,10 +932,17 @@ fn macro_to_script(
         allow_input,
         allow_process,
     ) = if mode == ConvertMode::Wrap || !blockers.is_empty() {
-        let src = format!(
-            "// Reference wrap — runs the original macro\ncaster.runMacro({});\n",
-            js_string_literal(&doc.name)
-        );
+        let src = if py {
+            format!(
+                "# Reference wrap — runs the original macro\ncaster.runMacro({})\n",
+                py_string_literal(&doc.name)
+            )
+        } else {
+            format!(
+                "// Reference wrap — runs the original macro\ncaster.runMacro({});\n",
+                js_string_literal(&doc.name)
+            )
+        };
         (
             src,
             ConvertReport {
@@ -762,7 +959,11 @@ fn macro_to_script(
             false,
         )
     } else {
-        let mut src = String::from("// Transpiled from macro\n");
+        let mut src = if py {
+            String::from("# Transpiled from macro\n")
+        } else {
+            String::from("// Transpiled from macro\n")
+        };
         let mut report = ConvertReport {
             kept: Vec::new(),
             dropped: Vec::new(),
@@ -789,7 +990,11 @@ fn macro_to_script(
             if action_tree_needs_macro_control(a) {
                 allow_mac = true;
             }
-            transpile_action(a, &mut src, &mut report);
+            if py {
+                transpile_action_py(a, &mut src, &mut report);
+            } else {
+                transpile_action(a, &mut src, &mut report);
+            }
         }
         (
             src,
@@ -1086,6 +1291,40 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.to_string().contains("not supported"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn macro_to_python_script_stamps_language() {
+        let dir = temp_dir();
+        let mut m = create_macro(&dir, Some("PySrc")).unwrap();
+        let id = m.name.clone();
+        m.actions = vec![
+            ActionNode::VarSet {
+                id: "v1".into(),
+                name: "x".into(),
+                value: MacroValue::Number(1.0),
+            },
+            ActionNode::Delay {
+                id: "d1".into(),
+                ms: 10,
+            },
+        ];
+        save_macro(&dir, &id, &m).unwrap();
+        let r = convert_library_item_lang(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Script,
+            ConvertMode::Transpile,
+            ScriptLanguage::Python,
+        )
+        .unwrap();
+        let s = load_script(&dir, &r.new_id).unwrap();
+        assert_eq!(s.language, ScriptLanguage::Python);
+        assert!(s.source.contains("caster.set"));
+        assert!(s.source.contains("caster.sleep(10)"));
+        assert!(!s.source.contains(';'));
         let _ = fs::remove_dir_all(&dir);
     }
 }

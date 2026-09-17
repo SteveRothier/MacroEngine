@@ -304,9 +304,10 @@ export const automations = defineCatalog({
       wrapConfirm: "Créer un script référence",
       languageTitle: "Langage du script",
       languageMessage:
-        "Choisir JavaScript ou TypeScript pour le script converti (exécuté via transpile TS→JS).",
+        "Choisir JavaScript, TypeScript ou Python pour le script converti.",
       languageJs: "JavaScript",
       languageTs: "TypeScript",
+      languagePy: "Python",
       blockers: {
         processRun: "lancement de processus",
         controlIf: "condition process (si)",
@@ -619,9 +620,10 @@ export const automations = defineCatalog({
       wrapConfirm: "Create reference script",
       languageTitle: "Script language",
       languageMessage:
-        "Choose JavaScript or TypeScript for the converted script (TS is transpiled to JS at run).",
+        "Choose JavaScript, TypeScript, or Python for the converted script.",
       languageJs: "JavaScript",
       languageTs: "TypeScript",
+      languagePy: "Python",
       blockers: {
         processRun: "process launch",
         controlIf: "process condition (if)",

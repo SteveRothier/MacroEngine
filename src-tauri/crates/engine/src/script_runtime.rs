@@ -104,6 +104,12 @@ pub fn run_script_with_options(
     let _ = timeout_ms;
     let _ = fs::create_dir_all(opts.script_data_dir());
 
+    if opts.language == ScriptLanguage::Python {
+        return crate::script_python::run_python_script(
+            source, timeout_ms, env, bus, cancel, opts,
+        );
+    }
+
     let source = prepare_script_source(source, opts.language)?;
 
     let mut ctx = Context::default();

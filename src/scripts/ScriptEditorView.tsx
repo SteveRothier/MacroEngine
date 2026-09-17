@@ -82,6 +82,13 @@ function humanizeRunError(raw: string, t: TFunction): string {
   if (s === "module_not_runnable" || /module_not_runnable/i.test(s)) {
     return t("scripts.module.runBlocked");
   }
+  if (s === "python_not_found" || /python_not_found/i.test(s)) {
+    return t("scripts.toast.pythonNotFound");
+  }
+  if (/python_sidecar_failed/i.test(s)) {
+    const detail = s.replace(/^python_sidecar_failed:?\s*/i, "");
+    return t("scripts.toast.pythonSidecarFailed", { detail });
+  }
   if (/network|fetch disabled|allowNetwork|réseau/i.test(s)) {
     return t("scripts.toast.networkDenied");
   }
@@ -383,11 +390,15 @@ export function ScriptEditorView({
   const sourceAria =
     lang === "typescript"
       ? t("scripts.toolbar.sourceAriaTs")
-      : t("scripts.toolbar.sourceAriaJs");
+      : lang === "python"
+        ? t("scripts.toolbar.sourceAriaPy")
+        : t("scripts.toolbar.sourceAriaJs");
   const sourcePlaceholder =
     lang === "typescript"
       ? t("scripts.toolbar.sourcePlaceholderTs")
-      : t("scripts.toolbar.sourcePlaceholderJs");
+      : lang === "python"
+        ? t("scripts.toolbar.sourcePlaceholderPy")
+        : t("scripts.toolbar.sourcePlaceholderJs");
 
   async function onRun() {
     if (draftRef.current?.isModule) {
@@ -511,10 +522,19 @@ export function ScriptEditorView({
                   value: "typescript",
                   label: t("scripts.language.typescript"),
                 },
+                {
+                  value: "python",
+                  label: t("scripts.language.python"),
+                },
               ]}
               onChange={(v) =>
                 patch({
-                  language: v === "typescript" ? "typescript" : "javascript",
+                  language:
+                    v === "typescript"
+                      ? "typescript"
+                      : v === "python"
+                        ? "python"
+                        : "javascript",
                 })
               }
             />
@@ -532,7 +552,13 @@ export function ScriptEditorView({
           <ScriptSourceEditor
             ref={sourceEditorRef}
             value={draft.source}
-            language={lang === "typescript" ? "typescript" : "javascript"}
+            language={
+              lang === "typescript"
+                ? "typescript"
+                : lang === "python"
+                  ? "python"
+                  : "javascript"
+            }
             colorScheme={colorScheme}
             onChange={(source) => {
               setDiagnostics([]);

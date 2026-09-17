@@ -34,10 +34,13 @@ export const scripts = defineCatalog({
       sourceAria: "Source JavaScript",
       sourceAriaJs: "Source JavaScript",
       sourceAriaTs: "Source TypeScript",
+      sourceAriaPy: "Source Python",
       sourcePlaceholderJs:
         "// //@param name type default\n// caster.get / set / return / log / fetch",
       sourcePlaceholderTs:
         "// //@param name type default\n// TypeScript → JS (oxc) · caster.*",
+      sourcePlaceholderPy:
+        "# #@param name type default\n# caster.get / set / return / log (sidecar Python)",
       runModuleBlocked:
         "Module bibliothèque — non exécutable directement (caster.include).",
       loadingAria: "Chargement du script",
@@ -86,6 +89,7 @@ export const scripts = defineCatalog({
       label: "Langage",
       javascript: "JavaScript",
       typescript: "TypeScript",
+      python: "Python",
     },
     module: {
       label: "Module bibliothèque",
@@ -122,6 +126,9 @@ export const scripts = defineCatalog({
     toast: {
       networkDenied:
         "Erreur : caster.fetch a échoué — le script n’a pas la permission Réseau. Activez-la dans Permissions si c’est voulu.",
+      pythonNotFound:
+        "Python introuvable — installez Python 3 et ajoutez-le au PATH (py / python).",
+      pythonSidecarFailed: "Échec du runtime Python : {detail}",
       errorPrefix: "Erreur : {detail}",
     },
     confirm: {
@@ -163,10 +170,13 @@ export const scripts = defineCatalog({
       sourceAria: "JavaScript source",
       sourceAriaJs: "JavaScript source",
       sourceAriaTs: "TypeScript source",
+      sourceAriaPy: "Python source",
       sourcePlaceholderJs:
         "// //@param name type default\n// caster.get / set / return / log / fetch",
       sourcePlaceholderTs:
         "// //@param name type default\n// TypeScript → JS (oxc) · caster.*",
+      sourcePlaceholderPy:
+        "# #@param name type default\n# caster.get / set / return / log (Python sidecar)",
       runModuleBlocked:
         "Library module — not runnable directly (use caster.include).",
       loadingAria: "Loading script",
@@ -213,6 +223,7 @@ export const scripts = defineCatalog({
       label: "Language",
       javascript: "JavaScript",
       typescript: "TypeScript",
+      python: "Python",
     },
     module: {
       label: "Library module",
@@ -249,6 +260,9 @@ export const scripts = defineCatalog({
     toast: {
       networkDenied:
         "Error: caster.fetch failed — the script does not have Network permission. Enable it under Permissions if intended.",
+      pythonNotFound:
+        "Python not found — install Python 3 and add it to PATH (py / python).",
+      pythonSidecarFailed: "Python runtime failed: {detail}",
       errorPrefix: "Error: {detail}",
     },
     confirm: {

@@ -138,7 +138,7 @@ async function invokeConvert(
   id: string,
   toKind: AutomationKind,
   mode: "transpile" | "wrap",
-  language?: "javascript" | "typescript",
+  language?: "javascript" | "typescript" | "python",
 ): Promise<ConvertResultDto> {
   return invoke<ConvertResultDto>("convert_library_item_cmd", {
     fromKind,
@@ -151,12 +151,13 @@ async function invokeConvert(
 
 async function askConvertScriptLanguage(
   t: TFunction,
-): Promise<"javascript" | "typescript" | null> {
+): Promise<"javascript" | "typescript" | "python" | null> {
   return askScriptLanguage({
     title: t("automations.convert.languageTitle"),
     message: t("automations.convert.languageMessage"),
     javascriptLabel: t("automations.convert.languageJs"),
     typescriptLabel: t("automations.convert.languageTs"),
+    pythonLabel: t("automations.convert.languagePy"),
     cancelLabel: t("common.cancel"),
   });
 }
@@ -215,7 +216,7 @@ export async function runLibraryConvert(opts: {
   });
   if (openAfter == null) return null;
 
-  let language: "javascript" | "typescript" = "javascript";
+  let language: "javascript" | "typescript" | "python" = "javascript";
   if (toKind === "script" && (fromKind === "macro" || fromKind === "clicker")) {
     const lang = await askConvertScriptLanguage(t);
     if (lang == null) return null;

@@ -32,6 +32,7 @@ pub enum ScriptLanguage {
     #[default]
     Javascript,
     Typescript,
+    Python,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -40,7 +41,7 @@ pub struct ScriptDoc {
     pub id: String,
     pub name: String,
     pub source: String,
-    /// Source language; TypeScript is transpiled to JS before Boa eval.
+    /// Source language; TypeScript is transpiled to JS before Boa; Python runs via sidecar.
     #[serde(default)]
     pub language: ScriptLanguage,
     /// Library module (for `caster.include`); not a primary Accueil runner.

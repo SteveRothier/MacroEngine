@@ -28,6 +28,7 @@ import {
   defaultHighlightStyle,
 } from "@codemirror/language";
 import { javascript } from "@codemirror/lang-javascript";
+import { python } from "@codemirror/lang-python";
 import { linter, lintGutter, type Diagnostic } from "@codemirror/lint";
 import {
   autocompletion,
@@ -66,7 +67,8 @@ const CASTER_COMPLETIONS = [
   { label: "caster.get", type: "function", detail: "(name)", apply: 'caster.get("")' },
   { label: "caster.set", type: "function", detail: "(name, value)", apply: 'caster.set("", )' },
   { label: "caster.log", type: "function", detail: "(message)", apply: 'caster.log("")' },
-  { label: "caster.return", type: "function", detail: "(value)", apply: "caster.return()" },
+  { label: "caster.return", type: "function", detail: "(value) JS", apply: "caster.return()" },
+  { label: "caster.ret", type: "function", detail: "(value) Python", apply: "caster.ret()" },
   { label: "caster.fetch", type: "function", detail: "({ method, url })", apply: 'caster.fetch({ method: "GET", url: "" })' },
   { label: "caster.sleep", type: "function", detail: "(ms)", apply: "caster.sleep(200)" },
   { label: "caster.click", type: "function", detail: "({ button, x, y })", apply: 'caster.click({ button: "left" })' },
@@ -83,6 +85,11 @@ const CASTER_COMPLETIONS = [
   { label: "caster.parseJson", type: "function", detail: "(text)", apply: "caster.parseJson()" },
   { label: "caster.stringify", type: "function", detail: "(value)", apply: "caster.stringify()" },
 ];
+
+function languageExtension(language: ScriptLanguage) {
+  if (language === "python") return python();
+  return javascript({ typescript: language === "typescript" });
+}
 
 function casterCompletions(context: CompletionContext): CompletionResult | null {
   const word = context.matchBefore(/caster(?:\.\w*)?|\w+/);
@@ -258,9 +265,7 @@ export const ScriptSourceEditor = forwardRef<
           ...completionKeymap,
           indentWithTab,
         ]),
-        langComp.current.of(
-          javascript({ typescript: language === "typescript" }),
-        ),
+        langComp.current.of(languageExtension(language)),
         lintGutter(),
         lintComp.current.of(updateDiag(diagnostics)),
         placeholderComp.current.of(
@@ -309,9 +314,7 @@ export const ScriptSourceEditor = forwardRef<
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
-      effects: langComp.current.reconfigure(
-        javascript({ typescript: language === "typescript" }),
-      ),
+      effects: langComp.current.reconfigure(languageExtension(language)),
     });
   }, [language]);
 
