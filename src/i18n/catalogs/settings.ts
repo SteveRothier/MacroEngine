@@ -17,6 +17,7 @@ export const settings = defineCatalog({
       paneHint: "Démarrage, fenêtre et apparence de Caster.",
       groupStartup: "Démarrage & fenêtre",
       groupNotifications: "Notifications",
+      groupScripts: "Scripts",
       groupAppearance: "Apparence",
       groupClicker: "Clicker",
       startWithWindows: "Démarrer avec Windows",
@@ -50,6 +51,15 @@ export const settings = defineCatalog({
       trayRelaunch: "Tray : relancer la dernière automation",
       trayRelaunchHint:
         "Les actions tray relancent le dernier clicker / la dernière macro connus.",
+      defaultTimeoutMs: "Timeout script par défaut (ms)",
+      defaultTimeoutMsHint:
+        "0 = pas de limite. Valeur de référence pour les scripts.",
+      clearConsoleOnRun: "Vider la console à chaque run",
+      clearConsoleOnRunHint:
+        "Efface les logs de l’éditeur avant d’exécuter un script.",
+      showPermBadgesOnHome: "Badges permissions sur Accueil",
+      showPermBadgesOnHomeHint:
+        "Affiche Réseau / FS / etc. sur les lignes script de la liste Accueil.",
       theme: "Thème",
       themeHint: "Suit Windows si Système.",
       language: "Langue",
@@ -168,6 +178,7 @@ export const settings = defineCatalog({
       paneHint: "Startup, window, and appearance for Caster.",
       groupStartup: "Startup & window",
       groupNotifications: "Notifications",
+      groupScripts: "Scripts",
       groupAppearance: "Appearance",
       groupClicker: "Clicker",
       startWithWindows: "Start with Windows",
@@ -198,6 +209,13 @@ export const settings = defineCatalog({
       focusJournalHint: "Show the journal as soon as an automation starts.",
       trayRelaunch: "Tray: relaunch last automation",
       trayRelaunchHint: "Tray actions relaunch the last known clicker / macro.",
+      defaultTimeoutMs: "Default script timeout (ms)",
+      defaultTimeoutMsHint: "0 = no limit. Reference value for scripts.",
+      clearConsoleOnRun: "Clear console on each run",
+      clearConsoleOnRunHint: "Clear editor logs before running a script.",
+      showPermBadgesOnHome: "Permission badges on Home",
+      showPermBadgesOnHomeHint:
+        "Show Network / FS / etc. on script rows in the Home list.",
       theme: "Theme",
       themeHint: "Follows Windows when set to System.",
       language: "Language",

@@ -626,16 +626,27 @@ export function MacroEditorView({
   );
 
   const addToBranch = useCallback(
-    (branch: "then" | "else", kind: MacroAction["type"]) => {
+    (branch: "then" | "else" | "body", kind: MacroAction["type"]) => {
       if (!selectedPath || editorLocked) return;
       const selected = getAtPath(doc.actions, selectedPath);
-      if (!selected || selected.type !== "control.if") return;
-      const child = makeAction(kind, t);
-      const actions = appendChild(doc.actions, selectedPath, branch, child);
-      const branchIdx = branch === "then" ? 0 : 1;
-      const list = branch === "then" ? selected.then : selected.else ?? [];
-      updateDoc({ ...doc, actions });
-      setSelectedPath([...selectedPath, branchIdx, list.length]);
+      if (!selected) return;
+      if (selected.type === "control.if") {
+        if (branch !== "then" && branch !== "else") return;
+        const child = makeAction(kind, t);
+        const actions = appendChild(doc.actions, selectedPath, branch, child);
+        const branchIdx = branch === "then" ? 0 : 1;
+        const list = branch === "then" ? selected.then : selected.else ?? [];
+        updateDoc({ ...doc, actions });
+        setSelectedPath([...selectedPath, branchIdx, list.length]);
+        return;
+      }
+      if (selected.type === "control.while" && branch === "body") {
+        const child = makeAction(kind, t);
+        const actions = appendChild(doc.actions, selectedPath, "body", child);
+        const list = selected.body ?? [];
+        updateDoc({ ...doc, actions });
+        setSelectedPath([...selectedPath, 0, list.length]);
+      }
     },
     [doc, editorLocked, selectedPath, t, updateDoc],
   );

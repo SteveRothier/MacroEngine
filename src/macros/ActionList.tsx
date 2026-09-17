@@ -82,7 +82,7 @@ type Props = {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
-  branchAddMenuItems?: (branch: "then" | "else") => ActionPickerEntry[];
+  branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
 };
 
@@ -182,6 +182,9 @@ function siblingList(actions: MacroAction[], path: ActionPath): MacroAction[] {
   if (parent?.type === "control.if" && (branch === 0 || branch === 1)) {
     return branch === 0 ? (parent.then ?? []) : (parent.else ?? []);
   }
+  if (parent?.type === "control.while" && branch === 0) {
+    return parent.body ?? [];
+  }
   return actions;
 }
 
@@ -196,16 +199,17 @@ function dropToReorderPaths(
   if (!fromPath || !dropPath) return null;
   if (isAncestorPath(fromPath, dropPath)) return null;
 
-  // Nest into then when dropping after an if from another list (not sibling reorder).
+  // Nest into then/body when dropping after if/while from another list.
   if (
-    dropRow.action.type === "control.if" &&
+    (dropRow.action.type === "control.if" ||
+      dropRow.action.type === "control.while") &&
     drop.edge === "after" &&
     !pathsEqual(fromPath, dropPath) &&
     !pathsEqual(parentPath(fromPath), parentPath(dropPath))
   ) {
-    const intoThen: ActionPath = [...dropPath, 0, 0];
-    if (isAncestorPath(fromPath, intoThen)) return null;
-    return { fromPath, toPath: intoThen };
+    const intoBranch: ActionPath = [...dropPath, 0, 0];
+    if (isAncestorPath(fromPath, intoBranch)) return null;
+    return { fromPath, toPath: intoBranch };
   }
 
   const fromParent = parentPath(fromPath);
@@ -914,7 +918,9 @@ export function ActionList({
                 pathsEqual(selectedPath, row.path) ? "selected" : "",
                 pathsEqual(activePath, row.path) ? "active" : "",
                 row.depth > 0 ? "nested" : "",
-                row.branchLabel === "then" ? "branch-then" : "",
+                row.branchLabel === "then" || row.branchLabel === "body"
+                  ? "branch-then"
+                  : "",
                 row.branchLabel === "else" ? "branch-else" : "",
                 dragFrom === flatIndex ? "is-drag-source" : "",
                 dropBefore ? "drop-before" : "",

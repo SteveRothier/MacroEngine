@@ -89,6 +89,7 @@ export function makeAction(
         type: "control.while",
         condition: { left: { var: "n" }, op: "gt", right: 0 },
         body: [],
+        maxIterations: 10000,
       };
     default:
       return { id, type: "process.run", command: "cmd", args: ["/C", "echo", "hi"] };

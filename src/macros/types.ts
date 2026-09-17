@@ -274,8 +274,58 @@ export type FlatRow = {
   path: ActionPath;
   depth: number;
   action: MacroAction;
-  branchLabel?: "then" | "else";
+  branchLabel?: "then" | "else" | "body";
 };
+
+function controlBranchList(
+  node: MacroAction,
+  branch: number,
+): MacroAction[] | null {
+  if (node.type === "control.if") {
+    if (branch === 0) return node.then ?? [];
+    if (branch === 1) return node.else ?? [];
+    return null;
+  }
+  if (node.type === "control.while" && branch === 0) {
+    return node.body ?? [];
+  }
+  return null;
+}
+
+function withControlBranch(
+  node: MacroAction,
+  branch: number,
+  list: MacroAction[],
+): MacroAction | null {
+  if (node.type === "control.if") {
+    if (branch === 0) return { ...node, then: list };
+    if (branch === 1) return { ...node, else: list };
+    return null;
+  }
+  if (node.type === "control.while" && branch === 0) {
+    return { ...node, body: list };
+  }
+  return null;
+}
+
+function visitControlChildren(
+  action: MacroAction,
+  path: ActionPath,
+  depth: number,
+  visitBranch: (
+    list: MacroAction[],
+    branchPrefix: ActionPath,
+    depth: number,
+    label: "then" | "else" | "body",
+  ) => void,
+) {
+  if (action.type === "control.if") {
+    visitBranch(action.then ?? [], [...path, 0], depth + 1, "then");
+    visitBranch(action.else ?? [], [...path, 1], depth + 1, "else");
+  } else if (action.type === "control.while") {
+    visitBranch(action.body ?? [], [...path, 0], depth + 1, "body");
+  }
+}
 
 export function emptyMacro(name = "Nouvelle macro"): MacroDocument {
   return {
@@ -344,7 +394,7 @@ export function pathsEqual(a: ActionPath | null, b: ActionPath | null): boolean 
   return a.every((n, i) => n === b[i]);
 }
 
-/** DFS flatten for nested if/then/else. */
+/** DFS flatten for nested if/then/else and while/body. */
 export function flattenTree(actions: MacroAction[]): FlatRow[] {
   const rows: FlatRow[] = [];
 
@@ -352,10 +402,7 @@ export function flattenTree(actions: MacroAction[]): FlatRow[] {
     list.forEach((action, index) => {
       const path = [...prefix, index];
       rows.push({ path, depth, action });
-      if (action.type === "control.if") {
-        visitBranch(action.then ?? [], [...path, 0], depth + 1, "then");
-        visitBranch(action.else ?? [], [...path, 1], depth + 1, "else");
-      }
+      visitControlChildren(action, path, depth, visitBranch);
     });
   }
 
@@ -363,7 +410,7 @@ export function flattenTree(actions: MacroAction[]): FlatRow[] {
     list: MacroAction[],
     branchPrefix: ActionPath,
     depth: number,
-    label: "then" | "else",
+    label: "then" | "else" | "body",
   ) {
     list.forEach((action, index) => {
       const path = [...branchPrefix, index];
@@ -373,10 +420,7 @@ export function flattenTree(actions: MacroAction[]): FlatRow[] {
         action,
         branchLabel: label,
       });
-      if (action.type === "control.if") {
-        visitBranch(action.then ?? [], [...path, 0], depth + 1, "then");
-        visitBranch(action.else ?? [], [...path, 1], depth + 1, "else");
-      }
+      visitControlChildren(action, path, depth, visitBranch);
     });
   }
 
@@ -392,9 +436,9 @@ export function getAtPath(actions: MacroAction[], path: ActionPath): MacroAction
     const node = list[idx];
     if (!node) return null;
     if (at === path.length - 1) return node;
-    if (node.type !== "control.if") return null;
     const branch = path[at + 1];
-    const next = branch === 0 ? node.then ?? [] : node.else ?? [];
+    const next = controlBranchList(node, branch);
+    if (!next) return null;
     return go(next, at + 2);
   }
 
@@ -440,6 +484,13 @@ export function remapActionIds(action: MacroAction): MacroAction {
       else: (action.else ?? []).map(remapActionIds),
     };
   }
+  if (action.type === "control.while") {
+    return {
+      ...action,
+      id,
+      body: (action.body ?? []).map(remapActionIds),
+    };
+  }
   return { ...action, id };
 }
 
@@ -478,17 +529,27 @@ export function duplicateAtPath(
 export function appendChild(
   actions: MacroAction[],
   parentPath: ActionPath,
-  branch: "then" | "else",
+  branch: "then" | "else" | "body",
   child: MacroAction,
 ): MacroAction[] {
   const parent = getAtPath(actions, parentPath);
-  if (!parent || parent.type !== "control.if") return actions;
-  const updated: MacroAction = {
-    ...parent,
-    then: branch === "then" ? [...(parent.then ?? []), child] : parent.then,
-    else: branch === "else" ? [...(parent.else ?? []), child] : parent.else,
-  };
-  return updateAtPath(actions, parentPath, updated);
+  if (!parent) return actions;
+  if (parent.type === "control.if" && (branch === "then" || branch === "else")) {
+    const updated: MacroAction = {
+      ...parent,
+      then: branch === "then" ? [...(parent.then ?? []), child] : parent.then,
+      else: branch === "else" ? [...(parent.else ?? []), child] : parent.else,
+    };
+    return updateAtPath(actions, parentPath, updated);
+  }
+  if (parent.type === "control.while" && branch === "body") {
+    const updated: MacroAction = {
+      ...parent,
+      body: [...(parent.body ?? []), child],
+    };
+    return updateAtPath(actions, parentPath, updated);
+  }
+  return actions;
 }
 
 export function moveInParent(
@@ -507,8 +568,9 @@ export function moveInParent(
     const branch = path[path.length - 2];
     const ifPath = path.slice(0, -2);
     const parent = getAtPath(actions, ifPath);
-    if (!parent || parent.type !== "control.if") return null;
-    siblingCount = (branch === 0 ? parent.then : parent.else)?.length ?? 0;
+    const list = parent ? controlBranchList(parent, branch) : null;
+    if (!list) return null;
+    siblingCount = list.length;
   }
   if (to >= siblingCount) return null;
 
@@ -658,11 +720,9 @@ export function moveAtPath(
     const branch = parent[parent.length - 1];
     const ifPath = parent.slice(0, -1);
     const node = getAtPath(without, ifPath);
-    if (node?.type === "control.if" && (branch === 0 || branch === 1)) {
-      max = (branch === 0 ? node.then : node.else)?.length ?? 0;
-    } else {
-      return null;
-    }
+    const list = node ? controlBranchList(node, branch) : null;
+    if (!list) return null;
+    max = list.length;
   }
   const clamped: ActionPath = [
     ...parent,
@@ -682,12 +742,12 @@ function rewriteList(
     }
     const idx = path[at];
     return list.map((action, i) => {
-      if (i !== idx || action.type !== "control.if") return action;
+      if (i !== idx) return action;
       const branch = path[at + 1];
-      if (branch === 0) {
-        return { ...action, then: go(action.then ?? [], at + 2) };
-      }
-      return { ...action, else: go(action.else ?? [], at + 2) };
+      const childList = controlBranchList(action, branch);
+      if (!childList) return action;
+      const nextList = go(childList, at + 2);
+      return withControlBranch(action, branch, nextList) ?? action;
     });
   }
   return go(actions, 0);

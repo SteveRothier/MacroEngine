@@ -298,8 +298,14 @@ export const automations = defineCatalog({
       batchMoreFails: "… et {count} autre(s)",
       wrapTitle: "Conversion partielle",
       wrapMessage:
-        "Transpile impossible ({detail}). Créer un script qui lance la macro d’origine ?",
+        "Impossible de transpile ({detail}). Créer un script qui lance la macro d’origine ?",
       wrapConfirm: "Créer un script référence",
+      blockers: {
+        processRun: "lancement de processus",
+        controlIf: "condition process (si)",
+        controlWhile: "condition process (tant que)",
+        other: "{code}",
+      },
       success: "Créé · {name} ({kind})",
       fail: "Conversion impossible",
       kept: "Conservé : {list}",
@@ -600,8 +606,14 @@ export const automations = defineCatalog({
       batchMoreFails: "… and {count} more",
       wrapTitle: "Partial conversion",
       wrapMessage:
-        "Transpile not possible ({detail}). Create a script that runs the original macro?",
+        "Cannot transpile ({detail}). Create a script that runs the original macro?",
       wrapConfirm: "Create reference script",
+      blockers: {
+        processRun: "process launch",
+        controlIf: "process condition (if)",
+        controlWhile: "process condition (while)",
+        other: "{code}",
+      },
       success: "Created · {name} ({kind})",
       fail: "Conversion failed",
       kept: "Kept: {list}",

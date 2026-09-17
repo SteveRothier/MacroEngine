@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   adjustPathAfterRemove,
   duplicateAtPath,
+  flattenTree,
   getAtPath,
   insertAtPath,
   isAncestorPath,
@@ -117,5 +118,45 @@ describe("moveAtPath cross-parent", () => {
   it("adjustPathAfterRemove decrements later siblings", () => {
     expect(adjustPathAfterRemove([0], [2, 0, 1])).toEqual([1, 0, 1]);
     expect(adjustPathAfterRemove([2], [1])).toEqual([1]);
+  });
+});
+
+describe("control.while tree", () => {
+  it("flattens body and getAtPath resolves nested actions", () => {
+    const actions: MacroAction[] = [
+      {
+        id: "w1",
+        type: "control.while",
+        condition: { left: { var: "n" }, op: "gt", right: 0 },
+        body: [click("b0"), delay("b1", 5)],
+        maxIterations: 100,
+      },
+    ];
+    const rows = flattenTree(actions);
+    expect(rows).toHaveLength(3);
+    expect(rows[1]?.branchLabel).toBe("body");
+    expect(getAtPath(actions, [0, 0, 1])?.id).toBe("b1");
+  });
+
+  it("duplicates inside while body", () => {
+    const actions: MacroAction[] = [
+      {
+        id: "w1",
+        type: "control.while",
+        condition: { left: { var: "n" }, op: "gt", right: 0 },
+        body: [click("b0"), delay("b1", 10)],
+        maxIterations: 50,
+      },
+    ];
+    const result = duplicateAtPath(actions, [0, 0, 0]);
+    expect(result).not.toBeNull();
+    const parent = getAtPath(result!.actions, [0]);
+    expect(parent?.type).toBe("control.while");
+    if (parent?.type === "control.while") {
+      expect(parent.body).toHaveLength(3);
+      expect(parent.body[0]!.id).toBe("b0");
+      expect(parent.body[1]!.id).not.toBe("b0");
+      expect(parent.body[2]!.id).toBe("b1");
+    }
   });
 });

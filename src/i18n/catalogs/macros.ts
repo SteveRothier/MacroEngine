@@ -244,6 +244,7 @@ export const macros = defineCatalog({
       branch: {
         then: "alors",
         else: "sinon",
+        body: "corps",
       },
       detail: {
         inline: "Inline",
@@ -318,6 +319,8 @@ export const macros = defineCatalog({
       operandVarShort: "Var",
       addThen: "+ Alors",
       addElse: "+ Sinon",
+      addBody: "+ Corps",
+      maxIterations: "Max itérations",
       processCommand: "Commande",
       processArgs: "Args (espace)",
       scriptSectionSource: "Source",
@@ -574,6 +577,7 @@ export const macros = defineCatalog({
       branch: {
         then: "then",
         else: "else",
+        body: "body",
       },
       detail: {
         inline: "Inline",
@@ -647,6 +651,8 @@ export const macros = defineCatalog({
       operandVarShort: "Var",
       addThen: "+ Then",
       addElse: "+ Else",
+      addBody: "+ Body",
+      maxIterations: "Max iterations",
       processCommand: "Command",
       processArgs: "Args (space-separated)",
       scriptSectionSource: "Source",

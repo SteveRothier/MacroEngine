@@ -24,8 +24,10 @@ import type { ThemeMode } from "../theme";
 import type { SettingsSection } from "../app/types";
 import {
   mergeAutomationPrefs,
+  mergeScriptsPrefs,
   mergeShellPrefs,
   type AutomationPrefs,
+  type ScriptsPrefs,
   type ShellPrefs,
   type StartupView,
   type UiLocale,
@@ -52,6 +54,7 @@ type Props = {
   onJournalOpenChange: (v: boolean) => void;
   onShellPrefsChange?: (prefs: ShellPrefs) => void;
   onAutomationPrefsChange?: (prefs: AutomationPrefs) => void;
+  onScriptsPrefsChange?: (prefs: ScriptsPrefs) => void;
 };
 
 function displayOptionLabel(d: DisplayDto, primarySuffix: string): string {
@@ -114,6 +117,7 @@ export function SettingsView({
   onJournalOpenChange,
   onShellPrefsChange,
   onAutomationPrefsChange,
+  onScriptsPrefsChange,
 }: Props) {
   const toast = useToast();
   const t = useT();
@@ -133,6 +137,7 @@ export function SettingsView({
   const [automation, setAutomation] = useState<AutomationPrefs>(() =>
     mergeAutomationPrefs(),
   );
+  const [scripts, setScripts] = useState<ScriptsPrefs>(() => mergeScriptsPrefs());
   const [liveExes, setLiveExes] = useState<string[]>([]);
   const [foregroundExe, setForegroundExe] = useState<string | null>(null);
   const [processDraft, setProcessDraft] = useState("");
@@ -171,6 +176,9 @@ export function SettingsView({
       const au = mergeAutomationPrefs(s.automation);
       setAutomation(au);
       onAutomationPrefsChange?.(au);
+      const sc = mergeScriptsPrefs(s.scripts);
+      setScripts(sc);
+      onScriptsPrefsChange?.(sc);
     });
     refreshDisplays();
     void invoke<AppPaths>("get_paths")
@@ -181,6 +189,7 @@ export function SettingsView({
     refreshDisplays,
     onShellPrefsChange,
     onAutomationPrefsChange,
+    onScriptsPrefsChange,
   ]);
 
   useEffect(() => {
@@ -215,6 +224,7 @@ export function SettingsView({
       startWithWindows?: boolean;
       shell?: ShellPrefs;
       automation?: AutomationPrefs;
+      scripts?: ScriptsPrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
@@ -231,6 +241,7 @@ export function SettingsView({
         startWithWindows: partial.startWithWindows ?? current.startWithWindows,
         shell: partial.shell,
         automation: partial.automation,
+        scripts: partial.scripts,
       });
     },
     [loadSettings, saveBundle, theme],
@@ -248,6 +259,13 @@ export function SettingsView({
     setAutomation(next);
     onAutomationPrefsChange?.(next);
     void persist({ automation: next });
+  };
+
+  const persistScriptsPrefs = (patch: Partial<ScriptsPrefs>) => {
+    const next = mergeScriptsPrefs({ ...scripts, ...patch });
+    setScripts(next);
+    onScriptsPrefsChange?.(next);
+    void persist({ scripts: next });
   };
 
   const setAdvanced = (next: boolean) => {
@@ -606,6 +624,62 @@ export function SettingsView({
                         ariaLabel={t("settings.application.trayRelaunch")}
                         onChange={(checked) =>
                           persistShellPrefs({ trayRelaunchLast: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </SettingsGroup>
+                <SettingsGroup title={t("settings.application.groupScripts")}>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.defaultTimeoutMs")}</span>
+                      <p>{t("settings.application.defaultTimeoutMsHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <input
+                        type="number"
+                        className="caster-input"
+                        min={0}
+                        step={1000}
+                        value={scripts.defaultTimeoutMs}
+                        aria-label={t("settings.application.defaultTimeoutMs")}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          persistScriptsPrefs({
+                            defaultTimeoutMs: Number.isFinite(n)
+                              ? Math.max(0, Math.floor(n))
+                              : 0,
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.clearConsoleOnRun")}</span>
+                      <p>{t("settings.application.clearConsoleOnRunHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={scripts.clearConsoleOnRun}
+                        ariaLabel={t("settings.application.clearConsoleOnRun")}
+                        onChange={(checked) =>
+                          persistScriptsPrefs({ clearConsoleOnRun: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.showPermBadgesOnHome")}</span>
+                      <p>{t("settings.application.showPermBadgesOnHomeHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={scripts.showPermBadgesOnHome}
+                        ariaLabel={t("settings.application.showPermBadgesOnHome")}
+                        onChange={(checked) =>
+                          persistScriptsPrefs({ showPermBadgesOnHome: checked })
                         }
                       />
                     </div>

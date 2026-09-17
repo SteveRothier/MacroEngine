@@ -139,10 +139,13 @@ export function actionTone(type: MacroAction["type"]): string {
   }
 }
 
-export function branchLabel(branch: "then" | "else", t: TFunction): string {
-  return branch === "then"
-    ? t("macros.action.branch.then")
-    : t("macros.action.branch.else");
+export function branchLabel(
+  branch: "then" | "else" | "body",
+  t: TFunction,
+): string {
+  if (branch === "then") return t("macros.action.branch.then");
+  if (branch === "else") return t("macros.action.branch.else");
+  return t("macros.action.branch.body");
 }
 
 /** Index of matching `mouse.up` if `start` begins a down→moves→up drag; else null. */
