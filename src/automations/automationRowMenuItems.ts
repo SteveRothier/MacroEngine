@@ -70,7 +70,7 @@ export function buildAutomationRowMenuItems(
       icon: actions.icons?.launch,
       onSelect: actions.onLaunch,
     });
-  } else {
+  } else if (!row.isModule) {
     items.push({
       id: "launch",
       label: t("automations.menu.row.execute"),

@@ -35,7 +35,13 @@ import {
   type TabContextAction,
 } from "../ui/shell";
 import { TitleBarProvider, useTitleBarContext } from "../ui/shell/TitleBarContext";
-import { ConfirmHost, confirmAction, PromptHost, promptAction } from "../ui";
+import {
+  ConfirmHost,
+  confirmAction,
+  PromptHost,
+  promptAction,
+  ScriptLanguageHost,
+} from "../ui";
 import { applyTheme, readStoredTheme, subscribeSystemTheme, type ThemeMode } from "../theme";
 import { stateLabel, sessionLabel } from "../ui/labels";
 import { LocaleProvider, useLocale, useT } from "../i18n";
@@ -1085,6 +1091,7 @@ function MainAppInner({
       />
       <ConfirmHost />
       <PromptHost />
+      <ScriptLanguageHost />
       <CommandPalette
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}

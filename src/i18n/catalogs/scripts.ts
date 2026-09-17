@@ -30,7 +30,16 @@ export const scripts = defineCatalog({
       snipClick: "click + sleep",
       snipKey: "keyTap",
       snipInclude: "include module",
+      snipProcess: "runProcess",
       sourceAria: "Source JavaScript",
+      sourceAriaJs: "Source JavaScript",
+      sourceAriaTs: "Source TypeScript",
+      sourcePlaceholderJs:
+        "// //@param name type default\n// caster.get / set / return / log / fetch",
+      sourcePlaceholderTs:
+        "// //@param name type default\n// TypeScript → JS (oxc) · caster.*",
+      runModuleBlocked:
+        "Module bibliothèque — non exécutable directement (caster.include).",
       loadingAria: "Chargement du script",
       notFound: "Script introuvable.",
     },
@@ -81,6 +90,8 @@ export const scripts = defineCatalog({
     module: {
       label: "Module bibliothèque",
       tip: "Destiné à caster.include — pas un runner Accueil principal.",
+      runBlocked:
+        "Les modules ne se lancent pas seuls — appelez-les via caster.include.",
     },
     presets: {
       helloParam: {
@@ -148,7 +159,16 @@ export const scripts = defineCatalog({
       snipClick: "click + sleep",
       snipKey: "keyTap",
       snipInclude: "include module",
+      snipProcess: "runProcess",
       sourceAria: "JavaScript source",
+      sourceAriaJs: "JavaScript source",
+      sourceAriaTs: "TypeScript source",
+      sourcePlaceholderJs:
+        "// //@param name type default\n// caster.get / set / return / log / fetch",
+      sourcePlaceholderTs:
+        "// //@param name type default\n// TypeScript → JS (oxc) · caster.*",
+      runModuleBlocked:
+        "Library module — not runnable directly (use caster.include).",
       loadingAria: "Loading script",
       notFound: "Script not found.",
     },
@@ -197,6 +217,8 @@ export const scripts = defineCatalog({
     module: {
       label: "Library module",
       tip: "For caster.include — not a primary Home runner.",
+      runBlocked:
+        "Modules cannot run alone — call them via caster.include.",
     },
     presets: {
       helloParam: {

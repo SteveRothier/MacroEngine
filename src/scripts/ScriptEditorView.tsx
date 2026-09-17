@@ -1,11 +1,9 @@
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -21,6 +19,7 @@ import {
   SCRIPT_SNIPPET_INCLUDE,
   SCRIPT_SNIPPET_KEY,
   SCRIPT_SNIPPET_PARAM,
+  SCRIPT_SNIPPET_RUN_PROCESS,
   SCRIPT_SNIPPET_SET,
 } from "./snippets";
 import {
@@ -39,6 +38,11 @@ import {
   formatConsoleTime,
   type ConsoleLine,
 } from "./ScriptConsole";
+import {
+  ScriptSourceEditor,
+  diagnosticsFromError,
+  type ScriptEditorDiagnostic,
+} from "./ScriptSourceEditor";
 import { parseParamDefs } from "./parseParams";
 import type { ScriptDoc } from "./types";
 import type { MacroValue } from "../macros/types";
@@ -72,6 +76,9 @@ function humanizeRunError(raw: string, t: TFunction): string {
   if (/network|fetch disabled|allowNetwork|réseau/i.test(s)) {
     return t("scripts.toast.networkDenied");
   }
+  if (/module bibliothèque|library module|caster\.include/i.test(s)) {
+    return t("scripts.module.runBlocked");
+  }
   if (/engine already|already active|clicker is active|record is active/i.test(s)) {
     return s;
   }
@@ -97,29 +104,19 @@ export function ScriptEditorView({
   const [running, setRunning] = useState(false);
   const [engineBusy, setEngineBusy] = useState<EngineBusyKind | null>(null);
   const [consoleLines, setConsoleLines] = useState<ConsoleLine[]>([]);
+  const [diagnostics, setDiagnostics] = useState<ScriptEditorDiagnostic[]>([]);
   const consoleIdRef = useRef(0);
   const baselineRef = useRef<string>("");
   const draftRef = useRef<ScriptDoc | null>(null);
   const dirtyRef = useRef(false);
   const autosaveTimer = useRef<number | null>(null);
   const savedFlashTimer = useRef<number | null>(null);
-  const sourceRef = useRef<HTMLTextAreaElement | null>(null);
-  const gutterRef = useRef<HTMLDivElement | null>(null);
-  const pendingSelRef = useRef<number | null>(null);
 
   const presets = useMemo(() => getScriptPresets(t), [t]);
 
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
-
-  useLayoutEffect(() => {
-    const el = sourceRef.current;
-    const pos = pendingSelRef.current;
-    if (el == null || pos == null) return;
-    pendingSelRef.current = null;
-    el.selectionStart = el.selectionEnd = pos;
-  }, [draft?.source]);
 
   const pushConsole = useCallback(
     (text: string, level?: ConsoleLine["level"]) => {
@@ -241,6 +238,7 @@ export function ScriptEditorView({
         onDirtyChange?.(scriptId, false);
         setSaveStatus("idle");
         setConsoleLines([]);
+        setDiagnostics([]);
       })
       .catch((e) => {
         if (!cancelled) {
@@ -339,6 +337,7 @@ export function ScriptEditorView({
       });
       if (!ok) return;
     }
+    setDiagnostics([]);
     patch({
       source: preset.source,
       ...presetPermissionPatch(preset),
@@ -346,45 +345,42 @@ export function ScriptEditorView({
     });
   }
 
-  function onSourceKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key !== "Tab") return;
-    e.preventDefault();
-    const el = e.currentTarget;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const insert = "  ";
-    const next = el.value.slice(0, start) + insert + el.value.slice(end);
-    pendingSelRef.current = start + insert.length;
-    patch({ source: next });
-  }
-
-  function syncGutterScroll() {
-    const ta = sourceRef.current;
-    const gut = gutterRef.current;
-    if (ta && gut) gut.scrollTop = ta.scrollTop;
-  }
-
   const paramDefs = useMemo(
     () => (draft ? parseParamDefs(draft.source) : []),
     [draft],
   );
 
-  const lineCount = useMemo(() => {
-    const src = draft?.source ?? "";
-    return Math.max(1, src.split(/\r?\n/).length);
-  }, [draft?.source]);
+  const lang = draft?.language ?? "javascript";
+  const sourceAria =
+    lang === "typescript"
+      ? t("scripts.toolbar.sourceAriaTs")
+      : t("scripts.toolbar.sourceAriaJs");
+  const sourcePlaceholder =
+    lang === "typescript"
+      ? t("scripts.toolbar.sourcePlaceholderTs")
+      : t("scripts.toolbar.sourcePlaceholderJs");
 
   async function onRun() {
+    if (draftRef.current?.isModule) {
+      const msg = t("scripts.module.runBlocked");
+      pushConsole(msg, "error");
+      toast.error(msg);
+      return;
+    }
     try {
       await flushAutosave();
+      setDiagnostics([]);
       pushConsole(t("scripts.console.sessionStart"), "session");
       await invoke("run_script_session_cmd", { id: scriptId });
       setRunning(true);
     } catch (e) {
-      const msg = humanizeRunError(String(e), t);
+      const raw = String(e);
+      const msg = humanizeRunError(raw, t);
       pushConsole(msg, "error");
       toast.error(msg);
       setRunning(false);
+      const src = draftRef.current?.source ?? "";
+      setDiagnostics(diagnosticsFromError(src, raw));
     }
   }
 
@@ -417,6 +413,7 @@ export function ScriptEditorView({
         onPermissionsChange={(partial) => patch(partial)}
         running={running}
         engineBusy={engineBusy}
+        isModule={!!draft.isModule}
         onRun={() => void onRun()}
         onStop={() => void onStop()}
         saveStatus={saveStatus}
@@ -503,22 +500,17 @@ export function ScriptEditorView({
           </label>
         </div>
         <div className="caster-script-source-wrap">
-          <div className="caster-script-source-gutter" ref={gutterRef} aria-hidden>
-            {Array.from({ length: lineCount }, (_, i) => (
-              <span key={i}>{i + 1}</span>
-            ))}
-          </div>
-          <textarea
-            ref={sourceRef}
-            className="caster-script-source"
-            spellCheck={false}
+          <ScriptSourceEditor
             value={draft.source}
-            placeholder="// //@param name type default&#10;// caster.get / set / return / log / fetch"
-            onChange={(e) => patch({ source: e.target.value })}
-            onKeyDown={onSourceKeyDown}
-            onScroll={syncGutterScroll}
+            language={lang === "typescript" ? "typescript" : "javascript"}
+            onChange={(source) => {
+              setDiagnostics([]);
+              patch({ source });
+            }}
             onBlur={() => void flushAutosave()}
-            aria-label={t("scripts.toolbar.sourceAria")}
+            ariaLabel={sourceAria}
+            placeholder={sourcePlaceholder}
+            diagnostics={diagnostics}
           />
           <div className="caster-script-snippets">
             <DropdownMenu
@@ -587,6 +579,16 @@ export function ScriptEditorView({
                         icon: <Code2 size={14} />,
                         onSelect: () =>
                           patch({ source: SCRIPT_SNIPPET_INCLUDE }),
+                      },
+                      {
+                        id: "snip-process",
+                        label: t("scripts.toolbar.snipProcess"),
+                        icon: <Code2 size={14} />,
+                        onSelect: () =>
+                          patch({
+                            source: SCRIPT_SNIPPET_RUN_PROCESS,
+                            allowProcess: true,
+                          }),
                       },
                     ],
                   },

@@ -24,6 +24,8 @@ export type AutomationRow = {
   sortOrder?: number;
   /** Active script permissions (Accueil badge). */
   permLabels?: string[];
+  /** Script marked as library module (not runnable from Accueil). */
+  isModule?: boolean;
 };
 
 export function statusToPill(

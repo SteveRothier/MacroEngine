@@ -237,11 +237,17 @@ export function useUnifiedAutomations(options: {
           favorite: false,
           locked: lib?.locked ?? false,
           dirty: options.dirtyScriptId === s.id,
-          meta: s.isModule
-            ? t("scripts.module.label")
-            : s.language === "typescript"
-              ? t("scripts.language.typescript")
-              : undefined,
+          isModule: !!s.isModule,
+          meta: (() => {
+            const parts: string[] = [];
+            if (s.isModule) parts.push(t("scripts.module.label"));
+            parts.push(
+              s.language === "typescript"
+                ? t("scripts.language.typescript")
+                : t("scripts.language.javascript"),
+            );
+            return parts.join(" · ");
+          })(),
           sortOrder: lib?.sortOrder ?? 0,
           permLabels,
         });
