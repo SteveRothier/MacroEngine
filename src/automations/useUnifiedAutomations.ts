@@ -244,7 +244,9 @@ export function useUnifiedAutomations(options: {
             parts.push(
               s.language === "typescript"
                 ? t("scripts.language.typescript")
-                : t("scripts.language.javascript"),
+                : s.language === "python"
+                  ? t("scripts.language.python")
+                  : t("scripts.language.javascript"),
             );
             return parts.join(" · ");
           })(),

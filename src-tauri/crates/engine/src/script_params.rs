@@ -15,7 +15,8 @@ pub struct ScriptParamDef {
     pub default: Option<MacroValue>,
 }
 
-/// Parse lines like `//@param clicks number 10` or `// @param label string hello world`.
+/// Parse lines like `//@param clicks number 10`, `// @param label string hello`,
+/// or Python `#@param` / `# @param`.
 pub fn parse_param_defs(source: &str) -> Vec<ScriptParamDef> {
     let mut out = Vec::new();
     for line in source.lines() {
@@ -23,6 +24,10 @@ pub fn parse_param_defs(source: &str) -> Vec<ScriptParamDef> {
         let rest = if let Some(r) = trimmed.strip_prefix("//@param") {
             r
         } else if let Some(r) = trimmed.strip_prefix("// @param") {
+            r
+        } else if let Some(r) = trimmed.strip_prefix("#@param") {
+            r
+        } else if let Some(r) = trimmed.strip_prefix("# @param") {
             r
         } else {
             continue;
@@ -63,13 +68,18 @@ mod tests {
 //@param clicks number 10
 // @param label string hi
 //@param enabled boolean true
+#@param pycount number 3
+# @param pylabel string hello
 caster.log('x');
 "#;
         let defs = parse_param_defs(src);
-        assert_eq!(defs.len(), 3);
+        assert_eq!(defs.len(), 5);
         assert_eq!(defs[0].name, "clicks");
         assert_eq!(defs[0].default, Some(MacroValue::Number(10.0)));
         assert_eq!(defs[1].default, Some(MacroValue::String("hi".into())));
         assert_eq!(defs[2].default, Some(MacroValue::Bool(true)));
+        assert_eq!(defs[3].name, "pycount");
+        assert_eq!(defs[3].default, Some(MacroValue::Number(3.0)));
+        assert_eq!(defs[4].default, Some(MacroValue::String("hello".into())));
     }
 }

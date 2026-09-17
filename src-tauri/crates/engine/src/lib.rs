@@ -27,6 +27,7 @@ pub mod scheduler;
 pub mod schema;
 pub mod script_library;
 pub mod script_params;
+pub mod script_python;
 pub mod script_runtime;
 pub mod script_transpile;
 pub mod settings;

@@ -19,6 +19,7 @@ pub fn prepare_script_source(
     match language {
         ScriptLanguage::Javascript => Ok(source.to_string()),
         ScriptLanguage::Typescript => transpile_typescript(source),
+        ScriptLanguage::Python => Ok(source.to_string()),
     }
 }
 

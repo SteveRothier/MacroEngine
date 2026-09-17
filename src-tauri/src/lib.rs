@@ -418,6 +418,7 @@ fn convert_library_item_cmd(
     };
     let lang = match language.as_deref() {
         Some("typescript") | Some("Typescript") => ScriptLanguage::Typescript,
+        Some("python") | Some("Python") => ScriptLanguage::Python,
         _ => ScriptLanguage::Javascript,
     };
     convert_library_item_lang(&dir.0, from, &id, to, mode, lang).map_err(|e| e.to_string())
