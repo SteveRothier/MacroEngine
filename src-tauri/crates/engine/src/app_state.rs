@@ -1360,10 +1360,7 @@ impl AppState {
         let doc = crate::script_library::load_script(&dir, script_id)
             .map_err(|e| e.to_string())?;
         if doc.is_module {
-            return Err(
-                "Ce script est un module bibliothèque — utilisez caster.include, pas Exécuter."
-                    .into(),
-            );
+            return Err("module_not_runnable".into());
         }
         let script_name = doc.name.clone();
         self.bus.publish(EngineEvent::Log {
@@ -1868,5 +1865,41 @@ mod tests {
                 assert_eq!(app.hotkey_bindings().macro_vk, 0x78);
             }
         }
+    }
+
+    #[test]
+    fn start_script_session_refuses_module() {
+        use crate::script_library::{save_script, ScriptDoc, ScriptLanguage};
+        use std::collections::HashMap;
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let dir = std::env::temp_dir().join(format!("caster-mod-{stamp}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        let doc = ScriptDoc {
+            id: "mod1".into(),
+            name: "Mod".into(),
+            source: "module.exports = {};".into(),
+            language: ScriptLanguage::Javascript,
+            is_module: true,
+            allow_network: false,
+            allow_clipboard: false,
+            allow_fs: false,
+            allow_macro_control: false,
+            allow_input: false,
+            allow_process: false,
+            param_values: HashMap::new(),
+        };
+        save_script(&dir, &doc).unwrap();
+
+        let inj = Arc::new(RecordingInjector::new());
+        let app = AppState::with_injector(Arc::clone(&inj) as Arc<dyn MouseInjector>);
+        app.set_macros_config_dir(dir.clone());
+        let err = app.start_script_session("mod1").unwrap_err();
+        assert_eq!(err, "module_not_runnable");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
