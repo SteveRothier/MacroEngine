@@ -14,6 +14,11 @@ import type { DropdownEntry } from "../ui/shell";
 import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import { confirmAction } from "../ui";
 import {
+  readStoredTheme,
+  resolvedColorScheme,
+  type ColorScheme,
+} from "../theme";
+import {
   SCRIPT_SNIPPET_CLICK,
   SCRIPT_SNIPPET_GET,
   SCRIPT_SNIPPET_INCLUDE,
@@ -42,6 +47,7 @@ import {
   ScriptSourceEditor,
   diagnosticsFromError,
   type ScriptEditorDiagnostic,
+  type ScriptSourceEditorHandle,
 } from "./ScriptSourceEditor";
 import { parseParamDefs } from "./parseParams";
 import type { ScriptDoc } from "./types";
@@ -73,11 +79,11 @@ function normalizeDoc(doc: ScriptDoc): ScriptDoc {
 
 function humanizeRunError(raw: string, t: TFunction): string {
   const s = String(raw);
+  if (s === "module_not_runnable" || /module_not_runnable/i.test(s)) {
+    return t("scripts.module.runBlocked");
+  }
   if (/network|fetch disabled|allowNetwork|réseau/i.test(s)) {
     return t("scripts.toast.networkDenied");
-  }
-  if (/module bibliothèque|library module|caster\.include/i.test(s)) {
-    return t("scripts.module.runBlocked");
   }
   if (/engine already|already active|clicker is active|record is active/i.test(s)) {
     return s;
@@ -85,6 +91,22 @@ function humanizeRunError(raw: string, t: TFunction): string {
   return s.startsWith("Erreur") || s.startsWith("Error")
     ? s
     : t("scripts.toast.errorPrefix", { detail: s });
+}
+
+function useDocumentColorScheme(): ColorScheme {
+  const [scheme, setScheme] = useState<ColorScheme>(() =>
+    resolvedColorScheme(readStoredTheme()),
+  );
+  useEffect(() => {
+    const el = document.documentElement;
+    const read = () =>
+      setScheme(el.dataset.theme === "dark" ? "dark" : "light");
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(el, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+  return scheme;
 }
 
 export function ScriptEditorView({
@@ -96,6 +118,8 @@ export function ScriptEditorView({
   const t = useT();
   const { locale } = useLocale();
   const toast = useToast();
+  const colorScheme = useDocumentColorScheme();
+  const sourceEditorRef = useRef<ScriptSourceEditorHandle | null>(null);
   const [draft, setDraft] = useState<ScriptDoc | null>(null);
   const [loading, setLoading] = useState(true);
   const [saveStatus, setSaveStatus] = useState<
@@ -345,6 +369,11 @@ export function ScriptEditorView({
     });
   }
 
+  function insertSnippet(text: string, perms?: Partial<ScriptDoc>) {
+    sourceEditorRef.current?.insertText(text);
+    if (perms) patch(perms);
+  }
+
   const paramDefs = useMemo(
     () => (draft ? parseParamDefs(draft.source) : []),
     [draft],
@@ -501,8 +530,10 @@ export function ScriptEditorView({
         </div>
         <div className="caster-script-source-wrap">
           <ScriptSourceEditor
+            ref={sourceEditorRef}
             value={draft.source}
             language={lang === "typescript" ? "typescript" : "javascript"}
+            colorScheme={colorScheme}
             onChange={(source) => {
               setDiagnostics([]);
               patch({ source });
@@ -539,27 +570,26 @@ export function ScriptEditorView({
                         id: "snip-get",
                         label: t("scripts.toolbar.snipGet"),
                         icon: <Code2 size={14} />,
-                        onSelect: () => patch({ source: SCRIPT_SNIPPET_GET }),
+                        onSelect: () => insertSnippet(SCRIPT_SNIPPET_GET),
                       },
                       {
                         id: "snip-set",
                         label: t("scripts.toolbar.snipSet"),
                         icon: <Code2 size={14} />,
-                        onSelect: () => patch({ source: SCRIPT_SNIPPET_SET }),
+                        onSelect: () => insertSnippet(SCRIPT_SNIPPET_SET),
                       },
                       {
                         id: "snip-param",
                         label: t("scripts.toolbar.snipParam"),
                         icon: <Code2 size={14} />,
-                        onSelect: () => patch({ source: SCRIPT_SNIPPET_PARAM }),
+                        onSelect: () => insertSnippet(SCRIPT_SNIPPET_PARAM),
                       },
                       {
                         id: "snip-click",
                         label: t("scripts.toolbar.snipClick"),
                         icon: <Code2 size={14} />,
                         onSelect: () =>
-                          patch({
-                            source: SCRIPT_SNIPPET_CLICK,
+                          insertSnippet(SCRIPT_SNIPPET_CLICK, {
                             allowInput: true,
                           }),
                       },
@@ -568,8 +598,7 @@ export function ScriptEditorView({
                         label: t("scripts.toolbar.snipKey"),
                         icon: <Code2 size={14} />,
                         onSelect: () =>
-                          patch({
-                            source: SCRIPT_SNIPPET_KEY,
+                          insertSnippet(SCRIPT_SNIPPET_KEY, {
                             allowInput: true,
                           }),
                       },
@@ -577,16 +606,14 @@ export function ScriptEditorView({
                         id: "snip-include",
                         label: t("scripts.toolbar.snipInclude"),
                         icon: <Code2 size={14} />,
-                        onSelect: () =>
-                          patch({ source: SCRIPT_SNIPPET_INCLUDE }),
+                        onSelect: () => insertSnippet(SCRIPT_SNIPPET_INCLUDE),
                       },
                       {
                         id: "snip-process",
                         label: t("scripts.toolbar.snipProcess"),
                         icon: <Code2 size={14} />,
                         onSelect: () =>
-                          patch({
-                            source: SCRIPT_SNIPPET_RUN_PROCESS,
+                          insertSnippet(SCRIPT_SNIPPET_RUN_PROCESS, {
                             allowProcess: true,
                           }),
                       },

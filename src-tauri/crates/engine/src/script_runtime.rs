@@ -1236,4 +1236,106 @@ mod tests {
         .unwrap();
         assert_eq!(inj.clicks(), vec![MouseButton::Left]);
     }
+
+    fn temp_scripts_dir(tag: &str) -> std::path::PathBuf {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let dir = std::env::temp_dir().join(format!("caster-rt-{tag}-{stamp}"));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
+    }
+
+    fn sample_doc(
+        id: &str,
+        source: &str,
+        allow_process: bool,
+    ) -> crate::script_library::ScriptDoc {
+        crate::script_library::ScriptDoc {
+            id: id.into(),
+            name: id.into(),
+            source: source.into(),
+            language: ScriptLanguage::Javascript,
+            is_module: false,
+            allow_network: false,
+            allow_clipboard: false,
+            allow_fs: false,
+            allow_macro_control: false,
+            allow_input: false,
+            allow_process,
+            param_values: Default::default(),
+        }
+    }
+
+    #[test]
+    fn run_script_unions_child_process_permission() {
+        use crate::script_library::save_script;
+        let dir = temp_scripts_dir("union");
+        let child = sample_doc(
+            "child-proc",
+            r#"caster.runProcess({ command: "cmd", args: ["/c", "echo", "ok"], wait: true });"#,
+            true,
+        );
+        save_script(&dir, &child).unwrap();
+        let mut env = MacroEnv::new();
+        let bus = EventBus::new();
+        let cancel = CancellationToken::new();
+        let opts = ScriptOptions {
+            allow_process: false,
+            allow_network: false,
+            config_dir: dir.clone(),
+            ..ScriptOptions::default()
+        };
+        // Parent lacks process; child has it — union must allow.
+        run_script_with_options(
+            r#"caster.runScript("child-proc");"#,
+            10_000,
+            &mut env,
+            &bus,
+            &cancel,
+            &opts,
+        )
+        .expect("child allow_process should union into nested run");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn run_script_max_nest_depth() {
+        use crate::script_library::save_script;
+        let dir = temp_scripts_dir("nest");
+        // Chain: nest0 → nest1 → … → nest5 (6th call exceeds max depth 5)
+        for i in 0..6 {
+            let next = i + 1;
+            let source = if i < 5 {
+                format!(r#"caster.runScript("nest{next}");"#)
+            } else {
+                "caster.log('leaf');".into()
+            };
+            save_script(&dir, &sample_doc(&format!("nest{i}"), &source, false)).unwrap();
+        }
+        let mut env = MacroEnv::new();
+        let bus = EventBus::new();
+        let cancel = CancellationToken::new();
+        let opts = ScriptOptions {
+            config_dir: dir.clone(),
+            call_depth: 0,
+            ..ScriptOptions::default()
+        };
+        let err = run_script_with_options(
+            r#"caster.runScript("nest0");"#,
+            10_000,
+            &mut env,
+            &bus,
+            &cancel,
+            &opts,
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("max depth"),
+            "expected depth error, got {err}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

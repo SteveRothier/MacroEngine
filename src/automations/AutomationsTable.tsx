@@ -603,7 +603,12 @@ export function AutomationsTable({
       onLaunchFocusJournal?.();
       // last-run finalized on engine://status busy→idle
     } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.scriptLaunchFail")));
+      const raw = typeof e === "string" ? e : String(e);
+      toast.error(
+        raw.includes("module_not_runnable")
+          ? t("automations.toast.scriptModuleBlocked")
+          : errMessage(e, t("automations.toast.scriptLaunchFail")),
+      );
     }
   }
 
