@@ -26,12 +26,26 @@ impl From<ScriptLibraryError> for ActionError {
     }
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ScriptLanguage {
+    #[default]
+    Javascript,
+    Typescript,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptDoc {
     pub id: String,
     pub name: String,
     pub source: String,
+    /// Source language; TypeScript is transpiled to JS before Boa eval.
+    #[serde(default)]
+    pub language: ScriptLanguage,
+    /// Library module (for `caster.include`); not a primary Accueil runner.
+    #[serde(default)]
+    pub is_module: bool,
     /// When true, `caster.fetch` is allowed.
     #[serde(default = "default_network")]
     pub allow_network: bool,
@@ -43,6 +57,9 @@ pub struct ScriptDoc {
     pub allow_macro_control: bool,
     #[serde(default)]
     pub allow_input: bool,
+    /// When true, `caster.runProcess` is allowed.
+    #[serde(default)]
+    pub allow_process: bool,
     /// Saved UI defaults for `//@param` values.
     #[serde(default)]
     pub param_values: HashMap<String, MacroValue>,
@@ -104,6 +121,18 @@ pub fn load_script(config_dir: &Path, id: &str) -> Result<ScriptDoc, ScriptLibra
         ScriptLibraryError::Other(format!("script not found: {id}"))
     })?;
     Ok(serde_json::from_str(&raw)?)
+}
+
+/// Resolve by id or exact name (case-sensitive).
+pub fn resolve_script(config_dir: &Path, id_or_name: &str) -> Result<ScriptDoc, ScriptLibraryError> {
+    if let Ok(doc) = load_script(config_dir, id_or_name) {
+        return Ok(doc);
+    }
+    let needle = id_or_name.trim();
+    list_scripts(config_dir)?
+        .into_iter()
+        .find(|d| d.name == needle || d.id == needle)
+        .ok_or_else(|| ScriptLibraryError::Other(format!("script not found: {id_or_name}")))
 }
 
 pub fn load_script_source(id: &str) -> Result<String, ActionError> {
@@ -168,11 +197,14 @@ mod tests {
             id: "hello".into(),
             name: "Hello".into(),
             source: "caster.set('x', 1);".into(),
+            language: ScriptLanguage::Javascript,
+            is_module: false,
             allow_network: false,
             allow_clipboard: false,
             allow_fs: false,
             allow_macro_control: false,
             allow_input: false,
+            allow_process: false,
             param_values: HashMap::new(),
         };
         save_script(&dir, &doc).unwrap();

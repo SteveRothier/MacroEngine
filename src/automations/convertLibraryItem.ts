@@ -136,13 +136,30 @@ async function invokeConvert(
   id: string,
   toKind: AutomationKind,
   mode: "transpile" | "wrap",
+  language?: "javascript" | "typescript",
 ): Promise<ConvertResultDto> {
   return invoke<ConvertResultDto>("convert_library_item_cmd", {
     fromKind,
     id,
     toKind,
     mode,
+    language: language ?? "javascript",
   });
+}
+
+async function askScriptLanguage(
+  t: TFunction,
+): Promise<"javascript" | "typescript" | null> {
+  const outcome = await confirmChoice({
+    title: t("automations.convert.languageTitle"),
+    message: t("automations.convert.languageMessage"),
+    confirmLabel: t("automations.convert.languageJs"),
+    discardLabel: t("automations.convert.languageTs"),
+    cancelLabel: t("common.cancel"),
+    danger: false,
+  });
+  if (outcome === "cancel") return null;
+  return outcome === "confirm" ? "javascript" : "typescript";
 }
 
 /** Transpile then auto-wrap on blocker (no dialog). */
@@ -199,13 +216,20 @@ export async function runLibraryConvert(opts: {
   });
   if (openAfter == null) return null;
 
+  let language: "javascript" | "typescript" = "javascript";
+  if (toKind === "script" && (fromKind === "macro" || fromKind === "clicker")) {
+    const lang = await askScriptLanguage(t);
+    if (lang == null) return null;
+    language = lang;
+  }
+
   const hold = confirmBusy({
     title: t("automations.convert.workingTitle"),
     message: t("automations.convert.workingMessage"),
   });
 
   try {
-    const result = await invokeConvert(fromKind, id, toKind, mode);
+    const result = await invokeConvert(fromKind, id, toKind, mode, language);
     hold.release();
     return { result, openAfter };
   } catch (e) {
@@ -226,7 +250,13 @@ export async function runLibraryConvert(opts: {
         message: t("automations.convert.workingMessage"),
       });
       try {
-        const result = await invokeConvert(fromKind, id, toKind, "wrap");
+        const result = await invokeConvert(
+          fromKind,
+          id,
+          toKind,
+          "wrap",
+          language,
+        );
         hold2.release();
         return { result, openAfter: wrapOpen };
       } catch (err) {

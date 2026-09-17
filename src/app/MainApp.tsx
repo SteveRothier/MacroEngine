@@ -634,11 +634,14 @@ function MainAppInner({
         name: t("shell.newScriptName"),
         source:
           "//@param label string world\ncaster.log('hello ' + caster.get('label'));\n",
+        language: "javascript",
+        isModule: false,
         allowNetwork: false,
         allowClipboard: false,
         allowFs: false,
         allowMacroControl: false,
         allowInput: false,
+        allowProcess: false,
         paramValues: {},
       };
       await invoke("save_script_cmd", { doc });

@@ -9,6 +9,7 @@ export type ScriptPermissions = {
   allowFs: boolean;
   allowMacroControl: boolean;
   allowInput: boolean;
+  allowProcess: boolean;
 };
 
 type Props = {
@@ -24,6 +25,7 @@ function countActive(v: ScriptPermissions): number {
     v.allowFs,
     v.allowMacroControl,
     v.allowInput,
+    v.allowProcess,
   ].filter(Boolean).length;
 }
 
@@ -99,6 +101,12 @@ export function ScriptPermissionsMenu({ value, onChange, disabled }: Props) {
             checked={value.allowMacroControl}
             onChange={(allowMacroControl) => onChange({ allowMacroControl })}
           />
+          <PermRow
+            label={t("scripts.permissions.process")}
+            tip={t("scripts.permissions.processTip")}
+            checked={value.allowProcess}
+            onChange={(allowProcess) => onChange({ allowProcess })}
+          />
         </div>
       ) : null}
     </div>
@@ -141,6 +149,7 @@ export function activePermissionLabels(
     allowFs?: boolean;
     allowMacroControl?: boolean;
     allowInput?: boolean;
+    allowProcess?: boolean;
   },
   t: TFunction,
 ): string[] {
@@ -150,5 +159,6 @@ export function activePermissionLabels(
   if (doc.allowInput) out.push(t("scripts.permissions.input"));
   if (doc.allowFs) out.push(t("scripts.permissions.fsShort"));
   if (doc.allowMacroControl) out.push(t("scripts.permissions.macrosShort"));
+  if (doc.allowProcess) out.push(t("scripts.permissions.processShort"));
   return out;
 }

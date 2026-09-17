@@ -28,6 +28,7 @@ pub mod schema;
 pub mod script_library;
 pub mod script_params;
 pub mod script_runtime;
+pub mod script_transpile;
 pub mod settings;
 pub mod state;
 pub mod stop_zones;
@@ -51,7 +52,8 @@ pub use clicker_presets::{
     save_preset_with_trigger, ClickerPreset, ClickerPresetSummary, PresetError,
 };
 pub use convert::{
-    convert_library_item, ConvertError, ConvertMode, ConvertReport, ConvertResult,
+    convert_library_item, convert_library_item_lang, ConvertError, ConvertMode, ConvertReport,
+    ConvertResult,
 };
 pub use library_index::{
     assert_not_locked, create_library_folder, delete_library_folder, enrich_macro_summaries,
@@ -92,7 +94,7 @@ pub use schema::{
 };
 pub use script_library::{
     delete_script, list_scripts, load_script, save_script, script_path, scripts_dir, ScriptDoc,
-    ScriptLibraryError,
+    ScriptLanguage, ScriptLibraryError,
 };
 pub use script_params::{parse_param_defs, ScriptParamDef};
 pub use settings::{

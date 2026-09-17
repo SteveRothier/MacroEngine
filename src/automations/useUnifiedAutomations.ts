@@ -237,7 +237,11 @@ export function useUnifiedAutomations(options: {
           favorite: false,
           locked: lib?.locked ?? false,
           dirty: options.dirtyScriptId === s.id,
-          meta: undefined,
+          meta: s.isModule
+            ? t("scripts.module.label")
+            : s.language === "typescript"
+              ? t("scripts.language.typescript")
+              : undefined,
           sortOrder: lib?.sortOrder ?? 0,
           permLabels,
         });

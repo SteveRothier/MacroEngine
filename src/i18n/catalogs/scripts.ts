@@ -29,6 +29,7 @@ export const scripts = defineCatalog({
       snipParam: "Template @param",
       snipClick: "click + sleep",
       snipKey: "keyTap",
+      snipInclude: "include module",
       sourceAria: "Source JavaScript",
       loadingAria: "Chargement du script",
       notFound: "Script introuvable.",
@@ -67,6 +68,19 @@ export const scripts = defineCatalog({
       macrosShort: "Macros",
       macrosTip:
         "Le script peut lancer d’autres macros via runMacro (profondeur max 3).",
+      process: "Processus",
+      processShort: "Process",
+      processTip:
+        "Autorise caster.runProcess — lancer des exécutables (équivalent process.run).",
+    },
+    language: {
+      label: "Langage",
+      javascript: "JavaScript",
+      typescript: "TypeScript",
+    },
+    module: {
+      label: "Module bibliothèque",
+      tip: "Destiné à caster.include — pas un runner Accueil principal.",
     },
     presets: {
       helloParam: {
@@ -133,6 +147,7 @@ export const scripts = defineCatalog({
       snipParam: "@param template",
       snipClick: "click + sleep",
       snipKey: "keyTap",
+      snipInclude: "include module",
       sourceAria: "JavaScript source",
       loadingAria: "Loading script",
       notFound: "Script not found.",
@@ -169,6 +184,19 @@ export const scripts = defineCatalog({
       macrosShort: "Macros",
       macrosTip:
         "The script can launch other macros via runMacro (max depth 3).",
+      process: "Process",
+      processShort: "Process",
+      processTip:
+        "Allows caster.runProcess — spawn executables (like process.run).",
+    },
+    language: {
+      label: "Language",
+      javascript: "JavaScript",
+      typescript: "TypeScript",
+    },
+    module: {
+      label: "Library module",
+      tip: "For caster.include — not a primary Home runner.",
     },
     presets: {
       helloParam: {

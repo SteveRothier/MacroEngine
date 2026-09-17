@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use caster_engine::{
-    assert_not_locked, convert_library_item, create_library_folder, create_macro, delete_library_folder, delete_macro,
+    assert_not_locked, convert_library_item_lang, create_library_folder, create_macro, delete_library_folder, delete_macro,
     delete_preset, delete_script, duplicate_macro, duplicate_preset, enrich_macro_summaries,
     export_preset_to_path, get_library_index, import_preset_from_path, list_library_items,
     list_macro_summaries, list_macros, list_preset_summaries, list_presets, list_scripts,
@@ -18,7 +18,7 @@ use caster_engine::{
     ConvertMode, ConvertResult, DrawnRect, EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto,
     LibraryKind, ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs,
     NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind, RecordOptions,
-    ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptsPrefs, ShellPrefs, StopZone, ThemeMode, Trigger,
+    ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptLanguage, ScriptsPrefs, ShellPrefs, StopZone, ThemeMode, Trigger,
     UiLocale, WindowBounds, clamp_overlay_opacity, settings_path,
 };
 use serde::{Deserialize, Serialize};
@@ -408,6 +408,7 @@ fn convert_library_item_cmd(
     id: String,
     to_kind: String,
     mode: String,
+    language: Option<String>,
 ) -> Result<ConvertResult, String> {
     let from = LibraryKind::parse(&from_kind).map_err(|e| e.to_string())?;
     let to = LibraryKind::parse(&to_kind).map_err(|e| e.to_string())?;
@@ -415,7 +416,11 @@ fn convert_library_item_cmd(
         "transpile" => ConvertMode::Transpile,
         _ => ConvertMode::Wrap,
     };
-    convert_library_item(&dir.0, from, &id, to, mode).map_err(|e| e.to_string())
+    let lang = match language.as_deref() {
+        Some("typescript") | Some("Typescript") => ScriptLanguage::Typescript,
+        _ => ScriptLanguage::Javascript,
+    };
+    convert_library_item_lang(&dir.0, from, &id, to, mode, lang).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
