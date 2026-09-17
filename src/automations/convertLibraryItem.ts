@@ -88,6 +88,35 @@ function openAfterFromOutcome(
   return outcome === "confirm";
 }
 
+const BLOCKER_PREFIX = "transpile blocked by:";
+
+/** Map backend blocker codes to localized labels for the wrap dialog. */
+export function formatTranspileBlockers(msg: string, t: TFunction): string {
+  const trimmed = msg.trim();
+  const raw = trimmed.toLowerCase().startsWith(BLOCKER_PREFIX)
+    ? trimmed.slice(BLOCKER_PREFIX.length).trim()
+    : trimmed;
+  const codes = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (codes.length === 0) return trimmed;
+  return codes
+    .map((code) => {
+      switch (code) {
+        case "process.run":
+          return t("automations.convert.blockers.processRun");
+        case "control.if":
+          return t("automations.convert.blockers.controlIf");
+        case "control.while":
+          return t("automations.convert.blockers.controlWhile");
+        default:
+          return t("automations.convert.blockers.other", { code });
+      }
+    })
+    .join(", ");
+}
+
 const choiceLabels = (t: TFunction) => ({
   confirmLabel: t("automations.convert.confirmOpen"),
   discardLabel: t("automations.convert.confirmOnly"),
@@ -184,7 +213,9 @@ export async function runLibraryConvert(opts: {
     if (mode === "transpile" && fromKind === "macro" && toKind === "script") {
       const wrapOutcome = await hold.replaceChoice({
         title: t("automations.convert.wrapTitle"),
-        message: t("automations.convert.wrapMessage", { detail: msg }),
+        message: t("automations.convert.wrapMessage", {
+          detail: formatTranspileBlockers(msg, t),
+        }),
         ...choiceLabels(t),
       });
       const wrapOpen = openAfterFromOutcome(wrapOutcome);

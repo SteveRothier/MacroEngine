@@ -1027,16 +1027,30 @@ export function MacroWorkspace({
     });
   }
 
-  function addToBranch(branch: "then" | "else", kind: MacroAction["type"]) {
+  function addToBranch(
+    branch: "then" | "else" | "body",
+    kind: MacroAction["type"],
+  ) {
     if (!selectedPath || activeLocked) return;
     const selected = getAtPath(doc.actions, selectedPath);
-    if (!selected || selected.type !== "control.if") return;
-    const child = makeAction(kind, t);
-    const actions = appendChild(doc.actions, selectedPath, branch, child);
-    const branchIdx = branch === "then" ? 0 : 1;
-    const list = branch === "then" ? selected.then : selected.else ?? [];
-    void pushDoc({ ...doc, schemaVersion: 8, actions });
-    setSelectedPath([...selectedPath, branchIdx, list.length]);
+    if (!selected) return;
+    if (selected.type === "control.if") {
+      if (branch !== "then" && branch !== "else") return;
+      const child = makeAction(kind, t);
+      const actions = appendChild(doc.actions, selectedPath, branch, child);
+      const branchIdx = branch === "then" ? 0 : 1;
+      const list = branch === "then" ? selected.then : selected.else ?? [];
+      void pushDoc({ ...doc, schemaVersion: 8, actions });
+      setSelectedPath([...selectedPath, branchIdx, list.length]);
+      return;
+    }
+    if (selected.type === "control.while" && branch === "body") {
+      const child = makeAction(kind, t);
+      const actions = appendChild(doc.actions, selectedPath, "body", child);
+      const list = selected.body ?? [];
+      void pushDoc({ ...doc, schemaVersion: 8, actions });
+      setSelectedPath([...selectedPath, 0, list.length]);
+    }
   }
 
   useEffect(() => {

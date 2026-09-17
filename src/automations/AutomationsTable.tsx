@@ -67,6 +67,7 @@ import {
   mergeAccueilPrefs,
   mergeAutomationPrefs,
   mergeScriptsPrefs,
+  type ScriptsPrefs,
 } from "../settings/settingsTypes";
 import {
   favoriteTooltip,
@@ -121,6 +122,7 @@ type Props = {
   /** Notify parent of focused Accueil row (`kind:id`). */
   onFocusKeyChange?: (key: string | null) => void;
   onLaunchFocusJournal?: () => void;
+  scriptsPrefs?: ScriptsPrefs;
 };
 
 function rowKey(r: AutomationRow): string {
@@ -201,13 +203,14 @@ export function AutomationsTable({
   runningScriptName = null,
   onFocusKeyChange,
   onLaunchFocusJournal,
+  scriptsPrefs: scriptsPrefsProp,
 }: Props) {
   const t = useT();
   const { locale } = useLocale();
   const empty = t("common.empty");
   const accueilPrefs = mergeAccueilPrefs();
   const automationPrefs = mergeAutomationPrefs();
-  const scriptsPrefs = mergeScriptsPrefs();
+  const scriptsPrefs = mergeScriptsPrefs(scriptsPrefsProp);
   const toast = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);

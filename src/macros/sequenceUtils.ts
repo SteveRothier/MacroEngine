@@ -16,9 +16,15 @@ export function actionOffsetMs(actions: MacroAction[], path: ActionPath): number
     }
     if (depth === path.length - 1) break;
     const node = list[idx];
-    if (!node || node.type !== "control.if") break;
+    if (!node || (node.type !== "control.if" && node.type !== "control.while"))
+      break;
     const branchIdx = path[depth + 1]!;
-    list = branchIdx === 0 ? node.then : node.else ?? [];
+    if (node.type === "control.if") {
+      list = branchIdx === 0 ? node.then : node.else ?? [];
+    } else {
+      if (branchIdx !== 0) break;
+      list = node.body ?? [];
+    }
   }
   return total;
 }

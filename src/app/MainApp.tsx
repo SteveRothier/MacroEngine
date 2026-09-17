@@ -14,8 +14,10 @@ import {
 import { SettingsView } from "../settings/SettingsView";
 import {
   mergeAutomationPrefs,
+  mergeScriptsPrefs,
   mergeShellPrefs,
   type AutomationPrefs,
+  type ScriptsPrefs,
   type ShellPrefs,
 } from "../settings/settingsTypes";
 import { RunJournalDock } from "../runs/RunJournalDock";
@@ -152,6 +154,9 @@ function MainAppInner({
   const [automationPrefs, setAutomationPrefs] = useState<AutomationPrefs>(() =>
     mergeAutomationPrefs(),
   );
+  const [scriptsPrefs, setScriptsPrefs] = useState<ScriptsPrefs>(() =>
+    mergeScriptsPrefs(),
+  );
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => loadWorkspace());
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
   const [advanced, setAdvanced] = useState(false);
@@ -218,6 +223,7 @@ function MainAppInner({
         setShellPrefs(sh);
         onUiLocalePrefChange(sh.uiLocale);
         setAutomationPrefs(mergeAutomationPrefs(s.automation));
+        setScriptsPrefs(mergeScriptsPrefs(s.scripts));
         if (!sh.restoreWorkspaceTabs) {
           setWorkspace((ws) => selectHome({ ...ws, tabs: [] }));
         } else if (sh.startupView === "lastDocument") {
@@ -919,6 +925,7 @@ function MainAppInner({
             onUiLocalePrefChange(prefs.uiLocale);
           }}
           onAutomationPrefsChange={setAutomationPrefs}
+          onScriptsPrefsChange={setScriptsPrefs}
         />
       );
     }
@@ -1022,6 +1029,7 @@ function MainAppInner({
               : null
           }
           onFocusKeyChange={automationsPage.setFocusKey}
+          scriptsPrefs={scriptsPrefs}
         />
       );
     }

@@ -26,7 +26,7 @@ type Props = {
   action: MacroAction;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else") => ActionPickerEntry[];
+  branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
 };
 
@@ -145,7 +145,7 @@ function ComplexPopover({
   action: MacroAction;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else") => ActionPickerEntry[];
+  branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
   onClose: () => void;
   anchor: DOMRect;

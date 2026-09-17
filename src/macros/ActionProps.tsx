@@ -52,7 +52,7 @@ type Props = {
   action: MacroAction | null;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else") => ActionPickerEntry[];
+  branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
 };
 
@@ -873,6 +873,144 @@ export function ActionProps({
                 items={branchAddMenuItems("else")}
               />
             </>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (action.type === "control.while") {
+    const left = action.condition.left;
+    const right = action.condition.right;
+    return (
+      <div className="props-grid">
+        <label className="caster-field">
+          <span>{t("macros.params.ifLeft")}</span>
+          <Select
+            className="caster-select"
+            disabled={disabled}
+            value={operandMode(left)}
+            options={operandModeOpts(t)}
+            onChange={(v) =>
+              onChange({
+                ...action,
+                condition: {
+                  ...action.condition,
+                  left: v === "var" ? { var: "n" } : 0,
+                },
+              })
+            }
+          />
+        </label>
+        <label className="caster-field">
+          <span>
+            {operandMode(left) === "var"
+              ? t("macros.params.operandVarShort")
+              : t("macros.params.varValue")}
+          </span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={isVarOperand(left) ? left.var : litString(left)}
+            onChange={(e) =>
+              onChange({
+                ...action,
+                condition: {
+                  ...action.condition,
+                  left:
+                    operandMode(left) === "var"
+                      ? { var: e.target.value }
+                      : parseLit(e.target.value),
+                },
+              })
+            }
+          />
+        </label>
+        <label className="caster-field">
+          <span>{t("macros.params.ifOperator")}</span>
+          <Select
+            className="caster-select"
+            disabled={disabled}
+            value={action.condition.op}
+            options={COMPARE_OP_OPTS}
+            onChange={(op) =>
+              onChange({
+                ...action,
+                condition: {
+                  ...action.condition,
+                  op: op as CompareOp,
+                },
+              })
+            }
+          />
+        </label>
+        <label className="caster-field">
+          <span>{t("macros.params.ifRight")}</span>
+          <Select
+            className="caster-select"
+            disabled={disabled}
+            value={operandMode(right)}
+            options={operandModeOpts(t)}
+            onChange={(v) =>
+              onChange({
+                ...action,
+                condition: {
+                  ...action.condition,
+                  right: v === "var" ? { var: "n" } : 0,
+                },
+              })
+            }
+          />
+        </label>
+        <label className="caster-field">
+          <span>
+            {operandMode(right) === "var"
+              ? t("macros.params.operandVarShort")
+              : t("macros.params.varValue")}
+          </span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={isVarOperand(right) ? right.var : litString(right)}
+            onChange={(e) =>
+              onChange({
+                ...action,
+                condition: {
+                  ...action.condition,
+                  right:
+                    operandMode(right) === "var"
+                      ? { var: e.target.value }
+                      : parseLit(e.target.value),
+                },
+              })
+            }
+          />
+        </label>
+        <label className="caster-field">
+          <span>{t("macros.params.maxIterations")}</span>
+          <input
+            type="number"
+            disabled={disabled}
+            min={1}
+            value={action.maxIterations ?? 10000}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              onChange({
+                ...action,
+                maxIterations: Number.isFinite(n)
+                  ? Math.max(1, Math.floor(n))
+                  : 10000,
+              });
+            }}
+          />
+        </label>
+        <div className="actions wrap">
+          {branchAddMenuItems ? (
+            <ActionPickerMenu
+              label={t("macros.params.addBody")}
+              disabled={disabled}
+              items={branchAddMenuItems("body")}
+            />
           ) : null}
         </div>
       </div>
