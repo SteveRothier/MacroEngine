@@ -11,7 +11,7 @@ use crate::clicker_presets::load_preset;
 use crate::library_index::{get_library_index, move_library_item, LibraryKind};
 use crate::macro_library::{create_macro, list_macros, load_macro, save_macro};
 use crate::schema::{
-    ActionNode, MacroValue, SCHEMA_VERSION_CURRENT, Trigger,
+    ActionNode, CompareOp, Condition, MacroValue, Operand, SCHEMA_VERSION_CURRENT, Trigger,
 };
 use crate::script_library::{list_scripts, load_script, save_script, ScriptDoc};
 
@@ -125,11 +125,54 @@ fn macro_value_js(v: &MacroValue) -> String {
     }
 }
 
+fn operand_js(op: &Operand) -> String {
+    match op {
+        Operand::Literal(v) => macro_value_js(v),
+        Operand::Var { var } => format!("caster.get({})", js_string_literal(var)),
+    }
+}
+
+fn compare_op_js(op: CompareOp) -> &'static str {
+    match op {
+        CompareOp::Eq => "===",
+        CompareOp::Ne => "!==",
+        CompareOp::Gt => ">",
+        CompareOp::Lt => "<",
+        CompareOp::Gte => ">=",
+        CompareOp::Lte => "<=",
+    }
+}
+
+/// Classic left/op/right → JS expression. `None` when predicate-based (process.*) or unsupported.
+fn condition_js(cond: &Condition) -> Option<String> {
+    if cond.predicate.is_some() {
+        return None;
+    }
+    Some(format!(
+        "{} {} {}",
+        operand_js(&cond.left),
+        compare_op_js(cond.op),
+        operand_js(&cond.right)
+    ))
+}
+
 fn action_blocks_transpile(a: &ActionNode) -> Option<&'static str> {
     match a {
         ActionNode::ProcessRun { .. } => Some("process.run"),
-        ActionNode::ControlIf { .. } => Some("control.if"),
-        ActionNode::ControlWhile { .. } => Some("control.while"),
+        ActionNode::ControlIf { condition, .. } => {
+            if condition_js(condition).is_none() {
+                Some("control.if")
+            } else {
+                None
+            }
+        }
+        ActionNode::ControlWhile { condition, .. } => {
+            if condition_js(condition).is_none() {
+                Some("control.while")
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }
@@ -147,6 +190,44 @@ fn action_needs_input(a: &ActionNode) -> bool {
             | ActionNode::KeyDown { .. }
             | ActionNode::KeyUp { .. }
     )
+}
+
+fn action_tree_needs_input(a: &ActionNode) -> bool {
+    if action_needs_input(a) {
+        return true;
+    }
+    match a {
+        ActionNode::ControlIf {
+            then, else_branch, ..
+        } => then.iter().any(action_tree_needs_input)
+            || else_branch.iter().any(action_tree_needs_input),
+        ActionNode::ControlWhile { body, .. } => body.iter().any(action_tree_needs_input),
+        _ => false,
+    }
+}
+
+fn action_tree_needs_network(a: &ActionNode) -> bool {
+    match a {
+        ActionNode::HttpRequest { .. } => true,
+        ActionNode::ControlIf {
+            then, else_branch, ..
+        } => then.iter().any(action_tree_needs_network)
+            || else_branch.iter().any(action_tree_needs_network),
+        ActionNode::ControlWhile { body, .. } => body.iter().any(action_tree_needs_network),
+        _ => false,
+    }
+}
+
+fn action_tree_needs_clipboard(a: &ActionNode) -> bool {
+    match a {
+        ActionNode::ClipboardSet { .. } | ActionNode::ClipboardGet { .. } => true,
+        ActionNode::ControlIf {
+            then, else_branch, ..
+        } => then.iter().any(action_tree_needs_clipboard)
+            || else_branch.iter().any(action_tree_needs_clipboard),
+        ActionNode::ControlWhile { body, .. } => body.iter().any(action_tree_needs_clipboard),
+        _ => false,
+    }
 }
 
 fn mouse_opts_js(button: &str, x: Option<i32>, y: Option<i32>) -> String {
@@ -318,6 +399,55 @@ fn transpile_action(a: &ActionNode, out: &mut String, report: &mut ConvertReport
                 key_mods_js(mods)
             ));
             report.kept.push("key.up".into());
+        }
+        ActionNode::ControlIf {
+            condition,
+            then,
+            else_branch,
+            ..
+        } => {
+            let Some(cond) = condition_js(condition) else {
+                report.dropped.push("control.if".into());
+                return;
+            };
+            out.push_str(&format!("if ({cond}) {{\n"));
+            for child in then {
+                transpile_action(child, out, report);
+            }
+            if !else_branch.is_empty() {
+                out.push_str("} else {\n");
+                for child in else_branch {
+                    transpile_action(child, out, report);
+                }
+            }
+            out.push_str("}\n");
+            report.kept.push("control.if".into());
+        }
+        ActionNode::ControlWhile {
+            id,
+            condition,
+            body,
+            max_iterations,
+            ..
+        } => {
+            let Some(cond) = condition_js(condition) else {
+                report.dropped.push("control.while".into());
+                return;
+            };
+            let var_name = format!(
+                "__w_{}",
+                id.chars()
+                    .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+                    .collect::<String>()
+            );
+            out.push_str(&format!(
+                "for (var {var_name} = 0; {var_name} < {max_iterations} && ({cond}); {var_name}++) {{\n"
+            ));
+            for child in body {
+                transpile_action(child, out, report);
+            }
+            out.push_str("}\n");
+            report.kept.push("control.while".into());
         }
         other => {
             if let Some(label) = action_blocks_transpile(other) {
@@ -573,16 +703,13 @@ fn macro_to_script(
             let mut allow_clip = false;
             let mut allow_inp = false;
             for a in &doc.actions {
-                if matches!(a, ActionNode::HttpRequest { .. }) {
+                if action_tree_needs_network(a) {
                     allow_net = true;
                 }
-                if matches!(
-                    a,
-                    ActionNode::ClipboardSet { .. } | ActionNode::ClipboardGet { .. }
-                ) {
+                if action_tree_needs_clipboard(a) {
                     allow_clip = true;
                 }
-                if action_needs_input(a) {
+                if action_tree_needs_input(a) {
                     allow_inp = true;
                 }
                 transpile_action(a, &mut src, &mut report);
@@ -644,10 +771,14 @@ mod tests {
     use std::fs;
 
     fn temp_dir() -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static N: AtomicU64 = AtomicU64::new(0);
+        let n = N.fetch_add(1, Ordering::Relaxed);
         let p = std::env::temp_dir().join(format!(
-            "caster-convert-{}-{}",
+            "caster-convert-{}-{}-{}",
             std::process::id(),
-            new_script_id()
+            new_script_id(),
+            n
         ));
         let _ = fs::create_dir_all(&p);
         p
@@ -753,6 +884,90 @@ mod tests {
         assert!(s.source.contains("caster.keyTap"));
         assert!(s.allow_input);
         assert!(!s.source.contains("runMacro"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn macro_if_click_to_script_transpile() {
+        let dir = temp_dir();
+        let mut m = create_macro(&dir, Some("IfClick")).unwrap();
+        let id = m.name.clone();
+        m.actions = vec![ActionNode::ControlIf {
+            id: "if1".into(),
+            condition: Condition {
+                predicate: None,
+                value: None,
+                left: Operand::Var {
+                    var: "ready".into(),
+                },
+                op: CompareOp::Eq,
+                right: Operand::Literal(MacroValue::Bool(true)),
+            },
+            then: vec![
+                ActionNode::MouseClick {
+                    id: "c1".into(),
+                    button: "left".into(),
+                    x: Some(5),
+                    y: Some(6),
+                },
+                ActionNode::Delay {
+                    id: "d1".into(),
+                    ms: 50,
+                },
+            ],
+            else_branch: vec![],
+        }];
+        save_macro(&dir, &id, &m).unwrap();
+        let r = convert_library_item(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Script,
+            ConvertMode::Transpile,
+        )
+        .unwrap();
+        let s = load_script(&dir, &r.new_id).unwrap();
+        assert!(s.source.contains("if ("));
+        assert!(s.source.contains("caster.get(\"ready\")"));
+        assert!(s.source.contains("caster.click"));
+        assert!(s.source.contains("caster.sleep(50)"));
+        assert!(s.allow_input);
+        assert!(!s.source.contains("runMacro"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn macro_process_run_blocks_transpile() {
+        let dir = temp_dir();
+        let mut m = create_macro(&dir, Some("Proc")).unwrap();
+        let id = m.name.clone();
+        m.actions = vec![ActionNode::ProcessRun {
+            id: "p1".into(),
+            command: "echo".into(),
+            args: vec![],
+            wait: true,
+            timeout_ms: None,
+        }];
+        save_macro(&dir, &id, &m).unwrap();
+        let err = convert_library_item(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Script,
+            ConvertMode::Transpile,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("process.run"));
+        let wrap = convert_library_item(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Script,
+            ConvertMode::Wrap,
+        )
+        .unwrap();
+        let s = load_script(&dir, &wrap.new_id).unwrap();
+        assert!(s.source.contains("runMacro"));
         let _ = fs::remove_dir_all(&dir);
     }
 

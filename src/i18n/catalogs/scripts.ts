@@ -27,6 +27,8 @@ export const scripts = defineCatalog({
       snipGet: "GET JSON",
       snipSet: "get / set / return",
       snipParam: "Template @param",
+      snipClick: "click + sleep",
+      snipKey: "keyTap",
       sourceAria: "Source JavaScript",
       loadingAria: "Chargement du script",
       notFound: "Script introuvable.",
@@ -87,6 +89,10 @@ export const scripts = defineCatalog({
         name: "Lancer une macro",
         description: "caster.runMacro (profondeur max 3)",
       },
+      clickSleep: {
+        name: "Click + sleep",
+        description: "Clic souris puis pause (permission Input)",
+      },
     },
     toast: {
       networkDenied:
@@ -125,6 +131,8 @@ export const scripts = defineCatalog({
       snipGet: "GET JSON",
       snipSet: "get / set / return",
       snipParam: "@param template",
+      snipClick: "click + sleep",
+      snipKey: "keyTap",
       sourceAria: "JavaScript source",
       loadingAria: "Loading script",
       notFound: "Script not found.",
@@ -182,6 +190,10 @@ export const scripts = defineCatalog({
       runMacro: {
         name: "Run a macro",
         description: "caster.runMacro (max depth 3)",
+      },
+      clickSleep: {
+        name: "Click + sleep",
+        description: "Mouse click then pause (Input permission)",
       },
     },
     toast: {

@@ -16,7 +16,9 @@ import type { DropdownEntry } from "../ui/shell";
 import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import { confirmAction } from "../ui";
 import {
+  SCRIPT_SNIPPET_CLICK,
   SCRIPT_SNIPPET_GET,
+  SCRIPT_SNIPPET_KEY,
   SCRIPT_SNIPPET_PARAM,
   SCRIPT_SNIPPET_SET,
 } from "./snippets";
@@ -520,6 +522,26 @@ export function ScriptEditorView({
                         label: t("scripts.toolbar.snipParam"),
                         icon: <Code2 size={14} />,
                         onSelect: () => patch({ source: SCRIPT_SNIPPET_PARAM }),
+                      },
+                      {
+                        id: "snip-click",
+                        label: t("scripts.toolbar.snipClick"),
+                        icon: <Code2 size={14} />,
+                        onSelect: () =>
+                          patch({
+                            source: SCRIPT_SNIPPET_CLICK,
+                            allowInput: true,
+                          }),
+                      },
+                      {
+                        id: "snip-key",
+                        label: t("scripts.toolbar.snipKey"),
+                        icon: <Code2 size={14} />,
+                        onSelect: () =>
+                          patch({
+                            source: SCRIPT_SNIPPET_KEY,
+                            allowInput: true,
+                          }),
                       },
                     ],
                   },
