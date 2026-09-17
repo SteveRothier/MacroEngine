@@ -12,6 +12,12 @@ thiserror = "2"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 boa_engine = "0.20"
 boa_runtime = "0.20"
+oxc_allocator = "0.48.0"
+oxc_parser = "0.48.0"
+oxc_codegen = "0.48.0"
+oxc_span = "0.48.0"
+oxc_transformer = "0.48.0"
+oxc_semantic = "0.48.0"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = [

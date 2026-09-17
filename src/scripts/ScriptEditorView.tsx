@@ -11,13 +11,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Code2, FileCode2 } from "lucide-react";
 import { useLocale, useT, type TFunction } from "../i18n";
-import { DropdownMenu, useToast } from "../ui/shell";
+import { DropdownMenu, Select, useToast } from "../ui/shell";
 import type { DropdownEntry } from "../ui/shell";
 import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import { confirmAction } from "../ui";
 import {
   SCRIPT_SNIPPET_CLICK,
   SCRIPT_SNIPPET_GET,
+  SCRIPT_SNIPPET_INCLUDE,
   SCRIPT_SNIPPET_KEY,
   SCRIPT_SNIPPET_PARAM,
   SCRIPT_SNIPPET_SET,
@@ -55,10 +56,13 @@ type Props = {
 function normalizeDoc(doc: ScriptDoc): ScriptDoc {
   return {
     ...doc,
+    language: doc.language ?? "javascript",
+    isModule: doc.isModule ?? false,
     allowClipboard: doc.allowClipboard ?? false,
     allowFs: doc.allowFs ?? false,
     allowMacroControl: doc.allowMacroControl ?? false,
     allowInput: doc.allowInput ?? false,
+    allowProcess: doc.allowProcess ?? false,
     paramValues: doc.paramValues ?? {},
   };
 }
@@ -408,6 +412,7 @@ export function ScriptEditorView({
           allowFs: !!draft.allowFs,
           allowMacroControl: !!draft.allowMacroControl,
           allowInput: !!draft.allowInput,
+          allowProcess: !!draft.allowProcess,
         }}
         onPermissionsChange={(partial) => patch(partial)}
         running={running}
@@ -464,6 +469,39 @@ export function ScriptEditorView({
           onChange={setParamValue}
           onBlurField={() => void flushAutosave()}
         />
+        <div className="caster-script-meta-row">
+          <label className="caster-field caster-script-lang-field">
+            <span>{t("scripts.language.label")}</span>
+            <Select
+              className="caster-select"
+              value={draft.language ?? "javascript"}
+              ariaLabel={t("scripts.language.label")}
+              options={[
+                {
+                  value: "javascript",
+                  label: t("scripts.language.javascript"),
+                },
+                {
+                  value: "typescript",
+                  label: t("scripts.language.typescript"),
+                },
+              ]}
+              onChange={(v) =>
+                patch({
+                  language: v === "typescript" ? "typescript" : "javascript",
+                })
+              }
+            />
+          </label>
+          <label className="caster-script-module-toggle">
+            <input
+              type="checkbox"
+              checked={!!draft.isModule}
+              onChange={(e) => patch({ isModule: e.target.checked })}
+            />
+            <span title={t("scripts.module.tip")}>{t("scripts.module.label")}</span>
+          </label>
+        </div>
         <div className="caster-script-source-wrap">
           <div className="caster-script-source-gutter" ref={gutterRef} aria-hidden>
             {Array.from({ length: lineCount }, (_, i) => (
@@ -542,6 +580,13 @@ export function ScriptEditorView({
                             source: SCRIPT_SNIPPET_KEY,
                             allowInput: true,
                           }),
+                      },
+                      {
+                        id: "snip-include",
+                        label: t("scripts.toolbar.snipInclude"),
+                        icon: <Code2 size={14} />,
+                        onSelect: () =>
+                          patch({ source: SCRIPT_SNIPPET_INCLUDE }),
                       },
                     ],
                   },

@@ -959,11 +959,14 @@ mod tests {
             id: "s1".into(),
             name: "Hello".into(),
             source: "// test".into(),
+            language: Default::default(),
+            is_module: false,
             allow_network: false,
             allow_clipboard: false,
             allow_fs: false,
             allow_macro_control: false,
             allow_input: false,
+            allow_process: false,
             param_values: Default::default(),
         };
         save_script(&dir, &doc).unwrap();

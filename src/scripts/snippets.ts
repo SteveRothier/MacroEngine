@@ -28,3 +28,8 @@ caster.sleep(200);
 export const SCRIPT_SNIPPET_KEY = `// Touche (nécessite permission Souris / clavier)
 caster.keyTap("A", { ctrl: false, alt: false, shift: false });
 `;
+
+export const SCRIPT_SNIPPET_INCLUDE = `// Module bibliothèque (caster.include)
+const utils = caster.include("mon-module");
+caster.log(utils);
+`;

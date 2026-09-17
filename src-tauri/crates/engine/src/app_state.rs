@@ -1396,9 +1396,12 @@ impl AppState {
                 allow_fs: doc.allow_fs,
                 allow_macro_control: doc.allow_macro_control,
                 allow_input: doc.allow_input,
+                allow_process: doc.allow_process,
+                language: doc.language,
                 config_dir: config_dir.clone(),
                 injector: Some(Arc::clone(&injector)),
                 run_macro: None,
+                call_depth: 0,
             };
             if opts.allow_macro_control {
                 let inj = Arc::clone(&injector);

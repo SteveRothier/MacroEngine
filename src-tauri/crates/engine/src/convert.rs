@@ -13,7 +13,9 @@ use crate::macro_library::{create_macro, list_macros, load_macro, save_macro};
 use crate::schema::{
     ActionNode, CompareOp, Condition, MacroValue, Operand, SCHEMA_VERSION_CURRENT, Trigger,
 };
-use crate::script_library::{list_scripts, load_script, save_script, ScriptDoc};
+use crate::script_library::{
+    list_scripts, load_script, save_script, ScriptDoc, ScriptLanguage,
+};
 
 #[derive(Debug, Error)]
 pub enum ConvertError {
@@ -158,7 +160,6 @@ fn condition_js(cond: &Condition) -> Option<String> {
 
 fn action_blocks_transpile(a: &ActionNode) -> Option<&'static str> {
     match a {
-        ActionNode::ProcessRun { .. } => Some("process.run"),
         ActionNode::ControlIf { condition, .. } => {
             if condition_js(condition).is_none() {
                 Some("control.if")
@@ -226,6 +227,32 @@ fn action_tree_needs_clipboard(a: &ActionNode) -> bool {
         } => then.iter().any(action_tree_needs_clipboard)
             || else_branch.iter().any(action_tree_needs_clipboard),
         ActionNode::ControlWhile { body, .. } => body.iter().any(action_tree_needs_clipboard),
+        _ => false,
+    }
+}
+
+fn action_tree_needs_process(a: &ActionNode) -> bool {
+    match a {
+        ActionNode::ProcessRun { .. } => true,
+        ActionNode::ControlIf {
+            then, else_branch, ..
+        } => then.iter().any(action_tree_needs_process)
+            || else_branch.iter().any(action_tree_needs_process),
+        ActionNode::ControlWhile { body, .. } => body.iter().any(action_tree_needs_process),
+        _ => false,
+    }
+}
+
+fn action_tree_needs_macro_control(a: &ActionNode) -> bool {
+    match a {
+        ActionNode::ScriptRun {
+            script_id: Some(_), ..
+        } => true,
+        ActionNode::ControlIf {
+            then, else_branch, ..
+        } => then.iter().any(action_tree_needs_macro_control)
+            || else_branch.iter().any(action_tree_needs_macro_control),
+        ActionNode::ControlWhile { body, .. } => body.iter().any(action_tree_needs_macro_control),
         _ => false,
     }
 }
@@ -328,9 +355,10 @@ fn transpile_action(a: &ActionNode, out: &mut String, report: &mut ConvertReport
         } => {
             if let Some(sid) = script_id {
                 out.push_str(&format!(
-                    "// nested script.run scriptId={sid} — not inlined\n"
+                    "caster.runScript({});\n",
+                    js_string_literal(sid)
                 ));
-                report.dropped.push(format!("script.run:{sid}"));
+                report.kept.push(format!("script.run:{sid}"));
             } else if !source.trim().is_empty() {
                 out.push_str(source);
                 if !source.ends_with('\n') {
@@ -338,6 +366,28 @@ fn transpile_action(a: &ActionNode, out: &mut String, report: &mut ConvertReport
                 }
                 report.kept.push("script.run:inline".into());
             }
+        }
+        ActionNode::ProcessRun {
+            command,
+            args,
+            wait,
+            timeout_ms,
+            ..
+        } => {
+            let args_js = args
+                .iter()
+                .map(|a| js_string_literal(a))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let timeout = timeout_ms
+                .map(|ms| format!(", timeoutMs: {ms}"))
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "caster.runProcess({{ command: {}, args: [{args_js}], wait: {}{timeout} }});\n",
+                js_string_literal(command),
+                if *wait { "true" } else { "false" },
+            ));
+            report.kept.push("process.run".into());
         }
         ActionNode::Delay { ms, .. } => {
             out.push_str(&format!("caster.sleep({ms});\n"));
@@ -448,13 +498,6 @@ fn transpile_action(a: &ActionNode, out: &mut String, report: &mut ConvertReport
             }
             out.push_str("}\n");
             report.kept.push("control.while".into());
-        }
-        other => {
-            if let Some(label) = action_blocks_transpile(other) {
-                report.dropped.push(label.into());
-            } else {
-                report.dropped.push("unknown".into());
-            }
         }
     }
 }
@@ -580,6 +623,25 @@ pub fn convert_library_item(
     to_kind: LibraryKind,
     mode: ConvertMode,
 ) -> Result<ConvertResult, ConvertError> {
+    convert_library_item_lang(
+        config_dir,
+        from_kind,
+        id,
+        to_kind,
+        mode,
+        ScriptLanguage::Javascript,
+    )
+}
+
+/// Like [`convert_library_item`] with explicit target script language.
+pub fn convert_library_item_lang(
+    config_dir: &Path,
+    from_kind: LibraryKind,
+    id: &str,
+    to_kind: LibraryKind,
+    mode: ConvertMode,
+    language: ScriptLanguage,
+) -> Result<ConvertResult, ConvertError> {
     if from_kind == to_kind {
         return Err(ConvertError::Message("same kind".into()));
     }
@@ -589,16 +651,14 @@ pub fn convert_library_item(
             script_to_macro(config_dir, id)
         }
         (LibraryKind::Macro, LibraryKind::Script) => {
-            macro_to_script(config_dir, id, mode)
+            macro_to_script(config_dir, id, mode, language)
         }
         (LibraryKind::Clicker, LibraryKind::Macro) => {
             clicker_to_macro(config_dir, id)
         }
         (LibraryKind::Clicker, LibraryKind::Script) => {
-            // Via macro intermediate in-memory then wrap/transpile.
             let mid = clicker_to_macro(config_dir, id)?;
-            let r = macro_to_script(config_dir, &mid.new_id, mode)?;
-            // Leave intermediate macro; user can delete. Warn.
+            let r = macro_to_script(config_dir, &mid.new_id, mode, language)?;
             let mut report = r.report;
             report.warnings.push(format!(
                 "Intermediate macro « {} » was also created",
@@ -659,6 +719,7 @@ fn macro_to_script(
     config_dir: &Path,
     id: &str,
     mode: ConvertMode,
+    language: ScriptLanguage,
 ) -> Result<ConvertResult, ConvertError> {
     let doc = load_macro(config_dir, id).map_err(|e| ConvertError::Message(e.to_string()))?;
     let folder = source_folder_id(config_dir, LibraryKind::Macro, id)?;
@@ -672,60 +733,91 @@ fn macro_to_script(
     }
 
     let name = unique_script_name(config_dir, &format!("{} (script)", doc.name))?;
-    let (source, report, allow_network, allow_clipboard, allow_macro, allow_input) =
-        if mode == ConvertMode::Wrap || !blockers.is_empty() {
-            let src = format!(
-                "// Reference wrap — runs the original macro\ncaster.runMacro({});\n",
-                js_string_literal(&doc.name)
-            );
-            (
-                src,
-                ConvertReport {
-                    kept: vec!["runMacro wrap".into()],
-                    dropped: blockers,
-                    warnings: vec![
-                        "Script calls caster.runMacro; enable macro control permission".into(),
-                    ],
-                },
-                false,
-                false,
-                true,
-                false,
-            )
-        } else {
-            let mut src = String::from("// Transpiled from macro\n");
-            let mut report = ConvertReport {
-                kept: Vec::new(),
-                dropped: Vec::new(),
-                warnings: Vec::new(),
-            };
-            let mut allow_net = false;
-            let mut allow_clip = false;
-            let mut allow_inp = false;
-            for a in &doc.actions {
-                if action_tree_needs_network(a) {
-                    allow_net = true;
-                }
-                if action_tree_needs_clipboard(a) {
-                    allow_clip = true;
-                }
-                if action_tree_needs_input(a) {
-                    allow_inp = true;
-                }
-                transpile_action(a, &mut src, &mut report);
-            }
-            (src, report, allow_net, allow_clip, false, allow_inp)
+    let (
+        mut source,
+        report,
+        allow_network,
+        allow_clipboard,
+        allow_macro,
+        allow_input,
+        allow_process,
+    ) = if mode == ConvertMode::Wrap || !blockers.is_empty() {
+        let src = format!(
+            "// Reference wrap — runs the original macro\ncaster.runMacro({});\n",
+            js_string_literal(&doc.name)
+        );
+        (
+            src,
+            ConvertReport {
+                kept: vec!["runMacro wrap".into()],
+                dropped: blockers,
+                warnings: vec![
+                    "Script calls caster.runMacro; enable macro control permission".into(),
+                ],
+            },
+            false,
+            false,
+            true,
+            false,
+            false,
+        )
+    } else {
+        let mut src = String::from("// Transpiled from macro\n");
+        let mut report = ConvertReport {
+            kept: Vec::new(),
+            dropped: Vec::new(),
+            warnings: Vec::new(),
         };
+        let mut allow_net = false;
+        let mut allow_clip = false;
+        let mut allow_inp = false;
+        let mut allow_proc = false;
+        let mut allow_mac = false;
+        for a in &doc.actions {
+            if action_tree_needs_network(a) {
+                allow_net = true;
+            }
+            if action_tree_needs_clipboard(a) {
+                allow_clip = true;
+            }
+            if action_tree_needs_input(a) {
+                allow_inp = true;
+            }
+            if action_tree_needs_process(a) {
+                allow_proc = true;
+            }
+            if action_tree_needs_macro_control(a) {
+                allow_mac = true;
+            }
+            transpile_action(a, &mut src, &mut report);
+        }
+        (
+            src,
+            report,
+            allow_net,
+            allow_clip,
+            allow_mac,
+            allow_inp,
+            allow_proc,
+        )
+    };
+
+    if language == ScriptLanguage::Typescript && !source.trim_start().starts_with("// @ts") {
+        source = format!("// @ts-check\n{source}");
+    }
 
     let script = ScriptDoc {
         id: new_script_id(),
         name: name.clone(),
         source,
+        language,
+        is_module: false,
         allow_network,
         allow_clipboard,
         allow_fs: false,
         allow_macro_control: allow_macro,
         allow_input,
+        allow_process,
         param_values: Default::default(),
     };
     save_script(config_dir, &script).map_err(|e| ConvertError::Message(e.to_string()))?;
@@ -791,11 +883,14 @@ mod tests {
             id: "s1".into(),
             name: "Hello".into(),
             source: "caster.log('hi');".into(),
+            language: Default::default(),
+            is_module: false,
             allow_network: true,
             allow_clipboard: false,
             allow_fs: false,
             allow_macro_control: false,
             allow_input: false,
+            allow_process: false,
             param_values: Default::default(),
         };
         save_script(&dir, &doc).unwrap();
@@ -937,37 +1032,30 @@ mod tests {
     }
 
     #[test]
-    fn macro_process_run_blocks_transpile() {
+    fn macro_process_run_transpiles() {
         let dir = temp_dir();
         let mut m = create_macro(&dir, Some("Proc")).unwrap();
         let id = m.name.clone();
         m.actions = vec![ActionNode::ProcessRun {
             id: "p1".into(),
             command: "echo".into(),
-            args: vec![],
+            args: vec!["hi".into()],
             wait: true,
             timeout_ms: None,
         }];
         save_macro(&dir, &id, &m).unwrap();
-        let err = convert_library_item(
+        let r = convert_library_item(
             &dir,
             LibraryKind::Macro,
             &id,
             LibraryKind::Script,
             ConvertMode::Transpile,
         )
-        .unwrap_err();
-        assert!(err.to_string().contains("process.run"));
-        let wrap = convert_library_item(
-            &dir,
-            LibraryKind::Macro,
-            &id,
-            LibraryKind::Script,
-            ConvertMode::Wrap,
-        )
         .unwrap();
-        let s = load_script(&dir, &wrap.new_id).unwrap();
-        assert!(s.source.contains("runMacro"));
+        let s = load_script(&dir, &r.new_id).unwrap();
+        assert!(s.source.contains("caster.runProcess"));
+        assert!(s.allow_process);
+        assert!(!s.source.contains("runMacro"));
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -978,11 +1066,14 @@ mod tests {
             id: "s2".into(),
             name: "X".into(),
             source: "".into(),
+            language: Default::default(),
+            is_module: false,
             allow_network: true,
             allow_clipboard: false,
             allow_fs: false,
             allow_macro_control: false,
             allow_input: false,
+            allow_process: false,
             param_values: Default::default(),
         };
         save_script(&dir, &doc).unwrap();

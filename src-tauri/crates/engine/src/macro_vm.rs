@@ -474,9 +474,12 @@ impl MacroVm {
                                     allow_fs: doc.allow_fs,
                                     allow_macro_control: doc.allow_macro_control,
                                     allow_input: doc.allow_input,
+                                    allow_process: doc.allow_process,
+                                    language: doc.language,
                                     config_dir: crate::script_library::config_dir_default(),
                                     injector: Some(Arc::clone(&self.injector)),
                                     run_macro: None,
+                                    call_depth: 0,
                                 },
                             )
                         } else {
@@ -488,9 +491,12 @@ impl MacroVm {
                                     allow_fs: false,
                                     allow_macro_control: false,
                                     allow_input: false,
+                                    allow_process: false,
+                                    language: crate::script_library::ScriptLanguage::Javascript,
                                     config_dir: crate::script_library::config_dir_default(),
                                     injector: Some(Arc::clone(&self.injector)),
                                     run_macro: None,
+                                    call_depth: 0,
                                 },
                             )
                         };

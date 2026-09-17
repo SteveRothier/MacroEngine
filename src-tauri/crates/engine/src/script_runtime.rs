@@ -14,7 +14,13 @@ use crate::cancel::CancellationToken;
 use crate::env::MacroEnv;
 use crate::event_bus::{EngineEvent, EventBus, LogLevel};
 use crate::input::{MouseButton, MouseInjector, Point};
+use crate::script_library::{resolve_script, ScriptLanguage};
+use crate::script_transpile::prepare_script_source;
 use crate::schema::MacroValue;
+use std::collections::HashSet;
+use std::process::Command;
+use std::sync::Mutex;
+use std::time::Instant;
 
 pub type RunMacroCallback =
     Arc<dyn Fn(&str) -> Result<(), ActionError> + Send + Sync>;
@@ -26,9 +32,13 @@ pub struct ScriptOptions {
     pub allow_fs: bool,
     pub allow_macro_control: bool,
     pub allow_input: bool,
+    pub allow_process: bool,
+    pub language: ScriptLanguage,
     pub config_dir: PathBuf,
     pub injector: Option<Arc<dyn MouseInjector>>,
     pub run_macro: Option<RunMacroCallback>,
+    /// Nesting depth for runScript / include (max 5).
+    pub call_depth: u32,
 }
 
 impl Default for ScriptOptions {
@@ -39,9 +49,12 @@ impl Default for ScriptOptions {
             allow_fs: false,
             allow_macro_control: false,
             allow_input: false,
+            allow_process: false,
+            language: ScriptLanguage::Javascript,
             config_dir: PathBuf::from("."),
             injector: None,
             run_macro: None,
+            call_depth: 0,
         }
     }
 }
@@ -90,6 +103,8 @@ pub fn run_script_with_options(
     let _ = timeout_ms;
     let _ = fs::create_dir_all(opts.script_data_dir());
 
+    let source = prepare_script_source(source, opts.language)?;
+
     let mut ctx = Context::default();
     let console = Console::init(&mut ctx);
     ctx.register_global_property(
@@ -120,9 +135,14 @@ pub fn run_script_with_options(
     let allow_fs = opts.allow_fs;
     let allow_macro = opts.allow_macro_control;
     let allow_input = opts.allow_input;
+    let allow_process = opts.allow_process;
     let data_dir = opts.script_data_dir();
+    let config_dir = opts.config_dir.clone();
     let injector = opts.injector.clone();
     let run_macro = opts.run_macro.clone();
+    let call_depth = opts.call_depth;
+    let include_stack: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+    let base_opts = opts.clone();
 
     let log_fn = NativeFunction::from_copy_closure(move |_this, args, _ctx| {
         let msg = args
@@ -519,6 +539,208 @@ pub fn run_script_with_options(
         })
     };
 
+    let parse_json_fn = NativeFunction::from_copy_closure(|_this, args, ctx| {
+        let raw = args
+            .first()
+            .and_then(|v| v.as_string())
+            .map(|s| s.to_std_string_escaped())
+            .unwrap_or_default();
+        let val: serde_json::Value = serde_json::from_str(&raw).map_err(|e| {
+            boa_engine::JsNativeError::error().with_message(format!("parseJson: {e}"))
+        })?;
+        json_to_js(&val, ctx)
+    });
+
+    let stringify_fn = NativeFunction::from_copy_closure(|_this, args, ctx| {
+        let v = args.first().cloned().unwrap_or(JsValue::undefined());
+        let json = js_to_json(&v, ctx).map_err(|e| {
+            boa_engine::JsNativeError::error().with_message(e)
+        })?;
+        let s = serde_json::to_string(&json).map_err(|e| {
+            boa_engine::JsNativeError::error().with_message(e.to_string())
+        })?;
+        Ok(JsValue::from(js_string!(s)))
+    });
+
+    let allow_process_rp = allow_process;
+    let cancel_ptr_rp = cancel_ptr;
+    let run_process_fn = unsafe {
+        NativeFunction::from_closure(move |_this, args, ctx| {
+            if !allow_process_rp {
+                return Err(boa_engine::JsNativeError::error()
+                    .with_message("caster.runProcess disabled (process permission required)")
+                    .into());
+            }
+            let opts = args
+                .first()
+                .and_then(|v| v.as_object())
+                .ok_or_else(|| {
+                    boa_engine::JsNativeError::typ()
+                        .with_message("runProcess expects an object")
+                })?;
+            let command = opts
+                .get(js_string!("command"), ctx)?
+                .as_string()
+                .map(|s| s.to_std_string_escaped())
+                .ok_or_else(|| {
+                    boa_engine::JsNativeError::typ().with_message("runProcess requires command")
+                })?;
+            if command.is_empty() {
+                return Err(boa_engine::JsNativeError::error()
+                    .with_message("runProcess empty command")
+                    .into());
+            }
+            let mut cmd_args: Vec<String> = Vec::new();
+            let args_val = opts.get(js_string!("args"), ctx)?;
+            if let Some(arr) = args_val.as_object() {
+                if let Ok(len) = arr.get(js_string!("length"), ctx) {
+                    if let Some(n) = len.as_number() {
+                        for i in 0..(n as i64).max(0) {
+                            if let Ok(item) = arr.get(i as u32, ctx) {
+                                if let Some(s) = item.as_string() {
+                                    cmd_args.push(s.to_std_string_escaped());
+                                } else if let Some(num) = item.as_number() {
+                                    cmd_args.push(num.to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            let wait = opts
+                .get(js_string!("wait"), ctx)?
+                .as_boolean()
+                .unwrap_or(true);
+            let timeout_ms = opts
+                .get(js_string!("timeoutMs"), ctx)?
+                .as_number()
+                .map(|n| n.max(0.0) as u64);
+
+            let mut child = Command::new(&command)
+                .args(&cmd_args)
+                .spawn()
+                .map_err(|e| {
+                    boa_engine::JsNativeError::error().with_message(format!("spawn failed: {e}"))
+                })?;
+            if !wait {
+                return Ok(JsValue::undefined());
+            }
+            let cancel = &*(cancel_ptr_rp as *const CancellationToken);
+            let deadline = timeout_ms.map(|ms| Instant::now() + Duration::from_millis(ms));
+            loop {
+                if cancel.is_cancelled() {
+                    let _ = child.kill();
+                    return Err(boa_engine::JsNativeError::error()
+                        .with_message("cancelled")
+                        .into());
+                }
+                if let Some(deadline) = deadline {
+                    if Instant::now() >= deadline {
+                        let _ = child.kill();
+                        return Err(boa_engine::JsNativeError::error()
+                            .with_message("runProcess timeout")
+                            .into());
+                    }
+                }
+                match child.try_wait() {
+                    Ok(Some(_)) => return Ok(JsValue::undefined()),
+                    Ok(None) => std::thread::sleep(Duration::from_millis(20)),
+                    Err(e) => {
+                        return Err(boa_engine::JsNativeError::error()
+                            .with_message(format!("wait failed: {e}"))
+                            .into());
+                    }
+                }
+            }
+        })
+    };
+
+    let include_stack_inc = include_stack.clone();
+    let config_dir_inc = config_dir.clone();
+    let include_fn = unsafe {
+        NativeFunction::from_closure(move |_this, args, ctx| {
+            if call_depth >= 5 {
+                return Err(boa_engine::JsNativeError::error()
+                    .with_message("caster.include max depth exceeded")
+                    .into());
+            }
+            let id = args
+                .first()
+                .and_then(|v| v.as_string())
+                .map(|s| s.to_std_string_escaped())
+                .unwrap_or_default();
+            {
+                let mut stack = include_stack_inc.lock().map_err(|_| {
+                    boa_engine::JsNativeError::error().with_message("include lock")
+                })?;
+                if !stack.insert(id.clone()) {
+                    return Err(boa_engine::JsNativeError::error()
+                        .with_message(format!("caster.include cycle: {id}"))
+                        .into());
+                }
+            }
+            let doc = resolve_script(&config_dir_inc, &id).map_err(|e| {
+                boa_engine::JsNativeError::error().with_message(e.to_string())
+            })?;
+            let js = prepare_script_source(&doc.source, doc.language).map_err(|e| {
+                boa_engine::JsNativeError::error().with_message(e.to_string())
+            })?;
+            let wrapped = format!(
+                "(function(exports, module){{\n{js}\nreturn module.exports;\n}})({{}}, {{exports: {{}}}});"
+            );
+            let result = ctx.eval(Source::from_bytes(wrapped.as_bytes()));
+            {
+                let mut stack = include_stack_inc.lock().map_err(|_| {
+                    boa_engine::JsNativeError::error().with_message("include lock")
+                })?;
+                stack.remove(&id);
+            }
+            result
+        })
+    };
+
+    let config_dir_rs = config_dir.clone();
+    let base_opts_rs = base_opts.clone();
+    let bus_ptr_rs = bus_ptr;
+    let cancel_ptr_rs = cancel_ptr;
+    let run_script_fn = unsafe {
+        NativeFunction::from_closure(move |_this, args, ctx| {
+            if call_depth >= 5 {
+                return Err(boa_engine::JsNativeError::error()
+                    .with_message("caster.runScript max depth exceeded")
+                    .into());
+            }
+            let id = args
+                .first()
+                .and_then(|v| v.as_string())
+                .map(|s| s.to_std_string_escaped())
+                .unwrap_or_default();
+            let doc = resolve_script(&config_dir_rs, &id).map_err(|e| {
+                boa_engine::JsNativeError::error().with_message(e.to_string())
+            })?;
+            // Apply optional params object onto __caster_vars
+            if let Some(params) = args.get(1).and_then(|v| v.as_object()) {
+                let vars = ctx.global_object().get(js_string!("__caster_vars"), ctx)?;
+                let vars_obj = vars.as_object().ok_or_else(|| {
+                    boa_engine::JsNativeError::typ().with_message("missing __caster_vars")
+                })?;
+                if let Ok(keys) = params.own_property_keys(ctx) {
+                    for key in keys {
+                        let name = property_key_to_string(&key);
+                        let v = params.get(key, ctx)?;
+                        vars_obj.set(js_string!(name), v, false, ctx)?;
+                    }
+                }
+            }
+            let js = prepare_script_source(&doc.source, doc.language).map_err(|e| {
+                boa_engine::JsNativeError::error().with_message(e.to_string())
+            })?;
+            let _ = (&base_opts_rs, bus_ptr_rs, cancel_ptr_rs);
+            let wrapped = format!("(function(){{\n{js}\n}})();");
+            ctx.eval(Source::from_bytes(wrapped.as_bytes()))
+        })
+    };
+
     let caster = boa_engine::object::ObjectInitializer::new(&mut ctx)
         .function(get_fn, js_string!("get"), 1)
         .function(set_fn, js_string!("set"), 2)
@@ -530,6 +752,11 @@ pub fn run_script_with_options(
         .function(read_file_fn, js_string!("readFile"), 1)
         .function(write_file_fn, js_string!("writeFile"), 2)
         .function(run_macro_fn, js_string!("runMacro"), 1)
+        .function(run_script_fn, js_string!("runScript"), 2)
+        .function(include_fn, js_string!("include"), 1)
+        .function(run_process_fn, js_string!("runProcess"), 1)
+        .function(parse_json_fn, js_string!("parseJson"), 1)
+        .function(stringify_fn, js_string!("stringify"), 1)
         .function(sleep_fn, js_string!("sleep"), 1)
         .function(click_fn, js_string!("click"), 1)
         .function(move_to_fn, js_string!("moveTo"), 2)
@@ -624,9 +851,91 @@ fn sandbox_path(root: &Path, relative: &str) -> Result<PathBuf, String> {
 fn property_key_to_string(key: &PropertyKey) -> String {
     match key {
         PropertyKey::String(s) => s.to_std_string_escaped(),
-        PropertyKey::Symbol(s) => format!("Symbol({s})"),
+        PropertyKey::Symbol(s) => format!("Symbol({})", s.descriptive_string().to_std_string_escaped()),
         PropertyKey::Index(i) => i.get().to_string(),
     }
+}
+
+fn json_to_js(
+    val: &serde_json::Value,
+    ctx: &mut Context,
+) -> Result<JsValue, boa_engine::JsError> {
+    match val {
+        serde_json::Value::Null => Ok(JsValue::null()),
+        serde_json::Value::Bool(b) => Ok(JsValue::from(*b)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(JsValue::from(i as f64))
+            } else if let Some(f) = n.as_f64() {
+                Ok(JsValue::from(f))
+            } else {
+                Ok(JsValue::from(0.0))
+            }
+        }
+        serde_json::Value::String(s) => Ok(JsValue::from(js_string!(s.clone()))),
+        serde_json::Value::Array(arr) => {
+            let obj = boa_engine::object::ObjectInitializer::new(ctx).build();
+            for (i, item) in arr.iter().enumerate() {
+                let v = json_to_js(item, ctx)?;
+                obj.set(i as u32, v, false, ctx)?;
+            }
+            obj.set(js_string!("length"), JsValue::from(arr.len() as f64), false, ctx)?;
+            Ok(JsValue::from(obj))
+        }
+        serde_json::Value::Object(map) => {
+            let obj = boa_engine::object::ObjectInitializer::new(ctx).build();
+            for (k, item) in map {
+                let v = json_to_js(item, ctx)?;
+                obj.set(js_string!(k.clone()), v, false, ctx)?;
+            }
+            Ok(JsValue::from(obj))
+        }
+    }
+}
+
+fn js_to_json(v: &JsValue, ctx: &mut Context) -> Result<serde_json::Value, String> {
+    if v.is_null() || v.is_undefined() {
+        return Ok(serde_json::Value::Null);
+    }
+    if let Some(b) = v.as_boolean() {
+        return Ok(serde_json::Value::Bool(b));
+    }
+    if let Some(n) = v.as_number() {
+        return Ok(serde_json::Number::from_f64(n)
+            .map(serde_json::Value::Number)
+            .unwrap_or(serde_json::Value::Null));
+    }
+    if let Some(s) = v.as_string() {
+        return Ok(serde_json::Value::String(s.to_std_string_escaped()));
+    }
+    if let Some(obj) = v.as_object() {
+        let len = obj
+            .get(js_string!("length"), ctx)
+            .ok()
+            .and_then(|l| l.as_number());
+        if let Some(n) = len {
+            let mut arr = Vec::new();
+            for i in 0..(n as i64).max(0) {
+                let item = obj
+                    .get(i as u32, ctx)
+                    .map_err(|e| e.to_string())?;
+                arr.push(js_to_json(&item, ctx)?);
+            }
+            return Ok(serde_json::Value::Array(arr));
+        }
+        let keys = obj.own_property_keys(ctx).map_err(|e| e.to_string())?;
+        let mut map = serde_json::Map::new();
+        for key in keys {
+            let name = property_key_to_string(&key);
+            if name == "length" {
+                continue;
+            }
+            let item = obj.get(key, ctx).map_err(|e| e.to_string())?;
+            map.insert(name, js_to_json(&item, ctx)?);
+        }
+        return Ok(serde_json::Value::Object(map));
+    }
+    Ok(serde_json::Value::Null)
 }
 
 fn parse_mouse_button(s: &str) -> MouseButton {
