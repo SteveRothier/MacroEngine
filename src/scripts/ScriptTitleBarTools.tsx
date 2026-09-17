@@ -1,10 +1,11 @@
 import { ArrowLeft, Play, Square } from "lucide-react";
 import { useT, type TFunction } from "../i18n";
-import { EditorToolbar, Tooltip } from "../ui/shell";
+import { EditorToolbar, Select, Tooltip } from "../ui/shell";
 import {
   ScriptPermissionsMenu,
   type ScriptPermissions,
 } from "./ScriptPermissionsMenu";
+import type { ScriptLanguage } from "./types";
 
 export type EngineBusyKind = "macro" | "clicker" | "record" | "script";
 
@@ -12,6 +13,10 @@ type Props = {
   onBack: () => void;
   name: string;
   onNameChange: (name: string) => void;
+  language: ScriptLanguage;
+  onLanguageChange: (language: ScriptLanguage) => void;
+  isModule: boolean;
+  onIsModuleChange: (isModule: boolean) => void;
   permissions: ScriptPermissions;
   onPermissionsChange: (partial: Partial<ScriptPermissions>) => void;
   running: boolean;
@@ -20,8 +25,6 @@ type Props = {
   onStop: () => void;
   saveStatus: "idle" | "saving" | "saved" | "error";
   onRetrySave?: () => void;
-  /** Library module — Run disabled. */
-  isModule?: boolean;
 };
 
 function busyTooltip(kind: EngineBusyKind, t: TFunction): string {
@@ -40,6 +43,10 @@ export function ScriptTitleBarTools({
   onBack,
   name,
   onNameChange,
+  language,
+  onLanguageChange,
+  isModule,
+  onIsModuleChange,
   permissions,
   onPermissionsChange,
   running,
@@ -48,7 +55,6 @@ export function ScriptTitleBarTools({
   onStop,
   saveStatus,
   onRetrySave,
-  isModule = false,
 }: Props) {
   const t = useT();
   const statusLabel =
@@ -90,35 +96,63 @@ export function ScriptTitleBarTools({
             value={permissions}
             onChange={onPermissionsChange}
           />
-          {statusLabel ? (
-            saveStatus === "error" ? (
-              <Tooltip content={t("scripts.toolbar.saveErrorTip")}>
-                <button
-                  type="button"
-                  className="caster-script-save-status is-error"
-                  onClick={() => onRetrySave?.()}
-                >
-                  {statusLabel}
-                </button>
-              </Tooltip>
-            ) : (
-              <span
-                className={[
-                  "caster-script-save-status",
-                  saveStatus === "saving" ? "is-saving" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                role="status"
+          <Select
+            className="caster-select caster-script-toolbar-lang"
+            value={language}
+            ariaLabel={t("scripts.language.label")}
+            options={[
+              {
+                value: "javascript",
+                label: t("scripts.language.javascript"),
+              },
+              {
+                value: "typescript",
+                label: t("scripts.language.typescript"),
+              },
+              {
+                value: "python",
+                label: t("scripts.language.python"),
+              },
+            ]}
+            onChange={(v) =>
+              onLanguageChange(
+                v === "typescript"
+                  ? "typescript"
+                  : v === "python"
+                    ? "python"
+                    : "javascript",
+              )
+            }
+          />
+          <label
+            className="caster-script-module-toggle caster-script-module-toggle--toolbar"
+            title={t("scripts.module.tip")}
+          >
+            <input
+              type="checkbox"
+              checked={isModule}
+              onChange={(e) => onIsModuleChange(e.target.checked)}
+            />
+            <span>{t("scripts.module.label")}</span>
+          </label>
+          {statusLabel && saveStatus === "error" ? (
+            <Tooltip content={t("scripts.toolbar.saveErrorTip")}>
+              <button
+                type="button"
+                className="caster-script-save-status is-error"
+                onClick={() => onRetrySave?.()}
               >
                 {statusLabel}
-              </span>
-            )
-          ) : (
-            <span className="caster-script-save-status is-placeholder" aria-hidden>
-              {t("scripts.toolbar.saved")}
+              </button>
+            </Tooltip>
+          ) : statusLabel && saveStatus === "saving" ? (
+            <span
+              className="caster-script-save-status is-saving"
+              role="status"
+            >
+              {statusLabel}
             </span>
-          )}
+          ) : null}
         </>
       }
       end={

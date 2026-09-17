@@ -24,8 +24,6 @@ import {
   bracketMatching,
   foldGutter,
   indentOnInput,
-  syntaxHighlighting,
-  defaultHighlightStyle,
 } from "@codemirror/language";
 import { javascript } from "@codemirror/lang-javascript";
 import { python } from "@codemirror/lang-python";
@@ -38,6 +36,7 @@ import {
 } from "@codemirror/autocomplete";
 import type { ScriptLanguage } from "./types";
 import type { ColorScheme } from "../theme";
+import { highlightExtension } from "./scriptCmHighlight";
 
 export type ScriptEditorDiagnostic = {
   from: number;
@@ -136,12 +135,14 @@ export function diagnosticsFromError(
 }
 
 function themeExtension(scheme: ColorScheme): Extension {
+  const baseColor = scheme === "dark" ? "#D4D4D4" : "#000000";
   return EditorView.theme(
     {
       "&": {
         height: "100%",
         fontSize: "13px",
         backgroundColor: "transparent",
+        color: baseColor,
       },
       ".cm-scroller": {
         fontFamily:
@@ -151,8 +152,8 @@ function themeExtension(scheme: ColorScheme): Extension {
       },
       ".cm-content": {
         padding: "14px 0",
-        caretColor: "var(--caster-text-primary)",
-        color: "var(--caster-text-primary)",
+        caretColor: "var(--caster-accent)",
+        color: baseColor,
       },
       ".cm-gutters": {
         backgroundColor:
@@ -207,6 +208,7 @@ export const ScriptSourceEditor = forwardRef<
   const lintComp = useRef(new Compartment());
   const placeholderComp = useRef(new Compartment());
   const themeComp = useRef(new Compartment());
+  const highlightComp = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
   onChangeRef.current = onChange;
@@ -257,7 +259,7 @@ export const ScriptSourceEditor = forwardRef<
         indentOnInput(),
         bracketMatching(),
         history(),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        highlightComp.current.of(highlightExtension(colorScheme)),
         autocompletion({ override: [casterCompletions] }),
         keymap.of([
           ...defaultKeymap,
@@ -322,7 +324,10 @@ export const ScriptSourceEditor = forwardRef<
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
-      effects: themeComp.current.reconfigure(themeExtension(colorScheme)),
+      effects: [
+        themeComp.current.reconfigure(themeExtension(colorScheme)),
+        highlightComp.current.reconfigure(highlightExtension(colorScheme)),
+      ],
     });
   }, [colorScheme]);
 
