@@ -9,7 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Code2, FileCode2 } from "lucide-react";
 import { useLocale, useT, type TFunction } from "../i18n";
-import { DropdownMenu, Select, useToast } from "../ui/shell";
+import { DropdownMenu, useToast } from "../ui/shell";
 import type { DropdownEntry } from "../ui/shell";
 import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import { confirmAction } from "../ui";
@@ -442,6 +442,16 @@ export function ScriptEditorView({
         }}
         name={draft.name}
         onNameChange={(name) => patch({ name })}
+        language={
+          draft.language === "typescript"
+            ? "typescript"
+            : draft.language === "python"
+              ? "python"
+              : "javascript"
+        }
+        onLanguageChange={(language) => patch({ language })}
+        isModule={!!draft.isModule}
+        onIsModuleChange={(isModule) => patch({ isModule })}
         permissions={{
           allowNetwork: draft.allowNetwork,
           allowClipboard: !!draft.allowClipboard,
@@ -453,7 +463,6 @@ export function ScriptEditorView({
         onPermissionsChange={(partial) => patch(partial)}
         running={running}
         engineBusy={engineBusy}
-        isModule={!!draft.isModule}
         onRun={() => void onRun()}
         onStop={() => void onStop()}
         saveStatus={saveStatus}
@@ -506,48 +515,6 @@ export function ScriptEditorView({
           onChange={setParamValue}
           onBlurField={() => void flushAutosave()}
         />
-        <div className="caster-script-meta-row">
-          <label className="caster-field caster-script-lang-field">
-            <span>{t("scripts.language.label")}</span>
-            <Select
-              className="caster-select"
-              value={draft.language ?? "javascript"}
-              ariaLabel={t("scripts.language.label")}
-              options={[
-                {
-                  value: "javascript",
-                  label: t("scripts.language.javascript"),
-                },
-                {
-                  value: "typescript",
-                  label: t("scripts.language.typescript"),
-                },
-                {
-                  value: "python",
-                  label: t("scripts.language.python"),
-                },
-              ]}
-              onChange={(v) =>
-                patch({
-                  language:
-                    v === "typescript"
-                      ? "typescript"
-                      : v === "python"
-                        ? "python"
-                        : "javascript",
-                })
-              }
-            />
-          </label>
-          <label className="caster-script-module-toggle">
-            <input
-              type="checkbox"
-              checked={!!draft.isModule}
-              onChange={(e) => patch({ isModule: e.target.checked })}
-            />
-            <span title={t("scripts.module.tip")}>{t("scripts.module.label")}</span>
-          </label>
-        </div>
         <div className="caster-script-source-wrap">
           <ScriptSourceEditor
             ref={sourceEditorRef}
