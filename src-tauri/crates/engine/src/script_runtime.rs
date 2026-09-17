@@ -19,6 +19,7 @@ use crate::script_transpile::prepare_script_source;
 use crate::schema::MacroValue;
 use std::collections::HashSet;
 use std::process::Command;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -142,6 +143,7 @@ pub fn run_script_with_options(
     let run_macro = opts.run_macro.clone();
     let call_depth = opts.call_depth;
     let include_stack: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+    let nest_depth = Arc::new(AtomicU32::new(call_depth));
     let base_opts = opts.clone();
 
     let log_fn = NativeFunction::from_copy_closure(move |_this, args, _ctx| {
@@ -656,10 +658,13 @@ pub fn run_script_with_options(
     };
 
     let include_stack_inc = include_stack.clone();
+    let nest_depth_inc = nest_depth.clone();
     let config_dir_inc = config_dir.clone();
     let include_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
-            if call_depth >= 5 {
+            let depth = nest_depth_inc.fetch_add(1, Ordering::SeqCst);
+            if depth >= 5 {
+                nest_depth_inc.fetch_sub(1, Ordering::SeqCst);
                 return Err(boa_engine::JsNativeError::error()
                     .with_message("caster.include max depth exceeded")
                     .into());
@@ -674,27 +679,31 @@ pub fn run_script_with_options(
                     boa_engine::JsNativeError::error().with_message("include lock")
                 })?;
                 if !stack.insert(id.clone()) {
+                    nest_depth_inc.fetch_sub(1, Ordering::SeqCst);
                     return Err(boa_engine::JsNativeError::error()
                         .with_message(format!("caster.include cycle: {id}"))
                         .into());
                 }
             }
-            let doc = resolve_script(&config_dir_inc, &id).map_err(|e| {
-                boa_engine::JsNativeError::error().with_message(e.to_string())
-            })?;
-            let js = prepare_script_source(&doc.source, doc.language).map_err(|e| {
-                boa_engine::JsNativeError::error().with_message(e.to_string())
-            })?;
-            let wrapped = format!(
-                "(function(exports, module){{\n{js}\nreturn module.exports;\n}})({{}}, {{exports: {{}}}});"
-            );
-            let result = ctx.eval(Source::from_bytes(wrapped.as_bytes()));
+            let result = (|| {
+                let doc = resolve_script(&config_dir_inc, &id).map_err(|e| {
+                    boa_engine::JsNativeError::error().with_message(e.to_string())
+                })?;
+                let js = prepare_script_source(&doc.source, doc.language).map_err(|e| {
+                    boa_engine::JsNativeError::error().with_message(e.to_string())
+                })?;
+                let wrapped = format!(
+                    "(function(exports, module){{\n{js}\nreturn module.exports;\n}})({{}}, {{exports: {{}}}});"
+                );
+                ctx.eval(Source::from_bytes(wrapped.as_bytes()))
+            })();
             {
                 let mut stack = include_stack_inc.lock().map_err(|_| {
                     boa_engine::JsNativeError::error().with_message("include lock")
                 })?;
                 stack.remove(&id);
             }
+            nest_depth_inc.fetch_sub(1, Ordering::SeqCst);
             result
         })
     };
@@ -703,41 +712,66 @@ pub fn run_script_with_options(
     let base_opts_rs = base_opts.clone();
     let bus_ptr_rs = bus_ptr;
     let cancel_ptr_rs = cancel_ptr;
+    let nest_depth_rs = nest_depth.clone();
     let run_script_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
-            if call_depth >= 5 {
+            let depth = nest_depth_rs.fetch_add(1, Ordering::SeqCst);
+            if depth >= 5 {
+                nest_depth_rs.fetch_sub(1, Ordering::SeqCst);
                 return Err(boa_engine::JsNativeError::error()
                     .with_message("caster.runScript max depth exceeded")
                     .into());
             }
-            let id = args
-                .first()
-                .and_then(|v| v.as_string())
-                .map(|s| s.to_std_string_escaped())
-                .unwrap_or_default();
-            let doc = resolve_script(&config_dir_rs, &id).map_err(|e| {
-                boa_engine::JsNativeError::error().with_message(e.to_string())
-            })?;
-            // Apply optional params object onto __caster_vars
-            if let Some(params) = args.get(1).and_then(|v| v.as_object()) {
-                let vars = ctx.global_object().get(js_string!("__caster_vars"), ctx)?;
-                let vars_obj = vars.as_object().ok_or_else(|| {
-                    boa_engine::JsNativeError::typ().with_message("missing __caster_vars")
+            let result = (|| {
+                let id = args
+                    .first()
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_std_string_escaped())
+                    .unwrap_or_default();
+                let doc = resolve_script(&config_dir_rs, &id).map_err(|e| {
+                    boa_engine::JsNativeError::error().with_message(e.to_string())
                 })?;
-                if let Ok(keys) = params.own_property_keys(ctx) {
-                    for key in keys {
-                        let name = property_key_to_string(&key);
-                        let v = params.get(key, ctx)?;
-                        vars_obj.set(js_string!(name), v, false, ctx)?;
+                let mut child_env = MacroEnv::new();
+                if let Some(params) = args.get(1).and_then(|v| v.as_object()) {
+                    if let Ok(keys) = params.own_property_keys(ctx) {
+                        for key in keys {
+                            let name = property_key_to_string(&key);
+                            let v = params.get(key, ctx)?;
+                            child_env.set(name, js_to_macro(&v));
+                        }
                     }
                 }
-            }
-            let js = prepare_script_source(&doc.source, doc.language).map_err(|e| {
-                boa_engine::JsNativeError::error().with_message(e.to_string())
-            })?;
-            let _ = (&base_opts_rs, bus_ptr_rs, cancel_ptr_rs);
-            let wrapped = format!("(function(){{\n{js}\n}})();");
-            ctx.eval(Source::from_bytes(wrapped.as_bytes()))
+                for (k, v) in &doc.param_values {
+                    if child_env.get(k).is_none() {
+                        child_env.set(k.clone(), v.clone());
+                    }
+                }
+                let mut child_opts = base_opts_rs.clone();
+                child_opts.allow_network |= doc.allow_network;
+                child_opts.allow_clipboard |= doc.allow_clipboard;
+                child_opts.allow_fs |= doc.allow_fs;
+                child_opts.allow_macro_control |= doc.allow_macro_control;
+                child_opts.allow_input |= doc.allow_input;
+                child_opts.allow_process |= doc.allow_process;
+                child_opts.language = doc.language;
+                child_opts.call_depth = depth + 1;
+                let bus = &*(bus_ptr_rs as *const EventBus);
+                let cancel = &*(cancel_ptr_rs as *const CancellationToken);
+                let ret = run_script_with_options(
+                    &doc.source,
+                    60_000,
+                    &mut child_env,
+                    bus,
+                    cancel,
+                    &child_opts,
+                )
+                .map_err(|e| {
+                    boa_engine::JsNativeError::error().with_message(e.to_string())
+                })?;
+                Ok(macro_to_js_value(ret.as_ref()))
+            })();
+            nest_depth_rs.fetch_sub(1, Ordering::SeqCst);
+            result
         })
     };
 
@@ -1059,6 +1093,15 @@ fn js_to_macro(v: &JsValue) -> MacroValue {
         return MacroValue::String(s);
     }
     MacroValue::String(String::new())
+}
+
+fn macro_to_js_value(v: Option<&MacroValue>) -> JsValue {
+    match v {
+        None => JsValue::undefined(),
+        Some(MacroValue::Bool(b)) => JsValue::from(*b),
+        Some(MacroValue::Number(n)) => JsValue::from(*n),
+        Some(MacroValue::String(s)) => JsValue::from(js_string!(s.as_str())),
+    }
 }
 
 pub fn http_fetch(

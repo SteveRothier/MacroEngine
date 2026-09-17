@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { confirmBusy, confirmChoice } from "../ui";
+import { confirmBusy, confirmChoice, askScriptLanguage } from "../ui";
 import type { TFunction } from "../i18n";
 import type { AutomationKind } from "./types";
 
@@ -54,7 +54,9 @@ export function commonConvertTargets(
   for (const r of unlocked) {
     const targets = new Set(convertTargetsFor(r.kind));
     common = common
-      ? new Set([...common].filter((k) => targets.has(k)))
+      ? new Set(
+          [...common].filter((k: AutomationKind) => targets.has(k)),
+        )
       : targets;
   }
   return common ? [...common] : [];
@@ -147,19 +149,16 @@ async function invokeConvert(
   });
 }
 
-async function askScriptLanguage(
+async function askConvertScriptLanguage(
   t: TFunction,
 ): Promise<"javascript" | "typescript" | null> {
-  const outcome = await confirmChoice({
+  return askScriptLanguage({
     title: t("automations.convert.languageTitle"),
     message: t("automations.convert.languageMessage"),
-    confirmLabel: t("automations.convert.languageJs"),
-    discardLabel: t("automations.convert.languageTs"),
+    javascriptLabel: t("automations.convert.languageJs"),
+    typescriptLabel: t("automations.convert.languageTs"),
     cancelLabel: t("common.cancel"),
-    danger: false,
   });
-  if (outcome === "cancel") return null;
-  return outcome === "confirm" ? "javascript" : "typescript";
 }
 
 /** Transpile then auto-wrap on blocker (no dialog). */
@@ -218,7 +217,7 @@ export async function runLibraryConvert(opts: {
 
   let language: "javascript" | "typescript" = "javascript";
   if (toKind === "script" && (fromKind === "macro" || fromKind === "clicker")) {
-    const lang = await askScriptLanguage(t);
+    const lang = await askConvertScriptLanguage(t);
     if (lang == null) return null;
     language = lang;
   }

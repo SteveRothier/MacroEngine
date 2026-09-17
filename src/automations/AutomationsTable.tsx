@@ -575,6 +575,10 @@ export function AutomationsTable({
   }
 
   async function launchRow(r: AutomationRow) {
+    if (r.kind === "script" && r.isModule) {
+      toast.error(t("automations.toast.scriptModuleBlocked"));
+      return;
+    }
     if (automationPrefs.confirmLaunchFromHome) {
       const ok = await confirmAction({
         title: t("automations.confirm.launchTitle"),
@@ -1938,7 +1942,7 @@ export function AutomationsTable({
                         const permCount = r.permLabels?.length ?? 0;
                         const propSecondary =
                           r.kind === "script"
-                            ? null
+                            ? (r.meta ?? null)
                             : r.folderLabel !== empty
                               ? r.folderLabel
                               : (r.meta ?? null);
@@ -2103,7 +2107,11 @@ export function AutomationsTable({
                                 >
                                   {propSecondary ? (
                                     <>
-                                      <Folder size={11} aria-hidden />
+                                      {r.kind === "script" ? (
+                                        <Code2 size={11} aria-hidden />
+                                      ) : (
+                                        <Folder size={11} aria-hidden />
+                                      )}
                                       {propSecondary}
                                     </>
                                   ) : null}
@@ -2148,14 +2156,17 @@ export function AutomationsTable({
                             >
                               <Tooltip
                                 content={
-                                  r.kind === "script"
-                                    ? t("automations.row.executeTip")
-                                    : t("automations.row.playTip")
+                                  r.kind === "script" && r.isModule
+                                    ? t("automations.toast.scriptModuleBlocked")
+                                    : r.kind === "script"
+                                      ? t("automations.row.executeTip")
+                                      : t("automations.row.playTip")
                                 }
                               >
                                   <button
                                     type="button"
                                     className="caster-auto-row-play-btn"
+                                    disabled={r.kind === "script" && !!r.isModule}
                                     aria-label={
                                       r.kind === "script"
                                         ? t("automations.row.executeAria", {

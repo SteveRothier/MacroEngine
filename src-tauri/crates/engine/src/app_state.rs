@@ -1359,6 +1359,12 @@ impl AppState {
             .unwrap_or_else(crate::script_library::config_dir_default);
         let doc = crate::script_library::load_script(&dir, script_id)
             .map_err(|e| e.to_string())?;
+        if doc.is_module {
+            return Err(
+                "Ce script est un module bibliothèque — utilisez caster.include, pas Exécuter."
+                    .into(),
+            );
+        }
         let script_name = doc.name.clone();
         self.bus.publish(EngineEvent::Log {
             level: LogLevel::Info,

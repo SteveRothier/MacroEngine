@@ -20,6 +20,8 @@ type Props = {
   onStop: () => void;
   saveStatus: "idle" | "saving" | "saved" | "error";
   onRetrySave?: () => void;
+  /** Library module — Run disabled. */
+  isModule?: boolean;
 };
 
 function busyTooltip(kind: EngineBusyKind, t: TFunction): string {
@@ -46,6 +48,7 @@ export function ScriptTitleBarTools({
   onStop,
   saveStatus,
   onRetrySave,
+  isModule = false,
 }: Props) {
   const t = useT();
   const statusLabel =
@@ -57,7 +60,8 @@ export function ScriptTitleBarTools({
           ? t("scripts.toolbar.saveError")
           : null;
 
-  const runBlocked = !running && engineBusy != null && engineBusy !== "script";
+  const runBlocked =
+    isModule || (!running && engineBusy != null && engineBusy !== "script");
 
   return (
     <EditorToolbar
@@ -134,9 +138,11 @@ export function ScriptTitleBarTools({
         ) : (
           <Tooltip
             content={
-              runBlocked && engineBusy
-                ? busyTooltip(engineBusy, t)
-                : t("scripts.toolbar.runTip")
+              isModule
+                ? t("scripts.toolbar.runModuleBlocked")
+                : runBlocked && engineBusy
+                  ? busyTooltip(engineBusy, t)
+                  : t("scripts.toolbar.runTip")
             }
           >
             <button

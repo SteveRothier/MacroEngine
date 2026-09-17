@@ -626,3 +626,11 @@ export type {
 } from "./ConfirmDialog";
 export { PromptHost, promptAction } from "./PromptDialog";
 export type { PromptOptions } from "./PromptDialog";
+export {
+  ScriptLanguageHost,
+  askScriptLanguage,
+} from "./ScriptLanguageDialog";
+export type {
+  ScriptLanguageChoice,
+  ScriptLanguageDialogOptions,
+} from "./ScriptLanguageDialog";

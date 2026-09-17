@@ -174,6 +174,8 @@ export const automations = defineCatalog({
       favoriteFail: "Impossible de modifier le favori",
       scriptLaunched: "Script lancé · {name}",
       scriptLaunchFail: "Échec du lancement script",
+      scriptModuleBlocked:
+        "Ce script est un module bibliothèque — utilisez caster.include, pas Exécuter.",
       trashed: "Mis à la corbeille",
       deleted: "Suppression effectuée",
       deleteFail: "Échec de la suppression",
@@ -487,6 +489,8 @@ export const automations = defineCatalog({
       favoriteFail: "Could not update favorite",
       scriptLaunched: "Script started · {name}",
       scriptLaunchFail: "Failed to start script",
+      scriptModuleBlocked:
+        "This script is a library module — use caster.include, not Run.",
       trashed: "Moved to trash",
       deleted: "Deleted",
       deleteFail: "Delete failed",

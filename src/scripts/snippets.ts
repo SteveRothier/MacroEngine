@@ -33,3 +33,14 @@ export const SCRIPT_SNIPPET_INCLUDE = `// Module bibliothèque (caster.include)
 const utils = caster.include("mon-module");
 caster.log(utils);
 `;
+
+export const SCRIPT_SNIPPET_RUN_PROCESS = `// Processus externe (nécessite permission Processus)
+const r = caster.runProcess({
+  command: "cmd",
+  args: ["/c", "echo", "hello"],
+  wait: true,
+  timeoutMs: 5000,
+});
+caster.log("exit=" + r.exitCode);
+caster.log(r.stdout);
+`;
