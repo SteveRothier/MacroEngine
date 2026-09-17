@@ -37,7 +37,7 @@ import { ConfirmHost, confirmAction, PromptHost, promptAction } from "../ui";
 import { applyTheme, readStoredTheme, subscribeSystemTheme, type ThemeMode } from "../theme";
 import { stateLabel, sessionLabel } from "../ui/labels";
 import { LocaleProvider, useLocale, useT } from "../i18n";
-import { loadRecent, loadLastStudio, pushRecent, saveLastStudio } from "./recent";
+import { loadLastStudio, pushRecent, saveLastStudio } from "./recent";
 import type { SettingsSection } from "./types";
 import type { AppSettings } from "../clicker/clickerTypes";
 import { DEFAULT_CLICKER } from "../clicker/clickerTypes";
@@ -1058,13 +1058,6 @@ function MainAppInner({
             sessionStatus={sessionPill}
             showStop={running}
             onStop={onEmergencyStop}
-            recentItems={loadRecent()
-              .slice(0, 12)
-              .map((r) => ({
-                id: `${r.kind}:${r.id}`,
-                label: r.label,
-                onSelect: () => openDoc(r.kind, r.id, r.label),
-              }))}
           />
         }
       >

@@ -4,13 +4,13 @@ import { TAB_LAYOUT, clampTabWidth, computeTargetTabWidth } from "./tabLayout";
 describe("tabLayout", () => {
   it("clampTabWidth respects min and max", () => {
     expect(clampTabWidth(10)).toBe(TAB_LAYOUT.MIN_W);
-    expect(clampTabWidth(500)).toBe(TAB_LAYOUT.MAX_W);
+    expect(clampTabWidth(TAB_LAYOUT.MAX_W + 100)).toBe(TAB_LAYOUT.MAX_W);
     expect(clampTabWidth(100)).toBe(100);
   });
 
   it("computeTargetTabWidth divides available strip space up to max", () => {
     const scroll = {
-      clientWidth: 900,
+      clientWidth: 2000,
     } as HTMLElement;
     const addBtn = { offsetWidth: 36 } as HTMLElement;
     const target = computeTargetTabWidth(scroll, addBtn, 2);
