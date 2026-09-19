@@ -3,7 +3,7 @@ import { tags as t } from "@lezer/highlight";
 import type { Extension } from "@codemirror/state";
 import type { ColorScheme } from "../theme";
 
-/** VS Code Dark+-inspired palette (JS / TS / Python via Lezer tags). */
+/** VS Code Dark+-inspired palette (JS / TS via Lezer tags). */
 const highlightDark = HighlightStyle.define([
   { tag: t.comment, color: "#6A9955" },
   { tag: t.lineComment, color: "#6A9955" },

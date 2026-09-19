@@ -13,9 +13,11 @@ import {
 } from "../macros/types";
 import { SettingsView } from "../settings/SettingsView";
 import {
+  mergeAccueilPrefs,
   mergeAutomationPrefs,
   mergeScriptsPrefs,
   mergeShellPrefs,
+  type AccueilPrefs,
   type AutomationPrefs,
   type ScriptsPrefs,
   type ShellPrefs,
@@ -37,7 +39,9 @@ import {
 import { TitleBarProvider, useTitleBarContext } from "../ui/shell/TitleBarContext";
 import {
   ConfirmHost,
+  askScriptLanguage,
   confirmAction,
+  confirmChoice,
   PromptHost,
   promptAction,
   ScriptLanguageHost,
@@ -49,6 +53,7 @@ import { loadLastStudio, pushRecent, saveLastStudio } from "./recent";
 import type { SettingsSection } from "./types";
 import type { AppSettings } from "../clicker/clickerTypes";
 import { DEFAULT_CLICKER } from "../clicker/clickerTypes";
+import { defaultScriptSource } from "../scripts/defaultSources";
 import {
   HOME_TAB_ID,
   activeDocTab,
@@ -163,6 +168,9 @@ function MainAppInner({
   const [scriptsPrefs, setScriptsPrefs] = useState<ScriptsPrefs>(() =>
     mergeScriptsPrefs(),
   );
+  const [accueilPrefs, setAccueilPrefs] = useState<AccueilPrefs>(() =>
+    mergeAccueilPrefs(),
+  );
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => loadWorkspace());
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
   const [advanced, setAdvanced] = useState(false);
@@ -189,6 +197,7 @@ function MainAppInner({
   }, []);
 
   const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const [docRemountKey, setDocRemountKey] = useState(0);
 
   const onThemeChange = useCallback((next: ThemeMode) => {
     setTheme(next);
@@ -230,6 +239,7 @@ function MainAppInner({
         onUiLocalePrefChange(sh.uiLocale);
         setAutomationPrefs(mergeAutomationPrefs(s.automation));
         setScriptsPrefs(mergeScriptsPrefs(s.scripts));
+        setAccueilPrefs(mergeAccueilPrefs(s.accueil));
         if (!sh.restoreWorkspaceTabs) {
           setWorkspace((ws) => selectHome({ ...ws, tabs: [] }));
         } else if (sh.startupView === "lastDocument") {
@@ -374,10 +384,16 @@ function MainAppInner({
   const onTabSelect = useCallback((tabId: string) => {
     if (tabId === HOME_TAB_ID) {
       goHome();
+      bumpRefresh();
       return;
     }
+    const activeId =
+      workspace.shellView.type === "doc" ? workspace.shellView.tabId : null;
+    if (activeId === tabId) {
+      setDocRemountKey((k) => k + 1);
+    }
     setWorkspace((ws) => selectDocTab(ws, tabId));
-  }, [goHome]);
+  }, [goHome, bumpRefresh, workspace.shellView]);
 
   const onTabClose = useCallback(
     async (tabId: string) => {
@@ -633,15 +649,31 @@ function MainAppInner({
   }, [bumpRefresh, openDoc, t, toast]);
 
   const onCreateScript = useCallback(async () => {
+    const outcome = await confirmChoice({
+      title: t("scripts.create.title"),
+      message: t("scripts.create.message"),
+      confirmLabel: t("scripts.create.runnable"),
+      discardLabel: t("scripts.create.module"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (outcome === "cancel") return;
+    const isModule = outcome === "discard";
+      const language = await askScriptLanguage({
+      title: t("scripts.create.languageTitle"),
+      message: t("scripts.create.languageMessage"),
+      javascriptLabel: t("scripts.language.javascript"),
+      typescriptLabel: t("scripts.language.typescript"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (!language) return;
     try {
       const id = newScriptId();
       const doc: ScriptDoc = {
         id,
         name: t("shell.newScriptName"),
-        source:
-          "//@param label string world\ncaster.log('hello ' + caster.get('label'));\n",
-        language: "javascript",
-        isModule: false,
+        source: defaultScriptSource(language, isModule),
+        language,
+        isModule,
         allowNetwork: false,
         allowClipboard: false,
         allowFs: false,
@@ -935,6 +967,7 @@ function MainAppInner({
           }}
           onAutomationPrefsChange={setAutomationPrefs}
           onScriptsPrefsChange={setScriptsPrefs}
+          onAccueilPrefsChange={setAccueilPrefs}
         />
       );
     }
@@ -943,6 +976,7 @@ function MainAppInner({
       if (activeDoc.kind === "macro") {
         return (
           <MacroEditorView
+            key={`${activeDocTabId}:${docRemountKey}`}
             macroId={activeDoc.resourceId}
             onBack={goHome}
             onDirtyChange={onActiveDocDirtyChange}
@@ -960,6 +994,7 @@ function MainAppInner({
       if (activeDoc.kind === "script") {
         return (
           <ScriptEditorView
+            key={`${activeDocTabId}:${docRemountKey}`}
             scriptId={activeDoc.resourceId}
             onBack={goHome}
             onDirtyChange={onActiveDocDirtyChange}
@@ -967,11 +1002,16 @@ function MainAppInner({
               if (!activeDocTabId) return;
               setWorkspace((ws) => setTabLabel(ws, activeDocTabId, name));
             }}
+            onOpenSettings={() =>
+              setWorkspace((ws) => openSettings(ws, "application"))
+            }
+            scriptsPrefs={scriptsPrefs}
           />
         );
       }
       return (
         <ClickerStudio
+          key={`${activeDocTabId}:${docRemountKey}`}
           presetId={activeDoc.resourceId}
           onBack={goHome}
           status={status}
@@ -1039,6 +1079,8 @@ function MainAppInner({
           }
           onFocusKeyChange={automationsPage.setFocusKey}
           scriptsPrefs={scriptsPrefs}
+          accueilPrefs={accueilPrefs}
+          onOpenSettings={() => goSettings("application")}
         />
       );
     }
@@ -1058,6 +1100,7 @@ function MainAppInner({
             onCreateMacro={() => void onCreateMacro()}
             onCreateClicker={() => void onCreateClicker()}
             onCreateScript={() => void onCreateScript()}
+            onOpenExisting={(kind, id, label) => openDoc(kind, id, label ?? id)}
             onTabContextAction={(tabId, action) => void onTabContextAction(tabId, action)}
             onBarContextAction={(action) => void onBarContextAction(action)}
             onTabReorder={onTabReorder}

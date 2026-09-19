@@ -1,4 +1,5 @@
-export type ScriptLanguage = "javascript" | "typescript" | "python";
+/** Script language (JavaScript or TypeScript). */
+export type ScriptLanguage = "javascript" | "typescript";
 
 export type ScriptDoc = {
   id: string;

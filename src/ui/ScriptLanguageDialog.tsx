@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import { Code2 } from "lucide-react";
 import { useT } from "../i18n";
 
-export type ScriptLanguageChoice = "javascript" | "typescript" | "python";
+export type ScriptLanguageChoice = "javascript" | "typescript";
 
 export type ScriptLanguageDialogOptions = {
   title: string;
   message: string;
   javascriptLabel?: string;
   typescriptLabel?: string;
-  pythonLabel?: string;
   cancelLabel?: string;
 };
 
@@ -21,7 +20,7 @@ let askFn:
   | ((opts: ScriptLanguageDialogOptions) => Promise<ScriptLanguageChoice | null>)
   | null = null;
 
-/** Dedicated JS | TS | Python | Cancel picker. */
+/** Dedicated JS | TS | Cancel picker. */
 export function askScriptLanguage(
   opts: ScriptLanguageDialogOptions,
 ): Promise<ScriptLanguageChoice | null> {
@@ -63,8 +62,6 @@ export function ScriptLanguageHost() {
     current.javascriptLabel ?? t("automations.convert.languageJs");
   const tsLabel =
     current.typescriptLabel ?? t("automations.convert.languageTs");
-  const pyLabel =
-    current.pythonLabel ?? t("automations.convert.languagePy");
   const cancelLabel = current.cancelLabel ?? t("common.cancel");
 
   function close(value: ScriptLanguageChoice | null) {
@@ -108,13 +105,6 @@ export function ScriptLanguageHost() {
             onClick={() => close("typescript")}
           >
             {tsLabel}
-          </button>
-          <button
-            type="button"
-            className="caster-btn caster-btn-primary"
-            onClick={() => close("python")}
-          >
-            {pyLabel}
           </button>
           <button
             type="button"

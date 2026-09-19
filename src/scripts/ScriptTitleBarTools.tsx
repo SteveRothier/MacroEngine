@@ -1,6 +1,6 @@
-import { ArrowLeft, Play, Square } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Play, Square } from "lucide-react";
 import { useT, type TFunction } from "../i18n";
-import { EditorToolbar, Select, Tooltip } from "../ui/shell";
+import { DropdownMenu, EditorToolbar, Select, Tooltip } from "../ui/shell";
 import {
   ScriptPermissionsMenu,
   type ScriptPermissions,
@@ -19,8 +19,14 @@ type Props = {
   onIsModuleChange: (isModule: boolean) => void;
   permissions: ScriptPermissions;
   onPermissionsChange: (partial: Partial<ScriptPermissions>) => void;
+  locked?: boolean;
+  loading?: boolean;
+  dryRun?: boolean;
+  onDryRunChange?: (dryRun: boolean) => void;
   running: boolean;
   engineBusy: EngineBusyKind | null;
+  lintBlocked?: boolean;
+  lintBlockReason?: string | null;
   onRun: () => void;
   onStop: () => void;
   saveStatus: "idle" | "saving" | "saved" | "error";
@@ -49,14 +55,21 @@ export function ScriptTitleBarTools({
   onIsModuleChange,
   permissions,
   onPermissionsChange,
+  locked = false,
+  loading = false,
+  dryRun = false,
+  onDryRunChange,
   running,
   engineBusy,
+  lintBlocked = false,
+  lintBlockReason = null,
   onRun,
   onStop,
   saveStatus,
   onRetrySave,
 }: Props) {
   const t = useT();
+  const editDisabled = locked || loading;
   const statusLabel =
     saveStatus === "saving"
       ? t("scripts.toolbar.saving")
@@ -67,7 +80,21 @@ export function ScriptTitleBarTools({
           : null;
 
   const runBlocked =
-    isModule || (!running && engineBusy != null && engineBusy !== "script");
+    loading ||
+    isModule ||
+    lintBlocked ||
+    (!running && engineBusy != null && engineBusy !== "script");
+
+  const langOptions = [
+    {
+      value: "javascript",
+      label: t("scripts.language.javascript"),
+    },
+    {
+      value: "typescript",
+      label: t("scripts.language.typescript"),
+    },
+  ];
 
   return (
     <EditorToolbar
@@ -85,6 +112,7 @@ export function ScriptTitleBarTools({
           <input
             className="caster-titlebar-name-input caster-titlebar-name-input--wide"
             value={name}
+            disabled={editDisabled}
             placeholder={t("scripts.toolbar.namePlaceholder")}
             aria-label={t("scripts.toolbar.nameAria")}
             onChange={(e) => onNameChange(e.target.value)}
@@ -92,49 +120,58 @@ export function ScriptTitleBarTools({
               if (e.key === "Enter") e.currentTarget.blur();
             }}
           />
+          {locked ? (
+            <span
+              className="caster-clicker-lock"
+              title={t("scripts.toolbar.lockedTitle")}
+            >
+              {t("scripts.toolbar.locked")}
+            </span>
+          ) : null}
           <ScriptPermissionsMenu
             value={permissions}
             onChange={onPermissionsChange}
+            disabled={editDisabled}
           />
           <Select
             className="caster-select caster-script-toolbar-lang"
             value={language}
+            disabled={editDisabled}
             ariaLabel={t("scripts.language.label")}
-            options={[
-              {
-                value: "javascript",
-                label: t("scripts.language.javascript"),
-              },
-              {
-                value: "typescript",
-                label: t("scripts.language.typescript"),
-              },
-              {
-                value: "python",
-                label: t("scripts.language.python"),
-              },
-            ]}
+            options={langOptions}
             onChange={(v) =>
-              onLanguageChange(
-                v === "typescript"
-                  ? "typescript"
-                  : v === "python"
-                    ? "python"
-                    : "javascript",
-              )
+              onLanguageChange(v === "typescript" ? "typescript" : "javascript")
             }
           />
-          <label
-            className="caster-script-module-toggle caster-script-module-toggle--toolbar"
-            title={t("scripts.module.tip")}
+          <DropdownMenu
+            label={t("scripts.toolbar.options")}
+            ariaLabel={t("scripts.toolbar.optionsAria")}
+            align="start"
+            disabled={editDisabled && running}
+            triggerClassName="caster-titlebar-btn caster-btn caster-btn-ghost"
+            items={[
+              {
+                id: "module",
+                label: isModule
+                  ? t("scripts.toolbar.optionsModuleOn")
+                  : t("scripts.toolbar.optionsModuleOff"),
+                description: t("scripts.module.tip"),
+                disabled: editDisabled,
+                onSelect: () => onIsModuleChange(!isModule),
+              },
+              {
+                id: "dry-run",
+                label: dryRun
+                  ? t("scripts.toolbar.optionsDryRunOn")
+                  : t("scripts.toolbar.optionsDryRunOff"),
+                description: t("scripts.toolbar.dryRunTip"),
+                disabled: running || !onDryRunChange,
+                onSelect: () => onDryRunChange?.(!dryRun),
+              },
+            ]}
           >
-            <input
-              type="checkbox"
-              checked={isModule}
-              onChange={(e) => onIsModuleChange(e.target.checked)}
-            />
-            <span>{t("scripts.module.label")}</span>
-          </label>
+            <MoreHorizontal size={14} aria-hidden />
+          </DropdownMenu>
           {statusLabel && saveStatus === "error" ? (
             <Tooltip content={t("scripts.toolbar.saveErrorTip")}>
               <button
@@ -174,9 +211,11 @@ export function ScriptTitleBarTools({
             content={
               isModule
                 ? t("scripts.toolbar.runModuleBlocked")
-                : runBlocked && engineBusy
-                  ? busyTooltip(engineBusy, t)
-                  : t("scripts.toolbar.runTip")
+                : lintBlocked && lintBlockReason
+                  ? lintBlockReason
+                  : runBlocked && engineBusy
+                    ? busyTooltip(engineBusy, t)
+                    : t("scripts.toolbar.runTip")
             }
           >
             <button

@@ -139,6 +139,7 @@ export function useUnifiedAutomations(options: {
       setHotkeys(hk);
       const favMacros = qa.favorites.macros ?? [];
       const favClickers = qa.favorites.clickerPresets ?? [];
+      const favScripts = qa.favorites.scripts ?? [];
       setRecentOrder(qa.recent.map((r) => rowKey(r.kind, r.id)));
       const runLabels = lastRunLabelMap(qa.recent, t, locale);
       const runTooltips = lastRunTooltipMap(qa.recent, t, locale);
@@ -234,19 +235,19 @@ export function useUnifiedAutomations(options: {
           ),
           lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("script", s.id)),
-          favorite: false,
+          favorite: favScripts.includes(s.id),
           locked: lib?.locked ?? false,
           dirty: options.dirtyScriptId === s.id,
           isModule: !!s.isModule,
+          scriptLanguage:
+            s.language === "typescript" ? "typescript" : "javascript",
           meta: (() => {
             const parts: string[] = [];
             if (s.isModule) parts.push(t("scripts.module.label"));
             parts.push(
               s.language === "typescript"
                 ? t("scripts.language.typescript")
-                : s.language === "python"
-                  ? t("scripts.language.python")
-                  : t("scripts.language.javascript"),
+                : t("scripts.language.javascript"),
             );
             return parts.join(" · ");
           })(),

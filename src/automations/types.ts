@@ -26,6 +26,8 @@ export type AutomationRow = {
   permLabels?: string[];
   /** Script marked as library module (not runnable from Accueil). */
   isModule?: boolean;
+  /** Script source language when kind === script. */
+  scriptLanguage?: "javascript" | "typescript";
 };
 
 export function statusToPill(

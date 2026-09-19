@@ -8,11 +8,11 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { Code2, FileCode2 } from "lucide-react";
-import { useLocale, useT, type TFunction } from "../i18n";
+import { useLocale, useT } from "../i18n";
 import { DropdownMenu, useToast } from "../ui/shell";
 import type { DropdownEntry } from "../ui/shell";
 import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
-import { confirmAction } from "../ui";
+import { confirmAction, confirmChoice } from "../ui";
 import {
   readStoredTheme,
   resolvedColorScheme,
@@ -26,12 +26,22 @@ import {
   SCRIPT_SNIPPET_PARAM,
   SCRIPT_SNIPPET_RUN_PROCESS,
   SCRIPT_SNIPPET_SET,
+  apiInsertSnippet,
+  type ApiInsertName,
 } from "./snippets";
 import {
   getScriptPresets,
   presetPermissionPatch,
   type ScriptPreset,
 } from "./presets";
+import {
+  defaultScriptSource,
+  isDefaultScriptSource,
+} from "./defaultSources";
+import {
+  humanizeScriptError,
+} from "./humanizeScriptError";
+import { permPatchForApi, permissionFromErrorMessage } from "./scriptApiPerms";
 import {
   ScriptTitleBarTools,
   type EngineBusyKind,
@@ -46,27 +56,48 @@ import {
 import {
   ScriptSourceEditor,
   diagnosticsFromError,
+  diagnosticsFromLint,
   type ScriptEditorDiagnostic,
+  type ScriptLintDiagnostic,
   type ScriptSourceEditorHandle,
 } from "./ScriptSourceEditor";
+import { ScriptRunTimeline } from "./ScriptRunTimeline";
 import { parseParamDefs } from "./parseParams";
-import type { ScriptDoc } from "./types";
-import type { MacroValue } from "../macros/types";
+import type { ScriptDoc, ScriptLanguage } from "./types";
+import type { EngineStatus, MacroValue } from "../macros/types";
+import {
+  mergeScriptsPrefs,
+  type ScriptsPrefs,
+} from "../settings/settingsTypes";
 
 const AUTOSAVE_MS = 400;
+const LINT_DEBOUNCE_MS = 500;
 const MAX_CONSOLE = 200;
+
+function isScriptSessionBusy(status: {
+  state?: string | null;
+  sessionKind?: string | null;
+}): boolean {
+  const state = status.state ?? "";
+  return (
+    status.sessionKind === "script" &&
+    (state === "running" || state === "paused")
+  );
+}
 
 type Props = {
   scriptId: string;
   onBack: () => void;
   onDirtyChange?: (id: string, dirty: boolean) => void;
   onLabelChange?: (name: string) => void;
+  onOpenSettings?: () => void;
+  scriptsPrefs?: ScriptsPrefs;
 };
 
 function normalizeDoc(doc: ScriptDoc): ScriptDoc {
   return {
     ...doc,
-    language: doc.language ?? "javascript",
+    language: doc.language === "typescript" ? "typescript" : "javascript",
     isModule: doc.isModule ?? false,
     allowClipboard: doc.allowClipboard ?? false,
     allowFs: doc.allowFs ?? false,
@@ -75,29 +106,6 @@ function normalizeDoc(doc: ScriptDoc): ScriptDoc {
     allowProcess: doc.allowProcess ?? false,
     paramValues: doc.paramValues ?? {},
   };
-}
-
-function humanizeRunError(raw: string, t: TFunction): string {
-  const s = String(raw);
-  if (s === "module_not_runnable" || /module_not_runnable/i.test(s)) {
-    return t("scripts.module.runBlocked");
-  }
-  if (s === "python_not_found" || /python_not_found/i.test(s)) {
-    return t("scripts.toast.pythonNotFound");
-  }
-  if (/python_sidecar_failed/i.test(s)) {
-    const detail = s.replace(/^python_sidecar_failed:?\s*/i, "");
-    return t("scripts.toast.pythonSidecarFailed", { detail });
-  }
-  if (/network|fetch disabled|allowNetwork|réseau/i.test(s)) {
-    return t("scripts.toast.networkDenied");
-  }
-  if (/engine already|already active|clicker is active|record is active/i.test(s)) {
-    return s;
-  }
-  return s.startsWith("Erreur") || s.startsWith("Error")
-    ? s
-    : t("scripts.toast.errorPrefix", { detail: s });
 }
 
 function useDocumentColorScheme(): ColorScheme {
@@ -121,10 +129,13 @@ export function ScriptEditorView({
   onBack,
   onDirtyChange,
   onLabelChange,
+  onOpenSettings: _onOpenSettings,
+  scriptsPrefs: scriptsPrefsProp,
 }: Props) {
   const t = useT();
   const { locale } = useLocale();
   const toast = useToast();
+  const scriptsPrefs = mergeScriptsPrefs(scriptsPrefsProp);
   const colorScheme = useDocumentColorScheme();
   const sourceEditorRef = useRef<ScriptSourceEditorHandle | null>(null);
   const [draft, setDraft] = useState<ScriptDoc | null>(null);
@@ -136,18 +147,35 @@ export function ScriptEditorView({
   const [engineBusy, setEngineBusy] = useState<EngineBusyKind | null>(null);
   const [consoleLines, setConsoleLines] = useState<ConsoleLine[]>([]);
   const [diagnostics, setDiagnostics] = useState<ScriptEditorDiagnostic[]>([]);
+  const [locked, setLocked] = useState(false);
+  const [dryRun, setDryRun] = useState(false);
+  const [runTimeline, setRunTimeline] = useState<ConsoleLine[]>([]);
   const consoleIdRef = useRef(0);
+  const runTimelineIdRef = useRef(0);
+  const lintTimerRef = useRef<number | null>(null);
+  const trackingRunRef = useRef(false);
+  const lockedRef = useRef(false);
   const baselineRef = useRef<string>("");
   const draftRef = useRef<ScriptDoc | null>(null);
   const dirtyRef = useRef(false);
   const autosaveTimer = useRef<number | null>(null);
   const savedFlashTimer = useRef<number | null>(null);
 
-  const presets = useMemo(() => getScriptPresets(t), [t]);
+  const lang = draft?.language ?? "javascript";
+  const presets = useMemo(() => getScriptPresets(t, lang), [t, lang]);
+
+  const hasLintErrors = useMemo(
+    () => diagnostics.some((d) => (d.severity ?? "error") === "error"),
+    [diagnostics],
+  );
 
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
+
+  useEffect(() => {
+    lockedRef.current = locked;
+  }, [locked]);
 
   const pushConsole = useCallback(
     (text: string, level?: ConsoleLine["level"]) => {
@@ -161,8 +189,31 @@ export function ScriptEditorView({
         const next = [...prev, line];
         return next.length > MAX_CONSOLE ? next.slice(-MAX_CONSOLE) : next;
       });
+      if (trackingRunRef.current) {
+        const runLine = { ...line, id: ++runTimelineIdRef.current };
+        setRunTimeline((prev) => [...prev, runLine]);
+      }
     },
     [locale],
+  );
+
+  const checkSourceLint = useCallback(
+    async (source: string, language: ScriptDoc["language"]) => {
+      if (locked) return;
+      try {
+        const items = await invoke<ScriptLintDiagnostic[]>(
+          "check_script_source_cmd",
+          {
+            source,
+            language: language ?? "javascript",
+          },
+        );
+        setDiagnostics(diagnosticsFromLint(source, items));
+      } catch {
+        /* ignore transient lint failures */
+      }
+    },
+    [locked, t],
   );
 
   useEffect(() => {
@@ -175,15 +226,20 @@ export function ScriptEditorView({
         /script «/i.test(msg) ||
         /script\.run/i.test(msg) ||
         /Annulation/i.test(msg) ||
-        /Fin script/i.test(msg)
+        /Fin script/i.test(msg) ||
+        /Arrêt script/i.test(msg)
       ) {
         pushConsole(msg);
+        if (/Fin script/i.test(msg) || /Arrêt script/i.test(msg)) {
+          pushConsole(t("scripts.console.sessionEnd"), "session");
+          trackingRunRef.current = false;
+        }
       }
     }).then((fn) => {
       un = fn;
     });
     return () => un?.();
-  }, [pushConsole]);
+  }, [pushConsole, t]);
 
   useEffect(() => {
     let un: (() => void) | undefined;
@@ -201,11 +257,23 @@ export function ScriptEditorView({
       } else {
         setEngineBusy(null);
         setRunning(false);
+        trackingRunRef.current = false;
       }
     }).then((fn) => {
       un = fn;
     });
     return () => un?.();
+  }, []);
+
+  const syncRunningFromStatus = useCallback((status: EngineStatus) => {
+    if (isScriptSessionBusy(status)) {
+      setEngineBusy("script");
+      setRunning(true);
+      return;
+    }
+    setEngineBusy(null);
+    setRunning(false);
+    trackingRunRef.current = false;
   }, []);
 
   const markDirty = useCallback(
@@ -221,6 +289,7 @@ export function ScriptEditorView({
 
   const persistNow = useCallback(
     async (doc: ScriptDoc) => {
+      if (locked) return;
       setSaveStatus("saving");
       try {
         await invoke("save_script_cmd", { doc });
@@ -241,7 +310,7 @@ export function ScriptEditorView({
         throw e;
       }
     },
-    [onDirtyChange, scriptId, toast],
+    [locked, onDirtyChange, scriptId, toast],
   );
 
   const flushAutosave = useCallback(async () => {
@@ -269,7 +338,20 @@ export function ScriptEditorView({
         onDirtyChange?.(scriptId, false);
         setSaveStatus("idle");
         setConsoleLines([]);
+        setRunTimeline([]);
+        runTimelineIdRef.current = 0;
         setDiagnostics([]);
+        void invoke<{ items: { id: string; locked?: boolean }[] }>(
+          "get_library_index_cmd",
+          { kind: "script" },
+        )
+          .then((idx) => {
+            if (cancelled) return;
+            setLocked(Boolean(idx.items.find((i) => i.id === scriptId)?.locked));
+          })
+          .catch(() => {
+            if (!cancelled) setLocked(false);
+          });
       })
       .catch((e) => {
         if (!cancelled) {
@@ -286,7 +368,24 @@ export function ScriptEditorView({
   }, [scriptId, toast, onDirtyChange]);
 
   useEffect(() => {
-    if (!draft || loading || !dirtyRef.current) return;
+    if (!draft || loading || locked) return;
+    if (lintTimerRef.current != null) {
+      window.clearTimeout(lintTimerRef.current);
+    }
+    lintTimerRef.current = window.setTimeout(() => {
+      lintTimerRef.current = null;
+      void checkSourceLint(draft.source, draft.language);
+    }, LINT_DEBOUNCE_MS);
+    return () => {
+      if (lintTimerRef.current != null) {
+        window.clearTimeout(lintTimerRef.current);
+        lintTimerRef.current = null;
+      }
+    };
+  }, [draft?.source, draft?.language, loading, locked, checkSourceLint]);
+
+  useEffect(() => {
+    if (!draft || loading || !dirtyRef.current || locked) return;
     if (JSON.stringify(draft) === baselineRef.current) return;
     if (autosaveTimer.current != null) {
       window.clearTimeout(autosaveTimer.current);
@@ -313,7 +412,7 @@ export function ScriptEditorView({
         window.clearTimeout(savedFlashTimer.current);
       }
       const doc = draftRef.current;
-      if (doc && dirtyRef.current) {
+      if (doc && dirtyRef.current && !lockedRef.current) {
         void invoke("save_script_cmd", { doc }).catch(() => undefined);
       }
     };
@@ -331,6 +430,7 @@ export function ScriptEditorView({
   }, [flushAutosave]);
 
   function patch(partial: Partial<ScriptDoc>) {
+    if (locked) return;
     setDraft((prev) => {
       if (!prev) return prev;
       const next = { ...prev, ...partial };
@@ -340,6 +440,40 @@ export function ScriptEditorView({
       }
       return next;
     });
+  }
+
+  async function onLanguageChange(language: ScriptLanguage) {
+    if (locked) return;
+    const prev = draftRef.current;
+    if (!prev || prev.language === language) return;
+    const isModule = !!prev.isModule;
+    if (isDefaultScriptSource(prev.source)) {
+      patch({
+        language,
+        source: defaultScriptSource(language, isModule),
+      });
+      void checkSourceLint(
+        defaultScriptSource(language, isModule),
+        language,
+      );
+      return;
+    }
+    const outcome = await confirmChoice({
+      title: t("scripts.confirm.languageTitle"),
+      message: t("scripts.confirm.languageMessage"),
+      confirmLabel: t("scripts.confirm.languageAdapt"),
+      discardLabel: t("scripts.confirm.languageKeep"),
+      cancelLabel: t("common.cancel"),
+    });
+    if (outcome === "cancel") return;
+    if (outcome === "confirm") {
+      const source = defaultScriptSource(language, isModule);
+      patch({ language, source });
+      void checkSourceLint(source, language);
+      return;
+    }
+    patch({ language });
+    void checkSourceLint(prev.source, language);
   }
 
   function setParamValue(name: string, value: MacroValue) {
@@ -374,6 +508,7 @@ export function ScriptEditorView({
       ...presetPermissionPatch(preset),
       paramValues: {},
     });
+    void checkSourceLint(preset.source, draftRef.current?.language ?? lang);
   }
 
   function insertSnippet(text: string, perms?: Partial<ScriptDoc>) {
@@ -386,19 +521,20 @@ export function ScriptEditorView({
     [draft],
   );
 
-  const lang = draft?.language ?? "javascript";
   const sourceAria =
     lang === "typescript"
       ? t("scripts.toolbar.sourceAriaTs")
-      : lang === "python"
-        ? t("scripts.toolbar.sourceAriaPy")
-        : t("scripts.toolbar.sourceAriaJs");
+      : t("scripts.toolbar.sourceAriaJs");
   const sourcePlaceholder =
     lang === "typescript"
       ? t("scripts.toolbar.sourcePlaceholderTs")
-      : lang === "python"
-        ? t("scripts.toolbar.sourcePlaceholderPy")
-        : t("scripts.toolbar.sourcePlaceholderJs");
+      : t("scripts.toolbar.sourcePlaceholderJs");
+
+  function insertApiExample(name: ApiInsertName) {
+    const snippet = apiInsertSnippet(name);
+    insertSnippet(snippet, permPatchForApi(name));
+    toast.info(t(`scripts.api.${name}`));
+  }
 
   async function onRun() {
     if (draftRef.current?.isModule) {
@@ -407,18 +543,56 @@ export function ScriptEditorView({
       toast.error(msg);
       return;
     }
-    try {
-      await flushAutosave();
-      setDiagnostics([]);
-      pushConsole(t("scripts.console.sessionStart"), "session");
-      await invoke("run_script_session_cmd", { id: scriptId });
-      setRunning(true);
-    } catch (e) {
-      const raw = String(e);
-      const msg = humanizeRunError(raw, t);
+    if (hasLintErrors) {
+      const msg = t("scripts.toast.lintBlocked");
       pushConsole(msg, "error");
       toast.error(msg);
+      return;
+    }
+    try {
+      if (!locked) {
+        await flushAutosave();
+      }
+      setDiagnostics([]);
+      if (scriptsPrefs.clearConsoleOnRun) {
+        setConsoleLines([]);
+        consoleIdRef.current = 0;
+      }
+      setRunTimeline([]);
+      runTimelineIdRef.current = 0;
+      trackingRunRef.current = true;
+      pushConsole(t("scripts.console.sessionStart"), "session");
+      if (dryRun) {
+        pushConsole(t("scripts.toolbar.dryRunActive"), "session");
+      }
+      // Do not trust a Running snapshot from the start command: fast scripts often
+      // reach Idle before this await resolves, and a stale Running would stick Arrêter.
+      await invoke("run_script_session_cmd", {
+        id: scriptId,
+        dryRun,
+      });
+      const fresh = await invoke<EngineStatus>("get_engine_state");
+      syncRunningFromStatus(fresh);
+    } catch (e) {
+      const raw = String(e);
+      const msg = humanizeScriptError(raw, t);
+      pushConsole(msg, "error");
+      const perm = permissionFromErrorMessage(raw);
+      if (perm && draftRef.current && !lockedRef.current) {
+        toast.error(msg, {
+          action: {
+            label: t("scripts.toast.enableAndRerun"),
+            onClick: () => {
+              patch({ [perm]: true });
+              void flushAutosave().then(() => void onRun());
+            },
+          },
+        });
+      } else {
+        toast.error(msg);
+      }
       setRunning(false);
+      trackingRunRef.current = false;
       const src = draftRef.current?.source ?? "";
       setDiagnostics(diagnosticsFromError(src, raw));
     }
@@ -426,7 +600,8 @@ export function ScriptEditorView({
 
   async function onStop() {
     try {
-      await invoke("request_cancel");
+      const status = await invoke<EngineStatus>("request_cancel");
+      syncRunningFromStatus(status);
       pushConsole(t("scripts.console.cancelRequested"), "session");
     } catch (e) {
       toast.error(String(e));
@@ -435,43 +610,56 @@ export function ScriptEditorView({
 
   const titleBarPortal = useTitleBarSlot(
     draft?.name ?? scriptId,
-    draft ? (
-      <ScriptTitleBarTools
-        onBack={() => {
-          void flushAutosave().finally(onBack);
-        }}
-        name={draft.name}
-        onNameChange={(name) => patch({ name })}
-        language={
-          draft.language === "typescript"
-            ? "typescript"
-            : draft.language === "python"
-              ? "python"
-              : "javascript"
+    <ScriptTitleBarTools
+      onBack={() => {
+        void flushAutosave().finally(onBack);
+      }}
+      name={draft?.name ?? scriptId}
+      onNameChange={(name) => patch({ name })}
+      language={
+        draft?.language === "typescript" ? "typescript" : "javascript"
+      }
+      onLanguageChange={(language) => void onLanguageChange(language)}
+      isModule={!!draft?.isModule}
+      onIsModuleChange={(isModule) => {
+        const prev = draftRef.current;
+        if (prev && isDefaultScriptSource(prev.source)) {
+          const language = prev.language ?? "javascript";
+          patch({
+            isModule,
+            source: defaultScriptSource(language, isModule),
+          });
+        } else {
+          patch({ isModule });
         }
-        onLanguageChange={(language) => patch({ language })}
-        isModule={!!draft.isModule}
-        onIsModuleChange={(isModule) => patch({ isModule })}
-        permissions={{
-          allowNetwork: draft.allowNetwork,
-          allowClipboard: !!draft.allowClipboard,
-          allowFs: !!draft.allowFs,
-          allowMacroControl: !!draft.allowMacroControl,
-          allowInput: !!draft.allowInput,
-          allowProcess: !!draft.allowProcess,
-        }}
-        onPermissionsChange={(partial) => patch(partial)}
-        running={running}
-        engineBusy={engineBusy}
-        onRun={() => void onRun()}
-        onStop={() => void onStop()}
-        saveStatus={saveStatus}
-        onRetrySave={() => {
-          const doc = draftRef.current;
-          if (doc) void persistNow(doc);
-        }}
-      />
-    ) : null,
+      }}
+      permissions={{
+        allowNetwork: !!draft?.allowNetwork,
+        allowClipboard: !!draft?.allowClipboard,
+        allowFs: !!draft?.allowFs,
+        allowMacroControl: !!draft?.allowMacroControl,
+        allowInput: !!draft?.allowInput,
+        allowProcess: !!draft?.allowProcess,
+      }}
+      onPermissionsChange={(partial) => patch(partial)}
+      locked={locked}
+      loading={loading || !draft}
+      dryRun={dryRun}
+      onDryRunChange={setDryRun}
+      running={running}
+      engineBusy={engineBusy}
+      lintBlocked={hasLintErrors}
+      lintBlockReason={
+        hasLintErrors ? t("scripts.toolbar.runLintBlocked") : null
+      }
+      onRun={() => void onRun()}
+      onStop={() => void onStop()}
+      saveStatus={saveStatus}
+      onRetrySave={() => {
+        const doc = draftRef.current;
+        if (doc) void persistNow(doc);
+      }}
+    />,
   );
 
   if (loading) {
@@ -513,48 +701,59 @@ export function ScriptEditorView({
           defs={paramDefs}
           values={draft.paramValues ?? {}}
           onChange={setParamValue}
+          disabled={locked}
           onBlurField={() => void flushAutosave()}
         />
         <div className="caster-script-source-wrap">
           <ScriptSourceEditor
             ref={sourceEditorRef}
             value={draft.source}
-            language={
-              lang === "typescript"
-                ? "typescript"
-                : lang === "python"
-                  ? "python"
-                  : "javascript"
-            }
+            language={lang === "typescript" ? "typescript" : "javascript"}
             colorScheme={colorScheme}
             onChange={(source) => {
-              setDiagnostics([]);
-              patch({ source });
+              if (!locked) patch({ source });
             }}
-            onBlur={() => void flushAutosave()}
+            onBlur={() => {
+              void flushAutosave();
+              if (draftRef.current) {
+                void checkSourceLint(
+                  draftRef.current.source,
+                  draftRef.current.language,
+                );
+              }
+            }}
             ariaLabel={sourceAria}
             placeholder={sourcePlaceholder}
             diagnostics={diagnostics}
+            readOnly={locked}
           />
           <div className="caster-script-snippets">
+            <DropdownMenu
+              label={t("scripts.toolbar.examples")}
+              ariaLabel={t("scripts.toolbar.examples")}
+              align="end"
+              triggerClassName="caster-btn caster-btn-ghost caster-script-snippets-btn"
+              menuClassName="caster-script-snippets-menu"
+              disabled={locked}
+              items={presets.map((p) => ({
+                id: `ex-${p.id}`,
+                label: p.name,
+                icon: <FileCode2 size={14} />,
+                onSelect: () => void applyPreset(p),
+              }))}
+            >
+              <FileCode2 size={14} aria-hidden />
+              {t("scripts.toolbar.examples")}
+            </DropdownMenu>
             <DropdownMenu
               label={t("scripts.toolbar.snippets")}
               ariaLabel={t("scripts.toolbar.snippetsAria")}
               align="end"
               triggerClassName="caster-btn caster-btn-ghost caster-script-snippets-btn"
               menuClassName="caster-script-snippets-menu"
+              disabled={locked}
               items={
                 [
-                  {
-                    id: "examples",
-                    label: t("scripts.toolbar.examples"),
-                    items: presets.map((p) => ({
-                      id: `ex-${p.id}`,
-                      label: p.name,
-                      icon: <FileCode2 size={14} />,
-                      onSelect: () => applyPreset(p),
-                    })),
-                  },
                   {
                     id: "snippets",
                     label: t("scripts.toolbar.snippets"),
@@ -563,7 +762,10 @@ export function ScriptEditorView({
                         id: "snip-get",
                         label: t("scripts.toolbar.snipGet"),
                         icon: <Code2 size={14} />,
-                        onSelect: () => insertSnippet(SCRIPT_SNIPPET_GET),
+                        onSelect: () =>
+                          insertSnippet(SCRIPT_SNIPPET_GET, {
+                            allowNetwork: true,
+                          }),
                       },
                       {
                         id: "snip-set",
@@ -612,6 +814,28 @@ export function ScriptEditorView({
                       },
                     ],
                   },
+                  {
+                    id: "api",
+                    label: t("scripts.toolbar.apiHelp"),
+                    items: (
+                      [
+                        "get",
+                        "set",
+                        "log",
+                        "return",
+                        "sleep",
+                        "fetch",
+                        "include",
+                        "runScript",
+                        "click",
+                      ] as ApiInsertName[]
+                    ).map((name) => ({
+                      id: `api-${name}`,
+                      label: `caster.${name}`,
+                      icon: <Code2 size={14} />,
+                      onSelect: () => insertApiExample(name),
+                    })),
+                  },
                 ] satisfies DropdownEntry[]
               }
             >
@@ -623,6 +847,11 @@ export function ScriptEditorView({
           scriptId={scriptId}
           lines={consoleLines}
           onClear={() => setConsoleLines([])}
+        />
+        <ScriptRunTimeline
+          lines={runTimeline}
+          running={running}
+          onRelaunch={() => void onRun()}
         />
       </div>
     </div>

@@ -43,6 +43,9 @@ import { useLocale, useT, type TFunction } from "../i18n";
 import type { ScriptDoc } from "../scripts/types";
 import { newScriptId } from "../scripts/ScriptEditorView";
 import {
+  humanizeScriptError,
+} from "../scripts/humanizeScriptError";
+import {
   applyAccueilOrder,
   beforeKeyForEndOfFolder,
   loadAccueilOrder,
@@ -67,6 +70,7 @@ import {
   mergeAccueilPrefs,
   mergeAutomationPrefs,
   mergeScriptsPrefs,
+  type AccueilPrefs,
   type ScriptsPrefs,
 } from "../settings/settingsTypes";
 import {
@@ -123,6 +127,8 @@ type Props = {
   onFocusKeyChange?: (key: string | null) => void;
   onLaunchFocusJournal?: () => void;
   scriptsPrefs?: ScriptsPrefs;
+  accueilPrefs?: AccueilPrefs;
+  onOpenSettings?: () => void;
 };
 
 function rowKey(r: AutomationRow): string {
@@ -166,11 +172,7 @@ const KindIcon = memo(function KindIcon({ row }: { row: AutomationRow }) {
 });
 
 async function deleteRow(r: AutomationRow): Promise<void> {
-  if (r.kind === "macro" || r.kind === "clicker") {
-    await invoke("trash_library_item_cmd", { kind: r.kind, id: r.id });
-  } else {
-    await invoke("delete_script_cmd", { id: r.id });
-  }
+  await invoke("trash_library_item_cmd", { kind: r.kind, id: r.id });
 }
 
 function errMessage(e: unknown, fallback: string): string {
@@ -204,11 +206,13 @@ export function AutomationsTable({
   onFocusKeyChange,
   onLaunchFocusJournal,
   scriptsPrefs: scriptsPrefsProp,
+  accueilPrefs: accueilPrefsProp,
+  onOpenSettings: _onOpenSettings,
 }: Props) {
   const t = useT();
   const { locale } = useLocale();
   const empty = t("common.empty");
-  const accueilPrefs = mergeAccueilPrefs();
+  const accueilPrefs = mergeAccueilPrefs(accueilPrefsProp);
   const automationPrefs = mergeAutomationPrefs();
   const scriptsPrefs = mergeScriptsPrefs(scriptsPrefsProp);
   const toast = useToast();
@@ -559,7 +563,6 @@ export function AutomationsTable({
 
   async function onToggleFavorite(r: AutomationRow, ev?: MouseEvent) {
     ev?.stopPropagation();
-    if (r.kind === "script") return;
     const favorite = !r.favorite;
     try {
       await invoke("set_quick_favorite", {
@@ -604,18 +607,26 @@ export function AutomationsTable({
       // last-run finalized on engine://status busy→idle
     } catch (e) {
       const raw = typeof e === "string" ? e : String(e);
-      toast.error(
-        raw.includes("module_not_runnable")
-          ? t("automations.toast.scriptModuleBlocked")
-          : errMessage(e, t("automations.toast.scriptLaunchFail")),
-      );
+      const msg = humanizeScriptError(raw, t);
+      toast.error(msg);
     }
   }
 
   const sorted = useMemo(() => {
     let baseRows = rows;
     if (filter === "all" && !accueilPrefs.showScriptsInAll) {
-      baseRows = rows.filter((r) => r.kind !== "script");
+      baseRows = baseRows.filter((r) => r.kind !== "script");
+    }
+    if (!accueilPrefs.showModulesInAll) {
+      baseRows = baseRows.filter((r) => !(r.kind === "script" && r.isModule));
+    }
+    if (accueilPrefs.hideScriptLanguages.length > 0) {
+      baseRows = baseRows.filter(
+        (r) =>
+          r.kind !== "script" ||
+          !r.scriptLanguage ||
+          !accueilPrefs.hideScriptLanguages.includes(r.scriptLanguage),
+      );
     }
     if (folderOverrides.size > 0) {
       baseRows = baseRows.map((r) => {
@@ -667,6 +678,8 @@ export function AutomationsTable({
     manualOrder,
     folderOverrides,
     accueilPrefs.showScriptsInAll,
+    accueilPrefs.showModulesInAll,
+    accueilPrefs.hideScriptLanguages,
     locale,
   ]);
   sortedRef.current = sorted;
@@ -820,49 +833,40 @@ export function AutomationsTable({
 
   async function onDeleteSelected() {
     if (selectedRows.length === 0) return;
-    const hasLibrary = selectedRows.some(
-      (r) => r.kind === "macro" || r.kind === "clicker",
-    );
     const ok = await confirmAction({
-      title: hasLibrary
-        ? t("automations.confirm.trashTitle")
-        : t("automations.confirm.deleteTitle"),
-      message: hasLibrary
-        ? selectedRows.length === 1
+      title: t("automations.confirm.trashTitle"),
+      message:
+        selectedRows.length === 1
           ? t("automations.confirm.trashMany", { count: selectedRows.length })
           : t("automations.confirm.trashManyOther", {
               count: selectedRows.length,
-            })
-        : selectedRows.length === 1
-          ? t("automations.confirm.deleteMany", { count: selectedRows.length })
-          : t("automations.confirm.deleteManyOther", {
-              count: selectedRows.length,
             }),
-      confirmLabel: hasLibrary
-        ? t("automations.confirm.trashConfirm")
-        : t("automations.confirm.deleteConfirm"),
+      confirmLabel: t("automations.confirm.trashConfirm"),
       danger: true,
     });
     if (!ok) return;
     try {
       for (const r of selectedRows) {
         await deleteRow(r);
+        accueilUndo.push({
+          type: "trash-item",
+          kind: r.kind,
+          id: r.id,
+          label: r.name,
+        });
       }
       setSelected(new Set());
       await refresh();
       onRefresh?.();
-      toast.success(hasLibrary ? t("automations.toast.trashed") : t("automations.toast.deleted"));
+      undoToast(t("automations.toast.trashed"));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.deleteFail")));
     }
   }
 
   async function onFavoriteSelected() {
-    const targets = selectedRows.filter((r) => r.kind !== "script");
-    if (targets.length === 0) {
-      toast.info(t("automations.toast.scriptsNoFavorite"));
-      return;
-    }
+    const targets = selectedRows;
+    if (targets.length === 0) return;
     const makeFav = targets.some((r) => !r.favorite);
     try {
       for (const r of targets) {
@@ -1067,39 +1071,28 @@ export function AutomationsTable({
   }
 
   async function onDeleteOne(r: AutomationRow) {
-    const toTrash = r.kind === "macro" || r.kind === "clicker";
-    if (toTrash && !accueilPrefs.confirmTrash) {
+    if (!accueilPrefs.confirmTrash) {
       try {
         await deleteRow(r);
         setMenuKey(null);
         await refresh();
         onRefresh?.();
-        if (r.kind === "macro" || r.kind === "clicker") {
-          accueilUndo.push({
-            type: "trash-item",
-            kind: r.kind,
-            id: r.id,
-            label: r.name,
-          });
-          undoToast(t("automations.toast.trashed"));
-        } else {
-          toast.success(t("automations.toast.deleted"));
-        }
+        accueilUndo.push({
+          type: "trash-item",
+          kind: r.kind,
+          id: r.id,
+          label: r.name,
+        });
+        undoToast(t("automations.toast.trashed"));
       } catch (e) {
         toast.error(errMessage(e, t("automations.toast.deleteFail")));
       }
       return;
     }
     const ok = await confirmAction({
-      title: toTrash
-        ? t("automations.confirm.trashTitle")
-        : t("automations.confirm.deleteTitle"),
-      message: toTrash
-        ? t("automations.confirm.trashOne", { name: r.name })
-        : t("automations.confirm.deleteOne", { name: r.name }),
-      confirmLabel: toTrash
-        ? t("automations.confirm.trashConfirm")
-        : t("automations.confirm.deleteConfirm"),
+      title: t("automations.confirm.trashTitle"),
+      message: t("automations.confirm.trashOne", { name: r.name }),
+      confirmLabel: t("automations.confirm.trashConfirm"),
       danger: true,
     });
     if (!ok) return;
@@ -1108,19 +1101,13 @@ export function AutomationsTable({
       setMenuKey(null);
       await refresh();
       onRefresh?.();
-      if (toTrash && (r.kind === "macro" || r.kind === "clicker")) {
-        accueilUndo.push({
-          type: "trash-item",
-          kind: r.kind,
-          id: r.id,
-          label: r.name,
-        });
-        undoToast(t("automations.toast.trashed"));
-      } else {
-        toast.success(
-          toTrash ? t("automations.toast.trashed") : t("automations.toast.deleted"),
-        );
-      }
+      accueilUndo.push({
+        type: "trash-item",
+        kind: r.kind,
+        id: r.id,
+        label: r.name,
+      });
+      undoToast(t("automations.toast.trashed"));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.deleteFail")));
     }
@@ -2134,7 +2121,7 @@ export function AutomationsTable({
                                 }
                               >
                                 <span className="caster-auto-row-prop caster-auto-row-prop--run">
-                                  {propLastRun ?? ""}
+                                  {propLastRun ?? empty}
                                 </span>
                               </Tooltip>
                               <Tooltip content={statusTooltip(r.status, t)}>
@@ -2186,28 +2173,26 @@ export function AutomationsTable({
                                     <Play size={14} aria-hidden />
                                   </button>
                                 </Tooltip>
-                              {r.kind !== "script" ? (
-                                <Tooltip content={favoriteTooltip(r.favorite, t)}>
-                                  <button
-                                    type="button"
-                                    className={[
-                                      "caster-automation-fav",
-                                      r.favorite ? "is-on" : "",
-                                    ]
-                                      .filter(Boolean)
-                                      .join(" ")}
-                                    aria-pressed={r.favorite}
-                                    aria-label={favoriteTooltip(r.favorite, t)}
-                                    onClick={(ev) => void onToggleFavorite(r, ev)}
-                                  >
-                                    <Star
-                                      size={14}
-                                      aria-hidden
-                                      fill={r.favorite ? "currentColor" : "none"}
-                                    />
-                                  </button>
-                                </Tooltip>
-                              ) : null}
+                              <Tooltip content={favoriteTooltip(r.favorite, t)}>
+                                <button
+                                  type="button"
+                                  className={[
+                                    "caster-automation-fav",
+                                    r.favorite ? "is-on" : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                  aria-pressed={r.favorite}
+                                  aria-label={favoriteTooltip(r.favorite, t)}
+                                  onClick={(ev) => void onToggleFavorite(r, ev)}
+                                >
+                                  <Star
+                                    size={14}
+                                    aria-hidden
+                                    fill={r.favorite ? "currentColor" : "none"}
+                                  />
+                                </button>
+                              </Tooltip>
                               <AutomationRowMenu
                                 row={r}
                                 open={menuKey === key}
