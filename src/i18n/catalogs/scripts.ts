@@ -31,20 +31,46 @@ export const scripts = defineCatalog({
       snipKey: "keyTap",
       snipInclude: "include module",
       snipProcess: "runProcess",
+      apiHelp: "API caster",
       sourceAria: "Source JavaScript",
       sourceAriaJs: "Source JavaScript",
       sourceAriaTs: "Source TypeScript",
-      sourceAriaPy: "Source Python",
       sourcePlaceholderJs:
         "// //@param name type default\n// caster.get / set / return / log / fetch",
       sourcePlaceholderTs:
         "// //@param name type default\n// TypeScript → JS (oxc) · caster.*",
-      sourcePlaceholderPy:
-        "# #@param name type default\n# caster.get / set / return / log (sidecar Python)",
       runModuleBlocked:
         "Module bibliothèque — non exécutable directement (caster.include).",
+      locked: "Verrouillé",
+      lockedTitle: "Script verrouillé — lecture seule",
+      dryRun: "Dry-run",
+      dryRunTip:
+        "Ignore click / touches / moveTo / runProcess (journalisés). fetch, fichiers et presse-papiers s’exécutent encore.",
+      dryRunActive:
+        "Dry-run actif — input et process ignorés (réseau / fichiers / presse-papiers actifs)",
+      options: "Options",
+      optionsAria: "Options du script",
+      optionsModuleOn: "Module · activé",
+      optionsModuleOff: "Module · désactivé",
+      optionsDryRunOn: "Dry-run · activé",
+      optionsDryRunOff: "Dry-run · désactivé",
       loadingAria: "Chargement du script",
       notFound: "Script introuvable.",
+      runLintBlocked: "Corrigez les erreurs de l’éditeur avant d’exécuter.",
+    },
+    timeline: {
+      title: "Timeline · run en cours",
+      relaunch: "Relancer",
+      running: "Exécution en cours…",
+    },
+    create: {
+      title: "Nouveau script",
+      message:
+        "Script exécutable (Accueil / Exécuter) ou module bibliothèque (caster.include) ?",
+      runnable: "Script exécutable",
+      module: "Module bibliothèque",
+      languageTitle: "Langage du script",
+      languageMessage: "Choisissez JavaScript ou TypeScript.",
     },
     console: {
       title: "Console",
@@ -59,6 +85,7 @@ export const scripts = defineCatalog({
       menuAria: "Actions de la console",
       sessionStart: "Session · démarrage",
       cancelRequested: "Annulation demandée (F8)",
+      sessionEnd: "Session · terminée",
     },
     permissions: {
       label: "Permissions",
@@ -89,7 +116,6 @@ export const scripts = defineCatalog({
       label: "Langage",
       javascript: "JavaScript",
       typescript: "TypeScript",
-      python: "Python",
     },
     module: {
       label: "Module bibliothèque",
@@ -102,9 +128,17 @@ export const scripts = defineCatalog({
         name: "Hello + @param",
         description: "Découverte des paramètres et de caster.return",
       },
+      assertReturn: {
+        name: "Assert + return",
+        description: "Assertion, incrément et valeur de retour",
+      },
+      sleepLog: {
+        name: "Sleep + log",
+        description: "Pause timer (permission Input) puis log",
+      },
       httpGet: {
-        name: "HTTP GET JSON",
-        description: "caster.fetch → variables status / body",
+        name: "HTTP GET JSON (réseau)",
+        description: "caster.fetch → variables status / body — permission Réseau",
       },
       clipRoundtrip: {
         name: "Presse-papiers",
@@ -126,16 +160,38 @@ export const scripts = defineCatalog({
     toast: {
       networkDenied:
         "Erreur : caster.fetch a échoué — le script n’a pas la permission Réseau. Activez-la dans Permissions si c’est voulu.",
-      pythonNotFound:
-        "Python introuvable — installez Python 3 et ajoutez-le au PATH (py / python).",
-      pythonSidecarFailed: "Échec du runtime Python : {detail}",
+      timeout: "Délai d’exécution dépassé (timeout script).",
       errorPrefix: "Erreur : {detail}",
+      permissionDenied:
+        "Permission « {permission} » manquante — activez-la dans le menu Permissions.",
+      enableAndRerun: "Activer et relancer",
+      assertionFailed: "Assertion échouée.",
+      assertionFailedDetail: "Assertion échouée : {detail}",
+      engineBusy:
+        "Une session est déjà en cours — Arrêter (F8) avant de relancer.",
+      lintBlocked: "Corrigez les erreurs affichées dans l’éditeur.",
+    },
+    api: {
+      get: "caster.get(name) — lit une variable (aucune permission).",
+      set: "caster.set(name, value) — écrit une variable.",
+      log: "caster.log(msg) — journal moteur.",
+      return: "caster.return(value) — valeur de retour (JS/TS).",
+      sleep: "caster.sleep(ms) — pause (permission Input).",
+      fetch: "caster.fetch({method,url}) — HTTP (permission Réseau).",
+      include: "caster.include(id) — charge un module (même langage).",
+      runScript: "caster.runScript(id, params?) — lance un script enfant.",
+      click: "caster.click({button,x,y}) — clic (permission Input).",
     },
     confirm: {
       replaceTitle: "Remplacer le code",
       replaceMessage:
         "Remplacer le code actuel par l’exemple « {name} » et aligner les permissions ?",
       replaceConfirm: "Remplacer",
+      languageTitle: "Changer de langage",
+      languageMessage:
+        "Le code n’est plus le modèle par défaut. Adapter au nouveau langage (remplace le code) ou garder le code actuel ?",
+      languageAdapt: "Adapter le modèle",
+      languageKeep: "Garder le code",
     },
   },
   en: {
@@ -167,20 +223,46 @@ export const scripts = defineCatalog({
       snipKey: "keyTap",
       snipInclude: "include module",
       snipProcess: "runProcess",
+      apiHelp: "caster API",
       sourceAria: "JavaScript source",
       sourceAriaJs: "JavaScript source",
       sourceAriaTs: "TypeScript source",
-      sourceAriaPy: "Python source",
       sourcePlaceholderJs:
         "// //@param name type default\n// caster.get / set / return / log / fetch",
       sourcePlaceholderTs:
         "// //@param name type default\n// TypeScript → JS (oxc) · caster.*",
-      sourcePlaceholderPy:
-        "# #@param name type default\n# caster.get / set / return / log (Python sidecar)",
       runModuleBlocked:
         "Library module — not runnable directly (use caster.include).",
+      locked: "Locked",
+      lockedTitle: "Script locked — read only",
+      dryRun: "Dry-run",
+      dryRunTip:
+        "Skip click / keys / moveTo / runProcess (logged). fetch, files, and clipboard still run.",
+      dryRunActive:
+        "Dry-run on — input and process skipped (network / files / clipboard still active)",
+      options: "Options",
+      optionsAria: "Script options",
+      optionsModuleOn: "Module · on",
+      optionsModuleOff: "Module · off",
+      optionsDryRunOn: "Dry-run · on",
+      optionsDryRunOff: "Dry-run · off",
       loadingAria: "Loading script",
       notFound: "Script not found.",
+      runLintBlocked: "Fix editor errors before running.",
+    },
+    timeline: {
+      title: "Timeline · current run",
+      relaunch: "Relaunch",
+      running: "Running…",
+    },
+    create: {
+      title: "New script",
+      message:
+        "Runnable script (Home / Run) or library module (caster.include)?",
+      runnable: "Runnable script",
+      module: "Library module",
+      languageTitle: "Script language",
+      languageMessage: "Choose JavaScript or TypeScript.",
     },
     console: {
       title: "Console",
@@ -194,6 +276,7 @@ export const scripts = defineCatalog({
       menuAria: "Console actions",
       sessionStart: "Session · started",
       cancelRequested: "Cancel requested (F8)",
+      sessionEnd: "Session · finished",
     },
     permissions: {
       label: "Permissions",
@@ -223,7 +306,6 @@ export const scripts = defineCatalog({
       label: "Language",
       javascript: "JavaScript",
       typescript: "TypeScript",
-      python: "Python",
     },
     module: {
       label: "Library module",
@@ -236,9 +318,17 @@ export const scripts = defineCatalog({
         name: "Hello + @param",
         description: "Intro to parameters and caster.return",
       },
+      assertReturn: {
+        name: "Assert + return",
+        description: "Assertion, increment, and return value",
+      },
+      sleepLog: {
+        name: "Sleep + log",
+        description: "Timed pause (Input permission) then log",
+      },
       httpGet: {
-        name: "HTTP GET JSON",
-        description: "caster.fetch → status / body variables",
+        name: "HTTP GET JSON (network)",
+        description: "caster.fetch → status / body — Network permission",
       },
       clipRoundtrip: {
         name: "Clipboard",
@@ -260,16 +350,37 @@ export const scripts = defineCatalog({
     toast: {
       networkDenied:
         "Error: caster.fetch failed — the script does not have Network permission. Enable it under Permissions if intended.",
-      pythonNotFound:
-        "Python not found — install Python 3 and add it to PATH (py / python).",
-      pythonSidecarFailed: "Python runtime failed: {detail}",
+      timeout: "Script execution timed out.",
       errorPrefix: "Error: {detail}",
+      permissionDenied:
+        "Missing “{permission}” permission — enable it in the Permissions menu.",
+      enableAndRerun: "Enable and rerun",
+      assertionFailed: "Assertion failed.",
+      assertionFailedDetail: "Assertion failed: {detail}",
+      engineBusy: "A session is already running — Stop (F8) before launching again.",
+      lintBlocked: "Fix the errors shown in the editor.",
+    },
+    api: {
+      get: "caster.get(name) — read a variable (no permission).",
+      set: "caster.set(name, value) — write a variable.",
+      log: "caster.log(msg) — engine journal.",
+      return: "caster.return(value) — return value (JS/TS).",
+      sleep: "caster.sleep(ms) — pause (Input permission).",
+      fetch: "caster.fetch({method,url}) — HTTP (Network permission).",
+      include: "caster.include(id) — load a module (same language).",
+      runScript: "caster.runScript(id, params?) — run a child script.",
+      click: "caster.click({button,x,y}) — click (Input permission).",
     },
     confirm: {
       replaceTitle: "Replace code",
       replaceMessage:
         "Replace the current code with the “{name}” example and align permissions?",
       replaceConfirm: "Replace",
+      languageTitle: "Change language",
+      languageMessage:
+        "The code is no longer the default template. Adapt to the new language (replaces code) or keep the current code?",
+      languageAdapt: "Adapt template",
+      languageKeep: "Keep code",
     },
   },
 });

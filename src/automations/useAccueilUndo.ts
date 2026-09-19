@@ -7,7 +7,7 @@ const HISTORY_MAX = 50;
 export type AccueilUndoEntry =
   | {
       type: "trash-item";
-      kind: "macro" | "clicker";
+      kind: AutomationKind;
       id: string;
       label: string;
     }
@@ -65,10 +65,6 @@ async function removeCreatedItem(
   kind: AutomationKind,
   id: string,
 ): Promise<void> {
-  if (kind === "script") {
-    await invoke("delete_script_cmd", { id });
-    return;
-  }
   await invoke("trash_library_item_cmd", { kind, id });
 }
 

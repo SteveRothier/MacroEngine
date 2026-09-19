@@ -81,17 +81,15 @@ export function buildAutomationRowMenuItems(
 
   items.push({ id: "sep-mid", label: "", separator: true });
 
-  if (row.kind !== "script") {
-    if (actions.onToggleFavorite) {
-      items.push({
-        id: "favorite",
-        label: row.favorite
-          ? t("automations.menu.row.removeFavorite")
-          : t("automations.menu.row.addFavorite"),
-        icon: actions.icons?.favorite,
-        onSelect: actions.onToggleFavorite,
-      });
-    }
+  if (actions.onToggleFavorite) {
+    items.push({
+      id: "favorite",
+      label: row.favorite
+        ? t("automations.menu.row.removeFavorite")
+        : t("automations.menu.row.addFavorite"),
+      icon: actions.icons?.favorite,
+      onSelect: actions.onToggleFavorite,
+    });
   }
   if (row.locked && actions.onUnlock) {
     items.push({
@@ -170,10 +168,7 @@ export function buildAutomationRowMenuItems(
     { id: "sep-del", label: "", separator: true },
     {
       id: "delete",
-      label:
-        row.kind === "macro" || row.kind === "clicker"
-          ? t("automations.menu.row.trash")
-          : t("automations.menu.row.delete"),
+      label: t("automations.menu.row.trash"),
       icon: actions.icons?.delete,
       danger: true,
       onSelect: actions.onDelete,

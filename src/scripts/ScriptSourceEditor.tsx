@@ -26,14 +26,17 @@ import {
   indentOnInput,
 } from "@codemirror/language";
 import { javascript } from "@codemirror/lang-javascript";
-import { python } from "@codemirror/lang-python";
 import { linter, lintGutter, type Diagnostic } from "@codemirror/lint";
 import {
   autocompletion,
+  closeBrackets,
+  closeBracketsKeymap,
   completionKeymap,
+  type Completion,
   type CompletionContext,
   type CompletionResult,
 } from "@codemirror/autocomplete";
+import { search, searchKeymap, highlightSelectionMatches } from "@codemirror/search";
 import type { ScriptLanguage } from "./types";
 import type { ColorScheme } from "../theme";
 import { highlightExtension } from "./scriptCmHighlight";
@@ -43,6 +46,8 @@ export type ScriptEditorDiagnostic = {
   to: number;
   message: string;
   severity?: "error" | "warning" | "info";
+  /** Stable machine code when message is localized. */
+  code?: string;
 };
 
 export type ScriptSourceEditorHandle = {
@@ -60,14 +65,14 @@ type Props = {
   ariaLabel: string;
   placeholder?: string;
   diagnostics?: ScriptEditorDiagnostic[];
+  readOnly?: boolean;
 };
 
-const CASTER_COMPLETIONS = [
+const CASTER_COMPLETIONS: Completion[] = [
   { label: "caster.get", type: "function", detail: "(name)", apply: 'caster.get("")' },
   { label: "caster.set", type: "function", detail: "(name, value)", apply: 'caster.set("", )' },
   { label: "caster.log", type: "function", detail: "(message)", apply: 'caster.log("")' },
-  { label: "caster.return", type: "function", detail: "(value) JS", apply: "caster.return()" },
-  { label: "caster.ret", type: "function", detail: "(value) Python", apply: "caster.ret()" },
+  { label: "caster.return", type: "function", detail: "(value)", apply: "caster.return()" },
   { label: "caster.fetch", type: "function", detail: "({ method, url })", apply: 'caster.fetch({ method: "GET", url: "" })' },
   { label: "caster.sleep", type: "function", detail: "(ms)", apply: "caster.sleep(200)" },
   { label: "caster.click", type: "function", detail: "({ button, x, y })", apply: 'caster.click({ button: "left" })' },
@@ -83,33 +88,86 @@ const CASTER_COMPLETIONS = [
   { label: "caster.writeFile", type: "function", detail: "(path, text)", apply: 'caster.writeFile("", "")' },
   { label: "caster.parseJson", type: "function", detail: "(text)", apply: "caster.parseJson()" },
   { label: "caster.stringify", type: "function", detail: "(value)", apply: "caster.stringify()" },
+  { label: "caster.assert", type: "function", detail: "(cond, msg?)", apply: 'caster.assert(true, "")' },
 ];
 
 function languageExtension(language: ScriptLanguage) {
-  if (language === "python") return python();
   return javascript({ typescript: language === "typescript" });
 }
 
-function casterCompletions(context: CompletionContext): CompletionResult | null {
-  const word = context.matchBefore(/caster(?:\.\w*)?|\w+/);
-  if (!word || (word.from === word.to && !context.explicit)) return null;
-  const typed = word.text.toLowerCase();
-  if (!typed.startsWith("cas") && !typed.startsWith("caster") && !context.explicit) {
-    return null;
-  }
-  return {
-    from: word.from,
-    options: CASTER_COMPLETIONS.filter(
+function completionsForLanguage(_language: ScriptLanguage): Completion[] {
+  return CASTER_COMPLETIONS;
+}
+
+function casterCompletions(
+  language: ScriptLanguage,
+): (context: CompletionContext) => CompletionResult | null {
+  return (context) => {
+    const word = context.matchBefore(/caster(?:\.\w*)?|\w+/);
+    if (!word || (word.from === word.to && !context.explicit)) return null;
+    const typed = word.text.toLowerCase();
+    if (
+      !typed.startsWith("cas") &&
+      !typed.startsWith("caster") &&
+      !context.explicit
+    ) {
+      return null;
+    }
+    const options = completionsForLanguage(language).filter(
       (c) =>
         typed.length === 0 ||
         c.label.toLowerCase().startsWith(typed) ||
         typed.startsWith("caster"),
-    ),
-    validFor: /^caster(?:\.\w*)?$/,
+    );
+    return {
+      from: word.from,
+      options,
+      validFor: /^caster(?:\.\w*)?$/,
+    };
   };
 }
 
+function autocompleteExtension(language: ScriptLanguage): Extension {
+  return autocompletion({ override: [casterCompletions(language)] });
+}
+
 /** Map engine / transpile errors that mention a line to a CM span. */
+export type ScriptLintDiagnostic = {
+  line: number;
+  column: number;
+  message: string;
+  severity: string;
+};
+
+export function diagnosticsFromLint(
+  source: string,
+  items: ScriptLintDiagnostic[],
+): ScriptEditorDiagnostic[] {
+  if (items.length === 0) return [];
+  const lines = source.split(/\r?\n/);
+  return items.map((d) => {
+    const line = Math.max(1, d.line);
+    let from = 0;
+    for (let i = 0; i < line - 1 && i < lines.length; i++) {
+      from += lines[i]!.length + 1;
+    }
+    const lineText = lines[line - 1] ?? "";
+    const col = Math.max(0, (d.column || 1) - 1);
+    const to = from + Math.max(col + 1, lineText.length, 1);
+    return {
+      from: Math.min(from + col, source.length || 0),
+      to: Math.min(to, source.length || 1),
+      message: d.message,
+      severity:
+        d.severity === "warning"
+          ? "warning"
+          : d.severity === "info"
+            ? "info"
+            : "error",
+    };
+  });
+}
+
 export function diagnosticsFromError(
   source: string,
   raw: string,
@@ -199,16 +257,19 @@ export const ScriptSourceEditor = forwardRef<
     ariaLabel,
     placeholder,
     diagnostics = [],
+    readOnly = false,
   },
   ref,
 ) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const langComp = useRef(new Compartment());
+  const autocompleteComp = useRef(new Compartment());
   const lintComp = useRef(new Compartment());
   const placeholderComp = useRef(new Compartment());
   const themeComp = useRef(new Compartment());
   const highlightComp = useRef(new Compartment());
+  const readOnlyComp = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   const onBlurRef = useRef(onBlur);
   onChangeRef.current = onChange;
@@ -258,11 +319,16 @@ export const ScriptSourceEditor = forwardRef<
         drawSelection(),
         indentOnInput(),
         bracketMatching(),
+        closeBrackets(),
         history(),
+        search(),
+        highlightSelectionMatches(),
         highlightComp.current.of(highlightExtension(colorScheme)),
-        autocompletion({ override: [casterCompletions] }),
+        autocompleteComp.current.of(autocompleteExtension(language)),
         keymap.of([
+          ...closeBracketsKeymap,
           ...defaultKeymap,
+          ...searchKeymap,
           ...historyKeymap,
           ...completionKeymap,
           indentWithTab,
@@ -289,6 +355,10 @@ export const ScriptSourceEditor = forwardRef<
             return false;
           },
         }),
+        readOnlyComp.current.of([
+          EditorState.readOnly.of(readOnly),
+          EditorView.editable.of(!readOnly),
+        ]),
       ],
     });
 
@@ -316,7 +386,10 @@ export const ScriptSourceEditor = forwardRef<
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
-      effects: langComp.current.reconfigure(languageExtension(language)),
+      effects: [
+        langComp.current.reconfigure(languageExtension(language)),
+        autocompleteComp.current.reconfigure(autocompleteExtension(language)),
+      ],
     });
   }, [language]);
 
@@ -366,12 +439,24 @@ export const ScriptSourceEditor = forwardRef<
     view.dom.setAttribute("aria-label", ariaLabel);
   }, [ariaLabel]);
 
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: readOnlyComp.current.reconfigure([
+        EditorState.readOnly.of(readOnly),
+        EditorView.editable.of(!readOnly),
+      ]),
+    });
+  }, [readOnly]);
+
   return (
     <div
       ref={hostRef}
       className="caster-script-cm"
       data-language={language}
       data-scheme={colorScheme}
+      data-readonly={readOnly ? "true" : undefined}
     />
   );
 });

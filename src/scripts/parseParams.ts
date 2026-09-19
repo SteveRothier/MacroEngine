@@ -6,7 +6,7 @@ export type ScriptParamDef = {
   default?: MacroValue;
 };
 
-/** Parse `//@param name type [default]` lines (same convention as Rust). */
+/** Parse `//@param` / `#@param name type [default]` lines (same convention as Rust). */
 export function parseParamDefs(source: string): ScriptParamDef[] {
   const out: ScriptParamDef[] = [];
   for (const line of source.split(/\r?\n/)) {
@@ -16,6 +16,10 @@ export function parseParamDefs(source: string): ScriptParamDef[] {
       rest = trimmed.slice("//@param".length).trim();
     } else if (trimmed.startsWith("// @param")) {
       rest = trimmed.slice("// @param".length).trim();
+    } else if (trimmed.startsWith("#@param")) {
+      rest = trimmed.slice("#@param".length).trim();
+    } else if (trimmed.startsWith("# @param")) {
+      rest = trimmed.slice("# @param".length).trim();
     }
     if (rest == null || rest === "") continue;
     const m = rest.match(/^(\S+)\s+(number|string|boolean)(?:\s+(.+))?$/i);

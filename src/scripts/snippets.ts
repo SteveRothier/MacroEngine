@@ -1,4 +1,4 @@
-/** Shared JS snippets for script.run / Script editor. */
+/** Shared snippets for Script editor (JS/TS). */
 
 export const SCRIPT_SNIPPET_GET = `// GET JSON → variable
 const res = caster.fetch({ method: "GET", url: "https://httpbin.org/get" });
@@ -44,3 +44,31 @@ const r = caster.runProcess({
 caster.log("exit=" + r.exitCode);
 caster.log(r.stdout);
 `;
+
+/** Mini insert examples for the API help menu (1–3 lines). */
+export type ApiInsertName =
+  | "get"
+  | "set"
+  | "log"
+  | "return"
+  | "sleep"
+  | "fetch"
+  | "include"
+  | "runScript"
+  | "click";
+
+const API_INSERT_JS: Record<ApiInsertName, string> = {
+  get: `const v = caster.get("label");\n`,
+  set: `caster.set("n", 1);\n`,
+  log: `caster.log("hello");\n`,
+  return: `caster.return(caster.get("label"));\n`,
+  sleep: `caster.sleep(200);\n`,
+  fetch: `const res = caster.fetch({ method: "GET", url: "https://httpbin.org/get" });\ncaster.log(String(res.status));\n`,
+  include: `const mod = caster.include("mon-module");\ncaster.log(mod);\n`,
+  runScript: `caster.runScript("autre-script", { n: 1 });\n`,
+  click: `caster.click({ button: "left", x: 100, y: 100 });\n`,
+};
+
+export function apiInsertSnippet(name: ApiInsertName): string {
+  return API_INSERT_JS[name];
+}
