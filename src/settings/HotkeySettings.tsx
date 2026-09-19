@@ -12,9 +12,10 @@ const DEFAULTS: HotkeyBindings = {
   macroVk: 0x78,
   pauseVk: 0x76,
   emergencyVk: 0x77,
+  scriptVk: 0x79,
 };
 
-type CaptureSlot = "action" | "macro" | "pause" | "emergency" | null;
+type CaptureSlot = "action" | "macro" | "pause" | "emergency" | "script" | null;
 
 type Props = {
   onBindingsChange?: (b: HotkeyBindings) => void;
@@ -60,6 +61,7 @@ export function HotkeySettings({ onBindingsChange }: Props) {
         }
         if (capture === "macro") return { ...prev, macroVk: vk };
         if (capture === "pause") return { ...prev, pauseVk: vk };
+        if (capture === "script") return { ...prev, scriptVk: vk };
         return { ...prev, emergencyVk: vk };
       });
       setCapture(null);
@@ -85,6 +87,7 @@ export function HotkeySettings({ onBindingsChange }: Props) {
         actionAlt: !!next.actionAlt,
         actionShift: !!next.actionShift,
         pauseVk: next.pauseVk ?? DEFAULTS.pauseVk,
+        scriptVk: next.scriptVk ?? DEFAULTS.scriptVk,
       };
       setBindings(normalized);
       onBindingsChange?.(normalized);
@@ -99,6 +102,7 @@ export function HotkeySettings({ onBindingsChange }: Props) {
   }
 
   const pause = bindings.pauseVk ?? 0x76;
+  const script = bindings.scriptVk ?? 0x79;
   let conflict: string | null = null;
   if (bindings.actionVk === bindings.macroVk) {
     conflict = t("settings.hotkeys.conflictClickerMacro");
@@ -106,12 +110,20 @@ export function HotkeySettings({ onBindingsChange }: Props) {
     conflict = t("settings.hotkeys.conflictClickerPause");
   } else if (bindings.actionVk === bindings.emergencyVk) {
     conflict = t("settings.hotkeys.conflictClickerEmergency");
+  } else if (bindings.actionVk === script) {
+    conflict = t("settings.hotkeys.conflictClickerScript");
   } else if (bindings.macroVk === pause) {
     conflict = t("settings.hotkeys.conflictMacroPause");
   } else if (bindings.macroVk === bindings.emergencyVk) {
     conflict = t("settings.hotkeys.conflictMacroEmergency");
+  } else if (bindings.macroVk === script) {
+    conflict = t("settings.hotkeys.conflictMacroScript");
   } else if (pause === bindings.emergencyVk) {
     conflict = t("settings.hotkeys.conflictPauseEmergency");
+  } else if (pause === script) {
+    conflict = t("settings.hotkeys.conflictPauseScript");
+  } else if (script === bindings.emergencyVk) {
+    conflict = t("settings.hotkeys.conflictScriptEmergency");
   }
 
   return (
@@ -137,6 +149,7 @@ export function HotkeySettings({ onBindingsChange }: Props) {
           [
             ["pause", "settings.hotkeys.pause", bindings.pauseVk ?? 0x76],
             ["macro", "settings.hotkeys.macro", bindings.macroVk],
+            ["script", "settings.hotkeys.script", bindings.scriptVk ?? 0x79],
             ["emergency", "settings.hotkeys.emergency", bindings.emergencyVk],
           ] as const
         ).map(([slot, labelKey, vk]) => (

@@ -4,6 +4,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { ChevronRight } from "lucide-react";
 
 /** Shared item shape for ContextMenu + DropdownMenu. */
@@ -20,6 +21,12 @@ export type MenuItemDef = {
   separator?: boolean;
   /** Render as section header (not selectable). */
   groupHeader?: boolean;
+  /** Inline filter field (not selectable). */
+  filter?: {
+    value: string;
+    placeholder?: string;
+    onChange: (value: string) => void;
+  };
   /** Nested flyout items (hover / focus). */
   submenu?: MenuItemDef[];
   onSelect?: () => void;
@@ -51,6 +58,14 @@ const VIEWPORT_PAD = 8;
 const SUBMENU_GAP_PX = 6;
 const PARENT_MENU_SEL =
   ".caster-context-menu, .caster-menu-popover, .caster-menu-submenu";
+const PORTAL_SUBMENU_SEL =
+  ".caster-menu-submenu--portal, .caster-menu-submenu-bridge--portal";
+
+/** True when the event target is inside a portaled submenu flyout/bridge. */
+export function isPortaledSubmenuTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest(PORTAL_SUBMENU_SEL));
+}
 
 /** Flat list of caster-menu-item rows (separators + optional icons + submenu flyouts). */
 export function MenuItemsList({
@@ -73,6 +88,26 @@ export function MenuItemsList({
           return (
             <div key={item.id} className="caster-action-picker-group-label">
               {item.label}
+            </div>
+          );
+        }
+        if (item.filter) {
+          return (
+            <div
+              key={item.id}
+              className="caster-menu-filter"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <input
+                type="search"
+                className="caster-menu-filter-input"
+                value={item.filter.value}
+                placeholder={item.filter.placeholder}
+                aria-label={item.filter.placeholder ?? item.label}
+                onChange={(e) => item.filter?.onChange(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
           );
         }
@@ -182,38 +217,38 @@ function SubmenuRow({
 
     const wrapEl = wrapRef.current;
     const fly = flyoutRef.current;
-    const wrap = wrapEl.getBoundingClientRect();
     const menuEl = wrapEl.closest(PARENT_MENU_SEL);
     const menu = (menuEl ?? wrapEl).getBoundingClientRect();
+    const btn = (btnRef.current ?? wrapEl).getBoundingClientRect();
 
     fly.style.visibility = "hidden";
+    fly.style.position = "fixed";
     fly.style.left = "0";
     fly.style.right = "auto";
     fly.style.top = "0";
-    fly.style.marginLeft = "0";
-    fly.style.marginRight = "0";
     fly.style.width = `${menu.width}px`;
     fly.style.minWidth = `${menu.width}px`;
     fly.style.maxWidth = `${menu.width}px`;
 
     const height = fly.getBoundingClientRect().height;
     const width = menu.width;
-    const btn = (btnRef.current ?? wrapEl).getBoundingClientRect();
 
     let placeLeft = false;
-    let left = menu.right - wrap.left + SUBMENU_GAP_PX;
+    let left = menu.right + SUBMENU_GAP_PX;
     const spaceRight = window.innerWidth - menu.right - VIEWPORT_PAD;
     if (spaceRight < width + SUBMENU_GAP_PX) {
       placeLeft = true;
-      left = menu.left - wrap.left - width - SUBMENU_GAP_PX;
+      left = menu.left - width - SUBMENU_GAP_PX;
     }
 
-    // Align top with the parent option row (not the whole menu panel).
-    let top = btn.top - wrap.top;
-    const absBottom = btn.top + height;
-    const overflow = absBottom - (window.innerHeight - VIEWPORT_PAD);
+    // Align top with the parent option row; clamp to viewport.
+    let top = btn.top;
+    const overflow = btn.top + height - (window.innerHeight - VIEWPORT_PAD);
     if (overflow > 0) {
       top -= overflow;
+    }
+    if (top < VIEWPORT_PAD) {
+      top = VIEWPORT_PAD;
     }
 
     fly.style.left = `${left}px`;
@@ -222,21 +257,48 @@ function SubmenuRow({
 
     const bridge = bridgeRef.current;
     if (bridge) {
-      const gap = placeLeft
-        ? Math.max(0, wrap.left - (menu.left - SUBMENU_GAP_PX))
-        : Math.max(0, menu.right + SUBMENU_GAP_PX - wrap.right);
-      bridge.style.top = "0";
-      bridge.style.height = `${Math.max(wrap.height, btn.height)}px`;
-      bridge.style.width = `${Math.max(gap, SUBMENU_GAP_PX + 2)}px`;
+      const gapW = Math.max(SUBMENU_GAP_PX + 2, SUBMENU_GAP_PX);
+      const bridgeTop = Math.min(btn.top, top);
+      const bridgeBottom = Math.max(btn.bottom, top + height);
+      bridge.style.position = "fixed";
+      bridge.style.top = `${bridgeTop}px`;
+      bridge.style.height = `${Math.max(bridgeBottom - bridgeTop, btn.height)}px`;
+      bridge.style.width = `${gapW}px`;
       if (placeLeft) {
-        bridge.style.left = "auto";
-        bridge.style.right = "100%";
+        bridge.style.left = `${left + width}px`;
       } else {
-        bridge.style.left = "100%";
-        bridge.style.right = "auto";
+        bridge.style.left = `${menu.right}px`;
       }
+      bridge.style.right = "auto";
     }
   }, [open, item.submenu]);
+
+  const portal =
+    open && item.submenu
+      ? createPortal(
+          <>
+            <div
+              ref={bridgeRef}
+              className="caster-menu-submenu-bridge caster-menu-submenu-bridge--portal"
+              aria-hidden
+              onMouseEnter={clearCloseTimer}
+              onMouseLeave={scheduleClose}
+            />
+            <div
+              ref={flyoutRef}
+              className="caster-menu-submenu caster-menu-submenu--portal"
+              role="menu"
+              style={{ visibility: "hidden" }}
+              onMouseEnter={clearCloseTimer}
+              onMouseLeave={scheduleClose}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <MenuItemsList items={item.submenu} onItemSelect={onItemSelect} />
+            </div>
+          </>,
+          document.body,
+        )
+      : null;
 
   return (
     <div
@@ -281,25 +343,7 @@ function SubmenuRow({
           <ChevronRight size={14} />
         </span>
       </button>
-      {open ? (
-        <div
-          ref={bridgeRef}
-          className="caster-menu-submenu-bridge"
-          aria-hidden
-        />
-      ) : null}
-      {open && item.submenu ? (
-        <div
-          ref={flyoutRef}
-          className="caster-menu-submenu"
-          role="menu"
-          style={{ visibility: "hidden" }}
-          onMouseEnter={clearCloseTimer}
-          onContextMenu={(e) => e.preventDefault()}
-        >
-          <MenuItemsList items={item.submenu} onItemSelect={onItemSelect} />
-        </div>
-      ) : null}
+      {portal}
     </div>
   );
 }

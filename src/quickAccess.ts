@@ -14,12 +14,13 @@ export type QuickAccess = {
   favorites: {
     clickerPresets: string[];
     macros: string[];
+    scripts: string[];
   };
   recent: RecentEntry[];
 };
 
 export const EMPTY_QUICK_ACCESS: QuickAccess = {
-  favorites: { clickerPresets: [], macros: [] },
+  favorites: { clickerPresets: [], macros: [], scripts: [] },
   recent: [],
 };
 

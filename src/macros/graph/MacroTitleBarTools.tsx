@@ -6,6 +6,7 @@ import { EditorToolbar } from "../../ui/shell";
 type Props = {
   onBack: () => void;
   locked: boolean;
+  loading?: boolean;
   engineState: string;
   recording: boolean;
   recordPaused: boolean;
@@ -13,6 +14,7 @@ type Props = {
   onPlay: () => void;
   /** When set, shows a secondary play-from-selection control. */
   onPlayFrom?: () => void;
+  onStop?: () => void;
   onStartRecord: () => void;
   onPauseRecord: () => void;
   onResumeRecord: () => void;
@@ -28,12 +30,14 @@ type Props = {
 export function MacroTitleBarTools({
   onBack,
   locked,
+  loading = false,
   engineState,
   recording,
   recordPaused,
   recordCount,
   onPlay,
   onPlayFrom,
+  onStop,
   onStartRecord,
   onPauseRecord,
   onResumeRecord,
@@ -46,7 +50,7 @@ export function MacroTitleBarTools({
 }: Props) {
   const t = useT();
   const running = engineState === "running" || engineState === "paused";
-  const busy = running || recording;
+  const busy = running || recording || loading;
 
   return (
     <EditorToolbar
@@ -159,6 +163,18 @@ export function MacroTitleBarTools({
             <Play size={14} aria-hidden />
             {t("macros.toolbar.test")}
           </button>
+          {onStop ? (
+            <button
+              type="button"
+              className="caster-titlebar-btn caster-btn caster-btn-danger-ghost"
+              disabled={!running || loading}
+              onClick={onStop}
+              title={t("macros.toolbar.stopTitle")}
+            >
+              <Square size={14} aria-hidden />
+              {t("macros.toolbar.stop")}
+            </button>
+          ) : null}
           {locked ? (
             <span className="caster-clicker-lock" title={t("macros.toolbar.lockedTitle")}>
               {t("macros.toolbar.locked")}

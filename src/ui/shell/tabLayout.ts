@@ -1,9 +1,9 @@
 export const TAB_LAYOUT = {
   MIN_W: 36,
-  /** Soft ceiling for layout math / animations only — CSS tabs have no max-width. */
-  MAX_W: 600,
+  /** Soft ceiling for layout math / animations — keep in sync with --caster-tab-max-w. */
+  MAX_W: 220,
   STRIP_GAP_PX: 4,
-  /** Min width of `.caster-doc-tabbar-drag-fill` (grows to fill leftover strip). */
+  /** Min width of `.caster-doc-tabbar-drag-fill` (CSS flex-grows to fill leftover strip). */
   DRAG_FILL_W: 24,
 } as const;
 

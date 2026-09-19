@@ -441,6 +441,22 @@ export function MacroEditorView({
     toast,
   ]);
 
+  const onStopSession = useCallback(async () => {
+    try {
+      const st = await invoke<EngineStatus>("emergency_stop");
+      onStatus(st);
+      toast.info(t("shell.sessionStopped"));
+    } catch {
+      try {
+        const st = await invoke<EngineStatus>("request_cancel");
+        onStatus(st);
+        toast.info(t("shell.cancelRequested"));
+      } catch (e) {
+        toast.error(errMessage(e, t("shell.cannotStop")));
+      }
+    }
+  }, [onStatus, t, toast]);
+
   const onRunFrom = useCallback(
     async (path: ActionPath) => {
       if (locked || recording || editorLocked) return;
@@ -726,11 +742,13 @@ export function MacroEditorView({
     <MacroTitleBarTools
       onBack={onBack}
       locked={locked}
+      loading={loading}
       engineState={engineState}
       recording={recording}
       recordPaused={recordPaused}
       recordCount={recordCount}
       onPlay={() => void onPlay()}
+      onStop={() => void onStopSession()}
       onPlayFrom={
         selectedPath && !editorLocked
           ? () => void onRunFrom(selectedPath)
@@ -748,7 +766,7 @@ export function MacroEditorView({
         <MacroMetaBar
           doc={doc}
           macroId={macroId}
-          locked={editorLocked}
+          locked={editorLocked || loading}
           onChange={updateDoc}
           onNameCommit={(name) => void commitRename(name)}
           onError={(msg) => toast.error(msg)}

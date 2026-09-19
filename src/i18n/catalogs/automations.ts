@@ -303,11 +303,9 @@ export const automations = defineCatalog({
         "Impossible de transpile ({detail}). Créer un script qui lance la macro d’origine ?",
       wrapConfirm: "Créer un script référence",
       languageTitle: "Langage du script",
-      languageMessage:
-        "Choisir JavaScript, TypeScript ou Python pour le script converti.",
+      languageMessage: "Choisir JavaScript ou TypeScript pour le script converti.",
       languageJs: "JavaScript",
       languageTs: "TypeScript",
-      languagePy: "Python",
       blockers: {
         processRun: "lancement de processus",
         controlIf: "condition process (si)",
@@ -619,11 +617,9 @@ export const automations = defineCatalog({
         "Cannot transpile ({detail}). Create a script that runs the original macro?",
       wrapConfirm: "Create reference script",
       languageTitle: "Script language",
-      languageMessage:
-        "Choose JavaScript, TypeScript, or Python for the converted script.",
+      languageMessage: "Choose JavaScript or TypeScript for the converted script.",
       languageJs: "JavaScript",
       languageTs: "TypeScript",
-      languagePy: "Python",
       blockers: {
         processRun: "process launch",
         controlIf: "process condition (if)",

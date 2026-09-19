@@ -251,6 +251,7 @@ export type HotkeyBindings = {
   macroVk: number;
   pauseVk?: number;
   emergencyVk: number;
+  scriptVk?: number;
 };
 
 export function chordLabel(b: {

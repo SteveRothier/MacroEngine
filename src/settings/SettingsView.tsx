@@ -23,9 +23,11 @@ import type { HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import type { SettingsSection } from "../app/types";
 import {
+  mergeAccueilPrefs,
   mergeAutomationPrefs,
   mergeScriptsPrefs,
   mergeShellPrefs,
+  type AccueilPrefs,
   type AutomationPrefs,
   type ScriptsPrefs,
   type ShellPrefs,
@@ -55,6 +57,7 @@ type Props = {
   onShellPrefsChange?: (prefs: ShellPrefs) => void;
   onAutomationPrefsChange?: (prefs: AutomationPrefs) => void;
   onScriptsPrefsChange?: (prefs: ScriptsPrefs) => void;
+  onAccueilPrefsChange?: (prefs: AccueilPrefs) => void;
 };
 
 function displayOptionLabel(d: DisplayDto, primarySuffix: string): string {
@@ -118,6 +121,7 @@ export function SettingsView({
   onShellPrefsChange,
   onAutomationPrefsChange,
   onScriptsPrefsChange,
+  onAccueilPrefsChange,
 }: Props) {
   const toast = useToast();
   const t = useT();
@@ -138,6 +142,7 @@ export function SettingsView({
     mergeAutomationPrefs(),
   );
   const [scripts, setScripts] = useState<ScriptsPrefs>(() => mergeScriptsPrefs());
+  const [accueil, setAccueil] = useState<AccueilPrefs>(() => mergeAccueilPrefs());
   const [liveExes, setLiveExes] = useState<string[]>([]);
   const [foregroundExe, setForegroundExe] = useState<string | null>(null);
   const [processDraft, setProcessDraft] = useState("");
@@ -179,6 +184,9 @@ export function SettingsView({
       const sc = mergeScriptsPrefs(s.scripts);
       setScripts(sc);
       onScriptsPrefsChange?.(sc);
+      const ac = mergeAccueilPrefs(s.accueil);
+      setAccueil(ac);
+      onAccueilPrefsChange?.(ac);
     });
     refreshDisplays();
     void invoke<AppPaths>("get_paths")
@@ -190,6 +198,7 @@ export function SettingsView({
     onShellPrefsChange,
     onAutomationPrefsChange,
     onScriptsPrefsChange,
+    onAccueilPrefsChange,
   ]);
 
   useEffect(() => {
@@ -225,6 +234,7 @@ export function SettingsView({
       shell?: ShellPrefs;
       automation?: AutomationPrefs;
       scripts?: ScriptsPrefs;
+      accueil?: AccueilPrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
@@ -242,6 +252,7 @@ export function SettingsView({
         shell: partial.shell,
         automation: partial.automation,
         scripts: partial.scripts,
+        accueil: partial.accueil,
       });
     },
     [loadSettings, saveBundle, theme],
@@ -266,6 +277,13 @@ export function SettingsView({
     setScripts(next);
     onScriptsPrefsChange?.(next);
     void persist({ scripts: next });
+  };
+
+  const persistAccueilPrefs = (patch: Partial<AccueilPrefs>) => {
+    const next = mergeAccueilPrefs({ ...accueil, ...patch });
+    setAccueil(next);
+    onAccueilPrefsChange?.(next);
+    void persist({ accueil: next });
   };
 
   const setAdvanced = (next: boolean) => {
@@ -682,6 +700,51 @@ export function SettingsView({
                           persistScriptsPrefs({ showPermBadgesOnHome: checked })
                         }
                       />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.showModulesInAll")}</span>
+                      <p>{t("settings.application.showModulesInAllHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={accueil.showModulesInAll}
+                        ariaLabel={t("settings.application.showModulesInAll")}
+                        onChange={(checked) =>
+                          persistAccueilPrefs({ showModulesInAll: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.accueilScriptLanguages")}</span>
+                      <p>{t("settings.application.accueilScriptLanguagesHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control caster-settings-lang-toggles">
+                      {(
+                        [
+                          ["javascript", "accueilScriptLangJs"],
+                          ["typescript", "accueilScriptLangTs"],
+                        ] as const
+                      ).map(([lang, labelKey]) => (
+                        <div key={lang} className="caster-settings-lang-toggle">
+                          <span>{t(`settings.application.${labelKey}`)}</span>
+                          <SettingsToggle
+                            checked={!accueil.hideScriptLanguages.includes(lang)}
+                            ariaLabel={t(`settings.application.${labelKey}`)}
+                            onChange={(checked) => {
+                              const hidden = new Set(accueil.hideScriptLanguages);
+                              if (checked) hidden.delete(lang);
+                              else hidden.add(lang);
+                              persistAccueilPrefs({
+                                hideScriptLanguages: [...hidden],
+                              });
+                            }}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </SettingsGroup>
