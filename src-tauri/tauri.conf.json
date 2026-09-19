@@ -19,49 +19,8 @@
         "minWidth": 560,
         "minHeight": 480,
         "resizable": true,
-        "decorations": false
-      },
-      {
-        "label": "overlay",
-        "title": "Caster Overlay",
-        "width": 240,
-        "height": 72,
         "decorations": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false,
-        "visible": false,
-        "transparent": true
-      },
-      {
-        "label": "picker",
-        "title": "Choisir un point",
-        "width": 800,
-        "height": 600,
-        "decorations": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false,
-        "visible": false,
-        "transparent": true,
-        "shadow": false,
-        "backgroundColor": "#00000000",
-        "fullscreen": false
-      },
-      {
-        "label": "zones",
-        "title": "Zones de sécurité",
-        "width": 800,
-        "height": 600,
-        "decorations": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": true,
-        "visible": false,
-        "transparent": true,
-        "shadow": false,
-        "backgroundColor": "#00000000",
-        "fullscreen": false
+        "visible": false
       }
     ],
     "security": {

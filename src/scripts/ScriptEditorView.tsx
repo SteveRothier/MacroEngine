@@ -64,6 +64,7 @@ import {
 import { ScriptRunTimeline } from "./ScriptRunTimeline";
 import { parseParamDefs } from "./parseParams";
 import type { ScriptDoc, ScriptLanguage } from "./types";
+export { newScriptId } from "./newScriptId";
 import type { EngineStatus, MacroValue } from "../macros/types";
 import {
   mergeScriptsPrefs,
@@ -856,8 +857,4 @@ export function ScriptEditorView({
       </div>
     </div>
   );
-}
-
-export function newScriptId(): string {
-  return `s${Math.random().toString(36).slice(2, 10)}`;
 }

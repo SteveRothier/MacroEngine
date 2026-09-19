@@ -7,7 +7,7 @@ import {
 } from "../macros/types";
 import type { LibraryFolder, LibraryIndexDto } from "../library/types";
 import type { QuickAccess, RecentRunStatus } from "../quickAccess";
-import type { ScriptDoc } from "../scripts/types";
+import type { ScriptSummary } from "../scripts/types";
 import { activePermissionLabels } from "../scripts/ScriptPermissionsMenu";
 import { useLocale, useT, type TFunction } from "../i18n";
 import type {
@@ -120,7 +120,7 @@ export function useUnifiedAutomations(options: {
         scriptsLibrary: LibraryIndexDto;
         macroSummaries: MacroSummary[];
         clickerSummaries: ClickerSummary[];
-        scripts: ScriptDoc[];
+        scripts: ScriptSummary[];
         quickAccess: QuickAccess;
         hotkeys: HotkeyBindings;
       }>("get_automations_home_cmd");

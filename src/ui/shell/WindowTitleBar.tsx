@@ -25,6 +25,8 @@ type Props = {
     id: string,
     label?: string,
   ) => void;
+  /** Prefetch lazy editor chunk (hover). */
+  onPrefetchEditor?: (kind: "macro" | "clicker" | "script" | "settings") => void;
   onTabContextAction?: (tabId: string, action: TabContextAction) => void;
   onBarContextAction?: (action: BarContextAction) => void;
   onTabReorder?: (fromTabId: string, insertBeforeTabId: string | null) => void;
@@ -47,6 +49,7 @@ export function WindowTitleBar({
   onCreateClicker,
   onCreateScript,
   onOpenExisting,
+  onPrefetchEditor,
   onTabContextAction,
   onBarContextAction,
   onTabReorder,
@@ -81,6 +84,7 @@ export function WindowTitleBar({
           onCreateClicker={onCreateClicker}
           onCreateScript={onCreateScript}
           onOpenExisting={onOpenExisting}
+          onPrefetchEditor={onPrefetchEditor}
           onTabContextAction={onTabContextAction}
           onBarContextAction={onBarContextAction}
           onTabReorder={onTabReorder}
@@ -103,6 +107,7 @@ export function WindowTitleBar({
               .filter(Boolean)
               .join(" ")}
             onClick={onSettingsClick}
+            onMouseEnter={() => onPrefetchEditor?.("settings")}
             title={t("shell.navSettings")}
             aria-label={t("shell.navSettings")}
             aria-pressed={settingsActive}

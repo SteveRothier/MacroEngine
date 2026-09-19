@@ -73,6 +73,7 @@ type Props = {
     id: string,
     label?: string,
   ) => void;
+  onPrefetchEditor?: (kind: "macro" | "clicker" | "script" | "settings") => void;
   onTabContextAction?: (tabId: string, action: TabContextAction) => void;
   onBarContextAction?: (action: BarContextAction) => void;
   onTabReorder?: (fromTabId: string, insertBeforeTabId: string | null) => void;
@@ -455,6 +456,7 @@ export function DocumentTabBar({
   onCreateClicker,
   onCreateScript,
   onOpenExisting,
+  onPrefetchEditor,
   onTabContextAction,
   onBarContextAction,
   onTabReorder,
@@ -566,6 +568,9 @@ export function DocumentTabBar({
       setCreateMenu(null);
       return;
     }
+    onPrefetchEditor?.("macro");
+    onPrefetchEditor?.("clicker");
+    onPrefetchEditor?.("script");
     const rect = addBtnRef.current?.getBoundingClientRect();
     if (!rect) return;
     setCreateMenu({ x: rect.left, y: rect.bottom + 4 });
@@ -785,6 +790,11 @@ export function DocumentTabBar({
         ]
           .filter(Boolean)
           .join(" ")}
+        onMouseEnter={() => {
+          if (tab.kind === "macro" || tab.kind === "clicker" || tab.kind === "script") {
+            onPrefetchEditor?.(tab.kind);
+          }
+        }}
         onContextMenu={(e) => openTabMenu(e, tab)}
         onAuxClick={(e) => {
           if (e.button !== 1) return;

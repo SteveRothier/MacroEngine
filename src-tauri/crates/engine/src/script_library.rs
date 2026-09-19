@@ -65,6 +65,47 @@ pub struct ScriptDoc {
     pub param_values: HashMap<String, MacroValue>,
 }
 
+/// Accueil / list metadata without source (avoids shipping large payloads).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptSummary {
+    pub id: String,
+    pub name: String,
+    #[serde(default, deserialize_with = "deserialize_script_language")]
+    pub language: ScriptLanguage,
+    #[serde(default)]
+    pub is_module: bool,
+    #[serde(default = "default_network")]
+    pub allow_network: bool,
+    #[serde(default)]
+    pub allow_clipboard: bool,
+    #[serde(default)]
+    pub allow_fs: bool,
+    #[serde(default)]
+    pub allow_macro_control: bool,
+    #[serde(default)]
+    pub allow_input: bool,
+    #[serde(default)]
+    pub allow_process: bool,
+}
+
+impl From<&ScriptDoc> for ScriptSummary {
+    fn from(doc: &ScriptDoc) -> Self {
+        Self {
+            id: doc.id.clone(),
+            name: doc.name.clone(),
+            language: doc.language,
+            is_module: doc.is_module,
+            allow_network: doc.allow_network,
+            allow_clipboard: doc.allow_clipboard,
+            allow_fs: doc.allow_fs,
+            allow_macro_control: doc.allow_macro_control,
+            allow_input: doc.allow_input,
+            allow_process: doc.allow_process,
+        }
+    }
+}
+
 fn default_network() -> bool {
     true
 }
@@ -151,6 +192,16 @@ pub fn list_scripts(config_dir: &Path) -> Result<Vec<ScriptDoc>, ScriptLibraryEr
     }
     out.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(out)
+}
+
+/// Like [`list_scripts`] but omits `source` from the returned payloads.
+pub fn list_script_summaries(
+    config_dir: &Path,
+) -> Result<Vec<ScriptSummary>, ScriptLibraryError> {
+    Ok(list_scripts(config_dir)?
+        .iter()
+        .map(ScriptSummary::from)
+        .collect())
 }
 
 pub fn load_script(config_dir: &Path, id: &str) -> Result<ScriptDoc, ScriptLibraryError> {

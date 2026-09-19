@@ -41,7 +41,7 @@ import { confirmAction, promptAction } from "../ui";
 import type { AppRoute } from "../app/types";
 import { useLocale, useT, type TFunction } from "../i18n";
 import type { ScriptDoc } from "../scripts/types";
-import { newScriptId } from "../scripts/ScriptEditorView";
+import { newScriptId } from "../scripts/newScriptId";
 import {
   humanizeScriptError,
 } from "../scripts/humanizeScriptError";
@@ -1774,37 +1774,6 @@ export function AutomationsTable({
               </div>
               <span className="caster-auto-colhead-trail" aria-hidden />
             </div>
-            {loading ? (
-              <div className="caster-auto-skeleton-page">
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <div key={i} className="caster-auto-skeleton-row">
-                    <div className="caster-skeleton caster-auto-skeleton-check" />
-                    <div className="caster-auto-skeleton-identity">
-                      <div className="caster-skeleton caster-auto-skeleton-kind" />
-                      <div className="caster-auto-skeleton-text">
-                        <div
-                          className="caster-skeleton caster-skeleton-line caster-skeleton-line--lg"
-                          style={{ width: `${52 - i * 5}%` }}
-                        />
-                        <div
-                          className="caster-skeleton caster-skeleton-line"
-                          style={{ width: `${36 - i * 3}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="caster-skeleton caster-auto-skeleton-type" />
-                    <div className="caster-auto-skeleton-props">
-                      <div className="caster-skeleton caster-auto-skeleton-prop caster-auto-skeleton-prop--trigger" />
-                      <div className="caster-skeleton caster-auto-skeleton-prop caster-auto-skeleton-prop--secondary" />
-                      <div className="caster-skeleton caster-auto-skeleton-prop caster-auto-skeleton-prop--run" />
-                      <div className="caster-skeleton caster-auto-skeleton-prop caster-auto-skeleton-prop--status" />
-                    </div>
-                    <div className="caster-auto-skeleton-trail" aria-hidden />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
             {sections.map((section) => {
               const collapsed = collapsedSections.has(section.id);
               const folderKey =
@@ -2241,8 +2210,6 @@ export function AutomationsTable({
                 </div>
               );
             })}
-              </>
-            )}
           </div>
         ) : (
           emptyState

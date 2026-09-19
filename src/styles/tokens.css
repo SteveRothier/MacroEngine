@@ -1,7 +1,7 @@
 :root {
-  --font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Rajdhani", "IBM Plex Sans", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
+  --font: "Segoe UI", system-ui, -apple-system, "IBM Plex Sans", sans-serif;
+  --font-display: "Segoe UI", system-ui, "Rajdhani", "IBM Plex Sans", sans-serif;
+  --font-mono: "Cascadia Code", Consolas, "IBM Plex Mono", ui-monospace, monospace;
 
   /* Light — cold gray ops console (derived from dark) */
   --bg: #e8ebf0;

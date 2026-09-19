@@ -366,10 +366,16 @@ pub fn get_library_index(
     config_dir: &Path,
     kind: LibraryKind,
 ) -> Result<LibraryIndexDto, LibraryIndexError> {
+    let index = prepare_library_index(config_dir)?;
+    build_dto(&index, config_dir, kind, None, None, false, None)
+}
+
+/// Load index, prune orphans, persist once — reuse for multi-kind Accueil queries.
+pub fn prepare_library_index(config_dir: &Path) -> Result<LibraryIndex, LibraryIndexError> {
     let mut index = load_index(config_dir)?;
     prune_orphans(&mut index, config_dir)?;
     save_index(config_dir, &index)?;
-    build_dto(&index, config_dir, kind, None, None, false)
+    Ok(index)
 }
 
 #[derive(Debug, Clone, Default)]
@@ -386,16 +392,25 @@ pub fn list_library_items(
     kind: LibraryKind,
     q: ListLibraryQuery,
 ) -> Result<LibraryIndexDto, LibraryIndexError> {
-    let mut index = load_index(config_dir)?;
-    prune_orphans(&mut index, config_dir)?;
-    save_index(config_dir, &index)?;
+    let index = prepare_library_index(config_dir)?;
+    list_library_items_from_index(&index, config_dir, kind, q, None)
+}
+
+pub fn list_library_items_from_index(
+    index: &LibraryIndex,
+    config_dir: &Path,
+    kind: LibraryKind,
+    q: ListLibraryQuery,
+    script_names: Option<&HashMap<String, String>>,
+) -> Result<LibraryIndexDto, LibraryIndexError> {
     build_dto(
-        &index,
+        index,
         config_dir,
         kind,
         q.folder_id.as_deref(),
         q.query.as_deref(),
         q.include_trash,
+        script_names,
     )
     .map(|mut dto| {
         if q.favorites_only {
@@ -413,6 +428,7 @@ fn build_dto(
     folder_filter: Option<&str>,
     query: Option<&str>,
     include_trash: bool,
+    script_names_hint: Option<&HashMap<String, String>>,
 ) -> Result<LibraryIndexDto, LibraryIndexError> {
     let key = kind_key(kind);
     let folders = index.folders.clone();
@@ -420,13 +436,20 @@ fn build_dto(
     let q_lower = query.map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty());
 
     let mut items = Vec::new();
-    let script_names: HashMap<String, String> = if kind == LibraryKind::Script {
-        list_scripts(config_dir)?
-            .into_iter()
-            .map(|s| (s.id, s.name))
-            .collect()
+    let owned_names: HashMap<String, String>;
+    let script_names: &HashMap<String, String> = if kind == LibraryKind::Script {
+        if let Some(hint) = script_names_hint {
+            hint
+        } else {
+            owned_names = list_scripts(config_dir)?
+                .into_iter()
+                .map(|s| (s.id, s.name))
+                .collect();
+            &owned_names
+        }
     } else {
-        HashMap::new()
+        owned_names = HashMap::new();
+        &owned_names
     };
     for id in list_disk_ids(config_dir, kind)? {
         let trashed = is_trashed(index, kind, &id);

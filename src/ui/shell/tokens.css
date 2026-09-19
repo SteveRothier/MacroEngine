@@ -7,8 +7,8 @@
 }
 
 :root {
-  --caster-font: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  --caster-font-mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
+  --caster-font: "Segoe UI", system-ui, -apple-system, "IBM Plex Sans", sans-serif;
+  --caster-font-mono: "Cascadia Code", Consolas, "IBM Plex Mono", ui-monospace, monospace;
 
   --caster-text-xs: 11px;
   --caster-text-sm: 12px;

@@ -1547,8 +1547,15 @@ impl AppState {
             stop,
         )?;
         *self.hotkey_thread.lock().expect("hotkey thread") = Some(handle);
-        let _ = self.rebuild_macro_triggers();
-        let _ = self.rebuild_clicker_triggers();
+        // Named macro/clicker triggers scan every JSON on disk — do it off the setup path.
+        let rebuild = self.clone();
+        std::thread::Builder::new()
+            .name("hotkey-triggers".into())
+            .spawn(move || {
+                let _ = rebuild.rebuild_macro_triggers();
+                let _ = rebuild.rebuild_clicker_triggers();
+            })
+            .map_err(|e| e.to_string())?;
         self.bus.publish(EngineEvent::Log {
             level: LogLevel::Info,
             message: format!(

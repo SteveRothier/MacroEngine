@@ -4,15 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/app-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-    />
     <title>Caster</title>
     <!-- Force WebKit scrollbar path (WebView2) before React CSS loads -->
     <style>
+      html {
+        font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      }
       *::-webkit-scrollbar {
         width: 6px;
         height: 6px;

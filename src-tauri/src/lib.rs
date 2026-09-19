@@ -6,32 +6,37 @@ use caster_engine::{
     assert_not_locked, convert_library_item_lang, create_library_folder, create_macro, delete_library_folder, delete_macro,
     delete_preset, delete_script, duplicate_macro, duplicate_preset, enrich_macro_summaries,
     export_preset_to_path, get_library_index, import_preset_from_path, list_library_items,
-    list_macro_summaries, list_macros, list_preset_summaries, list_presets, list_scripts,
-    load_macro, load_preset, load_quick_access, load_script, load_settings, load_accueil_order,
-    list_visible_process_exes, macro_to_json, move_library_item, overlay_bands, parse_macro_json,
-    prune_orphans, purge_library_trash, remove_library_entry, rename_library_entry_key,
-    rename_library_folder, rename_macro, rename_preset, restore_library_item, save_macro_checked,
-    save_preset, save_preset_with_trigger, save_quick_access, save_script, save_settings,
-    save_accueil_order, set_favorite, set_library_item_locked, trash_library_item,
-    normalize_app_settings, AccueilPrefs, AppearancePrefs, AppSettings, AppState, AutomationPrefs,
-    ClickerConfig, ClickerMetrics, ClickerPreset, ClickerPresetSummary, ConfirmationsPrefs,
-    ConvertMode, ConvertResult, DrawnRect, EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto,
-    LibraryKind, ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs,
-    NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind, RecordOptions,
-    ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptLanguage, ScriptSourceDiagnostic, ScriptsPrefs,
-    ShellPrefs, StopZone, ThemeMode, Trigger, UiLocale, WindowBounds, check_script_source,
-    clamp_overlay_opacity, settings_path,
+    list_library_items_from_index, list_macro_summaries, list_macros, list_preset_summaries,
+    list_presets, list_script_summaries, list_scripts, load_macro, load_preset, load_quick_access,
+    load_script, load_settings, load_accueil_order, list_visible_process_exes, macro_to_json,
+    move_library_item, overlay_bands, parse_macro_json, prepare_library_index, prune_orphans,
+    purge_library_trash, remove_library_entry, rename_library_entry_key, rename_library_folder,
+    rename_macro, rename_preset, restore_library_item, save_macro_checked, save_preset,
+    save_preset_with_trigger, save_quick_access, save_script, save_settings, save_accueil_order,
+    set_favorite, set_library_item_locked, trash_library_item, normalize_app_settings, AccueilPrefs,
+    AppearancePrefs, AppSettings, AppState, AutomationPrefs, ClickerConfig, ClickerMetrics,
+    ClickerPreset, ClickerPresetSummary, ConfirmationsPrefs, ConvertMode, ConvertResult, DrawnRect,
+    EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto, LibraryKind,
+    ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs, NativeZoneOverlay, PickedPoint,
+    ProcessFilter, QuickAccess, QuickKind, RecordOptions, ScreenGeom, ScreenGeomDto, ScriptDoc,
+    ScriptLanguage, ScriptSourceDiagnostic, ScriptSummary, ScriptsPrefs, ShellPrefs, StopZone,
+    ThemeMode, Trigger, UiLocale, WindowBounds, check_script_source, clamp_overlay_opacity,
+    settings_path,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, Manager, State, WindowEvent,
+    AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    WindowEvent,
 };
 use tauri_plugin_log::{Target, TargetKind};
 
 struct SettingsDir(PathBuf);
+
+/// When true, frontend must not show main after paint (autostart + minimize_to_tray).
+struct BootStayHidden(Mutex<bool>);
 
 struct UiPrefs {
     advanced_ui: bool,
@@ -579,7 +584,7 @@ struct AutomationsHomeDto {
     scripts_library: LibraryIndexDto,
     macro_summaries: Vec<MacroSummary>,
     clicker_summaries: Vec<ClickerPresetSummary>,
-    scripts: Vec<ScriptDoc>,
+    scripts: Vec<ScriptSummary>,
     quick_access: QuickAccess,
     hotkeys: HotkeyBindings,
 }
@@ -596,15 +601,38 @@ fn get_automations_home_cmd(
         favorites_only: false,
         favorite_ids: Vec::new(),
     };
-    let macros = list_library_items(&dir.0, LibraryKind::Macro, empty_q.clone())
-        .map_err(|e| e.to_string())?;
-    let clickers = list_library_items(&dir.0, LibraryKind::Clicker, empty_q.clone())
-        .map_err(|e| e.to_string())?;
-    let scripts_library = list_library_items(&dir.0, LibraryKind::Script, empty_q)
-        .map_err(|e| e.to_string())?;
+    let index = prepare_library_index(&dir.0).map_err(|e| e.to_string())?;
+    let scripts = list_script_summaries(&dir.0).unwrap_or_default();
+    let script_names: std::collections::HashMap<String, String> = scripts
+        .iter()
+        .map(|s| (s.id.clone(), s.name.clone()))
+        .collect();
+    let macros = list_library_items_from_index(
+        &index,
+        &dir.0,
+        LibraryKind::Macro,
+        empty_q.clone(),
+        None,
+    )
+    .map_err(|e| e.to_string())?;
+    let clickers = list_library_items_from_index(
+        &index,
+        &dir.0,
+        LibraryKind::Clicker,
+        empty_q.clone(),
+        None,
+    )
+    .map_err(|e| e.to_string())?;
+    let scripts_library = list_library_items_from_index(
+        &index,
+        &dir.0,
+        LibraryKind::Script,
+        empty_q,
+        Some(&script_names),
+    )
+    .map_err(|e| e.to_string())?;
     let macro_summaries = enrich_macro_summaries_cmd(&dir.0)?;
     let clicker_summaries = list_preset_summaries(&dir.0).map_err(|e| e.to_string())?;
-    let scripts = list_scripts(&dir.0).unwrap_or_default();
     let mut qa = load_quick_access(&dir.0).map_err(|e| e.to_string())?;
     let clicker_ids = list_presets(&dir.0).unwrap_or_default();
     let macro_ids = list_macros(&dir.0).unwrap_or_default();
@@ -998,9 +1026,28 @@ fn apply_main_window_shell(
             }
         }
     }
-    if hide_for_autostart && shell.minimize_to_tray {
+    let stay_hidden = hide_for_autostart && shell.minimize_to_tray;
+    if let Some(flag) = app.try_state::<BootStayHidden>() {
+        if let Ok(mut g) = flag.0.lock() {
+            *g = stay_hidden;
+        }
+    }
+    if stay_hidden {
         let _ = main.hide();
     }
+}
+
+#[tauri::command]
+fn show_main_when_frontend_ready(app: AppHandle) -> Result<(), String> {
+    let stay_hidden = app
+        .try_state::<BootStayHidden>()
+        .and_then(|f| f.0.lock().ok().map(|g| *g))
+        .unwrap_or(false);
+    if stay_hidden {
+        return Ok(());
+    }
+    show_main_window(&app);
+    Ok(())
 }
 
 fn persist_main_window_bounds(app: &AppHandle, engine: &AppState) {
@@ -1698,10 +1745,73 @@ fn load_preset_macro(engine: State<'_, AppState>, name: String) -> Result<MacroD
     Ok(doc)
 }
 
+fn ensure_overlay_window(app: &AppHandle) -> Result<WebviewWindow, String> {
+    if let Some(win) = app.get_webview_window("overlay") {
+        return Ok(win);
+    }
+    let win = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("index.html".into()))
+        .title("Caster Overlay")
+        .inner_size(240.0, 72.0)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .visible(false)
+        .transparent(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = win.set_ignore_cursor_events(true);
+    Ok(win)
+}
+
+fn ensure_picker_window(app: &AppHandle) -> Result<WebviewWindow, String> {
+    if let Some(win) = app.get_webview_window("picker") {
+        return Ok(win);
+    }
+    let win = WebviewWindowBuilder::new(app, "picker", WebviewUrl::App("index.html".into()))
+        .title("Choisir un point")
+        .inner_size(800.0, 600.0)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .visible(false)
+        .transparent(true)
+        .shadow(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = win.set_background_color(Some(Color(0, 0, 0, 0)));
+    let _ = win.set_ignore_cursor_events(true);
+    let _ = win.set_always_on_top(false);
+    let _ = win.hide();
+    Ok(win)
+}
+
+fn ensure_zones_window(app: &AppHandle) -> Result<WebviewWindow, String> {
+    if let Some(win) = app.get_webview_window("zones") {
+        return Ok(win);
+    }
+    let win = WebviewWindowBuilder::new(app, "zones", WebviewUrl::App("index.html".into()))
+        .title("Zones de sécurité")
+        .inner_size(800.0, 600.0)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(true)
+        .visible(false)
+        .transparent(true)
+        .shadow(false)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = win.set_background_color(Some(Color(0, 0, 0, 0)));
+    let _ = win.set_ignore_cursor_events(true);
+    let _ = win.set_always_on_top(false);
+    let _ = win.hide();
+    Ok(win)
+}
+
 fn set_overlay_visible_inner(app: &AppHandle, visible: bool) -> Result<(), String> {
-    let Some(win) = app.get_webview_window("overlay") else {
-        return Err("overlay window missing".into());
-    };
+    let win = ensure_overlay_window(app)?;
     if visible {
         let id = app
             .try_state::<AppState>()
@@ -1793,8 +1903,9 @@ fn apply_display(engine: &AppState, display: &DisplayDto) {
 }
 
 fn place_status_overlay(app: &AppHandle, display: &DisplayDto) -> Result<(), String> {
-    let Some(win) = app.get_webview_window("overlay") else {
-        return Ok(());
+    let win = match ensure_overlay_window(app) {
+        Ok(w) => w,
+        Err(_) => return Ok(()),
     };
     const INSET: i32 = 16;
     let size = win
@@ -1829,9 +1940,7 @@ fn apply_zone_window(
     visible: bool,
     capture: bool,
 ) -> Result<(), String> {
-    let Some(win) = app.get_webview_window("zones") else {
-        return Err("zones window missing".into());
-    };
+    let win = ensure_zones_window(app)?;
     sync_native_overlay(app, visible, capture);
     if capture {
         let _ = win.set_background_color(Some(Color(0, 0, 0, 0)));
@@ -1901,9 +2010,7 @@ fn restore_zone_overlay(app: &AppHandle, engine: &AppState) {
 }
 
 fn show_picker_inner(app: &AppHandle) -> Result<(), String> {
-    let Some(win) = app.get_webview_window("picker") else {
-        return Err("picker window missing".into());
-    };
+    let win = ensure_picker_window(app)?;
     park_zone_overlay(app);
     // Alpha 0 is required on Windows 8+ so WebView2 clears instead of painting opaque.
     let _ = win.set_background_color(Some(Color(0, 0, 0, 0)));
@@ -1930,7 +2037,8 @@ fn show_picker_inner(app: &AppHandle) -> Result<(), String> {
 fn hide_picker_inner(app: &AppHandle, engine: &AppState) -> Result<(), String> {
     engine.set_picking(false);
     let Some(win) = app.get_webview_window("picker") else {
-        return Err("picker window missing".into());
+        restore_zone_overlay(app, engine);
+        return Ok(());
     };
     // Release mouse capture so the desktop / main window stay usable.
     let _ = win.set_ignore_cursor_events(true);
@@ -2042,6 +2150,7 @@ pub fn run() {
         }))
         .manage(Mutex::new(ZoneOverlaySnap::default()))
         .manage(Arc::new(NativeZoneOverlay::new()))
+        .manage(BootStayHidden(Mutex::new(false)))
         .setup(move |app| {
             let config_dir = app
                 .path()
@@ -2092,27 +2201,11 @@ pub fn run() {
                 log::error!("hotkeys unavailable: {e}");
             }
 
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                let _ = overlay.set_ignore_cursor_events(true);
-                if settings.overlay_visible {
-                    if let Ok(d) = resolve_display(app.handle(), engine.display_id().as_deref()) {
-                        let _ = place_status_overlay(app.handle(), &d);
-                    }
-                    apply_overlay_opacity(app.handle(), settings.overlay_opacity);
-                    let _ = overlay.show();
+            // Overlay / picker / zones are created on demand (fewer WebViews at cold start).
+            if settings.overlay_visible {
+                if let Err(e) = set_overlay_visible_inner(app.handle(), true) {
+                    log::warn!("overlay show at boot failed: {e}");
                 }
-            }
-            if let Some(picker) = app.get_webview_window("picker") {
-                let _ = picker.set_background_color(Some(Color(0, 0, 0, 0)));
-                let _ = picker.set_ignore_cursor_events(true);
-                let _ = picker.set_always_on_top(false);
-                let _ = picker.hide();
-            }
-            if let Some(zones) = app.get_webview_window("zones") {
-                let _ = zones.set_background_color(Some(Color(0, 0, 0, 0)));
-                let _ = zones.set_ignore_cursor_events(true);
-                let _ = zones.set_always_on_top(false);
-                let _ = zones.hide();
             }
 
             let tray_locale = resolve_ui_locale(settings.shell.ui_locale);
@@ -2272,6 +2365,7 @@ pub fn run() {
             get_settings,
             save_app_settings,
             confirm_app_exit,
+            show_main_when_frontend_ready,
             get_paths,
             open_path,
             reveal_library_entry,

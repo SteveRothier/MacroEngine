@@ -1,17 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { AutomationsTable } from "../automations/AutomationsTable";
 import { useAutomationsPageState } from "../automations/useAutomationsPageState";
-import { ClickerStudio } from "../clicker/ClickerStudio";
-import { MacroEditorView } from "../macros/graph/MacroEditorView";
-import { ScriptEditorView, newScriptId } from "../scripts/ScriptEditorView";
 import type { ScriptDoc } from "../scripts/types";
+import { newScriptId } from "../scripts/newScriptId";
 import {
   type EngineStatus,
   type HotkeyBindings,
 } from "../macros/types";
-import { SettingsView } from "../settings/SettingsView";
 import {
   mergeAccueilPrefs,
   mergeAutomationPrefs,
@@ -55,6 +52,13 @@ import type { AppSettings } from "../clicker/clickerTypes";
 import { DEFAULT_CLICKER } from "../clicker/clickerTypes";
 import { defaultScriptSource } from "../scripts/defaultSources";
 import {
+  loadClickerStudio,
+  loadMacroEditor,
+  loadScriptEditor,
+  loadSettingsView,
+  prefetchEditor,
+} from "./lazyEditors";
+import {
   HOME_TAB_ID,
   activeDocTab,
   closeAllDocTabs,
@@ -81,6 +85,27 @@ import {
   type DocTabKind,
   type WorkspaceState,
 } from "./workspaces";
+
+const MacroEditorView = lazy(async () => {
+  const m = await loadMacroEditor();
+  return { default: m.MacroEditorView };
+});
+const ScriptEditorView = lazy(async () => {
+  const m = await loadScriptEditor();
+  return { default: m.ScriptEditorView };
+});
+const ClickerStudio = lazy(async () => {
+  const m = await loadClickerStudio();
+  return { default: m.ClickerStudio };
+});
+const SettingsView = lazy(async () => {
+  const m = await loadSettingsView();
+  return { default: m.SettingsView };
+});
+
+function EditorSuspenseFallback() {
+  return <div className="caster-editor-suspense" aria-busy="true" />;
+}
 
 const JOURNAL_OPEN_KEY = "caster-journal-open";
 const LEGACY_JOURNAL_OPEN_KEY = "v2-journal-open";
@@ -359,6 +384,7 @@ function MainAppInner({
 
   const openDoc = useCallback(
     (kind: DocTabKind, resourceId: string, label?: string) => {
+      prefetchEditor(kind);
       setWorkspace((ws) => {
         const next = openDocTab(ws, kind, resourceId, label ?? resourceId);
         if (kind === "macro" || kind === "clicker") {
@@ -940,7 +966,7 @@ function MainAppInner({
 
   const tabBarActiveId = titleBarHighlightTabId(workspace);
 
-  const stage = (() => {
+  const stageInner = (() => {
     if (workspace.shellView.type === "settings") {
       const section = workspace.shellView.section ?? settingsSection;
       return (
@@ -1088,6 +1114,10 @@ function MainAppInner({
     return null;
   })();
 
+  const stage = (
+    <Suspense fallback={<EditorSuspenseFallback />}>{stageInner}</Suspense>
+  );
+
   return (
     <>
       <AppShell
@@ -1101,12 +1131,16 @@ function MainAppInner({
             onCreateClicker={() => void onCreateClicker()}
             onCreateScript={() => void onCreateScript()}
             onOpenExisting={(kind, id, label) => openDoc(kind, id, label ?? id)}
+            onPrefetchEditor={prefetchEditor}
             onTabContextAction={(tabId, action) => void onTabContextAction(tabId, action)}
             onBarContextAction={(action) => void onBarContextAction(action)}
             onTabReorder={onTabReorder}
             onPinnedCloseAttempt={() => toast.info(t("shell.pinnedTab"))}
             settingsActive={settingsActive}
-            onSettingsClick={() => goSettings(settingsSection)}
+            onSettingsClick={() => {
+              prefetchEditor("settings");
+              goSettings(settingsSection);
+            }}
             onJournalClick={() => {
               setJournalOpen((o) => {
                 const next = !o;

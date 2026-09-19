@@ -57,11 +57,11 @@ pub use convert::{
 };
 pub use library_index::{
     assert_not_locked, create_library_folder, delete_library_folder, enrich_macro_summaries,
-    get_library_index, is_locked, list_library_items, load_index, move_library_item,
-    purge_library_trash, remove_library_entry, rename_library_entry_key, rename_library_folder,
-    restore_library_item,
-    set_library_item_locked, trash_library_item, LibraryFolder, LibraryIndex, LibraryIndexDto,
-    LibraryIndexError, LibraryItemDto, LibraryKind, ListLibraryQuery,
+    get_library_index, is_locked, list_library_items, list_library_items_from_index, load_index,
+    move_library_item, prepare_library_index, purge_library_trash, remove_library_entry,
+    rename_library_entry_key, rename_library_folder, restore_library_item, set_library_item_locked,
+    trash_library_item, LibraryFolder, LibraryIndex, LibraryIndexDto, LibraryIndexError,
+    LibraryItemDto, LibraryKind, ListLibraryQuery,
 };
 pub use env::MacroEnv;
 pub use event_bus::{EngineEvent, EventBus, LogLevel};
@@ -93,8 +93,8 @@ pub use schema::{
     SCHEMA_VERSION_V1, SCHEMA_VERSION_V4, SCHEMA_VERSION_V5,
 };
 pub use script_library::{
-    delete_script, list_scripts, load_script, save_script, script_path, scripts_dir, ScriptDoc,
-    ScriptLanguage, ScriptLibraryError,
+    delete_script, list_script_summaries, list_scripts, load_script, save_script, script_path,
+    scripts_dir, ScriptDoc, ScriptLanguage, ScriptLibraryError, ScriptSummary,
 };
 pub use script_params::{parse_param_defs, ScriptParamDef};
 pub use script_transpile::{check_script_source, ScriptSourceDiagnostic};
