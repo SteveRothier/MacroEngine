@@ -139,6 +139,27 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const futureRef = useRef<ClickerConfigPayload[]>([]);
   const baselineKeyRef = useRef<string>("");
   const skipHistoryRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const lockedRef = useRef(false);
+  const selectedPresetRef = useRef("");
+  const triggerRef = useRef<ClickerTrigger>(MANUAL_TRIGGER);
+  const autosaveTimerRef = useRef<number | null>(null);
+  const buildConfigRef = useRef<() => ClickerConfigPayload>(() => {
+    throw new Error("buildConfig not ready");
+  });
+
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+  useEffect(() => {
+    lockedRef.current = locked;
+  }, [locked]);
+  useEffect(() => {
+    selectedPresetRef.current = selectedPreset;
+  }, [selectedPreset]);
+  useEffect(() => {
+    triggerRef.current = trigger;
+  }, [trigger]);
 
   const syncHistFlags = useCallback(() => {
     setCanUndo(pastRef.current.length > 0);
@@ -218,6 +239,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     clickZoneOrder,
     zoneModel,
   ]);
+
+  buildConfigRef.current = buildConfig;
 
   const applyConfig = useCallback((c: ClickerConfigPayload) => {
     setCps(c.cps);
@@ -598,13 +621,45 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
 
   useEffect(() => {
     if (!dirty || locked || !selectedPreset) return;
-    const timer = window.setTimeout(() => {
+    if (autosaveTimerRef.current != null) {
+      window.clearTimeout(autosaveTimerRef.current);
+    }
+    autosaveTimerRef.current = window.setTimeout(() => {
+      autosaveTimerRef.current = null;
       void onSavePreset().catch((e: unknown) => {
         console.error(e);
       });
     }, 600);
-    return () => window.clearTimeout(timer);
+    return () => {
+      if (autosaveTimerRef.current != null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
   }, [dirty, locked, onSavePreset, selectedPreset]);
+
+  useEffect(() => {
+    return () => {
+      if (autosaveTimerRef.current != null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+      if (
+        dirtyRef.current &&
+        !lockedRef.current &&
+        selectedPresetRef.current
+      ) {
+        const normalized = normalizeHotkeyTrigger(
+          triggerRef.current,
+        ) as ClickerTrigger;
+        void invoke("save_clicker_preset", {
+          name: selectedPresetRef.current,
+          config: buildConfigRef.current(),
+          trigger: normalized,
+        }).catch(() => {});
+      }
+    };
+  }, []);
 
   const onRenamePreset = useCallback(
     async (raw: string) => {

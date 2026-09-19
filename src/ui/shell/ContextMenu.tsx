@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { MenuItemsList, type MenuItemDef } from "./MenuItemsList";
+import { MenuItemsList, isPortaledSubmenuTarget, type MenuItemDef } from "./MenuItemsList";
 
 export type ContextMenuItem = MenuItemDef;
 
@@ -55,9 +55,9 @@ export function ContextMenu({
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) {
-        onClose();
-      }
+      if (menuRef.current?.contains(e.target as Node)) return;
+      if (isPortaledSubmenuTarget(e.target)) return;
+      onClose();
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {

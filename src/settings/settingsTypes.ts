@@ -26,6 +26,10 @@ export type AccueilPrefs = {
   confirmTrash: boolean;
   confirmDeleteFolder: boolean;
   showScriptsInAll: boolean;
+  /** When false, script modules are hidden from Accueil lists. */
+  showModulesInAll: boolean;
+  /** Script languages hidden from Accueil (`javascript`, `typescript`). */
+  hideScriptLanguages: string[];
   syncLibrarySortOnReorder: boolean;
   doubleClickDelayMs: number;
   dragThresholdPx: number;
@@ -49,6 +53,7 @@ export type ShellPrefs = {
   uiLocale: UiLocale;
   lastClickerId: string | null;
   lastMacroId: string | null;
+  lastScriptId: string | null;
 };
 
 export type AutomationPrefs = {
@@ -93,6 +98,8 @@ export const DEFAULT_ACCUEIL_PREFS: AccueilPrefs = {
   confirmTrash: true,
   confirmDeleteFolder: true,
   showScriptsInAll: true,
+  showModulesInAll: false,
+  hideScriptLanguages: [],
   syncLibrarySortOnReorder: true,
   doubleClickDelayMs: 300,
   dragThresholdPx: 6,
@@ -116,6 +123,7 @@ export const DEFAULT_SHELL_PREFS: ShellPrefs = {
   uiLocale: "system",
   lastClickerId: null,
   lastMacroId: null,
+  lastScriptId: null,
 };
 
 export const DEFAULT_AUTOMATION_PREFS: AutomationPrefs = {
@@ -185,7 +193,14 @@ export function mergeConfirmationsPrefs(
 export function mergeScriptsPrefs(
   partial?: Partial<ScriptsPrefs> | null,
 ): ScriptsPrefs {
-  return { ...DEFAULT_SCRIPTS_PREFS, ...partial };
+  const merged = { ...DEFAULT_SCRIPTS_PREFS, ...partial };
+  // Drop legacy pythonPath if present in persisted JSON.
+  delete (merged as ScriptsPrefs & { pythonPath?: unknown }).pythonPath;
+  return {
+    defaultTimeoutMs: merged.defaultTimeoutMs,
+    clearConsoleOnRun: merged.clearConsoleOnRun,
+    showPermBadgesOnHome: merged.showPermBadgesOnHome,
+  };
 }
 
 export function mergeAppearancePrefs(

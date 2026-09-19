@@ -14,7 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { MenuItemsList, type MenuItemDef } from "./MenuItemsList";
+import { MenuItemsList, isPortaledSubmenuTarget, type MenuItemDef } from "./MenuItemsList";
 
 export type DropdownItem = MenuItemDef;
 
@@ -112,6 +112,8 @@ function flattenEntries(entries: DropdownEntry[]): {
       list.push(entry);
     } else if (entry.groupHeader) {
       list.push(entry);
+    } else if (entry.filter) {
+      list.push(entry);
     } else {
       selectableIndices.push(list.length);
       list.push(entry);
@@ -198,6 +200,7 @@ export function DropdownMenu({
       const target = e.target as Node;
       if (rootRef.current?.contains(target)) return;
       if (panelRef.current?.contains(target)) return;
+      if (isPortaledSubmenuTarget(e.target)) return;
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {

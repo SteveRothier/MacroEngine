@@ -207,6 +207,7 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           <button
             type="button"
             className="caster-titlebar-btn caster-btn caster-btn-danger-ghost"
+            disabled={!editor.running}
             onClick={() => void editor.onStop()}
           >
             {t("clicker.toolbar.stop")}

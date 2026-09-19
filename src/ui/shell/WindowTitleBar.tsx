@@ -20,6 +20,11 @@ type Props = {
   onCreateMacro?: () => void;
   onCreateClicker?: () => void;
   onCreateScript?: () => void;
+  onOpenExisting?: (
+    kind: "macro" | "clicker" | "script",
+    id: string,
+    label?: string,
+  ) => void;
   onTabContextAction?: (tabId: string, action: TabContextAction) => void;
   onBarContextAction?: (action: BarContextAction) => void;
   onTabReorder?: (fromTabId: string, insertBeforeTabId: string | null) => void;
@@ -41,6 +46,7 @@ export function WindowTitleBar({
   onCreateMacro,
   onCreateClicker,
   onCreateScript,
+  onOpenExisting,
   onTabContextAction,
   onBarContextAction,
   onTabReorder,
@@ -74,6 +80,7 @@ export function WindowTitleBar({
           onCreateMacro={onCreateMacro}
           onCreateClicker={onCreateClicker}
           onCreateScript={onCreateScript}
+          onOpenExisting={onOpenExisting}
           onTabContextAction={onTabContextAction}
           onBarContextAction={onBarContextAction}
           onTabReorder={onTabReorder}

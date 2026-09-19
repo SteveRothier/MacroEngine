@@ -8,6 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Code2,
   Copy,
@@ -24,6 +25,8 @@ import {
   X,
 } from "lucide-react";
 import { useT, type TFunction } from "../../i18n";
+import type { LibraryIndexDto } from "../../library/types";
+import type { QuickAccess, RecentEntry } from "../../quickAccess";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { Tooltip } from "./Tooltip";
 import { useDocumentTabReorder } from "./useDocumentTabReorder";
@@ -64,6 +67,12 @@ type Props = {
   onCreateMacro?: () => void;
   onCreateClicker?: () => void;
   onCreateScript?: () => void;
+  /** Open an existing automation (macro / clicker / script) in a document tab. */
+  onOpenExisting?: (
+    kind: "macro" | "clicker" | "script",
+    id: string,
+    label?: string,
+  ) => void;
   onTabContextAction?: (tabId: string, action: TabContextAction) => void;
   onBarContextAction?: (action: BarContextAction) => void;
   onTabReorder?: (fromTabId: string, insertBeforeTabId: string | null) => void;
@@ -207,7 +216,194 @@ export function buildBarContextItems(t: TFunction): ContextMenuItem[] {
   ];
 }
 
-function buildCreateMenuItems(t: TFunction): ContextMenuItem[] {
+function byName(a: { name: string }, b: { name: string }): number {
+  return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+}
+
+type OpenableKind = "macro" | "clicker" | "script";
+
+type OpenableItem = {
+  kind: OpenableKind;
+  id: string;
+  name: string;
+  folderId: string | null;
+};
+
+function kindIcon(kind: OpenableKind) {
+  if (kind === "macro") return <Workflow size={MENU_ICON} aria-hidden />;
+  if (kind === "script") return <Code2 size={MENU_ICON} aria-hidden />;
+  return <MousePointer2 size={MENU_ICON} aria-hidden />;
+}
+
+function openLeafItem(item: OpenableItem): ContextMenuItem {
+  return {
+    id: `open:${item.kind}:${item.id}`,
+    label: item.name,
+    icon: kindIcon(item.kind),
+  };
+}
+
+function collectOpenable(
+  kind: OpenableKind,
+  index: LibraryIndexDto,
+): OpenableItem[] {
+  return index.items
+    .filter((it) => !it.trashed)
+    .map((it) => ({
+      kind,
+      id: it.id,
+      name: it.name,
+      folderId: it.folderId ?? null,
+    }));
+}
+
+function matchesFilter(name: string, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return name.toLowerCase().includes(q);
+}
+
+function buildOpenExistingSubmenu(
+  indexes: LibraryIndexes | null,
+  recent: RecentEntry[],
+  filterQuery: string,
+  onFilterChange: (value: string) => void,
+  t: TFunction,
+): ContextMenuItem[] {
+  if (!indexes) {
+    return [
+      {
+        id: "open-loading",
+        label: t("shell.noMacros"),
+        disabled: true,
+      },
+    ];
+  }
+
+  const items = [
+    ...collectOpenable("macro", indexes.macros),
+    ...collectOpenable("clicker", indexes.clickers),
+    ...collectOpenable("script", indexes.scripts),
+  ];
+
+  const out: ContextMenuItem[] = [
+    {
+      id: "open-filter",
+      label: t("shell.openFilterPlaceholder"),
+      filter: {
+        value: filterQuery,
+        placeholder: t("shell.openFilterPlaceholder"),
+        onChange: onFilterChange,
+      },
+    },
+  ];
+
+  if (items.length === 0) {
+    out.push({
+      id: "open-empty",
+      label: t("shell.noMacros"),
+      disabled: true,
+    });
+    return out;
+  }
+
+  const byKey = new Map(
+    items.map((it) => [`${it.kind}:${it.id}`, it] as const),
+  );
+
+  const folderMap = new Map<string, string>();
+  for (const f of [
+    ...indexes.macros.folders,
+    ...indexes.clickers.folders,
+    ...indexes.scripts.folders,
+  ]) {
+    if (!folderMap.has(f.id)) folderMap.set(f.id, f.name);
+  }
+  const knownFolders = new Set(folderMap.keys());
+
+  const recentLeaves = recent
+    .filter((r) => r.kind === "macro" || r.kind === "clicker" || r.kind === "script")
+    .map((r) => byKey.get(`${r.kind}:${r.id}`))
+    .filter((it): it is OpenableItem => !!it)
+    .filter((it) => matchesFilter(it.name, filterQuery))
+    .slice(0, 5)
+    .map(openLeafItem);
+
+  if (recentLeaves.length > 0) {
+    out.push({
+      id: "open-recent-h",
+      label: t("shell.openRecent"),
+      groupHeader: true,
+    });
+    out.push(...recentLeaves);
+  }
+
+  const unfiled = items
+    .filter(
+      (it) =>
+        it.folderId == null ||
+        it.folderId === "" ||
+        !knownFolders.has(it.folderId),
+    )
+    .filter((it) => matchesFilter(it.name, filterQuery))
+    .slice()
+    .sort(byName);
+
+  if (unfiled.length > 0) {
+    out.push({
+      id: "open-unfiled-h",
+      label: t("shell.openUnfiled"),
+      groupHeader: true,
+    });
+    out.push(...unfiled.map(openLeafItem));
+  }
+
+  const folders = [...folderMap.entries()]
+    .map(([id, name]) => ({ id, name }))
+    .sort(byName);
+
+  for (const folder of folders) {
+    const children = items
+      .filter((it) => it.folderId === folder.id)
+      .filter((it) => matchesFilter(it.name, filterQuery))
+      .slice()
+      .sort(byName);
+    if (children.length === 0) continue;
+    out.push({
+      id: `open-folder:${folder.id}`,
+      label: folder.name,
+      icon: <FolderOpen size={MENU_ICON} aria-hidden />,
+      submenu: children.map(openLeafItem),
+    });
+  }
+
+  const hasLeaves = out.some(
+    (it) => !it.groupHeader && !it.filter && !it.disabled && !it.separator,
+  );
+  if (!hasLeaves) {
+    out.push({
+      id: "open-empty-filter",
+      label: t("shell.noMacros"),
+      disabled: true,
+    });
+  }
+
+  return out;
+}
+
+type LibraryIndexes = {
+  macros: LibraryIndexDto;
+  clickers: LibraryIndexDto;
+  scripts: LibraryIndexDto;
+};
+
+function buildCreateMenuItems(
+  t: TFunction,
+  indexes: LibraryIndexes | null,
+  recent: RecentEntry[],
+  filterQuery: string,
+  onFilterChange: (value: string) => void,
+): ContextMenuItem[] {
   return [
     {
       id: "macro",
@@ -223,6 +419,18 @@ function buildCreateMenuItems(t: TFunction): ContextMenuItem[] {
       id: "script",
       label: t("labels.script"),
       icon: <Code2 size={MENU_ICON} aria-hidden />,
+    },
+    {
+      id: "openExistingMacro",
+      label: t("shell.openExistingMacro"),
+      icon: <FolderOpen size={MENU_ICON} aria-hidden />,
+      submenu: buildOpenExistingSubmenu(
+        indexes,
+        recent,
+        filterQuery,
+        onFilterChange,
+        t,
+      ),
     },
   ];
 }
@@ -246,6 +454,7 @@ export function DocumentTabBar({
   onCreateMacro,
   onCreateClicker,
   onCreateScript,
+  onOpenExisting,
   onTabContextAction,
   onBarContextAction,
   onTabReorder,
@@ -256,7 +465,22 @@ export function DocumentTabBar({
   const scrollRef = useRef<HTMLDivElement>(null);
   const tabElsRef = useRef(new Map<string, HTMLDivElement>());
 
-  const createMenuItems = useMemo(() => buildCreateMenuItems(t), [t]);
+  const [libraryIndexes, setLibraryIndexes] = useState<LibraryIndexes | null>(
+    null,
+  );
+  const [openRecent, setOpenRecent] = useState<RecentEntry[]>([]);
+  const [openFilterQuery, setOpenFilterQuery] = useState("");
+  const createMenuItems = useMemo(
+    () =>
+      buildCreateMenuItems(
+        t,
+        libraryIndexes,
+        openRecent,
+        openFilterQuery,
+        setOpenFilterQuery,
+      ),
+    [t, libraryIndexes, openRecent, openFilterQuery],
+  );
   const homeContextItems = useMemo(() => buildHomeContextItems(t), [t]);
   const barContextItems = useMemo(() => buildBarContextItems(t), [t]);
 
@@ -345,6 +569,31 @@ export function DocumentTabBar({
     const rect = addBtnRef.current?.getBoundingClientRect();
     if (!rect) return;
     setCreateMenu({ x: rect.left, y: rect.bottom + 4 });
+    setLibraryIndexes(null);
+    setOpenRecent([]);
+    setOpenFilterQuery("");
+    const empty: LibraryIndexDto = { folders: [], items: [], trash: [] };
+    void Promise.all([
+      invoke<LibraryIndexDto>("get_library_index_cmd", { kind: "macro" }),
+      invoke<LibraryIndexDto>("get_library_index_cmd", { kind: "clicker" }),
+      invoke<LibraryIndexDto>("get_library_index_cmd", { kind: "script" }),
+      invoke<QuickAccess>("get_quick_access").catch(() => ({
+        favorites: { clickerPresets: [], macros: [], scripts: [] },
+        recent: [] as RecentEntry[],
+      })),
+    ])
+      .then(([macros, clickers, scripts, qa]) => {
+        setLibraryIndexes({ macros, clickers, scripts });
+        setOpenRecent(qa.recent ?? []);
+      })
+      .catch(() => {
+        setLibraryIndexes({
+          macros: empty,
+          clickers: empty,
+          scripts: empty,
+        });
+        setOpenRecent([]);
+      });
   };
 
   const openBarMenu = (e: ReactMouseEvent) => {
@@ -418,6 +667,21 @@ export function DocumentTabBar({
     if (id === "macro") onCreateMacro?.();
     if (id === "clicker") onCreateClicker?.();
     if (id === "script") onCreateScript?.();
+    const openMatch = /^open:(macro|clicker|script):(.+)$/.exec(id);
+    if (openMatch) {
+      const kind = openMatch[1] as OpenableKind;
+      const resourceId = openMatch[2];
+      if (!resourceId) return;
+      const pool = libraryIndexes
+        ? [
+            ...collectOpenable("macro", libraryIndexes.macros),
+            ...collectOpenable("clicker", libraryIndexes.clickers),
+            ...collectOpenable("script", libraryIndexes.scripts),
+          ]
+        : [];
+      const hit = pool.find((it) => it.kind === kind && it.id === resourceId);
+      onOpenExisting?.(kind, resourceId, hit?.name ?? resourceId);
+    }
   };
 
   const ghost = dragUi.ghost;
