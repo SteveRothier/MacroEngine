@@ -468,35 +468,47 @@ impl MacroVm {
                             }
                             (
                                 doc.source,
-                                crate::script_runtime::ScriptOptions {
-                                    allow_network: doc.allow_network,
-                                    allow_clipboard: doc.allow_clipboard,
-                                    allow_fs: doc.allow_fs,
-                                    allow_macro_control: doc.allow_macro_control,
-                                    allow_input: doc.allow_input,
-                                    allow_process: doc.allow_process,
-                                    language: doc.language,
-                                    config_dir: crate::script_library::config_dir_default(),
-                                    injector: Some(Arc::clone(&self.injector)),
-                                    run_macro: None,
-                                    call_depth: 0,
+                                {
+                                    let config_dir = crate::script_library::config_dir_default();
+                                    crate::script_runtime::ScriptOptions {
+                                        allow_network: doc.allow_network,
+                                        allow_clipboard: doc.allow_clipboard,
+                                        allow_fs: doc.allow_fs,
+                                        allow_macro_control: doc.allow_macro_control,
+                                        allow_input: doc.allow_input,
+                                        allow_process: doc.allow_process,
+                                        language: doc.language,
+                                        config_dir,
+                                        injector: Some(Arc::clone(&self.injector)),
+                                        run_macro: None,
+                                        call_depth: 0,
+                                        nest_depth: None,
+                                        include_stack: None,
+                                        dry_run: false,
+                                    }
                                 },
                             )
                         } else {
                             (
                                 source.clone(),
-                                crate::script_runtime::ScriptOptions {
-                                    allow_network: true,
-                                    allow_clipboard: false,
-                                    allow_fs: false,
-                                    allow_macro_control: false,
-                                    allow_input: false,
-                                    allow_process: false,
-                                    language: crate::script_library::ScriptLanguage::Javascript,
-                                    config_dir: crate::script_library::config_dir_default(),
-                                    injector: Some(Arc::clone(&self.injector)),
-                                    run_macro: None,
-                                    call_depth: 0,
+                                {
+                                    let config_dir = crate::script_library::config_dir_default();
+                                    crate::script_runtime::ScriptOptions {
+                                        allow_network: true,
+                                        allow_clipboard: false,
+                                        allow_fs: false,
+                                        allow_macro_control: false,
+                                        allow_input: false,
+                                        allow_process: false,
+                                        language: crate::script_library::ScriptLanguage::Javascript,
+                                        config_dir,
+                                        injector: Some(Arc::clone(&self.injector)),
+                                        run_macro: None,
+                                        call_depth: 0,
+                                        nest_depth: None,
+                                        include_stack: None,
+                                        dry_run: false,
+                                    }
                                 },
                             )
                         };

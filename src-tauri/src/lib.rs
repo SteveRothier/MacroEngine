@@ -18,8 +18,9 @@ use caster_engine::{
     ConvertMode, ConvertResult, DrawnRect, EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto,
     LibraryKind, ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs,
     NativeZoneOverlay, PickedPoint, ProcessFilter, QuickAccess, QuickKind, RecordOptions,
-    ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptLanguage, ScriptsPrefs, ShellPrefs, StopZone, ThemeMode, Trigger,
-    UiLocale, WindowBounds, clamp_overlay_opacity, settings_path,
+    ScreenGeom, ScreenGeomDto, ScriptDoc, ScriptLanguage, ScriptSourceDiagnostic, ScriptsPrefs,
+    ShellPrefs, StopZone, ThemeMode, Trigger, UiLocale, WindowBounds, check_script_source,
+    clamp_overlay_opacity, settings_path,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -418,7 +419,9 @@ fn convert_library_item_cmd(
     };
     let lang = match language.as_deref() {
         Some("typescript") | Some("Typescript") => ScriptLanguage::Typescript,
-        Some("python") | Some("Python") => ScriptLanguage::Python,
+        Some("python") | Some("Python") => {
+            return Err("unsupported language".into());
+        }
         _ => ScriptLanguage::Javascript,
     };
     convert_library_item_lang(&dir.0, from, &id, to, mode, lang).map_err(|e| e.to_string())
@@ -966,12 +969,17 @@ fn window_bounds_sane(b: &WindowBounds) -> bool {
     true
 }
 
-fn apply_main_window_shell(app: &AppHandle, shell: &ShellPrefs, hide_for_autostart: bool) {
+fn apply_main_window_shell(
+    app: &AppHandle,
+    shell: &ShellPrefs,
+    hide_for_autostart: bool,
+    apply_bounds: bool,
+) {
     let Some(main) = app.get_webview_window("main") else {
         return;
     };
     let _ = main.set_always_on_top(shell.always_on_top);
-    if shell.remember_window_bounds {
+    if apply_bounds && shell.remember_window_bounds {
         if let Some(b) = &shell.window_bounds {
             if window_bounds_sane(b) {
                 let _ = main.set_position(tauri::PhysicalPosition::new(b.x, b.y));
@@ -1157,6 +1165,7 @@ fn apply_loaded_settings(
     engine: &AppState,
     prefs: &Mutex<UiPrefs>,
     settings: AppSettings,
+    apply_window_bounds: bool,
 ) -> Result<AppSettings, String> {
     let prev_locale = prefs
         .lock()
@@ -1174,7 +1183,9 @@ fn apply_loaded_settings(
     if let Err(e) = set_start_with_windows(settings.start_with_windows) {
         log::warn!("start with windows: {e}");
     }
-    apply_main_window_shell(app, &settings.shell, false);
+    // Routine preference saves must not re-apply persisted geometry (that was
+    // snapping the window wider on every Settings toggle). Startup + import do.
+    apply_main_window_shell(app, &settings.shell, false, apply_window_bounds);
     if let Ok(display) = resolve_display(app, kept_display.as_deref()) {
         apply_display(engine, &display);
     }
@@ -1204,7 +1215,7 @@ fn save_app_settings(
     prefs: State<'_, Mutex<UiPrefs>>,
     settings: AppSettings,
 ) -> Result<AppSettings, String> {
-    apply_loaded_settings(&app, &engine, &prefs, settings)
+    apply_loaded_settings(&app, &engine, &prefs, settings, false)
 }
 
 #[tauri::command]
@@ -1301,6 +1312,7 @@ fn load_script_cmd(dir: State<'_, SettingsDir>, id: String) -> Result<ScriptDoc,
 
 #[tauri::command]
 fn save_script_cmd(dir: State<'_, SettingsDir>, doc: ScriptDoc) -> Result<(), String> {
+    assert_not_locked(&dir.0, LibraryKind::Script, &doc.id).map_err(|e| e.to_string())?;
     save_script(&dir.0, &doc).map_err(|e| e.to_string())
 }
 
@@ -1313,9 +1325,26 @@ fn delete_script_cmd(dir: State<'_, SettingsDir>, id: String) -> Result<(), Stri
 fn run_script_session_cmd(
     engine: State<'_, AppState>,
     id: String,
+    dry_run: Option<bool>,
 ) -> Result<EngineStatusPayload, String> {
-    engine.start_script_session(&id)?;
+    engine.start_script_session(&id, dry_run.unwrap_or(false))?;
     Ok(status_of(&engine, Some("script running".into())))
+}
+
+fn parse_script_language(language: &str) -> ScriptLanguage {
+    match language {
+        "typescript" | "Typescript" => ScriptLanguage::Typescript,
+        _ => ScriptLanguage::Javascript,
+    }
+}
+
+#[tauri::command]
+fn check_script_source_cmd(
+    source: String,
+    language: String,
+) -> Result<Vec<ScriptSourceDiagnostic>, String> {
+    let lang = parse_script_language(&language);
+    Ok(check_script_source(&source, lang))
 }
 
 #[tauri::command]
@@ -1339,7 +1368,7 @@ fn import_app_settings(
 ) -> Result<AppSettings, String> {
     let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let settings: AppSettings = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
-    apply_loaded_settings(&app, &engine, &prefs, settings)
+    apply_loaded_settings(&app, &engine, &prefs, settings, true)
 }
 
 #[derive(Clone, Serialize)]
@@ -2036,6 +2065,7 @@ pub fn run() {
                 app.handle(),
                 &settings.shell,
                 is_autostart_launch(),
+                true,
             );
             app.manage(SettingsDir(config_dir.clone()));
             // So macro VM can resolve scriptId from the same config dir.
@@ -2251,6 +2281,7 @@ pub fn run() {
             save_script_cmd,
             delete_script_cmd,
             run_script_session_cmd,
+            check_script_source_cmd,
             export_app_settings,
             import_app_settings,
             request_cancel,

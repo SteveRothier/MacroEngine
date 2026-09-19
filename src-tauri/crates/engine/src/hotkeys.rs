@@ -58,10 +58,17 @@ pub struct HotkeyBindings {
     pub pause_vk: u16,
     /// Immediate emergency cancel (F8).
     pub emergency_vk: u16,
+    /// Run last script (F10 by default). 0 = unbound.
+    #[serde(default = "default_script_vk")]
+    pub script_vk: u16,
 }
 
 fn default_pause_vk() -> u16 {
     0x76 // VK_F7
+}
+
+fn default_script_vk() -> u16 {
+    0x79 // VK_F10
 }
 
 impl Default for HotkeyBindings {
@@ -74,6 +81,7 @@ impl Default for HotkeyBindings {
             macro_vk: 0x78,     // VK_F9
             pause_vk: 0x76,     // VK_F7
             emergency_vk: 0x77, // VK_F8
+            script_vk: 0x79,    // VK_F10
         }
     }
 }
@@ -90,6 +98,7 @@ impl HotkeyBindings {
                 macro_vk: VK_F9.0,
                 pause_vk: 0x76, // F7
                 emergency_vk: VK_F8.0,
+                script_vk: 0x79, // F10
             }
         }
         #[cfg(not(windows))]
@@ -134,6 +143,7 @@ pub struct HotkeyCallbacks {
     pub on_action_down: Box<dyn Fn() + Send + Sync>,
     pub on_action_up: Box<dyn Fn() + Send + Sync>,
     pub on_macro_down: Box<dyn Fn() + Send + Sync>,
+    pub on_script_down: Box<dyn Fn() + Send + Sync>,
     pub on_named_macro: Box<dyn Fn(String) + Send + Sync>,
     pub on_named_clicker: Box<dyn Fn(String) + Send + Sync>,
     pub on_clicker_pause: Box<dyn Fn() + Send + Sync>,
@@ -149,6 +159,7 @@ struct HookShared {
     clicker_triggers: Mutex<HashMap<TriggerBinding, String>>,
     action_down: AtomicBool,
     macro_down: AtomicBool,
+    script_down: AtomicBool,
     named_down: Mutex<HashSet<TriggerBinding>>,
     ctrl_down: AtomicBool,
     alt_down: AtomicBool,
@@ -300,6 +311,16 @@ unsafe extern "system" fn low_level_keyboard_proc(
                             shared.macro_down.store(false, Ordering::SeqCst);
                             handled = true;
                         }
+                    } else if bindings.script_vk != 0 && vk == bindings.script_vk {
+                        if is_down {
+                            if !shared.script_down.swap(true, Ordering::SeqCst) {
+                                (shared.callbacks.on_script_down)();
+                            }
+                            handled = true;
+                        } else if is_up {
+                            shared.script_down.store(false, Ordering::SeqCst);
+                            handled = true;
+                        }
                     } else if vk == bindings.pause_vk {
                         if is_down {
                             (shared.callbacks.on_clicker_pause)();
@@ -360,6 +381,7 @@ impl HotkeyHook {
                 clicker_triggers: Mutex::new(HashMap::new()),
                 action_down: AtomicBool::new(false),
                 macro_down: AtomicBool::new(false),
+                script_down: AtomicBool::new(false),
                 named_down: Mutex::new(HashSet::new()),
                 ctrl_down: AtomicBool::new(false),
                 alt_down: AtomicBool::new(false),
@@ -415,6 +437,7 @@ pub fn install_test_callbacks(callbacks: HotkeyCallbacks, bindings: HotkeyBindin
         clicker_triggers: Mutex::new(HashMap::new()),
         action_down: AtomicBool::new(false),
         macro_down: AtomicBool::new(false),
+        script_down: AtomicBool::new(false),
         named_down: Mutex::new(HashSet::new()),
         ctrl_down: AtomicBool::new(false),
         alt_down: AtomicBool::new(false),
@@ -446,6 +469,16 @@ pub fn simulate_key_with_mods(vk: u16, down: bool, ctrl: bool, alt: bool, shift:
             }
         } else {
             shared.macro_down.store(false, Ordering::SeqCst);
+        }
+        return;
+    }
+    if bindings.script_vk != 0 && vk == bindings.script_vk {
+        if down {
+            if !shared.script_down.swap(true, Ordering::SeqCst) {
+                (shared.callbacks.on_script_down)();
+            }
+        } else {
+            shared.script_down.store(false, Ordering::SeqCst);
         }
         return;
     }
@@ -485,6 +518,7 @@ mod tests {
                 on_action_down: Box::new(|| {}),
                 on_action_up: Box::new(|| {}),
                 on_macro_down: Box::new(|| {}),
+                on_script_down: Box::new(|| {}),
                 on_named_macro: Box::new(|_| {}),
                 on_named_clicker: Box::new(|_| {}),
                 on_clicker_pause: Box::new(|| {}),
@@ -510,6 +544,7 @@ mod tests {
                 on_macro_down: Box::new(move || {
                     n2.fetch_add(1, Ordering::SeqCst);
                 }),
+                on_script_down: Box::new(|| {}),
                 on_named_macro: Box::new(|_| {}),
                 on_named_clicker: Box::new(|_| {}),
                 on_clicker_pause: Box::new(|| {}),
@@ -537,6 +572,7 @@ mod tests {
                 }),
                 on_action_up: Box::new(|| {}),
                 on_macro_down: Box::new(|| {}),
+                on_script_down: Box::new(|| {}),
                 on_named_macro: Box::new(|_| {}),
                 on_named_clicker: Box::new(|_| {}),
                 on_clicker_pause: Box::new(|| {}),

@@ -17,11 +17,15 @@ use crate::input::{MouseButton, MouseInjector, Point};
 use crate::script_library::{resolve_script, ScriptLanguage};
 use crate::script_transpile::prepare_script_source;
 use crate::schema::MacroValue;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::process::Command;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
+
+use serde_json::{json, Value};
+
+pub const MAX_SCRIPT_NEST: u32 = 5;
 
 pub type RunMacroCallback =
     Arc<dyn Fn(&str) -> Result<(), ActionError> + Send + Sync>;
@@ -40,6 +44,12 @@ pub struct ScriptOptions {
     pub run_macro: Option<RunMacroCallback>,
     /// Nesting depth for runScript / include (max 5).
     pub call_depth: u32,
+    /// Shared nesting counter (created on first run when unset).
+    pub nest_depth: Option<Arc<AtomicU32>>,
+    /// Include cycle detection stack.
+    pub include_stack: Option<Arc<Mutex<HashSet<String>>>>,
+    /// When true, input/process side effects are logged and skipped.
+    pub dry_run: bool,
 }
 
 impl Default for ScriptOptions {
@@ -56,6 +66,9 @@ impl Default for ScriptOptions {
             injector: None,
             run_macro: None,
             call_depth: 0,
+            nest_depth: None,
+            include_stack: None,
+            dry_run: false,
         }
     }
 }
@@ -64,6 +77,172 @@ impl ScriptOptions {
     pub fn script_data_dir(&self) -> PathBuf {
         self.config_dir.join("script-data")
     }
+
+    pub fn ensure_nest_state(&mut self) {
+        if self.nest_depth.is_none() {
+            self.nest_depth = Some(Arc::new(AtomicU32::new(self.call_depth)));
+        }
+        if self.include_stack.is_none() {
+            self.include_stack = Some(Arc::new(Mutex::new(HashSet::new())));
+        }
+    }
+}
+
+pub fn ensure_script_lang_compat(
+    _caller: ScriptLanguage,
+    _child: ScriptLanguage,
+) -> Result<(), ActionError> {
+    Ok(())
+}
+
+pub fn dry_run_skip(bus: &EventBus, method: &str) {
+    bus.publish(EngineEvent::Log {
+        level: LogLevel::Info,
+        message: format!("script: dry-run skipped {method}"),
+    });
+}
+
+fn nest_depth_ref(opts: &ScriptOptions) -> Result<&Arc<AtomicU32>, ActionError> {
+    opts.nest_depth
+        .as_ref()
+        .ok_or_else(|| ActionError::Message("nest state missing".into()))
+}
+
+pub fn nest_begin(opts: &ScriptOptions) -> Result<u32, ActionError> {
+    let depth_ref = nest_depth_ref(opts)?;
+    let depth = depth_ref.fetch_add(1, Ordering::SeqCst);
+    if depth >= MAX_SCRIPT_NEST {
+        depth_ref.fetch_sub(1, Ordering::SeqCst);
+        return Err(ActionError::Message(
+            "caster.runScript max depth exceeded".into(),
+        ));
+    }
+    Ok(depth)
+}
+
+pub fn nest_end(opts: &ScriptOptions) {
+    if let Some(d) = &opts.nest_depth {
+        d.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+pub fn include_begin(opts: &ScriptOptions, id: &str) -> Result<(), ActionError> {
+    let depth_ref = nest_depth_ref(opts)?;
+    let depth = depth_ref.fetch_add(1, Ordering::SeqCst);
+    if depth >= MAX_SCRIPT_NEST {
+        depth_ref.fetch_sub(1, Ordering::SeqCst);
+        return Err(ActionError::Message(
+            "caster.include max depth exceeded".into(),
+        ));
+    }
+    let stack = opts
+        .include_stack
+        .as_ref()
+        .ok_or_else(|| ActionError::Message("include stack missing".into()))?;
+    let mut guard = stack
+        .lock()
+        .map_err(|_| ActionError::Message("include lock".into()))?;
+    if !guard.insert(id.to_string()) {
+        drop(guard);
+        nest_end(opts);
+        return Err(ActionError::Message(format!("caster.include cycle: {id}")));
+    }
+    Ok(())
+}
+
+pub fn include_end(opts: &ScriptOptions, id: &str) {
+    if let Some(stack) = &opts.include_stack {
+        if let Ok(mut guard) = stack.lock() {
+            guard.remove(id);
+        }
+    }
+    nest_end(opts);
+}
+
+pub fn nest_include_js_wrapped(source: &str, language: ScriptLanguage) -> Result<String, ActionError> {
+    let js = prepare_script_source(source, language)?;
+    Ok(format!(
+        "(function(exports, module){{\n{js}\nreturn module.exports;\n}})({{}}, {{exports: {{}}}});"
+    ))
+}
+
+pub fn macro_to_json_value(v: Option<&MacroValue>) -> Value {
+    match v {
+        Some(MacroValue::Bool(b)) => Value::Bool(*b),
+        Some(MacroValue::Number(n)) => json!(*n),
+        Some(MacroValue::String(s)) => Value::String(s.clone()),
+        None => Value::Null,
+    }
+}
+
+pub fn json_params_to_env(params: &Value) -> HashMap<String, MacroValue> {
+    let mut out = HashMap::new();
+    let Some(obj) = params.as_object() else {
+        return out;
+    };
+    for (k, v) in obj {
+        out.insert(k.clone(), json_to_macro(v));
+    }
+    out
+}
+
+fn json_to_macro(v: &Value) -> MacroValue {
+    match v {
+        Value::Bool(b) => MacroValue::Bool(*b),
+        Value::Number(n) => MacroValue::Number(n.as_f64().unwrap_or(0.0)),
+        Value::String(s) => MacroValue::String(s.clone()),
+        Value::Null => MacroValue::String(String::new()),
+        other => MacroValue::String(other.to_string()),
+    }
+}
+
+pub fn merge_child_script_opts(base: &ScriptOptions, doc: &crate::script_library::ScriptDoc, depth: u32) -> ScriptOptions {
+    let mut child = base.clone();
+    child.allow_network |= doc.allow_network;
+    child.allow_clipboard |= doc.allow_clipboard;
+    child.allow_fs |= doc.allow_fs;
+    child.allow_macro_control |= doc.allow_macro_control;
+    child.allow_input |= doc.allow_input;
+    child.allow_process |= doc.allow_process;
+    child.language = doc.language;
+    child.call_depth = depth + 1;
+    child
+}
+
+pub fn nest_run_script(
+    id: &str,
+    params: HashMap<String, MacroValue>,
+    timeout_ms: u64,
+    bus: &EventBus,
+    cancel: &CancellationToken,
+    opts: &ScriptOptions,
+) -> Result<Option<MacroValue>, ActionError> {
+    let depth = nest_begin(opts)?;
+    let result = (|| {
+        let doc = resolve_script(&opts.config_dir, id)
+            .map_err(|e| ActionError::Message(e.to_string()))?;
+        ensure_script_lang_compat(opts.language, doc.language)?;
+        let mut child_env = MacroEnv::new();
+        for (k, v) in params {
+            child_env.set(k, v);
+        }
+        for (k, v) in &doc.param_values {
+            if child_env.get(k).is_none() {
+                child_env.set(k.clone(), v.clone());
+            }
+        }
+        let child_opts = merge_child_script_opts(opts, &doc, depth);
+        run_script_with_options(
+            &doc.source,
+            timeout_ms,
+            &mut child_env,
+            bus,
+            cancel,
+            &child_opts,
+        )
+    })();
+    nest_end(opts);
+    result
 }
 
 /// Run inline JS with host API. Returns value from `caster.return(x)` or the IIFE result.
@@ -101,13 +280,33 @@ pub fn run_script_with_options(
     if cancel.is_cancelled() {
         return Err(ActionError::Cancelled);
     }
-    let _ = timeout_ms;
+    let mut run_opts = opts.clone();
+    run_opts.ensure_nest_state();
+    let opts = &run_opts;
     let _ = fs::create_dir_all(opts.script_data_dir());
 
-    if opts.language == ScriptLanguage::Python {
-        return crate::script_python::run_python_script(
-            source, timeout_ms, env, bus, cancel, opts,
-        );
+    let timed_out = Arc::new(AtomicBool::new(false));
+    let watchdog_done = Arc::new(AtomicBool::new(false));
+    if timeout_ms > 0 {
+        let cancel_w = cancel.clone();
+        let timed_out_w = Arc::clone(&timed_out);
+        let done_w = Arc::clone(&watchdog_done);
+        std::thread::spawn(move || {
+            let step = 50u64;
+            let mut left = timeout_ms;
+            while left > 0 {
+                if done_w.load(Ordering::SeqCst) {
+                    return;
+                }
+                let chunk = left.min(step);
+                std::thread::sleep(Duration::from_millis(chunk));
+                left = left.saturating_sub(chunk);
+            }
+            if !done_w.load(Ordering::SeqCst) {
+                timed_out_w.store(true, Ordering::SeqCst);
+                cancel_w.cancel();
+            }
+        });
     }
 
     let source = prepare_script_source(source, opts.language)?;
@@ -147,9 +346,12 @@ pub fn run_script_with_options(
     let config_dir = opts.config_dir.clone();
     let injector = opts.injector.clone();
     let run_macro = opts.run_macro.clone();
-    let call_depth = opts.call_depth;
-    let include_stack: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
-    let nest_depth = Arc::new(AtomicU32::new(call_depth));
+    let _include_stack = opts
+        .include_stack
+        .clone()
+        .expect("nest include_stack");
+    let _nest_depth = opts.nest_depth.clone().expect("nest depth");
+    let dry_run = opts.dry_run;
     let base_opts = opts.clone();
 
     let log_fn = NativeFunction::from_copy_closure(move |_this, args, _ctx| {
@@ -417,6 +619,11 @@ pub fn run_script_with_options(
     let inj_click = injector.clone();
     let click_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.click");
+                return Ok(JsValue::undefined());
+            }
             require_input(allow_input, "caster.click")?;
             let inj = require_injector(inj_click.as_ref())?;
             let (button, x, y) = parse_mouse_opts(args.first(), ctx)?;
@@ -429,6 +636,11 @@ pub fn run_script_with_options(
     let inj_move = injector.clone();
     let move_to_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, _ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.moveTo");
+                return Ok(JsValue::undefined());
+            }
             require_input(allow_input, "caster.moveTo")?;
             let inj = require_injector(inj_move.as_ref())?;
             let x = args
@@ -451,6 +663,11 @@ pub fn run_script_with_options(
     let inj_down = injector.clone();
     let mouse_down_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.mouseDown");
+                return Ok(JsValue::undefined());
+            }
             require_input(allow_input, "caster.mouseDown")?;
             let inj = require_injector(inj_down.as_ref())?;
             let (button, x, y) = parse_mouse_opts(args.first(), ctx)?;
@@ -463,6 +680,11 @@ pub fn run_script_with_options(
     let inj_up = injector.clone();
     let mouse_up_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.mouseUp");
+                return Ok(JsValue::undefined());
+            }
             require_input(allow_input, "caster.mouseUp")?;
             let inj = require_injector(inj_up.as_ref())?;
             let (button, x, y) = parse_mouse_opts(args.first(), ctx)?;
@@ -475,6 +697,11 @@ pub fn run_script_with_options(
     let inj_wheel = injector.clone();
     let wheel_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.wheel");
+                return Ok(JsValue::undefined());
+            }
             require_input(allow_input, "caster.wheel")?;
             let inj = require_injector(inj_wheel.as_ref())?;
             let delta = args
@@ -493,6 +720,11 @@ pub fn run_script_with_options(
     let inj_ktap = injector.clone();
     let key_tap_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.keyTap");
+                return Ok(JsValue::undefined());
+            }
             require_input(allow_input, "caster.keyTap")?;
             let inj = require_injector(inj_ktap.as_ref())?;
             let key = args
@@ -512,6 +744,11 @@ pub fn run_script_with_options(
     let inj_kdown = injector.clone();
     let key_down_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.keyDown");
+                return Ok(JsValue::undefined());
+            }
             require_input(allow_input, "caster.keyDown")?;
             let inj = require_injector(inj_kdown.as_ref())?;
             let key = args
@@ -531,6 +768,11 @@ pub fn run_script_with_options(
     let inj_kup = injector.clone();
     let key_up_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.keyUp");
+                return Ok(JsValue::undefined());
+            }
             require_input(allow_input, "caster.keyUp")?;
             let inj = require_injector(inj_kup.as_ref())?;
             let key = args
@@ -574,6 +816,11 @@ pub fn run_script_with_options(
     let cancel_ptr_rp = cancel_ptr;
     let run_process_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            if dry_run {
+                let bus = unsafe { &*(bus_ptr as *const EventBus) };
+                dry_run_skip(bus, "caster.runProcess");
+                return Ok(JsValue::undefined());
+            }
             if !allow_process_rp {
                 return Err(boa_engine::JsNativeError::error()
                     .with_message("caster.runProcess disabled (process permission required)")
@@ -663,123 +910,80 @@ pub fn run_script_with_options(
         })
     };
 
-    let include_stack_inc = include_stack.clone();
-    let nest_depth_inc = nest_depth.clone();
     let config_dir_inc = config_dir.clone();
+    let base_opts_inc = base_opts.clone();
     let include_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
-            let depth = nest_depth_inc.fetch_add(1, Ordering::SeqCst);
-            if depth >= 5 {
-                nest_depth_inc.fetch_sub(1, Ordering::SeqCst);
-                return Err(boa_engine::JsNativeError::error()
-                    .with_message("caster.include max depth exceeded")
-                    .into());
-            }
             let id = args
                 .first()
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_std_string_escaped())
                 .unwrap_or_default();
-            {
-                let mut stack = include_stack_inc.lock().map_err(|_| {
-                    boa_engine::JsNativeError::error().with_message("include lock")
-                })?;
-                if !stack.insert(id.clone()) {
-                    nest_depth_inc.fetch_sub(1, Ordering::SeqCst);
-                    return Err(boa_engine::JsNativeError::error()
-                        .with_message(format!("caster.include cycle: {id}"))
-                        .into());
-                }
-            }
+            include_begin(&base_opts_inc, &id).map_err(|e| {
+                boa_engine::JsNativeError::error().with_message(e.to_string())
+            })?;
             let result = (|| {
                 let doc = resolve_script(&config_dir_inc, &id).map_err(|e| {
                     boa_engine::JsNativeError::error().with_message(e.to_string())
                 })?;
-                let js = prepare_script_source(&doc.source, doc.language).map_err(|e| {
+                ensure_script_lang_compat(base_opts_inc.language, doc.language).map_err(|e| {
                     boa_engine::JsNativeError::error().with_message(e.to_string())
                 })?;
-                let wrapped = format!(
-                    "(function(exports, module){{\n{js}\nreturn module.exports;\n}})({{}}, {{exports: {{}}}});"
-                );
+                let wrapped = nest_include_js_wrapped(&doc.source, doc.language).map_err(|e| {
+                    boa_engine::JsNativeError::error().with_message(e.to_string())
+                })?;
                 ctx.eval(Source::from_bytes(wrapped.as_bytes()))
             })();
-            {
-                let mut stack = include_stack_inc.lock().map_err(|_| {
-                    boa_engine::JsNativeError::error().with_message("include lock")
-                })?;
-                stack.remove(&id);
-            }
-            nest_depth_inc.fetch_sub(1, Ordering::SeqCst);
+            include_end(&base_opts_inc, &id);
             result
         })
     };
 
-    let config_dir_rs = config_dir.clone();
     let base_opts_rs = base_opts.clone();
     let bus_ptr_rs = bus_ptr;
     let cancel_ptr_rs = cancel_ptr;
-    let nest_depth_rs = nest_depth.clone();
+    let nest_timeout_ms = timeout_ms;
     let run_script_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
-            let depth = nest_depth_rs.fetch_add(1, Ordering::SeqCst);
-            if depth >= 5 {
-                nest_depth_rs.fetch_sub(1, Ordering::SeqCst);
-                return Err(boa_engine::JsNativeError::error()
-                    .with_message("caster.runScript max depth exceeded")
-                    .into());
+            let id = args
+                .first()
+                .and_then(|v| v.as_string())
+                .map(|s| s.to_std_string_escaped())
+                .unwrap_or_default();
+            let mut params = HashMap::new();
+            if let Some(param_obj) = args.get(1).and_then(|v| v.as_object()) {
+                if let Ok(keys) = param_obj.own_property_keys(ctx) {
+                    for key in keys {
+                        let name = property_key_to_string(&key);
+                        let v = param_obj.get(key, ctx)?;
+                        params.insert(name, js_to_macro(&v));
+                    }
+                }
             }
-            let result = (|| {
-                let id = args
-                    .first()
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_std_string_escaped())
-                    .unwrap_or_default();
-                let doc = resolve_script(&config_dir_rs, &id).map_err(|e| {
-                    boa_engine::JsNativeError::error().with_message(e.to_string())
-                })?;
-                let mut child_env = MacroEnv::new();
-                if let Some(params) = args.get(1).and_then(|v| v.as_object()) {
-                    if let Ok(keys) = params.own_property_keys(ctx) {
-                        for key in keys {
-                            let name = property_key_to_string(&key);
-                            let v = params.get(key, ctx)?;
-                            child_env.set(name, js_to_macro(&v));
-                        }
-                    }
-                }
-                for (k, v) in &doc.param_values {
-                    if child_env.get(k).is_none() {
-                        child_env.set(k.clone(), v.clone());
-                    }
-                }
-                let mut child_opts = base_opts_rs.clone();
-                child_opts.allow_network |= doc.allow_network;
-                child_opts.allow_clipboard |= doc.allow_clipboard;
-                child_opts.allow_fs |= doc.allow_fs;
-                child_opts.allow_macro_control |= doc.allow_macro_control;
-                child_opts.allow_input |= doc.allow_input;
-                child_opts.allow_process |= doc.allow_process;
-                child_opts.language = doc.language;
-                child_opts.call_depth = depth + 1;
-                let bus = &*(bus_ptr_rs as *const EventBus);
-                let cancel = &*(cancel_ptr_rs as *const CancellationToken);
-                let ret = run_script_with_options(
-                    &doc.source,
-                    60_000,
-                    &mut child_env,
-                    bus,
-                    cancel,
-                    &child_opts,
-                )
+            let bus = &*(bus_ptr_rs as *const EventBus);
+            let cancel = &*(cancel_ptr_rs as *const CancellationToken);
+            let ret = nest_run_script(&id, params, nest_timeout_ms, bus, cancel, &base_opts_rs)
                 .map_err(|e| {
                     boa_engine::JsNativeError::error().with_message(e.to_string())
                 })?;
-                Ok(macro_to_js_value(ret.as_ref()))
-            })();
-            nest_depth_rs.fetch_sub(1, Ordering::SeqCst);
-            result
+            Ok(macro_to_js_value(ret.as_ref()))
         })
     };
+
+    let assert_fn = NativeFunction::from_copy_closure(move |_this, args, _ctx| {
+        let cond = args.first().map(|v| v.to_boolean()).unwrap_or(false);
+        if cond {
+            return Ok(JsValue::undefined());
+        }
+        let msg = args
+            .get(1)
+            .and_then(|v| v.as_string())
+            .map(|s| s.to_std_string_escaped())
+            .unwrap_or_else(|| "assertion failed".into());
+        Err(boa_engine::JsNativeError::error()
+            .with_message(msg)
+            .into())
+    });
 
     let caster = boa_engine::object::ObjectInitializer::new(&mut ctx)
         .function(get_fn, js_string!("get"), 1)
@@ -806,6 +1010,7 @@ pub fn run_script_with_options(
         .function(key_tap_fn, js_string!("keyTap"), 2)
         .function(key_down_fn, js_string!("keyDown"), 2)
         .function(key_up_fn, js_string!("keyUp"), 2)
+        .function(assert_fn, js_string!("assert"), 2)
         .build();
     ctx.register_global_property(
         js_string!("caster"),
@@ -817,8 +1022,15 @@ pub fn run_script_with_options(
     let wrapped = format!("(function(){{\n{source}\n}})();");
     let eval_result = ctx
         .eval(Source::from_bytes(wrapped.as_bytes()))
-        .map_err(|e| ActionError::Message(format!("script.run: {e}")))?;
+        .map_err(|e| ActionError::Message(format!("script.run: {e}")));
 
+    watchdog_done.store(true, Ordering::SeqCst);
+
+    let eval_result = eval_result?;
+
+    if timed_out.load(Ordering::SeqCst) {
+        return Err(ActionError::Message("script_timeout".into()));
+    }
     if cancel.is_cancelled() {
         return Err(ActionError::Cancelled);
     }

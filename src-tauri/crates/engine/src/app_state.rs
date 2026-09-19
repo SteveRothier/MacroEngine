@@ -37,6 +37,7 @@ enum HotkeyCmd {
     ActionDown,
     ActionUp,
     ToggleMacro,
+    RunLastScript,
     ToggleClickerPause,
     NamedMacro(String),
     NamedClicker(String),
@@ -600,12 +601,19 @@ impl AppState {
 
     /// Soft stop for clicker or macro (returns quickly; join runs off-lock).
     pub fn stop_engine(&self) -> EngineState {
-        if matches!(
-            self.state(),
-            EngineState::Running | EngineState::Paused
-        ) {
-            self.log_stop("Arrêt demandé");
+        let state = self.state();
+        if !matches!(state, EngineState::Running | EngineState::Paused) {
+            // Already idle: do not spam cancel logs / join a finished worker.
+            if state == EngineState::Stopping {
+                let handle = {
+                    let _lifecycle = self.lifecycle.lock().expect("lifecycle");
+                    self.worker.lock().expect("worker lock").take()
+                };
+                self.detach_or_join_worker(handle, true);
+            }
+            return self.state();
         }
+        self.log_stop("Arrêt demandé");
         let handle = {
             let _lifecycle = self.lifecycle.lock().expect("lifecycle");
             self.stop_engine_begin_locked()
@@ -829,6 +837,14 @@ impl AppState {
                 }
                 self.on_macro_key_down();
             }
+            HotkeyCmd::RunLastScript => {
+                if self.is_recording() {
+                    return;
+                }
+                if let Err(e) = self.on_script_hotkey() {
+                    self.log_hotkey_err("script hotkey", e);
+                }
+            }
             HotkeyCmd::ToggleClickerPause => {
                 if self.is_recording() {
                     return;
@@ -910,6 +926,22 @@ impl AppState {
             return;
         };
         let _ = crate::quick_access::push_recent(&dir, crate::quick_access::QuickKind::Script, id);
+        if let Ok(mut settings) = crate::settings::load_settings(&dir) {
+            settings.shell.last_script_id = Some(id.to_string());
+            let _ = crate::settings::save_settings(&dir, &settings);
+        }
+    }
+
+    fn on_script_hotkey(&self) -> Result<(), String> {
+        let dir = self
+            .macros_config_dir()
+            .unwrap_or_else(crate::script_library::config_dir_default);
+        let id = crate::settings::load_settings(&dir)
+            .ok()
+            .and_then(|s| s.shell.last_script_id)
+            .filter(|s| !s.trim().is_empty())
+            .ok_or_else(|| "no last script".to_string())?;
+        self.start_script_session(&id, false).map(|_| ())
     }
 
     fn finalize_recent_clicker(
@@ -1350,7 +1382,11 @@ impl AppState {
     }
 
     /// Run a library script outside of a macro (M5). Cancel via F8 / `request_cancel`.
-    pub fn start_script_session(&self, script_id: &str) -> Result<EngineState, String> {
+    pub fn start_script_session(
+        &self,
+        script_id: &str,
+        dry_run: bool,
+    ) -> Result<EngineState, String> {
         self.wait_while_stopping(Duration::from_millis(1000));
         let _lifecycle = self.lifecycle.lock().expect("lifecycle");
         self.ensure_idle_ready()?;
@@ -1393,6 +1429,10 @@ impl AppState {
                     }
                 }
             }
+            let timeout_ms = crate::settings::load_settings(&config_dir)
+                .ok()
+                .map(|s| s.scripts.default_timeout_ms as u64)
+                .unwrap_or(0);
             let mut opts = crate::script_runtime::ScriptOptions {
                 allow_network: doc.allow_network,
                 allow_clipboard: doc.allow_clipboard,
@@ -1405,6 +1445,9 @@ impl AppState {
                 injector: Some(Arc::clone(&injector)),
                 run_macro: None,
                 call_depth: 0,
+                nest_depth: None,
+                include_stack: None,
+                dry_run,
             };
             if opts.allow_macro_control {
                 let inj = Arc::clone(&injector);
@@ -1418,7 +1461,7 @@ impl AppState {
             }
             let status = match crate::script_runtime::run_script_with_options(
                 &doc.source,
-                60_000,
+                timeout_ms,
                 &mut env,
                 &bus,
                 &cancel,
@@ -1466,6 +1509,7 @@ impl AppState {
         let app_down = self.clone();
         let app_up = self.clone();
         let app_macro = self.clone();
+        let app_script = self.clone();
         let app_named = self.clone();
         let app_named_clicker = self.clone();
         let app_pause = self.clone();
@@ -1483,6 +1527,9 @@ impl AppState {
                 }),
                 on_macro_down: Box::new(move || {
                     app_macro.enqueue_hotkey(HotkeyCmd::ToggleMacro);
+                }),
+                on_script_down: Box::new(move || {
+                    app_script.enqueue_hotkey(HotkeyCmd::RunLastScript);
                 }),
                 on_named_macro: Box::new(move |name| {
                     app_named.enqueue_hotkey(HotkeyCmd::NamedMacro(name));
@@ -1505,8 +1552,12 @@ impl AppState {
         self.bus.publish(EngineEvent::Log {
             level: LogLevel::Info,
             message: format!(
-                "hotkeys armed action=0x{:X} macro=0x{:X} pause=0x{:X} emergency=0x{:X}",
-                bindings.action_vk, bindings.macro_vk, bindings.pause_vk, bindings.emergency_vk
+                "hotkeys armed action=0x{:X} macro=0x{:X} script=0x{:X} pause=0x{:X} emergency=0x{:X}",
+                bindings.action_vk,
+                bindings.macro_vk,
+                bindings.script_vk,
+                bindings.pause_vk,
+                bindings.emergency_vk
             ),
         });
         Ok(())
@@ -1898,7 +1949,7 @@ mod tests {
         let inj = Arc::new(RecordingInjector::new());
         let app = AppState::with_injector(Arc::clone(&inj) as Arc<dyn MouseInjector>);
         app.set_macros_config_dir(dir.clone());
-        let err = app.start_script_session("mod1").unwrap_err();
+        let err = app.start_script_session("mod1", false).unwrap_err();
         assert_eq!(err, "module_not_runnable");
         let _ = std::fs::remove_dir_all(&dir);
     }

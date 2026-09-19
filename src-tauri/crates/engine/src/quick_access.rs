@@ -44,6 +44,8 @@ pub struct Favorites {
     pub clicker_presets: Vec<String>,
     #[serde(default)]
     pub macros: Vec<String>,
+    #[serde(default)]
+    pub scripts: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -171,7 +173,7 @@ pub fn set_favorite(
     let list = match kind {
         QuickKind::Clicker => &mut data.favorites.clicker_presets,
         QuickKind::Macro => &mut data.favorites.macros,
-        QuickKind::Script => return Err(QuickAccessError::InvalidKind),
+        QuickKind::Script => &mut data.favorites.scripts,
     };
     list.retain(|n| n != id);
     if favorite {
@@ -197,6 +199,9 @@ pub fn prune_orphans(
     data.favorites
         .macros
         .retain(|id| macro_ids.iter().any(|n| n == id));
+    data.favorites
+        .scripts
+        .retain(|id| script_ids.iter().any(|n| n == id));
     data.recent.retain(|e| match e.kind {
         QuickKind::Clicker => {
             e.id == SYNTHETIC_CLICKER_ID || clicker_ids.iter().any(|n| n == &e.id)
@@ -228,6 +233,7 @@ mod tests {
         let _ = fs::create_dir_all(&dir);
         set_favorite(&dir, QuickKind::Clicker, "fast", true).unwrap();
         set_favorite(&dir, QuickKind::Macro, "demo", true).unwrap();
+        set_favorite(&dir, QuickKind::Script, "s1", true).unwrap();
         push_recent(&dir, QuickKind::Macro, "demo").unwrap();
         push_recent(&dir, QuickKind::Clicker, "fast").unwrap();
         push_recent(&dir, QuickKind::Macro, "demo").unwrap();
@@ -235,6 +241,7 @@ mod tests {
         let loaded = load_quick_access(&dir).unwrap();
         assert_eq!(loaded.favorites.clicker_presets, vec!["fast"]);
         assert_eq!(loaded.favorites.macros, vec!["demo"]);
+        assert_eq!(loaded.favorites.scripts, vec!["s1"]);
         assert_eq!(loaded.recent.len(), 2);
         assert_eq!(loaded.recent[0].id, "demo");
         assert_eq!(loaded.recent[0].kind, QuickKind::Macro);
@@ -250,6 +257,7 @@ mod tests {
             favorites: Favorites {
                 clicker_presets: vec!["gone".into(), "keep".into()],
                 macros: vec!["old".into(), "live".into()],
+                scripts: vec!["dead".into(), "alive".into()],
             },
             recent: vec![
                 RecentEntry {
@@ -272,10 +280,11 @@ mod tests {
             &mut qa,
             &["keep".into()],
             &["live".into()],
-            &[],
+            &["alive".into()],
         ));
         assert_eq!(qa.favorites.clicker_presets, vec!["keep".to_string()]);
         assert_eq!(qa.favorites.macros, vec!["live".to_string()]);
+        assert_eq!(qa.favorites.scripts, vec!["alive".to_string()]);
         assert_eq!(qa.recent.len(), 1);
         assert_eq!(qa.recent[0].id, "live");
     }
