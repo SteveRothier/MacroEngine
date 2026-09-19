@@ -32,7 +32,6 @@ pub enum ScriptLanguage {
     #[default]
     Javascript,
     Typescript,
-    Python,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -41,8 +40,8 @@ pub struct ScriptDoc {
     pub id: String,
     pub name: String,
     pub source: String,
-    /// Source language; TypeScript is transpiled to JS before Boa; Python runs via sidecar.
-    #[serde(default)]
+    /// Source language; TypeScript is transpiled to JS before Boa.
+    #[serde(default, deserialize_with = "deserialize_script_language")]
     pub language: ScriptLanguage,
     /// Library module (for `caster.include`); not a primary Accueil runner.
     #[serde(default)]
@@ -68,6 +67,43 @@ pub struct ScriptDoc {
 
 fn default_network() -> bool {
     true
+}
+
+/// Accepts legacy `"python"` / `"Python"` as JavaScript (migration).
+fn deserialize_script_language<'de, D>(deserializer: D) -> Result<ScriptLanguage, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw = String::deserialize(deserializer)?;
+    Ok(match raw.to_ascii_lowercase().as_str() {
+        "typescript" | "ts" => ScriptLanguage::Typescript,
+        _ => ScriptLanguage::Javascript,
+    })
+}
+
+fn raw_language_is_python(raw: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(raw)
+        .ok()
+        .and_then(|v| {
+            v.get("language")
+                .and_then(|l| l.as_str())
+                .map(|s| s.eq_ignore_ascii_case("python"))
+        })
+        .unwrap_or(false)
+}
+
+/// Persist language rewrite when a legacy python doc was loaded.
+fn migrate_python_language_if_needed(
+    config_dir: &Path,
+    raw: &str,
+    doc: &mut ScriptDoc,
+) -> Result<(), ScriptLibraryError> {
+    if !raw_language_is_python(raw) {
+        return Ok(());
+    }
+    doc.language = ScriptLanguage::Javascript;
+    save_script(config_dir, doc)?;
+    Ok(())
 }
 
 pub fn scripts_dir(config_dir: &Path) -> PathBuf {
@@ -108,7 +144,8 @@ pub fn list_scripts(config_dir: &Path) -> Result<Vec<ScriptDoc>, ScriptLibraryEr
             continue;
         }
         let raw = fs::read_to_string(&path)?;
-        if let Ok(doc) = serde_json::from_str::<ScriptDoc>(&raw) {
+        if let Ok(mut doc) = serde_json::from_str::<ScriptDoc>(&raw) {
+            let _ = migrate_python_language_if_needed(config_dir, &raw, &mut doc);
             out.push(doc);
         }
     }
@@ -121,7 +158,9 @@ pub fn load_script(config_dir: &Path, id: &str) -> Result<ScriptDoc, ScriptLibra
     let raw = fs::read_to_string(&path).map_err(|_| {
         ScriptLibraryError::Other(format!("script not found: {id}"))
     })?;
-    Ok(serde_json::from_str(&raw)?)
+    let mut doc: ScriptDoc = serde_json::from_str(&raw)?;
+    migrate_python_language_if_needed(config_dir, &raw, &mut doc)?;
+    Ok(doc)
 }
 
 /// Resolve by id or exact name (case-sensitive).
@@ -214,6 +253,36 @@ mod tests {
         assert!(!loaded.allow_network);
         delete_script(&dir, "hello").unwrap();
         assert!(load_script(&dir, "hello").is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn load_migrates_python_language_to_javascript() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let dir = std::env::temp_dir().join(format!("caster-scripts-py-{stamp}"));
+        let _ = fs::remove_dir_all(&dir);
+        ensure_scripts_dir(&dir).unwrap();
+        let path = script_path(&dir, "legacy-py");
+        fs::write(
+            &path,
+            r#"{
+  "id": "legacy-py",
+  "name": "Legacy",
+  "source": "print(1)",
+  "language": "python"
+}"#,
+        )
+        .unwrap();
+        let loaded = load_script(&dir, "legacy-py").unwrap();
+        assert_eq!(loaded.language, ScriptLanguage::Javascript);
+        let raw = fs::read_to_string(&path).unwrap();
+        assert!(
+            raw.contains("\"language\": \"javascript\"") || raw.contains("\"language\":\"javascript\""),
+            "expected persisted javascript, got {raw}"
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 }

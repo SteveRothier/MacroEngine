@@ -16,7 +16,7 @@ pub struct ScriptParamDef {
 }
 
 /// Parse lines like `//@param clicks number 10`, `// @param label string hello`,
-/// or Python `#@param` / `# @param`.
+/// or hash-style `#@param` / `# @param`.
 pub fn parse_param_defs(source: &str) -> Vec<ScriptParamDef> {
     let mut out = Vec::new();
     for line in source.lines() {

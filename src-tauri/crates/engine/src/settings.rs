@@ -184,6 +184,12 @@ pub struct AccueilPrefs {
     pub confirm_delete_folder: bool,
     #[serde(default = "default_true")]
     pub show_scripts_in_all: bool,
+    /// When false, hide script modules from Accueil lists (default: hide).
+    #[serde(default)]
+    pub show_modules_in_all: bool,
+    /// Script languages hidden from Accueil lists (`javascript`, `typescript`).
+    #[serde(default)]
+    pub hide_script_languages: Vec<String>,
     #[serde(default = "default_true")]
     pub sync_library_sort_on_reorder: bool,
     #[serde(default = "default_double_click_ms")]
@@ -203,6 +209,8 @@ impl Default for AccueilPrefs {
             confirm_trash: true,
             confirm_delete_folder: true,
             show_scripts_in_all: true,
+            show_modules_in_all: false,
+            hide_script_languages: Vec::new(),
             sync_library_sort_on_reorder: true,
             double_click_delay_ms: 300,
             drag_threshold_px: 6,
@@ -273,6 +281,8 @@ pub struct ShellPrefs {
     pub last_clicker_id: Option<String>,
     #[serde(default)]
     pub last_macro_id: Option<String>,
+    #[serde(default)]
+    pub last_script_id: Option<String>,
 }
 
 impl Default for ShellPrefs {
@@ -292,9 +302,10 @@ impl Default for ShellPrefs {
             tray_relaunch_last: true,
             remember_window_bounds: true,
             window_bounds: None,
-            ui_locale: UiLocale::System,
+            ui_locale: UiLocale::default(),
             last_clicker_id: None,
             last_macro_id: None,
+            last_script_id: None,
         }
     }
 }

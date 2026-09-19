@@ -27,7 +27,6 @@ pub mod scheduler;
 pub mod schema;
 pub mod script_library;
 pub mod script_params;
-pub mod script_python;
 pub mod script_runtime;
 pub mod script_transpile;
 pub mod settings;
@@ -98,6 +97,7 @@ pub use script_library::{
     ScriptLanguage, ScriptLibraryError,
 };
 pub use script_params::{parse_param_defs, ScriptParamDef};
+pub use script_transpile::{check_script_source, ScriptSourceDiagnostic};
 pub use settings::{
     clamp_overlay_opacity, load_settings, normalize_app_settings, save_settings, settings_path,
     AccentTheme, AccueilFilter, AccueilPrefs, AccueilSortBy, AccueilSortDir, AppearancePrefs,

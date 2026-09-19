@@ -8,9 +8,69 @@ use oxc_parser::Parser;
 use oxc_semantic::SemanticBuilder;
 use oxc_span::SourceType;
 use oxc_transformer::{TransformOptions, Transformer};
+use serde::Serialize;
 
 use crate::actions::registry::ActionError;
 use crate::script_library::ScriptLanguage;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptSourceDiagnostic {
+    pub line: u32,
+    pub column: u32,
+    pub message: String,
+    pub severity: String,
+}
+
+fn offset_to_line_col(source: &str, offset: u32) -> (u32, u32) {
+    let mut line = 1u32;
+    let mut col = 1u32;
+    for (i, ch) in source.char_indices() {
+        if i as u32 >= offset {
+            break;
+        }
+        if ch == '\n' {
+            line += 1;
+            col = 1;
+        } else {
+            col += 1;
+        }
+    }
+    (line, col)
+}
+
+pub fn check_script_source(
+    source: &str,
+    language: ScriptLanguage,
+) -> Vec<ScriptSourceDiagnostic> {
+    check_js_or_ts(source, language == ScriptLanguage::Typescript)
+}
+
+fn check_js_or_ts(source: &str, typescript: bool) -> Vec<ScriptSourceDiagnostic> {
+    let allocator = Allocator::default();
+    let source_type = SourceType::default()
+        .with_typescript(typescript)
+        .with_module(false);
+    let ret = Parser::new(&allocator, source, source_type).parse();
+    ret.errors
+        .iter()
+        .map(|e| {
+            let offset = e
+                .labels
+                .as_ref()
+                .and_then(|ls| ls.first())
+                .map(|l| l.offset())
+                .unwrap_or(0);
+            let (line, column) = offset_to_line_col(source, offset as u32);
+            ScriptSourceDiagnostic {
+                line,
+                column,
+                message: e.to_string(),
+                severity: "error".into(),
+            }
+        })
+        .collect()
+}
 
 pub fn prepare_script_source(
     source: &str,
@@ -19,7 +79,6 @@ pub fn prepare_script_source(
     match language {
         ScriptLanguage::Javascript => Ok(source.to_string()),
         ScriptLanguage::Typescript => transpile_typescript(source),
-        ScriptLanguage::Python => Ok(source.to_string()),
     }
 }
 
