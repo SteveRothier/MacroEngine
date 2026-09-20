@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileCode2 } from "lucide-react";
-import { pickScreenPoint } from "../pick";
+import { pickScreenPointDetailed } from "../pick";
 import { Segmented } from "../ui";
-import { ActionPickerMenu, DropdownMenu, Select, Tooltip } from "../ui/shell";
+import { ActionPickerMenu, DropdownMenu, Select, Tooltip, useToast } from "../ui/shell";
 import type { ActionPickerEntry, DropdownEntry } from "../ui/shell";
 import type { CompareOp, KeyMods, MacroAction, MacroValue, Operand } from "./types";
 import type { ScriptDoc } from "../scripts/types";
@@ -108,15 +108,21 @@ function PointFields({
   hint,
 }: PointFieldsProps) {
   const t = useT();
+  const toast = useToast();
   const mode: "cursor" | "position" =
     optional && x == null && y == null ? "cursor" : "position";
 
   async function onPick() {
     setPicking(true);
     try {
-      const p = await pickScreenPoint();
-      if (!p) return;
-      onChangeXY(p.x, p.y);
+      const result = await pickScreenPointDetailed();
+      if (!result.ok) {
+        if (result.reason === "timeout" || result.reason === "error") {
+          toast.info(t("macros.params.pickCancelled"));
+        }
+        return;
+      }
+      onChangeXY(result.point.x, result.point.y);
     } finally {
       setPicking(false);
     }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { MainApp } from "./app/MainApp";
@@ -122,7 +122,15 @@ function PickOverlayInner() {
     window.addEventListener("mousedown", onClick);
     window.addEventListener("keydown", onKey);
     window.addEventListener("contextmenu", onContext);
+    void emit("picker://ready");
+    let unPrepare: (() => void) | undefined;
+    void listen("picker://prepare", () => {
+      void emit("picker://ready");
+    }).then((un) => {
+      unPrepare = un;
+    });
     return () => {
+      unPrepare?.();
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mousedown", onClick);
       window.removeEventListener("keydown", onKey);

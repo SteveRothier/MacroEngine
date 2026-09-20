@@ -115,6 +115,7 @@ export function MacroEditorView({
   const [doc, setDoc] = useState<MacroDocument>(() => emptyMacro(macroId));
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hydrated, setHydrated] = useState(false);
   const [selectedPath, setSelectedPath] = useState<ActionPath | null>(null);
   const [activePath, setActivePath] = useState<ActionPath | null>(null);
   const [locked, setLocked] = useState(false);
@@ -126,6 +127,8 @@ export function MacroEditorView({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const baselineRef = useRef("");
+  const hydratedRef = useRef(false);
+  const loadFailedRef = useRef(false);
   const autosaveTimer = useRef<number | null>(null);
   const docRef = useRef(doc);
   const uiLayoutRef = useRef(uiLayout);
@@ -135,6 +138,7 @@ export function MacroEditorView({
   const selectedPathRef = useRef(selectedPath);
   const pastRef = useRef<HistoryEntry[]>([]);
   const futureRef = useRef<HistoryEntry[]>([]);
+  const loadGenRef = useRef(0);
 
   docRef.current = doc;
   uiLayoutRef.current = uiLayout;
@@ -152,13 +156,21 @@ export function MacroEditorView({
 
   useEffect(() => {
     let cancelled = false;
+    const loadId = ++loadGenRef.current;
+    hydratedRef.current = false;
+    loadFailedRef.current = false;
+    setHydrated(false);
     setLoading(true);
     void (async () => {
       try {
-        const loaded = await invoke<MacroDocument>("load_saved_macro", { name: macroId });
-        if (cancelled) return;
+        const loaded = await invoke<MacroDocument>("load_saved_macro", {
+          name: macroId,
+        });
+        if (cancelled || loadId !== loadGenRef.current) return;
         setDoc(loaded);
         baselineRef.current = JSON.stringify(loaded);
+        hydratedRef.current = true;
+        setHydrated(true);
         setDirty(false);
         setSelectedPath(null);
         setActivePath(null);
@@ -168,24 +180,37 @@ export function MacroEditorView({
         setCanRedo(false);
         const ext = loaded as MacroDocument & { uiLayout?: MacroUiLayout };
         setUiLayout(ext.uiLayout);
-        try {
-          const lib = await invoke<{ name: string; locked?: boolean }[]>("list_macro_library");
-          if (!cancelled) {
-            setLocked(Boolean(lib.find((m) => m.name === macroId)?.locked));
-          }
-        } catch {
-          if (!cancelled) setLocked(false);
+      } catch {
+        if (!cancelled && loadId === loadGenRef.current) {
+          loadFailedRef.current = true;
+          const empty = emptyMacro(macroId);
+          setDoc(empty);
+          baselineRef.current = JSON.stringify(empty);
+          hydratedRef.current = true;
+          setHydrated(true);
+          setDirty(false);
+          toast.error(t("macros.toast.loadFailed"));
+        }
+      } finally {
+        // Always clear loading for this generation — do not wait on lock lookup.
+        if (loadId === loadGenRef.current) setLoading(false);
+      }
+      if (cancelled || loadId !== loadGenRef.current) return;
+      try {
+        const lib = await invoke<{ name: string; locked?: boolean }[]>(
+          "list_macro_library",
+        );
+        if (!cancelled && loadId === loadGenRef.current) {
+          setLocked(Boolean(lib.find((m) => m.name === macroId)?.locked));
         }
       } catch {
-        if (!cancelled) setDoc(emptyMacro(macroId));
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && loadId === loadGenRef.current) setLocked(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [macroId]);
+  }, [macroId, toast, t]);
 
   useEffect(() => {
     onDirtyChange?.(macroId, dirty);
@@ -201,6 +226,7 @@ export function MacroEditorView({
 
   const persistNow = useCallback(
     async (nextDoc: MacroDocument, id: string) => {
+      if (!hydratedRef.current || loadFailedRef.current) return;
       try {
         const payload = { ...nextDoc, uiLayout: uiLayoutRef.current } as MacroDocument & {
           uiLayout?: MacroUiLayout;
@@ -221,18 +247,25 @@ export function MacroEditorView({
       window.clearTimeout(autosaveTimer.current);
       autosaveTimer.current = null;
     }
-    if (dirtyRef.current && !lockedRef.current) {
+    if (
+      hydratedRef.current &&
+      !loadFailedRef.current &&
+      dirtyRef.current &&
+      !lockedRef.current
+    ) {
       await persistNow(docRef.current, macroIdRef.current);
     }
   }, [persistNow]);
 
   useEffect(() => {
+    if (!hydratedRef.current || loadFailedRef.current) return;
     if (!dirty || locked || loading || recording) return;
     if (autosaveTimer.current != null) {
       window.clearTimeout(autosaveTimer.current);
     }
     autosaveTimer.current = window.setTimeout(() => {
       autosaveTimer.current = null;
+      if (!hydratedRef.current || loadFailedRef.current) return;
       void persistNow(docRef.current, macroIdRef.current);
     }, AUTOSAVE_MS);
     return () => {
@@ -249,16 +282,22 @@ export function MacroEditorView({
         window.clearTimeout(autosaveTimer.current);
         autosaveTimer.current = null;
       }
-      if (dirtyRef.current && !lockedRef.current) {
-        const payload = {
-          ...docRef.current,
-          uiLayout: uiLayoutRef.current,
-        } as MacroDocument & { uiLayout?: MacroUiLayout };
-        void invoke("save_saved_macro", {
-          id: macroIdRef.current,
-          doc: payload,
-        }).catch(() => {});
+      if (
+        !hydratedRef.current ||
+        loadFailedRef.current ||
+        !dirtyRef.current ||
+        lockedRef.current
+      ) {
+        return;
       }
+      const payload = {
+        ...docRef.current,
+        uiLayout: uiLayoutRef.current,
+      } as MacroDocument & { uiLayout?: MacroUiLayout };
+      void invoke("save_saved_macro", {
+        id: macroIdRef.current,
+        doc: payload,
+      }).catch(() => {});
     };
   }, []);
 
@@ -334,6 +373,8 @@ export function MacroEditorView({
 
   const updateDoc = useCallback(
     (next: MacroDocument, opts?: { skipHistory?: boolean }) => {
+      // Ignore edits while the first load is in flight — emptyMacro is not dirty.
+      if (!hydratedRef.current) return;
       if (!opts?.skipHistory && !lockedRef.current) {
         pastRef.current = [
           ...pastRef.current,
@@ -802,7 +843,7 @@ export function MacroEditorView({
 
   const onGraphChange = useCallback(
     (nodes: MacroGraphNode[]) => {
-      if (editorLocked) return;
+      if (editorLocked || !hydratedRef.current || loadFailedRef.current) return;
       const layout = extractUiLayout({ nodes, edges: graph.edges });
       setUiLayout(layout);
       const payload = { ...docRef.current, uiLayout: layout };
@@ -877,39 +918,18 @@ export function MacroEditorView({
     />,
   );
 
-  if (loading) {
-    return (
-      <div className="caster-page caster-macro-editor">
-        {titleBarPortal}
-        <div
-          className="caster-macro-loading"
-          aria-busy="true"
-          aria-label={t("macros.toolbar.loadingAria")}
-        >
-          <div className="caster-skeleton-page caster-skeleton-page--center">
-            <div
-              className="caster-skeleton caster-skeleton-line caster-skeleton-line--lg"
-              style={{ width: "55%" }}
-            />
-            <div className="caster-skeleton caster-skeleton-line" style={{ width: "88%" }} />
-            <div className="caster-skeleton caster-skeleton-line" style={{ width: "72%" }} />
-            <div className="caster-skeleton caster-skeleton-line" style={{ width: "80%" }} />
-            <div className="caster-skeleton caster-skeleton-line" style={{ width: "64%" }} />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="caster-page caster-macro-editor">
+    <div
+      className="caster-page caster-macro-editor"
+      aria-busy={loading || undefined}
+    >
       {titleBarPortal}
       <div className="caster-editor-layout">
         <div className="caster-seq-panel">
           <div className="caster-seq-toolbar">
             <ActionPickerMenu
               label={t("macros.toolbar.add")}
-              disabled={editorLocked}
+              disabled={editorLocked || !hydrated}
               items={buildActionAddMenu(addAction, t)}
               open={addMenuOpen}
               onOpenChange={setAddMenuOpen}
@@ -937,7 +957,7 @@ export function MacroEditorView({
                     .join(" ")}
                   aria-label={aria}
                   aria-pressed={editorView === value}
-                  disabled={editorLocked}
+                  disabled={editorLocked || !hydrated}
                   onClick={() => setEditorView(value)}
                 >
                   {label}
@@ -961,7 +981,13 @@ export function MacroEditorView({
                   }
             }
           >
-            {editorView === "graph" ? (
+            {!hydrated ? (
+              <div
+                className="caster-seq-loading"
+                aria-busy="true"
+                aria-live="polite"
+              />
+            ) : editorView === "graph" ? (
               <MacroCanvas
                 graphNodes={graph.nodes}
                 graphEdges={graph.edges}

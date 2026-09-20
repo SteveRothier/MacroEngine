@@ -409,8 +409,8 @@ function MainAppInner({
 
   const onTabSelect = useCallback((tabId: string) => {
     if (tabId === HOME_TAB_ID) {
+      // Accueil stays mounted — no forced remount refresh (avoids empty flash).
       goHome();
-      bumpRefresh();
       return;
     }
     const activeId =
@@ -419,7 +419,7 @@ function MainAppInner({
       setDocRemountKey((k) => k + 1);
     }
     setWorkspace((ws) => selectDocTab(ws, tabId));
-  }, [goHome, bumpRefresh, workspace.shellView]);
+  }, [goHome, workspace.shellView]);
 
   const onTabClose = useCallback(
     async (tabId: string) => {
@@ -966,9 +966,79 @@ function MainAppInner({
 
   const tabBarActiveId = titleBarHighlightTabId(workspace);
 
+  const showHome =
+    workspace.shellView.type === "home" ||
+    workspace.shellView.type === "library";
+  const showSettings = workspace.shellView.type === "settings";
+  const showDoc = workspace.shellView.type === "doc" && !!activeDoc;
+
+  const homeTable = (
+    <div
+      className="caster-stage-home"
+      hidden={!showHome}
+      style={showHome ? { height: "100%" } : { display: "none" }}
+      aria-hidden={!showHome}
+      ref={(el) => {
+        if (!el) return;
+        if (!showHome) el.setAttribute("inert", "");
+        else el.removeAttribute("inert");
+      }}
+    >
+      <AutomationsTable
+        active={showHome}
+        onNavigate={(r) => {
+          if (r.name === "automation") {
+            openDoc(r.kind, r.id, r.label ?? r.id);
+          }
+        }}
+        onCreateMacro={() => void onCreateMacro()}
+        onCreateClicker={() => void onCreateClicker()}
+        onCreateScript={() => void onCreateScript()}
+        onLaunchClicker={(n) => void onLaunchClicker(n)}
+        onLaunchMacro={(n) => void onLaunchMacro(n)}
+        dirtyMacroId={
+          workspace.tabs.find((t) => t.kind === "macro" && t.dirty)?.resourceId ?? null
+        }
+        dirtyClickerId={
+          workspace.tabs.find((t) => t.kind === "clicker" && t.dirty)?.resourceId ?? null
+        }
+        dirtyScriptId={
+          workspace.tabs.find((t) => t.kind === "script" && t.dirty)?.resourceId ?? null
+        }
+        refreshKey={refreshKey}
+        query={automationsPage.query}
+        onQueryChange={automationsPage.setQuery}
+        filter={automationsPage.filter}
+        display={automationsPage.display}
+        onDisplayChange={automationsPage.setDisplay}
+        onFilterChange={automationsPage.setFilter}
+        onRefresh={bumpRefresh}
+        onResourceRenamed={(kind, fromId, toId, label) => {
+          const tabId = docTabId(kind, fromId);
+          setWorkspace((ws) => {
+            if (!ws.tabs.some((t) => t.id === tabId)) return ws;
+            if (kind === "script") return setTabLabel(ws, tabId, label);
+            return renameDocTab(ws, tabId, toId, label);
+          });
+        }}
+        runningScriptName={
+          running && status.sessionKind === "script"
+            ? status.sessionName ?? null
+            : null
+        }
+        onFocusKeyChange={automationsPage.setFocusKey}
+        scriptsPrefs={scriptsPrefs}
+        accueilPrefs={accueilPrefs}
+        onOpenSettings={() => goSettings("application")}
+      />
+    </div>
+  );
+
   const stageInner = (() => {
-    if (workspace.shellView.type === "settings") {
-      const section = workspace.shellView.section ?? settingsSection;
+    if (showSettings) {
+      const section = workspace.shellView.type === "settings"
+        ? (workspace.shellView.section ?? settingsSection)
+        : settingsSection;
       return (
         <SettingsView
           section={section}
@@ -998,7 +1068,7 @@ function MainAppInner({
       );
     }
 
-    if (workspace.shellView.type === "doc" && activeDoc) {
+    if (showDoc && activeDoc) {
       if (activeDoc.kind === "macro") {
         return (
           <MacroEditorView
@@ -1062,65 +1132,16 @@ function MainAppInner({
       );
     }
 
-    if (
-      workspace.shellView.type === "home" ||
-      workspace.shellView.type === "library"
-    ) {
-      return (
-        <AutomationsTable
-          onNavigate={(r) => {
-            if (r.name === "automation") {
-              openDoc(r.kind, r.id, r.label ?? r.id);
-            }
-          }}
-          onCreateMacro={() => void onCreateMacro()}
-          onCreateClicker={() => void onCreateClicker()}
-          onCreateScript={() => void onCreateScript()}
-          onLaunchClicker={(n) => void onLaunchClicker(n)}
-          onLaunchMacro={(n) => void onLaunchMacro(n)}
-          dirtyMacroId={
-            workspace.tabs.find((t) => t.kind === "macro" && t.dirty)?.resourceId ?? null
-          }
-          dirtyClickerId={
-            workspace.tabs.find((t) => t.kind === "clicker" && t.dirty)?.resourceId ?? null
-          }
-          dirtyScriptId={
-            workspace.tabs.find((t) => t.kind === "script" && t.dirty)?.resourceId ?? null
-          }
-          refreshKey={refreshKey}
-          query={automationsPage.query}
-          onQueryChange={automationsPage.setQuery}
-          filter={automationsPage.filter}
-          display={automationsPage.display}
-          onDisplayChange={automationsPage.setDisplay}
-          onFilterChange={automationsPage.setFilter}
-          onRefresh={bumpRefresh}
-          onResourceRenamed={(kind, fromId, toId, label) => {
-            const tabId = docTabId(kind, fromId);
-            setWorkspace((ws) => {
-              if (!ws.tabs.some((t) => t.id === tabId)) return ws;
-              if (kind === "script") return setTabLabel(ws, tabId, label);
-              return renameDocTab(ws, tabId, toId, label);
-            });
-          }}
-          runningScriptName={
-            running && status.sessionKind === "script"
-              ? status.sessionName ?? null
-              : null
-          }
-          onFocusKeyChange={automationsPage.setFocusKey}
-          scriptsPrefs={scriptsPrefs}
-          accueilPrefs={accueilPrefs}
-          onOpenSettings={() => goSettings("application")}
-        />
-      );
-    }
-
     return null;
   })();
 
   const stage = (
-    <Suspense fallback={<EditorSuspenseFallback />}>{stageInner}</Suspense>
+    <>
+      {homeTable}
+      {showSettings || showDoc ? (
+        <Suspense fallback={<EditorSuspenseFallback />}>{stageInner}</Suspense>
+      ) : null}
+    </>
   );
 
   return (

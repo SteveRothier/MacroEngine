@@ -1,4 +1,6 @@
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -29,12 +31,15 @@ use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     window::Color,
-    AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
+    AppHandle, Emitter, Listener, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     WindowEvent,
 };
 use tauri_plugin_log::{Target, TargetKind};
 
 struct SettingsDir(PathBuf);
+
+/// Set when the picker webview has registered click/Esc handlers (`picker://ready`).
+static PICKER_READY: AtomicBool = AtomicBool::new(false);
 
 /// When true, frontend must not show main after paint (autostart + minimize_to_tray).
 struct BootStayHidden(Mutex<bool>);
@@ -2065,6 +2070,20 @@ fn restore_zone_overlay(app: &AppHandle, engine: &AppState) {
 }
 
 fn show_picker_inner(app: &AppHandle) -> Result<(), String> {
+    let existed = app.get_webview_window("picker").is_some();
+
+    // Cold-create only: wait for React handlers. Pre-created conf windows already
+    // mounted at boot — waiting for a missed `picker://ready` costs ~3s for nothing.
+    let (tx, rx) = mpsc::channel::<()>();
+    let listen_id = if existed || PICKER_READY.load(Ordering::SeqCst) {
+        None
+    } else {
+        Some(app.listen_any("picker://ready", move |_| {
+            PICKER_READY.store(true, Ordering::SeqCst);
+            let _ = tx.send(());
+        }))
+    };
+
     let win = ensure_picker_window(app)?;
     park_zone_overlay(app);
     // Alpha 0 is required on Windows 8+ so WebView2 clears instead of painting opaque.
@@ -2082,10 +2101,23 @@ fn show_picker_inner(app: &AppHandle) -> Result<(), String> {
         let _ = win.set_position(tauri::PhysicalPosition::new(pos.x, pos.y));
         let _ = win.set_size(tauri::PhysicalSize::new(size.width, size.height));
     }
+
+    if !existed {
+        // Nudge the webview to re-emit ready in case mount raced past our listener.
+        let _ = win.emit("picker://prepare", ());
+        if let Some(lid) = listen_id {
+            if !PICKER_READY.load(Ordering::SeqCst) {
+                let _ = rx.recv_timeout(Duration::from_millis(800));
+            }
+            app.unlisten(lid);
+        }
+    }
+
     let _ = win.set_always_on_top(true);
     let _ = win.set_ignore_cursor_events(false);
     win.show().map_err(|e| e.to_string())?;
-    win.set_focus().map_err(|e| e.to_string())?;
+    // Best-effort: focus failure must not abort the pick session.
+    let _ = win.set_focus();
     Ok(())
 }
 
@@ -2213,6 +2245,9 @@ pub fn run() {
         .manage(Arc::new(NativeZoneOverlay::new()))
         .manage(BootStayHidden(Mutex::new(false)))
         .setup(move |app| {
+            let _ = app.listen_any("picker://ready", |_| {
+                PICKER_READY.store(true, Ordering::SeqCst);
+            });
             let config_dir = app
                 .path()
                 .app_config_dir()
@@ -2262,11 +2297,32 @@ pub fn run() {
                 log::error!("hotkeys unavailable: {e}");
             }
 
-            // Overlay / picker / zones are created on demand (fewer WebViews at cold start).
-            if settings.overlay_visible {
-                if let Err(e) = set_overlay_visible_inner(app.handle(), true) {
-                    log::warn!("overlay show at boot failed: {e}");
+            // Sanitize secondary windows from tauri.conf (alwaysOnTop / click-through).
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                let _ = overlay.set_ignore_cursor_events(true);
+                if settings.overlay_visible {
+                    if let Ok(d) =
+                        resolve_display(app.handle(), engine.display_id().as_deref())
+                    {
+                        let _ = place_status_overlay(app.handle(), &d);
+                    }
+                    apply_overlay_opacity(app.handle(), settings.overlay_opacity);
+                    if let Err(e) = set_overlay_visible_inner(app.handle(), true) {
+                        log::warn!("overlay show at boot failed: {e}");
+                    }
                 }
+            }
+            if let Some(picker) = app.get_webview_window("picker") {
+                let _ = picker.set_background_color(Some(Color(0, 0, 0, 0)));
+                let _ = picker.set_ignore_cursor_events(true);
+                let _ = picker.set_always_on_top(false);
+                let _ = picker.hide();
+            }
+            if let Some(zones) = app.get_webview_window("zones") {
+                let _ = zones.set_background_color(Some(Color(0, 0, 0, 0)));
+                let _ = zones.set_ignore_cursor_events(true);
+                let _ = zones.set_always_on_top(false);
+                let _ = zones.hide();
             }
 
             let tray_locale = resolve_ui_locale(settings.shell.ui_locale);

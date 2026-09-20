@@ -129,6 +129,8 @@ type Props = {
   scriptsPrefs?: ScriptsPrefs;
   accueilPrefs?: AccueilPrefs;
   onOpenSettings?: () => void;
+  /** When false (Accueil keep-mounted but hidden), ignore global Accueil shortcuts. */
+  active?: boolean;
 };
 
 function rowKey(r: AutomationRow): string {
@@ -208,6 +210,7 @@ export function AutomationsTable({
   scriptsPrefs: scriptsPrefsProp,
   accueilPrefs: accueilPrefsProp,
   onOpenSettings: _onOpenSettings,
+  active = true,
 }: Props) {
   const t = useT();
   const { locale } = useLocale();
@@ -1412,6 +1415,8 @@ export function AutomationsTable({
   }
 
   useEffect(() => {
+    if (!active) return;
+
     function isTypingTarget(t: EventTarget | null): boolean {
       if (!(t instanceof HTMLElement)) return false;
       const tag = t.tagName;
@@ -1498,7 +1503,7 @@ export function AutomationsTable({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectAllVisible/sorted via closure refresh
-  }, [selected.size, createOpen, focusKey, sorted, flatKeys, dragRow, accueilUndo, t, toast]);
+  }, [active, selected.size, createOpen, focusKey, sorted, flatKeys, dragRow, accueilUndo, t, toast]);
 
   const moveFolders = useMemo(() => {
     const movable = selectedRows.filter(
@@ -1665,14 +1670,11 @@ export function AutomationsTable({
         className="caster-page-body caster-automations-list-body"
         ref={listScrollRef}
       >
-        {loading || sorted.length > 0 ? (
+        {sorted.length > 0 ? (
           <div
             className="caster-automations-list"
-            role={loading ? undefined : "list"}
+            role="list"
             aria-busy={loading || undefined}
-            aria-label={
-              loading ? t("automations.empty.loadingAria") : undefined
-            }
           >
             <div className="caster-auto-colhead">
               <span className="caster-auto-colhead-check" aria-hidden />
@@ -2211,9 +2213,9 @@ export function AutomationsTable({
               );
             })}
           </div>
-        ) : (
+        ) : !loading ? (
           emptyState
-        )}
+        ) : null}
       </div>
 
       {selected.size > 0 ? (

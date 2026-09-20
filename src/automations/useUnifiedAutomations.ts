@@ -89,6 +89,16 @@ function clickerTriggerLabel(hotkeys: HotkeyBindings): string {
   return parts.join("+");
 }
 
+/** Survives AutomationsTable remount within the same JS session. */
+type HomeSnapshot = {
+  rows: AutomationRow[];
+  recentOrder: string[];
+  folders: AutomationFolderOption[];
+  hotkeys: HotkeyBindings | null;
+};
+
+let lastHomeSnapshot: HomeSnapshot | null = null;
+
 export function useUnifiedAutomations(options: {
   dirtyMacroId?: string | null;
   dirtyClickerId?: string | null;
@@ -100,30 +110,51 @@ export function useUnifiedAutomations(options: {
 }) {
   const t = useT();
   const { locale } = useLocale();
-  const [rows, setRows] = useState<AutomationRow[]>([]);
-  const [recentOrder, setRecentOrder] = useState<string[]>([]);
-  const [folders, setFolders] = useState<AutomationFolderOption[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<AutomationRow[]>(
+    () => lastHomeSnapshot?.rows ?? [],
+  );
+  const [recentOrder, setRecentOrder] = useState<string[]>(
+    () => lastHomeSnapshot?.recentOrder ?? [],
+  );
+  const [folders, setFolders] = useState<AutomationFolderOption[]>(
+    () => lastHomeSnapshot?.folders ?? [],
+  );
+  const [loading, setLoading] = useState(() => lastHomeSnapshot == null);
   const [internalQuery, setInternalQuery] = useState("");
   const query = options.query ?? internalQuery;
   const filter = options.filter ?? "all";
   const setQuery = options.setQuery ?? setInternalQuery;
-  const [hotkeys, setHotkeys] = useState<HotkeyBindings | null>(null);
-  const hasLoadedRef = useRef(false);
-  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+  const [hotkeys, setHotkeys] = useState<HotkeyBindings | null>(
+    () => lastHomeSnapshot?.hotkeys ?? null,
+  );
+  const hasLoadedRef = useRef(lastHomeSnapshot != null);
+  const homeLoadGenRef = useRef(0);
+  const refresh = useCallback(async (opts?: { silent?: boolean; retried?: boolean }) => {
     const silent = opts?.silent === true || hasLoadedRef.current;
     if (!silent) setLoading(true);
+    const loadId = ++homeLoadGenRef.current;
+    const HOME_TIMEOUT_MS = 12_000;
+    let timeoutId: number | undefined;
     try {
-      const home = await invoke<{
-        macros: LibraryIndexDto;
-        clickers: LibraryIndexDto;
-        scriptsLibrary: LibraryIndexDto;
-        macroSummaries: MacroSummary[];
-        clickerSummaries: ClickerSummary[];
-        scripts: ScriptSummary[];
-        quickAccess: QuickAccess;
-        hotkeys: HotkeyBindings;
-      }>("get_automations_home_cmd");
+      const home = await Promise.race([
+        invoke<{
+          macros: LibraryIndexDto;
+          clickers: LibraryIndexDto;
+          scriptsLibrary: LibraryIndexDto;
+          macroSummaries: MacroSummary[];
+          clickerSummaries: ClickerSummary[];
+          scripts: ScriptSummary[];
+          quickAccess: QuickAccess;
+          hotkeys: HotkeyBindings;
+        }>("get_automations_home_cmd"),
+        new Promise<never>((_, reject) => {
+          timeoutId = window.setTimeout(
+            () => reject(new Error("home_timeout")),
+            HOME_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      if (loadId !== homeLoadGenRef.current) return;
       const macroIndex = home.macros;
       const clickerIndex = home.clickers;
       const scriptsLibrary = home.scriptsLibrary ?? {
@@ -140,7 +171,8 @@ export function useUnifiedAutomations(options: {
       const favMacros = qa.favorites.macros ?? [];
       const favClickers = qa.favorites.clickerPresets ?? [];
       const favScripts = qa.favorites.scripts ?? [];
-      setRecentOrder(qa.recent.map((r) => rowKey(r.kind, r.id)));
+      const nextRecent = qa.recent.map((r) => rowKey(r.kind, r.id));
+      setRecentOrder(nextRecent);
       const runLabels = lastRunLabelMap(qa.recent, t, locale);
       const runTooltips = lastRunTooltipMap(qa.recent, t, locale);
       const runStatuses = lastRunStatusMap(qa.recent);
@@ -149,7 +181,8 @@ export function useUnifiedAutomations(options: {
         ...clickerIndex.folders,
         ...scriptsLibrary.folders,
       ];
-      setFolders(toFolderOptions(allFolders));
+      const nextFolders = toFolderOptions(allFolders);
+      setFolders(nextFolders);
 
       const macroMap = new Map(macros.map((m) => [m.name, m]));
       const clickerMap = new Map(clickers.map((c) => [c.name, c]));
@@ -174,14 +207,14 @@ export function useUnifiedAutomations(options: {
           folderId: it.folderId ?? null,
           status: rowEditorStatus(
             !!it.locked,
-            options.dirtyMacroId === it.id,
+            false,
             runStatuses.get(rowKey("macro", it.id)),
           ),
           lastRunLabel: runLabels.get(rowKey("macro", it.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("macro", it.id)),
           favorite: favMacros.includes(it.id),
           locked: it.locked,
-          dirty: options.dirtyMacroId === it.id,
+          dirty: false,
           meta: m
             ? t("automations.row.metaActions", { count: m.actionCount })
             : undefined,
@@ -201,14 +234,14 @@ export function useUnifiedAutomations(options: {
           folderId: it.folderId ?? null,
           status: rowEditorStatus(
             !!it.locked,
-            options.dirtyClickerId === it.id,
+            false,
             runStatuses.get(rowKey("clicker", it.id)),
           ),
           lastRunLabel: runLabels.get(rowKey("clicker", it.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("clicker", it.id)),
           favorite: favClickers.includes(it.id),
           locked: it.locked,
-          dirty: options.dirtyClickerId === it.id,
+          dirty: false,
           meta: c
             ? t("automations.row.metaCps", { cps: c.cps.toFixed(0) })
             : undefined,
@@ -230,14 +263,14 @@ export function useUnifiedAutomations(options: {
           folderId,
           status: rowEditorStatus(
             !!lib?.locked,
-            options.dirtyScriptId === s.id,
+            false,
             runStatuses.get(rowKey("script", s.id)),
           ),
           lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("script", s.id)),
           favorite: favScripts.includes(s.id),
           locked: lib?.locked ?? false,
-          dirty: options.dirtyScriptId === s.id,
+          dirty: false,
           isModule: !!s.isModule,
           scriptLanguage:
             s.language === "typescript" ? "typescript" : "javascript",
@@ -258,21 +291,31 @@ export function useUnifiedAutomations(options: {
 
       setRows(next);
       hasLoadedRef.current = true;
+      lastHomeSnapshot = {
+        rows: next,
+        recentOrder: nextRecent,
+        folders: nextFolders,
+        hotkeys: hk,
+      };
     } catch {
-      if (!silent) {
-        setRows([]);
-        setRecentOrder([]);
+      if (loadId !== homeLoadGenRef.current) return;
+      // Keep prior rows / cache — never wipe to EmptyState on timeout/error.
+      if (lastHomeSnapshot) {
+        setRows(lastHomeSnapshot.rows);
+        setRecentOrder(lastHomeSnapshot.recentOrder);
+        setFolders(lastHomeSnapshot.folders);
+        setHotkeys(lastHomeSnapshot.hotkeys);
+        hasLoadedRef.current = true;
+      }
+      if (!hasLoadedRef.current && !opts?.retried) {
+        void refresh({ silent: true, retried: true });
       }
     } finally {
-      if (!silent) setLoading(false);
+      if (timeoutId != null) window.clearTimeout(timeoutId);
+      // Always clear loading for the current generation (silent retry included).
+      if (loadId === homeLoadGenRef.current) setLoading(false);
     }
-  }, [
-    options.dirtyMacroId,
-    options.dirtyClickerId,
-    options.dirtyScriptId,
-    t,
-    locale,
-  ]);
+  }, [t, locale]);
 
   useEffect(() => {
     // refreshKey bumps (sidebar / post-DnD) must stay silent once loaded —
@@ -280,17 +323,41 @@ export function useUnifiedAutomations(options: {
     void refresh({ silent: hasLoadedRef.current });
   }, [refresh, options.refreshKey]);
 
+  // Overlay dirty flags locally — do not refetch home IPC on every tab dirty flip.
+  const rowsWithDirty = useMemo(() => {
+    const dm = options.dirtyMacroId ?? null;
+    const dc = options.dirtyClickerId ?? null;
+    const ds = options.dirtyScriptId ?? null;
+    if (!dm && !dc && !ds) return rows;
+    return rows.map((r) => {
+      const dirty =
+        (r.kind === "macro" && r.id === dm) ||
+        (r.kind === "clicker" && r.id === dc) ||
+        (r.kind === "script" && r.id === ds);
+      if (!dirty) return r;
+      if (r.locked) return { ...r, dirty: true };
+      return { ...r, dirty: true, status: "attention" as const };
+    });
+  }, [
+    rows,
+    options.dirtyMacroId,
+    options.dirtyClickerId,
+    options.dirtyScriptId,
+  ]);
+
   const counts: FilterCounts = useMemo(() => {
     const recentSet = new Set(recentOrder);
     return {
-      all: rows.length,
-      favorites: rows.filter((r) => r.favorite).length,
-      recent: rows.filter((r) => recentSet.has(rowKey(r.kind, r.id))).length,
+      all: rowsWithDirty.length,
+      favorites: rowsWithDirty.filter((r) => r.favorite).length,
+      recent: rowsWithDirty.filter((r) =>
+        recentSet.has(rowKey(r.kind, r.id)),
+      ).length,
     };
-  }, [rows, recentOrder]);
+  }, [rowsWithDirty, recentOrder]);
 
   const filtered = useMemo(() => {
-    let list = rows;
+    let list = rowsWithDirty;
     if (filter === "favorites") {
       list = list.filter((r) => r.favorite);
     } else if (filter === "recent") {
@@ -312,11 +379,11 @@ export function useUnifiedAutomations(options: {
         r.folderLabel.toLowerCase().includes(q) ||
         (r.meta?.toLowerCase().includes(q) ?? false),
     );
-  }, [rows, query, filter, recentOrder]);
+  }, [rowsWithDirty, query, filter, recentOrder]);
 
   return {
     rows: filtered,
-    allRows: rows,
+    allRows: rowsWithDirty,
     folders,
     counts,
     loading,

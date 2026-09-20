@@ -844,25 +844,25 @@ impl AppState {
         match cmd {
             HotkeyCmd::Emergency => self.emergency_stop(),
             HotkeyCmd::ActionDown => {
-                if self.is_recording() {
+                if self.is_recording() || self.is_picking() {
                     return;
                 }
                 self.on_action_key_down();
             }
             HotkeyCmd::ActionUp => {
-                if self.is_recording() {
+                if self.is_recording() || self.is_picking() {
                     return;
                 }
                 self.on_action_key_up();
             }
             HotkeyCmd::ToggleMacro => {
-                if self.is_recording() {
+                if self.is_recording() || self.is_picking() {
                     return;
                 }
                 self.on_macro_key_down();
             }
             HotkeyCmd::RunLastScript => {
-                if self.is_recording() {
+                if self.is_recording() || self.is_picking() {
                     return;
                 }
                 if let Err(e) = self.on_script_hotkey() {
@@ -870,7 +870,7 @@ impl AppState {
                 }
             }
             HotkeyCmd::ToggleClickerPause => {
-                if self.is_recording() {
+                if self.is_recording() || self.is_picking() {
                     return;
                 }
                 if *self.active.lock().expect("active lock") != ActiveKind::Clicker {
@@ -884,13 +884,13 @@ impl AppState {
                 }
             }
             HotkeyCmd::NamedMacro(name) => {
-                if self.is_recording() {
+                if self.is_recording() || self.is_picking() {
                     return;
                 }
                 self.on_named_macro_key_down(name);
             }
             HotkeyCmd::NamedClicker(name) => {
-                if self.is_recording() {
+                if self.is_recording() || self.is_picking() {
                     return;
                 }
                 self.on_named_clicker_key_down(name);

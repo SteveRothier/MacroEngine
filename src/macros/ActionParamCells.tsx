@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT, type TFunction } from "../i18n";
-import { pickScreenPoint } from "../pick";
-import { Select, type ActionPickerEntry } from "../ui/shell";
+import { pickScreenPointDetailed } from "../pick";
+import { Select, useToast, type ActionPickerEntry } from "../ui/shell";
 import { ActionProps } from "./ActionProps";
 import { actionDetail } from "./actionLabels";
 import type { KeyMods, MacroAction } from "./types";
@@ -68,15 +68,21 @@ function CompactXY({
   onChangeXY: (x: number | null, y: number | null) => void;
 }) {
   const t = useT();
+  const toast = useToast();
   const [picking, setPicking] = useState(false);
   const isCursor = optional && x == null && y == null;
 
   async function onPick() {
     setPicking(true);
     try {
-      const p = await pickScreenPoint();
-      if (!p) return;
-      onChangeXY(p.x, p.y);
+      const result = await pickScreenPointDetailed();
+      if (!result.ok) {
+        if (result.reason === "timeout" || result.reason === "error") {
+          toast.info(t("macros.params.pickCancelled"));
+        }
+        return;
+      }
+      onChangeXY(result.point.x, result.point.y);
     } finally {
       setPicking(false);
     }

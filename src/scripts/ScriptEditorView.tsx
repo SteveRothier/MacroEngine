@@ -166,6 +166,7 @@ export function ScriptEditorView({
   const dirtyRef = useRef(false);
   const autosaveTimer = useRef<number | null>(null);
   const savedFlashTimer = useRef<number | null>(null);
+  const loadGenRef = useRef(0);
 
   const lang = draft?.language ?? "javascript";
   const presets = useMemo(() => getScriptPresets(t, lang), [t, lang]);
@@ -347,10 +348,11 @@ export function ScriptEditorView({
 
   useEffect(() => {
     let cancelled = false;
+    const loadId = ++loadGenRef.current;
     setLoading(true);
     void invoke<ScriptDoc>("load_script_cmd", { id: scriptId })
       .then((doc) => {
-        if (cancelled) return;
+        if (cancelled || loadId !== loadGenRef.current) return;
         const normalized = normalizeDoc(doc);
         setDraft(normalized);
         draftRef.current = normalized;
@@ -367,21 +369,23 @@ export function ScriptEditorView({
           { kind: "script" },
         )
           .then((idx) => {
-            if (cancelled) return;
-            setLocked(Boolean(idx.items.find((i) => i.id === scriptId)?.locked));
+            if (cancelled || loadId !== loadGenRef.current) return;
+            setLocked(
+              Boolean(idx.items.find((i) => i.id === scriptId)?.locked),
+            );
           })
           .catch(() => {
-            if (!cancelled) setLocked(false);
+            if (!cancelled && loadId === loadGenRef.current) setLocked(false);
           });
       })
       .catch((e) => {
-        if (!cancelled) {
+        if (!cancelled && loadId === loadGenRef.current) {
           toast.error(String(e));
           setDraft(null);
         }
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (loadId === loadGenRef.current) setLoading(false);
       });
     return () => {
       cancelled = true;
@@ -729,33 +733,18 @@ export function ScriptEditorView({
     />,
   );
 
-  if (loading) {
-    return (
-      <div className="caster-page caster-script-editor">
-        {titleBarPortal}
-        <div
-          className="caster-skeleton-page caster-skeleton-page--center"
-          aria-busy="true"
-          aria-label={t("scripts.toolbar.loadingAria")}
-        >
-          <div
-            className="caster-skeleton caster-skeleton-line caster-skeleton-line--lg"
-            style={{ width: "40%" }}
-          />
-          <div className="caster-skeleton caster-skeleton-line" style={{ width: "100%" }} />
-          <div className="caster-skeleton caster-skeleton-line" style={{ width: "92%" }} />
-          <div className="caster-skeleton caster-skeleton-line" style={{ width: "78%" }} />
-          <div className="caster-skeleton caster-skeleton-line" style={{ width: "85%" }} />
-        </div>
-      </div>
-    );
-  }
-
   if (!draft) {
     return (
-      <div className="caster-page caster-script-editor">
+      <div
+        className="caster-page caster-script-editor"
+        aria-busy={loading || undefined}
+      >
         {titleBarPortal}
-        <div className="caster-scripts-hint">{t("scripts.toolbar.notFound")}</div>
+        <div className="caster-scripts-hint">
+          {loading
+            ? t("scripts.toolbar.loadingAria")
+            : t("scripts.toolbar.notFound")}
+        </div>
       </div>
     );
   }
