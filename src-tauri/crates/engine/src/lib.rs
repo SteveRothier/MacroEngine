@@ -97,6 +97,7 @@ pub use script_library::{
     scripts_dir, ScriptDoc, ScriptLanguage, ScriptLibraryError, ScriptSummary,
 };
 pub use script_params::{parse_param_defs, ScriptParamDef};
+pub use script_runtime::ScriptStepGate;
 pub use script_transpile::{check_script_source, ScriptSourceDiagnostic};
 pub use settings::{
     clamp_overlay_opacity, load_settings, normalize_app_settings, save_settings, settings_path,

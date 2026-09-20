@@ -22,6 +22,9 @@ pub enum EngineEvent {
     RecordProgress {
         count: usize,
     },
+    ScriptStep {
+        method: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

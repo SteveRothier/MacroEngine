@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { confirmAction } from "../../ui";
@@ -10,6 +10,7 @@ import {
   appendChild,
   duplicateAtPath,
   emptyMacro,
+  flattenTree,
   getAtPath,
   insertAtPath,
   moveInParent,
@@ -22,14 +23,44 @@ import {
   type MacroAction,
   type MacroDocument,
 } from "../types";
-import type { MacroUiLayout } from "./macroToGraph";
+import { MacroCanvas } from "./MacroCanvas";
+import {
+  extractUiLayout,
+  macroToGraph,
+  type MacroGraphNode,
+  type MacroUiLayout,
+} from "./macroToGraph";
 import { MacroTitleBarTools } from "./MacroTitleBarTools";
 import { useTitleBarSlot } from "../../ui/shell/TitleBarContext";
 import { mergeAutomationPrefs } from "../../settings/settingsTypes";
 import { useT, type TFunction } from "../../i18n";
+import { runLibraryConvert } from "../../automations/convertLibraryItem";
 
 const AUTOSAVE_MS = 400;
 const HISTORY_MAX = 50;
+const MACRO_VIEW_KEY = "caster-macro-view";
+
+type EditorViewMode = "list" | "graph";
+
+function readEditorViewMode(): EditorViewMode {
+  try {
+    const v = sessionStorage.getItem(MACRO_VIEW_KEY);
+    if (v === "graph" || v === "list") return v;
+  } catch {
+    /* ignore */
+  }
+  return "list";
+}
+
+function findPathByActionId(
+  actions: MacroDocument["actions"],
+  actionId: string,
+): ActionPath | null {
+  for (const row of flattenTree(actions)) {
+    if (row.action.id === actionId) return row.path;
+  }
+  return null;
+}
 
 type HistoryEntry = {
   doc: MacroDocument;
@@ -88,6 +119,7 @@ export function MacroEditorView({
   const [activePath, setActivePath] = useState<ActionPath | null>(null);
   const [locked, setLocked] = useState(false);
   const [uiLayout, setUiLayout] = useState<MacroUiLayout | undefined>();
+  const [editorView, setEditorView] = useState<EditorViewMode>(readEditorViewMode);
   const [recording, setRecording] = useState(false);
   const [recordPaused, setRecordPaused] = useState(false);
   const [recordCount, setRecordCount] = useState(0);
@@ -158,6 +190,14 @@ export function MacroEditorView({
   useEffect(() => {
     onDirtyChange?.(macroId, dirty);
   }, [dirty, macroId, onDirtyChange]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(MACRO_VIEW_KEY, editorView);
+    } catch {
+      /* ignore */
+    }
+  }, [editorView]);
 
   const persistNow = useCallback(
     async (nextDoc: MacroDocument, id: string) => {
@@ -737,6 +777,40 @@ export function MacroEditorView({
 
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
+  const graph = useMemo(
+    () => macroToGraph(doc, uiLayout, t),
+    [doc, uiLayout, t],
+  );
+
+  const selectedNodeId = useMemo(() => {
+    if (!selectedPath) return null;
+    const action = getAtPath(doc.actions, selectedPath);
+    return action?.id ?? null;
+  }, [doc.actions, selectedPath]);
+
+  const onSelectGraphNode = useCallback(
+    (nodeId: string | null) => {
+      if (!nodeId) {
+        setSelectedPath(null);
+        return;
+      }
+      const path = findPathByActionId(doc.actions, nodeId);
+      setSelectedPath(path);
+    },
+    [doc.actions],
+  );
+
+  const onGraphChange = useCallback(
+    (nodes: MacroGraphNode[]) => {
+      if (editorLocked) return;
+      const layout = extractUiLayout({ nodes, edges: graph.edges });
+      setUiLayout(layout);
+      const payload = { ...docRef.current, uiLayout: layout };
+      setDirty(JSON.stringify(payload) !== baselineRef.current);
+    },
+    [editorLocked, graph.edges],
+  );
+
   const titleBarPortal = useTitleBarSlot(
     doc.name || macroId,
     <MacroTitleBarTools
@@ -762,6 +836,34 @@ export function MacroEditorView({
       canRedo={canRedo}
       onUndo={editorLocked ? undefined : undo}
       onRedo={editorLocked ? undefined : redo}
+      onConvertToScript={
+        editorLocked
+          ? undefined
+          : () => {
+              void (async () => {
+                const outcome = await runLibraryConvert({
+                  fromKind: "macro",
+                  id: macroId,
+                  toKind: "script",
+                  name: doc.name || macroId,
+                  t,
+                });
+                if (!outcome) return;
+                toast.success(
+                  t("automations.convert.success", {
+                    name: outcome.result.newName,
+                    kind: t(`automations.convert.kind.${outcome.result.toKind}`),
+                  }),
+                );
+                if (outcome.openAfter && onOpenScript) {
+                  onOpenScript(
+                    outcome.result.newId,
+                    outcome.result.newName,
+                  );
+                }
+              })();
+            }
+      }
       meta={
         <MacroMetaBar
           doc={doc}
@@ -812,6 +914,36 @@ export function MacroEditorView({
               open={addMenuOpen}
               onOpenChange={setAddMenuOpen}
             />
+            <div
+              className="caster-segmented"
+              role="group"
+              aria-label={t("macros.toolbar.viewListAria")}
+              style={{ marginLeft: "auto" }}
+            >
+              {(
+                [
+                  ["list", t("macros.toolbar.viewList"), t("macros.toolbar.viewListAria")],
+                  ["graph", t("macros.toolbar.viewGraph"), t("macros.toolbar.viewGraphAria")],
+                ] as const
+              ).map(([value, label, aria]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={[
+                    "caster-segmented-btn",
+                    editorView === value ? "active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-label={aria}
+                  aria-pressed={editorView === value}
+                  disabled={editorLocked}
+                  onClick={() => setEditorView(value)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <div
             className="caster-seq-scroll"
@@ -829,52 +961,63 @@ export function MacroEditorView({
                   }
             }
           >
-            <ActionList
-              actions={doc.actions}
-              selectedPath={selectedPath}
-              activePath={activePath}
-              readOnly={editorLocked}
-              onSelect={setSelectedPath}
-              onReorder={(from, to) => {
-                const next = reorderAtPath(doc.actions, from, to);
-                if (next) updateDoc({ ...doc, actions: next });
-              }}
-              onRemove={onRemove}
-              onDuplicate={onDuplicate}
-              onMove={onMove}
-              onRunFrom={editorLocked ? undefined : (path) => void onRunFrom(path)}
-              onInsertBefore={onInsertBefore}
-              onInsertAfter={onInsertAfter}
-              onPasteAfter={onPasteAfter}
-              onAddKind={editorLocked ? undefined : addAction}
-              onOpenAddMenu={
-                editorLocked ? undefined : () => setAddMenuOpen(true)
-              }
-              onEmptyAdd={editorLocked ? undefined : () => addAction("mouse.click")}
-              onStartRecord={
-                editorLocked || recording
-                  ? undefined
-                  : () => void onStartRecord()
-              }
-              onApplyPreset={
-                editorLocked ? undefined : (name) => void onApplyPreset(name)
-              }
-              onClearSelection={() => setSelectedPath(null)}
-              onUndo={editorLocked ? undefined : undo}
-              onRedo={editorLocked ? undefined : redo}
-              canUndo={canUndo}
-              canRedo={canRedo}
-              onChangeAction={(path, a) =>
-                updateDoc({
-                  ...doc,
-                  actions: updateAtPath(doc.actions, path, a),
-                })
-              }
-              branchAddMenuItems={(branch) =>
-                buildActionAddMenu((kind) => addToBranch(branch, kind), t)
-              }
-              onOpenScript={onOpenScript}
-            />
+            {editorView === "graph" ? (
+              <MacroCanvas
+                graphNodes={graph.nodes}
+                graphEdges={graph.edges}
+                selectedNodeId={selectedNodeId}
+                onSelectNode={onSelectGraphNode}
+                onGraphChange={onGraphChange}
+                readOnly={editorLocked}
+              />
+            ) : (
+              <ActionList
+                actions={doc.actions}
+                selectedPath={selectedPath}
+                activePath={activePath}
+                readOnly={editorLocked}
+                onSelect={setSelectedPath}
+                onReorder={(from, to) => {
+                  const next = reorderAtPath(doc.actions, from, to);
+                  if (next) updateDoc({ ...doc, actions: next });
+                }}
+                onRemove={onRemove}
+                onDuplicate={onDuplicate}
+                onMove={onMove}
+                onRunFrom={editorLocked ? undefined : (path) => void onRunFrom(path)}
+                onInsertBefore={onInsertBefore}
+                onInsertAfter={onInsertAfter}
+                onPasteAfter={onPasteAfter}
+                onAddKind={editorLocked ? undefined : addAction}
+                onOpenAddMenu={
+                  editorLocked ? undefined : () => setAddMenuOpen(true)
+                }
+                onEmptyAdd={editorLocked ? undefined : () => addAction("mouse.click")}
+                onStartRecord={
+                  editorLocked || recording
+                    ? undefined
+                    : () => void onStartRecord()
+                }
+                onApplyPreset={
+                  editorLocked ? undefined : (name) => void onApplyPreset(name)
+                }
+                onClearSelection={() => setSelectedPath(null)}
+                onUndo={editorLocked ? undefined : undo}
+                onRedo={editorLocked ? undefined : redo}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onChangeAction={(path, a) =>
+                  updateDoc({
+                    ...doc,
+                    actions: updateAtPath(doc.actions, path, a),
+                  })
+                }
+                branchAddMenuItems={(branch) =>
+                  buildActionAddMenu((kind) => addToBranch(branch, kind), t)
+                }
+                onOpenScript={onOpenScript}
+              />
+            )}
           </div>
         </div>
       </div>

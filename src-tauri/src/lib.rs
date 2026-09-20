@@ -1373,9 +1373,20 @@ fn run_script_session_cmd(
     engine: State<'_, AppState>,
     id: String,
     dry_run: Option<bool>,
+    step_mode: Option<bool>,
 ) -> Result<EngineStatusPayload, String> {
-    engine.start_script_session(&id, dry_run.unwrap_or(false))?;
+    engine.start_script_session(
+        &id,
+        dry_run.unwrap_or(false),
+        step_mode.unwrap_or(false),
+    )?;
     Ok(status_of(&engine, Some("script running".into())))
+}
+
+#[tauri::command]
+fn script_step_continue_cmd(engine: State<'_, AppState>) -> Result<(), String> {
+    engine.script_step_continue();
+    Ok(())
 }
 
 fn parse_script_language(language: &str) -> ScriptLanguage {
@@ -2098,6 +2109,12 @@ fn wire_engine_events(handle: AppHandle, engine: &AppState) {
                     serde_json::json!({ "count": count }),
                 );
             }
+            EngineEvent::ScriptStep { method } => {
+                let _ = emit_handle.emit(
+                    "engine://script-step",
+                    serde_json::json!({ "method": method }),
+                );
+            }
         }
     });
 }
@@ -2375,6 +2392,7 @@ pub fn run() {
             save_script_cmd,
             delete_script_cmd,
             run_script_session_cmd,
+            script_step_continue_cmd,
             check_script_source_cmd,
             export_app_settings,
             import_app_settings,

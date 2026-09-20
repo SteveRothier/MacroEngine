@@ -1,6 +1,6 @@
 /**
- * Legacy React Flow projection of MacroDocument.actions.
- * Not mounted by MacroEditorView (sequence is the primary editor).
+ * React Flow projection of MacroDocument.actions.
+ * Mounted optionally by MacroEditorView graph mode (list mode uses ActionList).
  */
 import { useCallback, useEffect, useMemo } from "react";
 import {

@@ -1,6 +1,6 @@
 /**
- * Legacy graph projection helpers (UI layout only).
- * MacroEditorView no longer mounts MacroCanvas; kept for optional future use / uiLayout round-trip.
+ * Graph projection helpers (UI layout round-trip).
+ * Used by MacroEditorView graph mode via macroToGraph / extractUiLayout.
  */
 import type { TFunction } from "../../i18n";
 import type { MacroAction, MacroDocument, MacroTrigger } from "../types";

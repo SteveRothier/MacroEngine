@@ -13,6 +13,7 @@ import { DropdownMenu, useToast } from "../ui/shell";
 import type { DropdownEntry } from "../ui/shell";
 import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import { confirmAction, confirmChoice } from "../ui";
+import { runLibraryConvert } from "../automations/convertLibraryItem";
 import {
   readStoredTheme,
   resolvedColorScheme,
@@ -92,6 +93,7 @@ type Props = {
   onDirtyChange?: (id: string, dirty: boolean) => void;
   onLabelChange?: (name: string) => void;
   onOpenSettings?: () => void;
+  onOpenMacro?: (macroId: string, label?: string) => void;
   scriptsPrefs?: ScriptsPrefs;
 };
 
@@ -131,6 +133,7 @@ export function ScriptEditorView({
   onDirtyChange,
   onLabelChange,
   onOpenSettings: _onOpenSettings,
+  onOpenMacro,
   scriptsPrefs: scriptsPrefsProp,
 }: Props) {
   const t = useT();
@@ -150,6 +153,8 @@ export function ScriptEditorView({
   const [diagnostics, setDiagnostics] = useState<ScriptEditorDiagnostic[]>([]);
   const [locked, setLocked] = useState(false);
   const [dryRun, setDryRun] = useState(false);
+  const [stepMode, setStepMode] = useState(false);
+  const [stepPausedMethod, setStepPausedMethod] = useState<string | null>(null);
   const [runTimeline, setRunTimeline] = useState<ConsoleLine[]>([]);
   const consoleIdRef = useRef(0);
   const runTimelineIdRef = useRef(0);
@@ -234,6 +239,7 @@ export function ScriptEditorView({
         if (/Fin script/i.test(msg) || /Arrêt script/i.test(msg)) {
           pushConsole(t("scripts.console.sessionEnd"), "session");
           trackingRunRef.current = false;
+          setStepPausedMethod(null);
         }
       }
     }).then((fn) => {
@@ -259,12 +265,25 @@ export function ScriptEditorView({
         setEngineBusy(null);
         setRunning(false);
         trackingRunRef.current = false;
+        setStepPausedMethod(null);
       }
     }).then((fn) => {
       un = fn;
     });
     return () => un?.();
   }, []);
+
+  useEffect(() => {
+    if (!running) return;
+    let un: (() => void) | undefined;
+    void listen<{ method?: string | null }>("engine://script-step", (e) => {
+      const method = e.payload.method?.trim();
+      if (method) setStepPausedMethod(method);
+    }).then((fn) => {
+      un = fn;
+    });
+    return () => un?.();
+  }, [running]);
 
   const syncRunningFromStatus = useCallback((status: EngineStatus) => {
     if (isScriptSessionBusy(status)) {
@@ -275,6 +294,7 @@ export function ScriptEditorView({
     setEngineBusy(null);
     setRunning(false);
     trackingRunRef.current = false;
+    setStepPausedMethod(null);
   }, []);
 
   const markDirty = useCallback(
@@ -568,9 +588,11 @@ export function ScriptEditorView({
       }
       // Do not trust a Running snapshot from the start command: fast scripts often
       // reach Idle before this await resolves, and a stale Running would stick Arrêter.
+      setStepPausedMethod(null);
       await invoke("run_script_session_cmd", {
         id: scriptId,
         dryRun,
+        stepMode,
       });
       const fresh = await invoke<EngineStatus>("get_engine_state");
       syncRunningFromStatus(fresh);
@@ -594,8 +616,18 @@ export function ScriptEditorView({
       }
       setRunning(false);
       trackingRunRef.current = false;
+      setStepPausedMethod(null);
       const src = draftRef.current?.source ?? "";
       setDiagnostics(diagnosticsFromError(src, raw));
+    }
+  }
+
+  async function onStepContinue() {
+    try {
+      await invoke("script_step_continue_cmd");
+      setStepPausedMethod(null);
+    } catch (e) {
+      toast.error(String(e));
     }
   }
 
@@ -647,6 +679,40 @@ export function ScriptEditorView({
       loading={loading || !draft}
       dryRun={dryRun}
       onDryRunChange={setDryRun}
+      stepMode={stepMode}
+      onStepModeChange={setStepMode}
+      stepPausedMethod={stepPausedMethod}
+      onStepContinue={() => void onStepContinue()}
+      onConvertToMacro={
+        locked || !draft
+          ? undefined
+          : () => {
+              void (async () => {
+                const outcome = await runLibraryConvert({
+                  fromKind: "script",
+                  id: scriptId,
+                  toKind: "macro",
+                  name: draft.name || scriptId,
+                  t,
+                });
+                if (!outcome) return;
+                toast.success(
+                  t("automations.convert.success", {
+                    name: outcome.result.newName,
+                    kind: t(
+                      `automations.convert.kind.${outcome.result.toKind}`,
+                    ),
+                  }),
+                );
+                if (outcome.openAfter && onOpenMacro) {
+                  onOpenMacro(
+                    outcome.result.newId,
+                    outcome.result.newName,
+                  );
+                }
+              })();
+            }
+      }
       running={running}
       engineBusy={engineBusy}
       lintBlocked={hasLintErrors}

@@ -23,6 +23,11 @@ type Props = {
   loading?: boolean;
   dryRun?: boolean;
   onDryRunChange?: (dryRun: boolean) => void;
+  stepMode?: boolean;
+  onStepModeChange?: (stepMode: boolean) => void;
+  stepPausedMethod?: string | null;
+  onStepContinue?: () => void;
+  onConvertToMacro?: () => void;
   running: boolean;
   engineBusy: EngineBusyKind | null;
   lintBlocked?: boolean;
@@ -59,6 +64,11 @@ export function ScriptTitleBarTools({
   loading = false,
   dryRun = false,
   onDryRunChange,
+  stepMode = false,
+  onStepModeChange,
+  stepPausedMethod = null,
+  onStepContinue,
+  onConvertToMacro,
   running,
   engineBusy,
   lintBlocked = false,
@@ -128,6 +138,17 @@ export function ScriptTitleBarTools({
               {t("scripts.toolbar.locked")}
             </span>
           ) : null}
+          {onConvertToMacro ? (
+            <button
+              type="button"
+              className="caster-titlebar-btn caster-btn caster-btn-ghost"
+              disabled={editDisabled || running}
+              onClick={onConvertToMacro}
+              title={t("scripts.toolbar.convertToMacroTitle")}
+            >
+              {t("scripts.toolbar.convertToMacro")}
+            </button>
+          ) : null}
           <ScriptPermissionsMenu
             value={permissions}
             onChange={onPermissionsChange}
@@ -168,10 +189,38 @@ export function ScriptTitleBarTools({
                 disabled: running || !onDryRunChange,
                 onSelect: () => onDryRunChange?.(!dryRun),
               },
+              {
+                id: "step-mode",
+                label: stepMode
+                  ? t("scripts.toolbar.optionsStepOn")
+                  : t("scripts.toolbar.optionsStepOff"),
+                description: t("scripts.toolbar.stepTip"),
+                disabled: running || !onStepModeChange,
+                onSelect: () => onStepModeChange?.(!stepMode),
+              },
             ]}
           >
             <MoreHorizontal size={14} aria-hidden />
           </DropdownMenu>
+          {dryRun ? (
+            <span
+              className="caster-script-perm-chip"
+              title={t("scripts.toolbar.dryRunTip")}
+            >
+              {t("scripts.toolbar.dryRunBadge")}
+            </span>
+          ) : null}
+          {stepPausedMethod ? (
+            <button
+              type="button"
+              className="caster-btn caster-btn-primary caster-script-run-btn"
+              onClick={() => onStepContinue?.()}
+              aria-label={t("scripts.toolbar.stepContinue")}
+            >
+              {t("scripts.toolbar.stepPaused", { method: stepPausedMethod })}{" "}
+              · {t("scripts.toolbar.stepContinue")}
+            </button>
+          ) : null}
           {statusLabel && saveStatus === "error" ? (
             <Tooltip content={t("scripts.toolbar.saveErrorTip")}>
               <button

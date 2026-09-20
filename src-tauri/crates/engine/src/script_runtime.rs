@@ -20,7 +20,7 @@ use crate::schema::MacroValue;
 use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex};
 use std::time::Instant;
 
 use serde_json::{json, Value};
@@ -29,6 +29,61 @@ pub const MAX_SCRIPT_NEST: u32 = 5;
 
 pub type RunMacroCallback =
     Arc<dyn Fn(&str) -> Result<(), ActionError> + Send + Sync>;
+
+/// Cooperative step gate for script session step-through debugging.
+pub struct ScriptStepGate {
+    waiting: Mutex<bool>,
+    cv: Condvar,
+}
+
+impl ScriptStepGate {
+    pub fn new() -> Self {
+        Self {
+            waiting: Mutex::new(false),
+            cv: Condvar::new(),
+        }
+    }
+
+    /// Publish `ScriptStep` and block until [`Self::continue_step`] or cancel.
+    pub fn wait_before(
+        &self,
+        bus: &EventBus,
+        method: &str,
+        cancel: &CancellationToken,
+    ) -> Result<(), ActionError> {
+        bus.publish(EngineEvent::ScriptStep {
+            method: method.to_string(),
+        });
+        let mut guard = self
+            .waiting
+            .lock()
+            .map_err(|_| ActionError::Message("step gate lock".into()))?;
+        *guard = true;
+        while *guard {
+            if cancel.is_cancelled() {
+                return Err(ActionError::Cancelled);
+            }
+            guard = self
+                .cv
+                .wait(guard)
+                .map_err(|_| ActionError::Message("step gate wait".into()))?;
+        }
+        Ok(())
+    }
+
+    pub fn continue_step(&self) {
+        if let Ok(mut guard) = self.waiting.lock() {
+            *guard = false;
+            self.cv.notify_all();
+        }
+    }
+}
+
+impl Default for ScriptStepGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[derive(Clone)]
 pub struct ScriptOptions {
@@ -50,6 +105,8 @@ pub struct ScriptOptions {
     pub include_stack: Option<Arc<Mutex<HashSet<String>>>>,
     /// When true, input/process side effects are logged and skipped.
     pub dry_run: bool,
+    /// Optional step-through gate (script session debug).
+    pub step_gate: Option<Arc<ScriptStepGate>>,
 }
 
 impl Default for ScriptOptions {
@@ -69,6 +126,7 @@ impl Default for ScriptOptions {
             nest_depth: None,
             include_stack: None,
             dry_run: false,
+            step_gate: None,
         }
     }
 }
@@ -100,6 +158,24 @@ pub fn dry_run_skip(bus: &EventBus, method: &str) {
         level: LogLevel::Info,
         message: format!("script: dry-run skipped {method}"),
     });
+}
+
+fn maybe_step(
+    opts: &ScriptOptions,
+    bus: &EventBus,
+    cancel: &CancellationToken,
+    method: &str,
+) -> Result<(), ActionError> {
+    if let Some(gate) = &opts.step_gate {
+        gate.wait_before(bus, method, cancel)?;
+    }
+    Ok(())
+}
+
+fn step_js_err(e: ActionError) -> boa_engine::JsError {
+    boa_engine::JsNativeError::error()
+        .with_message(e.to_string())
+        .into()
 }
 
 fn nest_depth_ref(opts: &ScriptOptions) -> Result<&Arc<AtomicU32>, ActionError> {
@@ -353,6 +429,7 @@ pub fn run_script_with_options(
     let _nest_depth = opts.nest_depth.clone().expect("nest depth");
     let dry_run = opts.dry_run;
     let base_opts = opts.clone();
+    let step_opts = base_opts.clone();
 
     let log_fn = NativeFunction::from_copy_closure(move |_this, args, _ctx| {
         let msg = args
@@ -403,13 +480,18 @@ pub fn run_script_with_options(
         Ok(value)
     });
 
-    let fetch_fn = NativeFunction::from_copy_closure(move |_this, args, ctx| {
-        if !allow_net {
-            return Err(boa_engine::JsNativeError::error()
-                .with_message("caster.fetch disabled (network permission required)")
-                .into());
-        }
-        let opts = args
+    let step_opts_fetch = step_opts.clone();
+    let fetch_fn = unsafe {
+        NativeFunction::from_closure(move |_this, args, ctx| {
+            if !allow_net {
+                return Err(boa_engine::JsNativeError::error()
+                    .with_message("caster.fetch disabled (network permission required)")
+                    .into());
+            }
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_fetch, bus, cancel, "caster.fetch").map_err(step_js_err)?;
+            let opts = args
             .first()
             .and_then(|v| v.as_object())
             .ok_or_else(|| {
@@ -464,11 +546,13 @@ pub fn run_script_with_options(
                 boa_engine::property::Attribute::all(),
             )
             .build();
-        Ok(JsValue::from(out))
-    });
+            Ok(JsValue::from(out))
+        })
+    };
 
     // SAFETY: closures capture only Rust heap (Arc/PathBuf), not JS GC-managed values.
     let inj_clip = injector.clone();
+    let step_opts_clip_r = step_opts.clone();
     let clipboard_read_fn = unsafe {
         NativeFunction::from_closure(move |_this, _args, _ctx| {
             if !allow_clip {
@@ -476,6 +560,10 @@ pub fn run_script_with_options(
                     .with_message("caster.clipboardRead disabled")
                     .into());
             }
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_clip_r, bus, cancel, "caster.clipboardRead")
+                .map_err(step_js_err)?;
             let Some(inj) = inj_clip.as_ref() else {
                 return Err(boa_engine::JsNativeError::error()
                     .with_message("clipboard unavailable")
@@ -489,6 +577,7 @@ pub fn run_script_with_options(
     };
 
     let inj_clip_w = injector.clone();
+    let step_opts_clip_w = step_opts.clone();
     let clipboard_write_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, _ctx| {
             if !allow_clip {
@@ -496,6 +585,10 @@ pub fn run_script_with_options(
                     .with_message("caster.clipboardWrite disabled")
                     .into());
             }
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_clip_w, bus, cancel, "caster.clipboardWrite")
+                .map_err(step_js_err)?;
             let text = args
                 .first()
                 .and_then(|v| v.as_string())
@@ -514,6 +607,7 @@ pub fn run_script_with_options(
     };
 
     let data_dir_r = data_dir.clone();
+    let step_opts_read = step_opts.clone();
     let read_file_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, _ctx| {
             if !allow_fs {
@@ -521,6 +615,9 @@ pub fn run_script_with_options(
                     .with_message("caster.readFile disabled")
                     .into());
             }
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_read, bus, cancel, "caster.readFile").map_err(step_js_err)?;
             let rel = args
                 .first()
                 .and_then(|v| v.as_string())
@@ -537,6 +634,7 @@ pub fn run_script_with_options(
     };
 
     let data_dir_w = data_dir.clone();
+    let step_opts_write = step_opts.clone();
     let write_file_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, _ctx| {
             if !allow_fs {
@@ -544,6 +642,9 @@ pub fn run_script_with_options(
                     .with_message("caster.writeFile disabled")
                     .into());
             }
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_write, bus, cancel, "caster.writeFile").map_err(step_js_err)?;
             let rel = args
                 .first()
                 .and_then(|v| v.as_string())
@@ -567,6 +668,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let step_opts_macro = step_opts.clone();
     let run_macro_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, _ctx| {
             if !allow_macro {
@@ -574,6 +676,9 @@ pub fn run_script_with_options(
                     .with_message("caster.runMacro disabled")
                     .into());
             }
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_macro, bus, cancel, "caster.runMacro").map_err(step_js_err)?;
             let id = args
                 .first()
                 .and_then(|v| v.as_string())
@@ -589,6 +694,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let step_opts_sleep = step_opts.clone();
     let sleep_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, _ctx| {
             if !allow_input {
@@ -596,12 +702,14 @@ pub fn run_script_with_options(
                     .with_message("caster.sleep disabled")
                     .into());
             }
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_sleep, bus, cancel, "caster.sleep").map_err(step_js_err)?;
             let ms = args
                 .first()
                 .and_then(|v| v.as_number())
                 .map(|n| n.max(0.0) as u64)
                 .unwrap_or(0);
-            let cancel = &*(cancel_ptr as *const CancellationToken);
             let deadline = std::time::Instant::now() + Duration::from_millis(ms);
             while std::time::Instant::now() < deadline {
                 if cancel.is_cancelled() {
@@ -617,10 +725,13 @@ pub fn run_script_with_options(
     };
 
     let inj_click = injector.clone();
+    let step_opts_click = step_opts.clone();
     let click_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_click, bus, cancel, "caster.click").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.click");
                 return Ok(JsValue::undefined());
             }
@@ -634,10 +745,13 @@ pub fn run_script_with_options(
     };
 
     let inj_move = injector.clone();
+    let step_opts_move = step_opts.clone();
     let move_to_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, _ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_move, bus, cancel, "caster.moveTo").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.moveTo");
                 return Ok(JsValue::undefined());
             }
@@ -661,10 +775,13 @@ pub fn run_script_with_options(
     };
 
     let inj_down = injector.clone();
+    let step_opts_mdown = step_opts.clone();
     let mouse_down_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_mdown, bus, cancel, "caster.mouseDown").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.mouseDown");
                 return Ok(JsValue::undefined());
             }
@@ -678,10 +795,13 @@ pub fn run_script_with_options(
     };
 
     let inj_up = injector.clone();
+    let step_opts_mup = step_opts.clone();
     let mouse_up_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_mup, bus, cancel, "caster.mouseUp").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.mouseUp");
                 return Ok(JsValue::undefined());
             }
@@ -695,10 +815,13 @@ pub fn run_script_with_options(
     };
 
     let inj_wheel = injector.clone();
+    let step_opts_wheel = step_opts.clone();
     let wheel_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_wheel, bus, cancel, "caster.wheel").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.wheel");
                 return Ok(JsValue::undefined());
             }
@@ -718,10 +841,13 @@ pub fn run_script_with_options(
     };
 
     let inj_ktap = injector.clone();
+    let step_opts_ktap = step_opts.clone();
     let key_tap_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_ktap, bus, cancel, "caster.keyTap").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.keyTap");
                 return Ok(JsValue::undefined());
             }
@@ -742,10 +868,13 @@ pub fn run_script_with_options(
     };
 
     let inj_kdown = injector.clone();
+    let step_opts_kdown = step_opts.clone();
     let key_down_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_kdown, bus, cancel, "caster.keyDown").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.keyDown");
                 return Ok(JsValue::undefined());
             }
@@ -766,10 +895,13 @@ pub fn run_script_with_options(
     };
 
     let inj_kup = injector.clone();
+    let step_opts_kup = step_opts.clone();
     let key_up_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_kup, bus, cancel, "caster.keyUp").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.keyUp");
                 return Ok(JsValue::undefined());
             }
@@ -814,10 +946,13 @@ pub fn run_script_with_options(
 
     let allow_process_rp = allow_process;
     let cancel_ptr_rp = cancel_ptr;
+    let step_opts_process = step_opts.clone();
     let run_process_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
+            let bus = unsafe { &*(bus_ptr as *const EventBus) };
+            maybe_step(&step_opts_process, bus, cancel, "caster.runProcess").map_err(step_js_err)?;
             if dry_run {
-                let bus = unsafe { &*(bus_ptr as *const EventBus) };
                 dry_run_skip(bus, "caster.runProcess");
                 return Ok(JsValue::undefined());
             }
@@ -945,6 +1080,9 @@ pub fn run_script_with_options(
     let nest_timeout_ms = timeout_ms;
     let run_script_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, ctx| {
+            let bus = &*(bus_ptr_rs as *const EventBus);
+            let cancel = &*(cancel_ptr_rs as *const CancellationToken);
+            maybe_step(&base_opts_rs, bus, cancel, "caster.runScript").map_err(step_js_err)?;
             let id = args
                 .first()
                 .and_then(|v| v.as_string())
@@ -960,8 +1098,6 @@ pub fn run_script_with_options(
                     }
                 }
             }
-            let bus = &*(bus_ptr_rs as *const EventBus);
-            let cancel = &*(cancel_ptr_rs as *const CancellationToken);
             let ret = nest_run_script(&id, params, nest_timeout_ms, bus, cancel, &base_opts_rs)
                 .map_err(|e| {
                     boa_engine::JsNativeError::error().with_message(e.to_string())

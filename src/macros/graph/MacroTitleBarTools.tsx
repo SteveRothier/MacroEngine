@@ -23,6 +23,8 @@ type Props = {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  /** Convert this macro to a script (Accueil convert flow). */
+  onConvertToScript?: () => void;
   /** Nom / répétitions / raccourci — fused into this bar. */
   meta?: ReactNode;
 };
@@ -46,6 +48,7 @@ export function MacroTitleBarTools({
   canRedo = false,
   onUndo,
   onRedo,
+  onConvertToScript,
   meta,
 }: Props) {
   const t = useT();
@@ -65,6 +68,17 @@ export function MacroTitleBarTools({
             <ArrowLeft size={14} aria-hidden />
           </button>
           {meta}
+          {onConvertToScript ? (
+            <button
+              type="button"
+              className="caster-titlebar-btn caster-btn caster-btn-ghost"
+              disabled={locked || busy}
+              onClick={onConvertToScript}
+              title={t("macros.toolbar.convertToScriptTitle")}
+            >
+              {t("macros.toolbar.convertToScript")}
+            </button>
+          ) : null}
         </>
       }
       end={

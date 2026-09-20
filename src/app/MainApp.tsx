@@ -1031,6 +1031,7 @@ function MainAppInner({
             onOpenSettings={() =>
               setWorkspace((ws) => openSettings(ws, "application"))
             }
+            onOpenMacro={(id, label) => openDoc("macro", id, label ?? id)}
             scriptsPrefs={scriptsPrefs}
           />
         );

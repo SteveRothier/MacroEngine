@@ -73,6 +73,8 @@ pub struct AppState {
     active_clicker_preset: Arc<Mutex<Option<String>>>,
     /// Script currently running as an autonomous session.
     active_script_name: Arc<Mutex<Option<String>>>,
+    /// Active step-through gate for script session debugging.
+    script_step_gate: Arc<Mutex<Option<Arc<crate::script_runtime::ScriptStepGate>>>>,
     /// Live chord → macro name for per-macro triggers.
     macro_triggers: Arc<Mutex<std::collections::HashMap<TriggerBinding, String>>>,
     /// Live chord → clicker preset name for per-preset triggers.
@@ -125,6 +127,7 @@ impl AppState {
             macros_config_dir: Arc::new(Mutex::new(None)),
             active_clicker_preset: Arc::new(Mutex::new(None)),
             active_script_name: Arc::new(Mutex::new(None)),
+            script_step_gate: Arc::new(Mutex::new(None)),
             macro_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
             clicker_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
             ui_release: Arc::new(Mutex::new(None)),
@@ -941,7 +944,7 @@ impl AppState {
             .and_then(|s| s.shell.last_script_id)
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| "no last script".to_string())?;
-        self.start_script_session(&id, false).map(|_| ())
+        self.start_script_session(&id, false, false).map(|_| ())
     }
 
     fn finalize_recent_clicker(
@@ -1382,10 +1385,22 @@ impl AppState {
     }
 
     /// Run a library script outside of a macro (M5). Cancel via F8 / `request_cancel`.
+    pub fn script_step_continue(&self) {
+        if let Some(gate) = self
+            .script_step_gate
+            .lock()
+            .expect("script step gate")
+            .as_ref()
+        {
+            gate.continue_step();
+        }
+    }
+
     pub fn start_script_session(
         &self,
         script_id: &str,
         dry_run: bool,
+        step_mode: bool,
     ) -> Result<EngineState, String> {
         self.wait_while_stopping(Duration::from_millis(1000));
         let _lifecycle = self.lifecycle.lock().expect("lifecycle");
@@ -1415,6 +1430,20 @@ impl AppState {
         let app = self.clone();
         let config_dir = dir.clone();
         let script_id_owned = script_id.to_string();
+        let step_gate: Option<Arc<crate::script_runtime::ScriptStepGate>> = if step_mode {
+            let gate = Arc::new(crate::script_runtime::ScriptStepGate::new());
+            *self
+                .script_step_gate
+                .lock()
+                .expect("script step gate") = Some(Arc::clone(&gate));
+            Some(gate)
+        } else {
+            *self
+                .script_step_gate
+                .lock()
+                .expect("script step gate") = None;
+            None
+        };
 
         let handle = std::thread::spawn(move || {
             let started = Instant::now();
@@ -1448,6 +1477,7 @@ impl AppState {
                 nest_depth: None,
                 include_stack: None,
                 dry_run,
+                step_gate: step_gate.clone(),
             };
             if opts.allow_macro_control {
                 let inj = Arc::clone(&injector);
@@ -1492,6 +1522,7 @@ impl AppState {
                 started.elapsed().as_millis() as u64,
             );
             *app.active_script_name.lock().expect("script name") = None;
+            *app.script_step_gate.lock().expect("script step gate") = None;
             let _ = app.finish_run();
         });
         *self.worker.lock().expect("worker lock") = Some(handle);
@@ -1956,7 +1987,7 @@ mod tests {
         let inj = Arc::new(RecordingInjector::new());
         let app = AppState::with_injector(Arc::clone(&inj) as Arc<dyn MouseInjector>);
         app.set_macros_config_dir(dir.clone());
-        let err = app.start_script_session("mod1", false).unwrap_err();
+        let err = app.start_script_session("mod1", false, false).unwrap_err();
         assert_eq!(err, "module_not_runnable");
         let _ = std::fs::remove_dir_all(&dir);
     }

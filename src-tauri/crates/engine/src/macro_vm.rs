@@ -485,6 +485,7 @@ impl MacroVm {
                                         nest_depth: None,
                                         include_stack: None,
                                         dry_run: false,
+                                        step_gate: None,
                                     }
                                 },
                             )
@@ -508,6 +509,7 @@ impl MacroVm {
                                         nest_depth: None,
                                         include_stack: None,
                                         dry_run: false,
+                                        step_gate: None,
                                     }
                                 },
                             )
