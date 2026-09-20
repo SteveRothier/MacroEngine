@@ -16,6 +16,7 @@ import {
   type ClickKind,
   type ClickMode,
   type ClickPoint,
+  type ClickerProcessFilterMode,
   type ClickZoneOrder,
   type CustomZone,
   type DisplayDto,
@@ -53,6 +54,8 @@ export type ClickerMetrics = {
   cumulativeDeadlineErrorMs: number;
   elapsedMs: number;
   running: boolean;
+  /** Ticks skipped because the process filter blocked the foreground exe. */
+  filterBlockedTicks?: number;
 };
 
 export type UseClickerEditorOptions = {
@@ -123,6 +126,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const [stopWhenComplete, setStopWhenComplete] = useState(false);
   const [picking, setPicking] = useState(false);
   const [pickingPointIndex, setPickingPointIndex] = useState<number | null>(null);
+  const [capturingPoints, setCapturingPoints] = useState(false);
+  const [capturedCount, setCapturedCount] = useState(0);
   const [drawing, setDrawing] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("");
@@ -132,6 +137,11 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [processFilter, setProcessFilter] = useState<ProcessFilter>(
+    DEFAULT_PROCESS_FILTER,
+  );
+  const [presetFilterMode, setPresetFilterMode] =
+    useState<ClickerProcessFilterMode>("inherit");
+  const [localProcessFilter, setLocalProcessFilter] = useState<ProcessFilter>(
     DEFAULT_PROCESS_FILTER,
   );
 
@@ -144,6 +154,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const selectedPresetRef = useRef("");
   const triggerRef = useRef<ClickerTrigger>(MANUAL_TRIGGER);
   const autosaveTimerRef = useRef<number | null>(null);
+  const capturingPointsRef = useRef(false);
   const buildConfigRef = useRef<() => ClickerConfigPayload>(() => {
     throw new Error("buildConfig not ready");
   });
@@ -160,6 +171,9 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   useEffect(() => {
     triggerRef.current = trigger;
   }, [trigger]);
+  useEffect(() => {
+    capturingPointsRef.current = capturingPoints;
+  }, [capturingPoints]);
 
   const syncHistFlags = useCallback(() => {
     setCanUndo(pastRef.current.length > 0);
@@ -206,6 +220,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       stopWhenComplete,
       clickZoneOrder,
       stopZones: stopZonesFromModel(zoneModel),
+      processFilter: presetFilterMode,
+      localProcessFilter,
     };
   }, [
     button,
@@ -238,6 +254,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     stopWhenComplete,
     clickZoneOrder,
     zoneModel,
+    presetFilterMode,
+    localProcessFilter,
   ]);
 
   buildConfigRef.current = buildConfig;
@@ -280,6 +298,11 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     }
     setZoneModel(modelFromStopZones(c.stopZones ?? []));
     setSelectedZoneId(null);
+    setPresetFilterMode(c.processFilter ?? "inherit");
+    setLocalProcessFilter({
+      ...DEFAULT_PROCESS_FILTER,
+      ...(c.localProcessFilter ?? {}),
+    });
   }, []);
 
   const persistUi = useCallback(
@@ -472,11 +495,17 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         status.state === "running" || status.state === "paused";
       if (!id || running || locked) return;
       try {
-        const geom = await invoke<ScreenGeomDto>("set_active_display", {
+        const display = await invoke<DisplayDto>("set_active_display", {
           displayId: id,
         });
         setActiveDisplayId(id);
-        setScreenGeom(geom);
+        setScreenGeom({
+          x: display.x,
+          y: display.y,
+          width: display.width,
+          height: display.height,
+          scaleFactor: display.scaleFactor,
+        });
         await persistUi(undefined, undefined, undefined, id);
       } catch {
         /* ignore */
@@ -545,6 +574,63 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     [persistUi],
   );
 
+  const finishPointCapture = useCallback(async () => {
+    try {
+      const captured = await invoke<ClickPoint[]>(
+        "stop_clicker_point_capture",
+      );
+      if (captured.length > 0) {
+        setPoints((prev) => [...prev, ...captured]);
+        setPointsEnabled(true);
+      }
+      return captured;
+    } finally {
+      setCapturingPoints(false);
+      setCapturedCount(0);
+    }
+  }, []);
+
+  const onTogglePointCapture = useCallback(async () => {
+    if (capturingPoints) {
+      await finishPointCapture();
+      return;
+    }
+    await invoke("start_clicker_point_capture");
+    setCapturedCount(0);
+    setCapturingPoints(true);
+  }, [capturingPoints, finishPointCapture]);
+
+  // Poll progress so the button shows the count and reacts to Esc (cancel).
+  useEffect(() => {
+    if (!capturingPoints) return;
+    let stopped = false;
+    const id = window.setInterval(() => {
+      void invoke<{ active: boolean; count: number; cancelled: boolean }>(
+        "get_clicker_point_capture_state",
+      )
+        .then((s) => {
+          if (stopped) return;
+          setCapturedCount(s.count);
+          if (!s.active) {
+            stopped = true;
+            void finishPointCapture().catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }, 250);
+    return () => {
+      stopped = true;
+      window.clearInterval(id);
+    };
+  }, [capturingPoints, finishPointCapture]);
+
+  useEffect(() => {
+    return () => {
+      if (!capturingPointsRef.current) return;
+      void invoke("stop_clicker_point_capture").catch(() => {});
+    };
+  }, []);
+
   const onDrawZone = useCallback(
     async (kind: ZoneKind = "safety") => {
       setDrawing(true);
@@ -604,6 +690,21 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     baselineKeyRef.current = JSON.stringify(buildConfig());
     setDirty(false);
   }, [buildConfig, locked, selectedPreset, trigger]);
+
+  /** Save the current config under a new name (keeps this tab untouched). */
+  const onSaveAsNewPreset = useCallback(
+    async (rawName: string): Promise<string> => {
+      const name = rawName.trim();
+      if (!name) throw new Error("empty preset name");
+      const preset = await invoke<{ name: string }>("save_clicker_preset", {
+        name,
+        config: buildConfig(),
+        trigger: MANUAL_TRIGGER,
+      });
+      return preset?.name ?? name;
+    },
+    [buildConfig],
+  );
 
   const setTrigger = useCallback(
     async (next: ClickerTrigger) => {
@@ -867,6 +968,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     pointsEnabled,
     points,
     stopWhenComplete,
+    presetFilterMode,
+    localProcessFilter,
   ]);
 
   useEffect(() => {
@@ -984,7 +1087,14 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     setStopWhenComplete,
     picking,
     pickingPointIndex,
+    capturingPoints,
+    capturedCount,
+    onTogglePointCapture,
     processFilter,
+    presetFilterMode,
+    setPresetFilterMode,
+    localProcessFilter,
+    setLocalProcessFilter,
     drawing,
     presetName,
     setPresetName,
@@ -1012,6 +1122,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     onDrawZone,
     updateCustomZone,
     onSavePreset,
+    onSaveAsNewPreset,
     onLoadPreset,
     onRenamePreset,
     onImportPreset,

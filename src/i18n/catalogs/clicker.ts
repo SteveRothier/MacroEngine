@@ -21,6 +21,7 @@ export const clicker = defineCatalog({
       pauseSession: "Pause session{hint}",
       moreActions: "Plus d’actions",
       saveNow: "Enregistrer maintenant",
+      saveAsNew: "Sauver comme nouveau preset",
       templates: "Modèles",
       import: "Importer…",
       export: "Exporter…",
@@ -35,8 +36,16 @@ export const clicker = defineCatalog({
       zones: "Zones",
       limits: "Limites",
     },
+    prompts: {
+      saveAsNewTitle: "Sauver comme nouveau preset",
+      saveAsNewMessage:
+        "La configuration actuelle est copiée dans un nouveau preset (sans déclencheur).",
+      saveAsNewPlaceholder: "Nom du nouveau preset",
+    },
     toasts: {
       presetSaved: "Preset enregistré",
+      presetCreated: "Preset « {name} » créé",
+      saveAsNewFailed: "Impossible de créer le preset",
       saveFailed: "Échec de l’enregistrement",
       templateApplied: "Modèle appliqué · {label}",
       triggerSaved: "Déclencheur enregistré",
@@ -61,6 +70,7 @@ export const clicker = defineCatalog({
       stats: "Stats session",
       paused: " · en pause",
       clicks: "{n} clics",
+      filterBlocked: "{n} ticks bloqués (filtre process)",
     },
     fileFilter: "Preset clicker",
     segments: {
@@ -139,6 +149,11 @@ export const clicker = defineCatalog({
       clicksOnPoint: "Clics sur ce point",
       randomRadius: "Rayon aléatoire (px)",
       removePoint: "Supprimer le point",
+      capture: "Capturer des points",
+      captureHint:
+        "Cliquez à l’écran pour ajouter des points (clics répétés au même endroit = compteur). Échap annule.",
+      captureStart: "Démarrer la capture",
+      captureStop: "Terminer ({n})",
       preview: "Aperçu",
       liveCursor: "Curseur live",
       noPoint: "Aucun point",
@@ -191,7 +206,7 @@ export const clicker = defineCatalog({
         pause:
           "Met la session en pause tant que le curseur reste dans la zone.",
         start:
-          "Annule la pause du tick en cours uniquement (ne démarre pas une session arrêtée).",
+          "Reprend une session en pause et annule la pause du tick en cours (ne démarre pas une session arrêtée).",
       },
       kindLabel: {
         safety: "Sécurité",
@@ -230,6 +245,19 @@ export const clicker = defineCatalog({
       allAllowed: "Tous autorisés",
       allowList: "Autoriser : {list}",
       denyList: "Bloquer : {list}",
+      modeAria: "Filtre processus du preset",
+      modeInherit: "Hérité (global)",
+      modeOff: "Désactivé",
+      modeLocal: "Local au preset",
+      offSummary: "Filtre ignoré pour ce preset",
+      localEnabled: "Filtre local actif",
+      localModeAria: "Mode du filtre local",
+      localModeDeny: "Bloquer la liste",
+      localModeAllow: "Autoriser seulement la liste",
+      localAdd: "Ajouter",
+      localRemove: "Retirer",
+      localEmpty: "Aucun .exe listé — le filtre local n’a aucun effet.",
+      exePlaceholder: "ex. game.exe",
     },
     templates: {
       "cps-cursor": {
@@ -243,6 +271,16 @@ export const clicker = defineCatalog({
       "edge-zones": {
         label: "Zones bords seuls",
         description: "Curseur + bords écran en zone d’arrêt (sécurité).",
+      },
+      "high-cps-pulse": {
+        label: "Impulsion haute cadence",
+        description:
+          "45–55 CPS en maintien, duty 50 %, aléa 15 %, bords en sécurité.",
+      },
+      "corner-safety": {
+        label: "Sécurité coins seuls",
+        description:
+          "12 CPS au curseur + les 4 coins en zone d’arrêt (96 px).",
       },
     },
     panel: {
@@ -302,6 +340,7 @@ export const clicker = defineCatalog({
       pauseSession: "Pause session{hint}",
       moreActions: "More actions",
       saveNow: "Save now",
+      saveAsNew: "Save as new preset",
       templates: "Templates",
       import: "Import…",
       export: "Export…",
@@ -316,8 +355,16 @@ export const clicker = defineCatalog({
       zones: "Zones",
       limits: "Limits",
     },
+    prompts: {
+      saveAsNewTitle: "Save as new preset",
+      saveAsNewMessage:
+        "The current configuration is copied into a new preset (no trigger).",
+      saveAsNewPlaceholder: "New preset name",
+    },
     toasts: {
       presetSaved: "Preset saved",
+      presetCreated: "Preset “{name}” created",
+      saveAsNewFailed: "Could not create the preset",
       saveFailed: "Failed to save",
       templateApplied: "Template applied · {label}",
       triggerSaved: "Trigger saved",
@@ -342,6 +389,7 @@ export const clicker = defineCatalog({
       stats: "Session stats",
       paused: " · paused",
       clicks: "{n} clicks",
+      filterBlocked: "{n} ticks blocked (process filter)",
     },
     fileFilter: "Clicker preset",
     segments: {
@@ -420,6 +468,11 @@ export const clicker = defineCatalog({
       clicksOnPoint: "Clicks on this point",
       randomRadius: "Random radius (px)",
       removePoint: "Remove point",
+      capture: "Capture points",
+      captureHint:
+        "Click on screen to add points (repeated clicks on the same spot raise the counter). Esc cancels.",
+      captureStart: "Start capture",
+      captureStop: "Finish ({n})",
       preview: "Preview",
       liveCursor: "Live cursor",
       noPoint: "No point",
@@ -471,7 +524,7 @@ export const clicker = defineCatalog({
         stop: "Stops the clicker session.",
         pause: "Pauses the session while the cursor stays in the zone.",
         start:
-          "Clears pause for the current tick only (does not start a stopped session).",
+          "Resumes a paused session and clears the pause-zone tick (does not start a stopped session).",
       },
       kindLabel: {
         safety: "Safety",
@@ -510,6 +563,19 @@ export const clicker = defineCatalog({
       allAllowed: "All allowed",
       allowList: "Allow: {list}",
       denyList: "Block: {list}",
+      modeAria: "Preset process filter",
+      modeInherit: "Inherit (global)",
+      modeOff: "Off",
+      modeLocal: "Local to preset",
+      offSummary: "Filter ignored for this preset",
+      localEnabled: "Local filter on",
+      localModeAria: "Local filter mode",
+      localModeDeny: "Block the list",
+      localModeAllow: "Allow only the list",
+      localAdd: "Add",
+      localRemove: "Remove",
+      localEmpty: "No .exe listed — the local filter has no effect.",
+      exePlaceholder: "e.g. game.exe",
     },
     templates: {
       "cps-cursor": {
@@ -523,6 +589,14 @@ export const clicker = defineCatalog({
       "edge-zones": {
         label: "Edge zones only",
         description: "Cursor + screen edges as stop (safety) zones.",
+      },
+      "high-cps-pulse": {
+        label: "High-CPS pulse",
+        description: "45–55 CPS hold, 50 % duty, 15 % jitter, edges as safety.",
+      },
+      "corner-safety": {
+        label: "Corner safety only",
+        description: "12 CPS on cursor + all 4 corners as stop zones (96 px).",
       },
     },
     panel: {

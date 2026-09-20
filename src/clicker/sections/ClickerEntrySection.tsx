@@ -26,6 +26,11 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
     <div className="caster-clicker-section caster-clicker-entry-split">
       <ClickerProcessFilterRow
         filter={e.processFilter}
+        mode={e.presetFilterMode}
+        onModeChange={e.setPresetFilterMode}
+        localFilter={e.localProcessFilter}
+        onLocalFilterChange={e.setLocalProcessFilter}
+        disabled={e.editDisabled}
         onOpenSettings={onOpenProcessSettings}
       />
       <div className="caster-clicker-entry-col">

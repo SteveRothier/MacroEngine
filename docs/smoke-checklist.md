@@ -16,8 +16,15 @@ Vérifications manuelles rapides après une build ou un gros changement.
 - [ ] Overlay zones : activer « Afficher » → bandes visibles sur l’écran cible
 - [ ] Dessiner zone sécurité et zone clic (`begin_zone_overlay_draw`)
 - [ ] Zone pause / arrêt / démarrer : curseur dans zone → comportement attendu
+- [ ] Zone **Démarrer** pendant une session en pause (F7 ou pause pixel) → la session reprend et l’état repasse en Running
 - [ ] Sélecteur d’écran (`list_displays` / `set_active_display`)
 - [ ] Filtre processus allow/deny bloque ou autorise les ticks
+- [ ] Filtre bloquant : stats session affichent « N ticks bloqués » et le journal logge au 1er blocage puis tous les 100
+- [ ] Filtre par preset : `inherit` / `off` / `local` (liste locale d’.exe éditable dans l’onglet Entrée)
+- [ ] Multi-moniteur : dessin de zone sur l’écran secondaire → rectangle aux bonnes coordonnées (origine non nulle, DPI ≠ 100 %)
+- [ ] Modèles : « Impulsion haute cadence » et « Sécurité coins seuls » appliqués depuis la barre d’outils
+- [ ] « Sauver comme nouveau preset » → nouveau preset créé, son onglet s’ouvre, l’onglet courant reste inchangé
+- [ ] « Capturer des points » (onglet Cible) : clics à l’écran → points ajoutés (clics répétés au même endroit = compteur), Échap annule
 
 ## Macros
 

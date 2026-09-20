@@ -24,6 +24,8 @@ type Props = {
   onRenamed?: (from: string, to: string) => void;
   hotkeys: HotkeyBindings;
   onOpenProcessSettings?: () => void;
+  /** New preset id created via « Sauver comme nouveau preset ». */
+  onSavedAsNew?: (id: string) => void;
 };
 
 type InspectorTab = "entry" | "target" | "zones" | "limits";
@@ -39,6 +41,7 @@ export function ClickerStudio({
   onRenamed,
   hotkeys,
   onOpenProcessSettings,
+  onSavedAsNew,
 }: Props) {
   const t = useT();
   const [tab, setTab] = useState<InspectorTab>("entry");
@@ -67,7 +70,12 @@ export function ClickerStudio({
 
   const titleBarPortal = useTitleBarSlot(
     editor.presetName || presetId,
-    <ClickerTitleBarTools editor={editor} onBack={onBack} hotkeys={hotkeys} />,
+    <ClickerTitleBarTools
+      editor={editor}
+      onBack={onBack}
+      hotkeys={hotkeys}
+      onSavedAsNew={onSavedAsNew}
+    />,
   );
 
   return (

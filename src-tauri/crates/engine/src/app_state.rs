@@ -5,7 +5,8 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use crate::cancel::CancellationToken;
-use crate::clicker::{ClickMode, ClickerConfig, ClickerSession};
+use crate::clicker::{ClickMode, ClickPoint, ClickerConfig, ClickerSession};
+use crate::clicker_capture::ClickPointCapture;
 use crate::event_bus::{EngineEvent, EventBus, LogLevel};
 use crate::hotkeys::{
     default_bindings, update_live_bindings, update_live_clicker_triggers,
@@ -87,6 +88,8 @@ pub struct AppState {
     display_id: Arc<Mutex<Option<String>>>,
     zone_screen: Arc<Mutex<ScreenGeom>>,
     process_filter: Arc<Mutex<ProcessFilter>>,
+    /// Active « capturer des points » session for the clicker editor.
+    point_capture: Arc<Mutex<Option<Arc<ClickPointCapture>>>>,
 }
 
 struct AppStateInner {
@@ -135,6 +138,7 @@ impl AppState {
             display_id: Arc::new(Mutex::new(None)),
             zone_screen: Arc::new(Mutex::new(ScreenGeom::from_size(1920, 1080))),
             process_filter: Arc::new(Mutex::new(ProcessFilter::default())),
+            point_capture: Arc::new(Mutex::new(None)),
         };
         let worker = state.clone();
         let _ = std::thread::Builder::new()
@@ -443,7 +447,9 @@ impl AppState {
         let metrics = self.metrics.clone();
         let bus = Arc::clone(&self.bus);
         let zone_screen = self.zone_screen_handle();
-        let process_filter = self.process_filter_handle();
+        // inherit → global handle (live edits apply), off → none, local → preset snapshot.
+        let process_filter =
+            config.effective_process_filter(Some(self.process_filter_handle()));
         let app = self.clone();
         let on_complete = config.on_complete_macro.clone();
         let natural_complete = Arc::new(AtomicBool::new(false));
@@ -458,7 +464,7 @@ impl AppState {
                 &metrics,
                 Some(&bus),
                 Some(zone_screen),
-                Some(process_filter),
+                process_filter,
                 Some(&pause),
                 Some(natural_flag.as_ref()),
             );
@@ -679,14 +685,21 @@ impl AppState {
             .map_err(|e| e.to_string())
     }
 
-    /// Sync PauseGate → EngineState for clicker (e.g. pixel condition pause).
+    /// Sync PauseGate → EngineState for clicker: pixel condition pause, or a
+    /// Start zone resuming the session from inside the clicker loop.
     pub fn sync_pause_gate_state(&self) {
         let active = *self.active.lock().expect("active lock");
         if active != ActiveKind::Clicker {
             return;
         }
-        if self.pause.is_paused() && self.state() == EngineState::Running {
-            let _ = self.transition_to(EngineState::Paused);
+        match (self.pause.is_paused(), self.state()) {
+            (true, EngineState::Running) => {
+                let _ = self.transition_to(EngineState::Paused);
+            }
+            (false, EngineState::Paused) => {
+                let _ = self.transition_to(EngineState::Running);
+            }
+            _ => {}
         }
     }
 
@@ -737,6 +750,14 @@ impl AppState {
     }
 
     pub fn emergency_stop(&self) {
+        let capturing = self
+            .point_capture
+            .lock()
+            .expect("point capture")
+            .is_some();
+        if capturing {
+            let _ = self.stop_clicker_point_capture();
+        }
         if matches!(
             self.state(),
             EngineState::Running | EngineState::Paused
@@ -1630,6 +1651,64 @@ impl AppState {
             .map_err(|e| e.to_string())
     }
 
+    /// Start collecting left-click positions as clicker points (Esc cancels).
+    pub fn start_clicker_point_capture(&self) -> Result<(), String> {
+        if matches!(self.state(), EngineState::Running | EngineState::Paused) {
+            return Err("cannot capture points while a session is running".into());
+        }
+        if self.is_recording() {
+            return Err("record is active".into());
+        }
+        let mut guard = self.point_capture.lock().expect("point capture");
+        if guard.as_ref().is_some_and(|c| c.is_running()) {
+            return Err("point capture already active".into());
+        }
+        if let Some(previous) = guard.take() {
+            let _ = previous.finish();
+        }
+        *guard = Some(Arc::new(ClickPointCapture::start(self.injector())));
+        drop(guard);
+        self.bus.publish(EngineEvent::Log {
+            level: LogLevel::Info,
+            message: "capture de points clicker démarrée (Échap pour annuler)".into(),
+        });
+        Ok(())
+    }
+
+    /// `(active, count, cancelled)` for the capture progress UI.
+    pub fn clicker_point_capture_state(&self) -> (bool, usize, bool) {
+        let guard = self.point_capture.lock().expect("point capture");
+        match guard.as_ref() {
+            Some(capture) => (
+                capture.is_running(),
+                capture.count(),
+                capture.was_cancelled(),
+            ),
+            None => (false, 0, false),
+        }
+    }
+
+    /// Stop the capture and return the collected points (empty when cancelled).
+    pub fn stop_clicker_point_capture(&self) -> Result<Vec<ClickPoint>, String> {
+        let capture = self
+            .point_capture
+            .lock()
+            .expect("point capture")
+            .take()
+            .ok_or_else(|| "point capture not active".to_string())?;
+        let cancelled = capture.was_cancelled();
+        let points = capture.finish();
+        self.bus.publish(EngineEvent::Log {
+            level: LogLevel::Info,
+            message: if cancelled {
+                "capture de points clicker annulée".into()
+            } else {
+                format!("capture de points clicker · {} point(s)", points.len())
+            },
+        });
+        Ok(points)
+    }
+
     pub fn injector(&self) -> Arc<dyn MouseInjector> {
         Arc::clone(&self.injector)
     }
@@ -1762,6 +1841,35 @@ mod tests {
     }
 
     #[test]
+    fn clicker_point_capture_start_stop_is_guarded() {
+        let app = AppState::with_injector(Arc::new(RecordingInjector::new()));
+        assert!(app.stop_clicker_point_capture().is_err());
+        app.start_clicker_point_capture().unwrap();
+        assert!(
+            app.start_clicker_point_capture().is_err(),
+            "a second capture must be refused"
+        );
+        let (active, count, cancelled) = app.clicker_point_capture_state();
+        assert!(active);
+        assert_eq!(count, 0);
+        assert!(!cancelled);
+        assert!(app.stop_clicker_point_capture().unwrap().is_empty());
+        assert_eq!(app.clicker_point_capture_state(), (false, 0, false));
+    }
+
+    #[test]
+    fn clicker_point_capture_refused_while_running() {
+        let app = AppState::with_injector(Arc::new(RecordingInjector::new()));
+        app.start_clicker(ClickerConfig {
+            cps: 60.0,
+            ..Default::default()
+        })
+        .unwrap();
+        assert!(app.start_clicker_point_capture().is_err());
+        app.stop_clicker();
+    }
+
+    #[test]
     fn request_cancel_sets_token() {
         let app = AppState::with_injector(Arc::new(RecordingInjector::new()));
         app.begin_run().unwrap();
@@ -1822,6 +1930,9 @@ mod tests {
             cps: 120.0,
             ..Default::default()
         };
+        // Limits must be enabled, otherwise the session runs until cancelled.
+        cfg.limits_enabled = true;
+        cfg.limit_mode = crate::clicker::LimitMode::Clicks;
         cfg.max_clicks = Some(5);
         app.start_clicker(cfg).unwrap();
         std::thread::sleep(Duration::from_millis(200));

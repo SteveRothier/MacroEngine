@@ -16,6 +16,7 @@ use crate::input::{InputError, MouseButton, MouseInjector, Point};
 use crate::metrics::MetricsCollector;
 use crate::pause::PauseGate;
 use crate::scheduler::wait_until;
+use crate::schema::MacroProcessFilterMode;
 use crate::settings::ProcessFilter;
 use crate::stop_zones::{zone_hit, ClickSampleMode, ScreenGeom, StopZone, ZoneAction};
 
@@ -206,6 +207,11 @@ pub struct ClickerConfig {
     pub stop_zones: Vec<StopZone>,
     #[serde(default)]
     pub click_zone_order: ClickZoneOrder,
+    /// Per-preset override of the global process filter (parity with macros).
+    #[serde(default)]
+    pub process_filter: MacroProcessFilterMode,
+    #[serde(default)]
+    pub local_process_filter: ProcessFilter,
 }
 
 fn default_duty() -> f64 {
@@ -264,6 +270,8 @@ impl Default for ClickerConfig {
             stop_when_complete: false,
             stop_zones: Vec::new(),
             click_zone_order: ClickZoneOrder::Random,
+            process_filter: MacroProcessFilterMode::Inherit,
+            local_process_filter: ProcessFilter::default(),
         }
     }
 }
@@ -292,6 +300,20 @@ impl ClickerConfig {
             (self.random_pct / 100.0).clamp(0.0, 0.95)
         } else {
             self.cps_jitter.clamp(0.0, 0.95)
+        }
+    }
+
+    /// Filter actually applied to ticks: global handle, none, or a local snapshot.
+    pub fn effective_process_filter(
+        &self,
+        global: Option<Arc<Mutex<ProcessFilter>>>,
+    ) -> Option<Arc<Mutex<ProcessFilter>>> {
+        match self.process_filter {
+            MacroProcessFilterMode::Inherit => global,
+            MacroProcessFilterMode::Off => None,
+            MacroProcessFilterMode::Local => {
+                Some(Arc::new(Mutex::new(self.local_process_filter.clone())))
+            }
         }
     }
 
@@ -502,6 +524,59 @@ fn resolve_zone_geom(
     injector.screen_geom().ok()
 }
 
+/// Safety-zone action under the cursor right now, if any.
+fn current_zone_action(
+    config: &ClickerConfig,
+    injector: &dyn MouseInjector,
+    zone_screen: &Option<Arc<Mutex<ScreenGeom>>>,
+) -> Option<ZoneAction> {
+    if config.stop_zones.is_empty() {
+        return None;
+    }
+    let pos = injector.cursor_position().ok()?;
+    let geom = resolve_zone_geom(injector, zone_screen)?;
+    zone_hit(&config.stop_zones, pos, geom)
+}
+
+fn log_start_zone_resume(bus: Option<&EventBus>) {
+    if let Some(bus) = bus {
+        bus.publish(EngineEvent::Log {
+            level: LogLevel::Info,
+            message: "start zone resumed the clicker session".into(),
+        });
+    }
+}
+
+/// Block while the gate is paused. A Start zone under the cursor resumes the
+/// session, so the pause gate is polled instead of simply waited on.
+fn wait_while_paused_with_start_zone(
+    gate: &PauseGate,
+    config: &ClickerConfig,
+    injector: &dyn MouseInjector,
+    zone_screen: &Option<Arc<Mutex<ScreenGeom>>>,
+    cancel: &CancellationToken,
+    bus: Option<&EventBus>,
+) -> bool {
+    let has_start_zone = config
+        .stop_zones
+        .iter()
+        .any(|z| z.is_safety() && z.action() == ZoneAction::Start);
+    while gate.is_paused() {
+        if cancel.is_cancelled() {
+            return false;
+        }
+        if has_start_zone
+            && current_zone_action(config, injector, zone_screen) == Some(ZoneAction::Start)
+        {
+            gate.resume();
+            log_start_zone_resume(bus);
+            break;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    !cancel.is_cancelled()
+}
+
 impl ClickerSession {
     pub fn run(
         config: &ClickerConfig,
@@ -585,7 +660,14 @@ impl ClickerSession {
                 break;
             }
             if let Some(gate) = pause {
-                if !gate.wait_while_paused(|| cancel.is_cancelled()) {
+                if !wait_while_paused_with_start_zone(
+                    gate,
+                    config,
+                    injector,
+                    &zone_screen,
+                    cancel,
+                    bus,
+                ) {
                     end_natural = false;
                     break;
                 }
@@ -662,31 +744,31 @@ impl ClickerSession {
             }
 
             let mut pause_tick = false;
-            if !config.stop_zones.is_empty() {
-                if let (Ok(pos), Some(geom)) = (
-                    injector.cursor_position(),
-                    resolve_zone_geom(injector, &zone_screen),
-                ) {
-                    match zone_hit(&config.stop_zones, pos, geom) {
-                        Some(ZoneAction::Stop) => {
-                            if let Some(bus) = bus {
-                                bus.publish(EngineEvent::Log {
-                                    level: LogLevel::Warn,
-                                    message: "stop zone hit".into(),
-                                });
-                            }
-                            // Natural end (zone safety stop) — allow chain.
-                            break;
+            match current_zone_action(config, injector, &zone_screen) {
+                Some(ZoneAction::Stop) => {
+                    if let Some(bus) = bus {
+                        bus.publish(EngineEvent::Log {
+                            level: LogLevel::Warn,
+                            message: "stop zone hit".into(),
+                        });
+                    }
+                    // Natural end (zone safety stop) — allow chain.
+                    break;
+                }
+                Some(ZoneAction::Pause) => {
+                    pause_tick = true;
+                }
+                Some(ZoneAction::Start) => {
+                    // Clears the pause-zone tick and lifts a paused session.
+                    pause_tick = false;
+                    if let Some(gate) = pause {
+                        if gate.is_paused() {
+                            gate.resume();
+                            log_start_zone_resume(bus);
                         }
-                        Some(ZoneAction::Pause) => {
-                            pause_tick = true;
-                        }
-                        Some(ZoneAction::Start) => {
-                            pause_tick = false;
-                        }
-                        None => {}
                     }
                 }
+                None => {}
             }
 
             let period = {
@@ -717,6 +799,21 @@ impl ClickerSession {
                 &mut cached_exe,
                 &mut cached_at,
             );
+
+            if filter_blocked {
+                let blocked = metrics.record_filter_block();
+                // First block explains the silence, then one line per 100 ticks.
+                if blocked == 1 || blocked % 100 == 0 {
+                    if let Some(bus) = bus {
+                        bus.publish(EngineEvent::Log {
+                            level: LogLevel::Warn,
+                            message: format!(
+                                "clicker process filter blocked ({blocked} ticks)"
+                            ),
+                        });
+                    }
+                }
+            }
 
             if pause_tick || filter_blocked || !in_duty {
                 // skip emission (pause zone / process filter / duty pulse)
@@ -1249,6 +1346,79 @@ mod tests {
     }
 
     #[test]
+    fn start_zone_resumes_paused_session() {
+        let cancel = CancellationToken::new();
+        let inj = RecordingInjector::new();
+        inj.set_cursor(Point { x: 15, y: 15 });
+        let metrics = MetricsCollector::new();
+        let pause = PauseGate::new();
+        pause.pause();
+        let mut cfg = ClickerConfig {
+            cps: 200.0,
+            stop_zones: vec![StopZone::Custom {
+                id: "s".into(),
+                x: 10,
+                y: 10,
+                width: 20,
+                height: 20,
+                action: ZoneAction::Start,
+                kind: ZoneKind::Safety,
+                color: String::new(),
+                click_mode: ClickSampleMode::Random,
+            }],
+            ..Default::default()
+        };
+        enable_click_limit(&mut cfg, 2);
+        let n = ClickerSession::run_with_zone_screen(
+            &cfg,
+            &cancel,
+            &inj,
+            &metrics,
+            None,
+            None,
+            None,
+            Some(&pause),
+            None,
+        )
+        .unwrap();
+        assert_eq!(n, 2, "start zone should lift the pause gate");
+        assert!(!pause.is_paused());
+    }
+
+    #[test]
+    fn paused_session_stays_paused_without_start_zone() {
+        let cancel = CancellationToken::new();
+        let inj = RecordingInjector::new();
+        let metrics = MetricsCollector::new();
+        let pause = PauseGate::new();
+        pause.pause();
+        let mut cfg = ClickerConfig {
+            cps: 200.0,
+            ..Default::default()
+        };
+        enable_click_limit(&mut cfg, 2);
+        let cancel_c = cancel.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(40));
+            cancel_c.cancel();
+        });
+        let n = ClickerSession::run_with_zone_screen(
+            &cfg,
+            &cancel,
+            &inj,
+            &metrics,
+            None,
+            None,
+            None,
+            Some(&pause),
+            None,
+        )
+        .unwrap();
+        assert_eq!(n, 0);
+        assert!(pause.is_paused());
+    }
+
+    #[test]
     fn click_zone_moves_inside_rect() {
         let cancel = CancellationToken::new();
         let inj = RecordingInjector::new();
@@ -1481,5 +1651,108 @@ mod tests {
         .unwrap();
         assert_eq!(n2, 0);
         assert_eq!(inj2.len(), 0);
+    }
+
+    fn global_deny(name: &str) -> Arc<Mutex<ProcessFilter>> {
+        Arc::new(Mutex::new(ProcessFilter {
+            enabled: true,
+            mode: ProcessFilterMode::Deny,
+            names: vec![name.into()],
+        }))
+    }
+
+    #[test]
+    fn preset_filter_off_ignores_global() {
+        let cfg = ClickerConfig {
+            process_filter: MacroProcessFilterMode::Off,
+            ..Default::default()
+        };
+        assert!(cfg
+            .effective_process_filter(Some(global_deny("notepad.exe")))
+            .is_none());
+    }
+
+    #[test]
+    fn preset_filter_inherit_keeps_global() {
+        let cfg = ClickerConfig::default();
+        let global = global_deny("notepad.exe");
+        let effective = cfg
+            .effective_process_filter(Some(Arc::clone(&global)))
+            .expect("inherit keeps the global filter");
+        assert!(Arc::ptr_eq(&effective, &global));
+    }
+
+    #[test]
+    fn preset_filter_local_blocks_listed_exe() {
+        let cancel = CancellationToken::new();
+        let inj = RecordingInjector::new();
+        inj.set_foreground_exe(Some("notepad.exe"));
+        let metrics = MetricsCollector::new();
+        let cfg = ClickerConfig {
+            cps: 100.0,
+            process_filter: MacroProcessFilterMode::Local,
+            local_process_filter: ProcessFilter {
+                enabled: true,
+                mode: ProcessFilterMode::Deny,
+                names: vec!["notepad.exe".into()],
+            },
+            ..Default::default()
+        };
+        let cancel_c = cancel.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(40));
+            cancel_c.cancel();
+        });
+        // Global filter is empty: only the preset-local list may block.
+        let effective = cfg.effective_process_filter(None);
+        assert!(effective.is_some());
+        let n = ClickerSession::run_with_zone_screen(
+            &cfg,
+            &cancel,
+            &inj,
+            &metrics,
+            None,
+            None,
+            effective,
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(n, 0);
+        assert!(metrics.snapshot().filter_blocked_ticks > 0);
+    }
+
+    #[test]
+    fn filter_blocked_ticks_are_counted() {
+        let cancel = CancellationToken::new();
+        let inj = RecordingInjector::new();
+        inj.set_foreground_exe(Some("notepad.exe"));
+        let metrics = MetricsCollector::new();
+        let cfg = ClickerConfig {
+            cps: 200.0,
+            ..Default::default()
+        };
+        let cancel_c = cancel.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(60));
+            cancel_c.cancel();
+        });
+        let bus = EventBus::new();
+        let n = ClickerSession::run_with_zone_screen(
+            &cfg,
+            &cancel,
+            &inj,
+            &metrics,
+            Some(&bus),
+            None,
+            Some(global_deny("notepad.exe")),
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(n, 0);
+        let snap = metrics.snapshot();
+        assert!(snap.filter_blocked_ticks > 0);
+        assert_eq!(snap.clicks_emitted, snap.filter_blocked_ticks);
     }
 }

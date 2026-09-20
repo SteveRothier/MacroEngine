@@ -1054,6 +1054,10 @@ function MainAppInner({
           }}
           hotkeys={hotkeys}
           onOpenProcessSettings={() => goSettings("security")}
+          onSavedAsNew={(id) => {
+            bumpRefresh();
+            openDoc("clicker", id);
+          }}
         />
       );
     }

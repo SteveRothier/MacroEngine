@@ -14,7 +14,8 @@ use caster_engine::{
     rename_macro, rename_preset, restore_library_item, save_macro_checked, save_preset,
     save_preset_with_trigger, save_quick_access, save_script, save_settings, save_accueil_order,
     set_favorite, set_library_item_locked, trash_library_item, normalize_app_settings, AccueilPrefs,
-    AppearancePrefs, AppSettings, AppState, AutomationPrefs, ClickerConfig, ClickerMetrics,
+    AppearancePrefs, AppSettings, AppState, AutomationPrefs, ClickPoint, ClickerConfig,
+    ClickerMetrics,
     ClickerPreset, ClickerPresetSummary, ConfirmationsPrefs, ConvertMode, ConvertResult, DrawnRect,
     EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto, LibraryKind,
     ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs, NativeZoneOverlay, PickedPoint,
@@ -163,6 +164,43 @@ fn start_zone_draw(engine: State<'_, AppState>) -> Result<DrawnRect, String> {
     engine.draw_zone_rect(Duration::from_secs(30))
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClickerCaptureState {
+    active: bool,
+    count: usize,
+    cancelled: bool,
+}
+
+fn capture_state_of(engine: &AppState) -> ClickerCaptureState {
+    let (active, count, cancelled) = engine.clicker_point_capture_state();
+    ClickerCaptureState {
+        active,
+        count,
+        cancelled,
+    }
+}
+
+#[tauri::command]
+fn start_clicker_point_capture(
+    engine: State<'_, AppState>,
+) -> Result<ClickerCaptureState, String> {
+    engine.start_clicker_point_capture()?;
+    Ok(capture_state_of(&engine))
+}
+
+#[tauri::command]
+fn get_clicker_point_capture_state(engine: State<'_, AppState>) -> ClickerCaptureState {
+    capture_state_of(&engine)
+}
+
+#[tauri::command]
+fn stop_clicker_point_capture(
+    engine: State<'_, AppState>,
+) -> Result<Vec<ClickPoint>, String> {
+    engine.stop_clicker_point_capture()
+}
+
 #[tauri::command]
 fn get_screen_geom(app: AppHandle, engine: State<'_, AppState>) -> ScreenGeomDto {
     geom_of(&app, &engine)
@@ -179,9 +217,10 @@ fn set_active_display(
     engine: State<'_, AppState>,
     prefs: State<'_, Mutex<UiPrefs>>,
     snap: State<'_, Mutex<ZoneOverlaySnap>>,
-    id: Option<String>,
+    // Callers send `displayId`; keep the snake_case name so Tauri maps it.
+    display_id: Option<String>,
 ) -> Result<DisplayDto, String> {
-    let display = resolve_display(&app, id.as_deref())?;
+    let display = resolve_display(&app, display_id.as_deref())?;
     apply_display(&engine, &display);
     {
         let mut p = prefs.lock().map_err(|e| e.to_string())?;
@@ -189,12 +228,7 @@ fn set_active_display(
     }
     let overlay_on = {
         let mut s = snap.lock().map_err(|e| e.to_string())?;
-        s.geom = ScreenGeomDto {
-            x: display.x,
-            y: display.y,
-            width: display.width,
-            height: display.height,
-        };
+        s.geom = geom_dto_of_display(&display);
         let payload = s.clone();
         let vis = s.visible;
         let drawing = s.drawing;
@@ -1929,17 +1963,27 @@ fn place_status_overlay(app: &AppHandle, display: &DisplayDto) -> Result<(), Str
     Ok(())
 }
 
+/// Physical geometry of a display; `scaleFactor` is informational for the UI.
+fn geom_dto_of_display(d: &DisplayDto) -> ScreenGeomDto {
+    ScreenGeomDto::from(ScreenGeom {
+        x: d.x,
+        y: d.y,
+        w: d.width,
+        h: d.height,
+    })
+    .with_scale_factor(d.scale_factor)
+}
+
 fn geom_of(app: &AppHandle, engine: &AppState) -> ScreenGeomDto {
     match resolve_display(app, engine.display_id().as_deref()) {
         Ok(d) => {
-            let geom = ScreenGeom {
+            engine.set_zone_screen(ScreenGeom {
                 x: d.x,
                 y: d.y,
                 w: d.width,
                 h: d.height,
-            };
-            engine.set_zone_screen(geom);
-            ScreenGeomDto::from(geom)
+            });
+            geom_dto_of_display(&d)
         }
         Err(_) => ScreenGeomDto::from(engine.zone_screen()),
     }
@@ -2411,6 +2455,9 @@ pub fn run() {
             set_zone_overlay_visible,
             begin_zone_overlay_draw,
             complete_zone_overlay_draw,
+            start_clicker_point_capture,
+            stop_clicker_point_capture,
+            get_clicker_point_capture_state,
             list_clicker_presets,
             save_clicker_preset,
             load_clicker_preset,

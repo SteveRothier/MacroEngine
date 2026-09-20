@@ -15,6 +15,9 @@ pub struct ClickerMetrics {
     pub cumulative_deadline_error_ms: f64,
     pub elapsed_ms: u64,
     pub running: bool,
+    /// Ticks skipped because the process filter blocked the foreground exe.
+    #[serde(default)]
+    pub filter_blocked_ticks: u64,
 }
 
 impl Default for ClickerMetrics {
@@ -26,6 +29,7 @@ impl Default for ClickerMetrics {
             cumulative_deadline_error_ms: 0.0,
             elapsed_ms: 0,
             running: false,
+            filter_blocked_ticks: 0,
         }
     }
 }
@@ -42,6 +46,7 @@ struct MetricsInner {
     target_cps: f64,
     cumulative_error: Duration,
     running: bool,
+    filter_blocked: u64,
 }
 
 impl Default for MetricsInner {
@@ -52,6 +57,7 @@ impl Default for MetricsInner {
             target_cps: 0.0,
             cumulative_error: Duration::ZERO,
             running: false,
+            filter_blocked: 0,
         }
     }
 }
@@ -69,7 +75,15 @@ impl MetricsCollector {
             target_cps,
             cumulative_error: Duration::ZERO,
             running: true,
+            filter_blocked: 0,
         };
+    }
+
+    /// One tick skipped by the process filter (session keeps running).
+    pub fn record_filter_block(&self) -> u64 {
+        let mut g = self.inner.lock().expect("metrics lock");
+        g.filter_blocked = g.filter_blocked.saturating_add(1);
+        g.filter_blocked
     }
 
     pub fn record_tick(&self, ideal_deadline: Instant, actual: Instant) {
@@ -103,6 +117,7 @@ impl MetricsCollector {
             cumulative_deadline_error_ms: g.cumulative_error.as_secs_f64() * 1000.0,
             elapsed_ms: elapsed.as_millis() as u64,
             running: g.running,
+            filter_blocked_ticks: g.filter_blocked,
         }
     }
 }
@@ -127,5 +142,17 @@ mod tests {
         assert_eq!(snap.clicks_emitted, 5);
         assert!(!snap.running);
         assert!(snap.measured_cps > 0.0);
+    }
+
+    #[test]
+    fn counts_filter_blocked_ticks() {
+        let m = MetricsCollector::new();
+        m.begin(10.0);
+        assert_eq!(m.record_filter_block(), 1);
+        assert_eq!(m.record_filter_block(), 2);
+        assert_eq!(m.snapshot().filter_blocked_ticks, 2);
+        // A new session resets the counter.
+        m.begin(10.0);
+        assert_eq!(m.snapshot().filter_blocked_ticks, 0);
     }
 }

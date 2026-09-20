@@ -8,6 +8,9 @@ export type ProcessFilter = {
   names: string[];
 };
 
+/** Per-preset override of the global filter (same modes as macros). */
+export type ClickerProcessFilterMode = "inherit" | "off" | "local";
+
 export const DEFAULT_PROCESS_FILTER: ProcessFilter = {
   enabled: false,
   mode: "deny",
@@ -122,11 +125,17 @@ export type CustomZone = {
   clickMode: ClickSampleMode;
 };
 
+/**
+ * Display rect on the virtual desktop, in physical pixels (Win32 coordinates).
+ * `x`/`y` may be negative or offset on multi-monitor setups — never assume 0,0.
+ * `scaleFactor` is informational (DPI label): width/height are already physical.
+ */
 export type ScreenGeomDto = {
   x: number;
   y: number;
   width: number;
   height: number;
+  scaleFactor?: number;
 };
 
 export const FALLBACK_SCREEN_GEOM: ScreenGeomDto = {
@@ -134,6 +143,7 @@ export const FALLBACK_SCREEN_GEOM: ScreenGeomDto = {
   y: 0,
   width: 1920,
   height: 1080,
+  scaleFactor: 1,
 };
 
 export function zoneActionLabel(t: TFunction, action: ZoneAction): string {
@@ -187,6 +197,8 @@ export type ClickerConfigPayload = {
   stopWhenComplete: boolean;
   stopZones: StopZone[];
   clickZoneOrder: ClickZoneOrder;
+  processFilter: ClickerProcessFilterMode;
+  localProcessFilter: ProcessFilter;
 };
 
 export type AppSettings = {
@@ -260,6 +272,8 @@ export const DEFAULT_CLICKER: ClickerConfigPayload = {
   stopWhenComplete: false,
   stopZones: [],
   clickZoneOrder: "random",
+  processFilter: "inherit",
+  localProcessFilter: DEFAULT_PROCESS_FILTER,
 };
 
 export const CORNER_LABELS: { id: Corner; cls: string }[] = [

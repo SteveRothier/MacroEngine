@@ -21,6 +21,7 @@ export function ClickerSessionStats({
   const [open, setOpen] = useState(true);
   const path = useMemo(() => sparklinePath(samples.map((s) => s.cps)), [samples]);
   const latest = samples.length > 0 ? samples[samples.length - 1]!.cps : 0;
+  const blocked = metrics?.filterBlockedTicks ?? 0;
 
   if (!running && samples.length === 0) return null;
 
@@ -57,6 +58,11 @@ export function ClickerSessionStats({
             <span>
               {formatDurationMs(metrics?.elapsedMs ?? 0)}
             </span>
+            {blocked > 0 ? (
+              <span className="caster-clicker-session-blocked">
+                {t("clicker.session.filterBlocked", { n: blocked })}
+              </span>
+            ) : null}
           </div>
         </div>
       ) : null}

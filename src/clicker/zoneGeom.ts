@@ -133,15 +133,33 @@ export function pct(px: number, total: number) {
   return (px / total) * 100;
 }
 
+/** Scale factor to display in the UI; never used to convert coordinates. */
+export function geomScaleFactor(geom: ScreenGeomDto): number {
+  const s = geom.scaleFactor;
+  return s != null && Number.isFinite(s) && s > 0 ? s : 1;
+}
+
+/**
+ * Map a pointer position inside `rect` to virtual-desktop pixels.
+ *
+ * The client rect is normalized to 0–1 and then projected onto `geom`, which is
+ * already the physical rect of the active display (origin can be negative on a
+ * left/top secondary monitor). DPI cancels out in the normalization, so
+ * `geom.scaleFactor` is informational only and is not applied here.
+ */
 export function clientToScreen(
   clientX: number,
   clientY: number,
   rect: DOMRect,
   geom: ScreenGeomDto,
 ) {
-  const x = geom.x + ((clientX - rect.left) / Math.max(1, rect.width)) * geom.width;
-  const y = geom.y + ((clientY - rect.top) / Math.max(1, rect.height)) * geom.height;
-  return { x: Math.round(x), y: Math.round(y) };
+  const g = geom.width > 0 && geom.height > 0 ? geom : FALLBACK_SCREEN_GEOM;
+  const nx = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
+  const ny = clamp((clientY - rect.top) / Math.max(1, rect.height), 0, 1);
+  return {
+    x: Math.round(g.x + nx * g.width),
+    y: Math.round(g.y + ny * g.height),
+  };
 }
 
 export function deltaToScreen(
@@ -150,9 +168,10 @@ export function deltaToScreen(
   rect: DOMRect,
   geom: ScreenGeomDto,
 ) {
+  const g = geom.width > 0 && geom.height > 0 ? geom : FALLBACK_SCREEN_GEOM;
   return {
-    dx: (dx / Math.max(1, rect.width)) * geom.width,
-    dy: (dy / Math.max(1, rect.height)) * geom.height,
+    dx: (dx / Math.max(1, rect.width)) * g.width,
+    dy: (dy / Math.max(1, rect.height)) * g.height,
   };
 }
 

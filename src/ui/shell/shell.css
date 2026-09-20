@@ -3261,6 +3261,48 @@ body.action-list-is-dragging .action-list-item {
   background: var(--caster-status-attention-bg);
 }
 
+.caster-clicker-process-local {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--caster-space-2);
+  padding-top: var(--caster-space-2);
+}
+
+.caster-clicker-process-local-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--caster-text-xs);
+  color: var(--caster-text-secondary);
+}
+
+.caster-clicker-process-local-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.caster-clicker-process-local-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.caster-clicker-process-local-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--caster-text-xs);
+  padding: 2px 4px 2px 8px;
+  border-radius: var(--caster-radius-sm);
+  background: color-mix(in srgb, var(--caster-text-primary) 6%, transparent);
+}
+
 .caster-clicker-trigger-btn {
   min-height: 28px;
   padding: 0 8px;
@@ -3465,6 +3507,10 @@ body.action-list-is-dragging .action-list-item {
   gap: 12px;
   font-size: 12px;
   color: var(--caster-text-muted);
+}
+
+.caster-clicker-session-blocked {
+  color: var(--caster-warn, #d97706);
 }
 
 .caster-clicker-pixel-controls {

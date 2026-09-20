@@ -8,6 +8,7 @@ pub mod actions;
 pub mod app_state;
 pub mod cancel;
 pub mod clicker;
+pub mod clicker_capture;
 pub mod clicker_presets;
 pub mod convert;
 pub mod env;
@@ -46,6 +47,7 @@ pub use clicker::{
     rate_to_per_second, ClickKind, ClickMode, ClickPoint, ClickTarget, ClickZoneOrder, ClickerConfig,
     ClickerError, ClickerSession, DutyMode, InputKind, LimitMode, RateUnit, TimingMode, CPS_SOFT_CAP,
 };
+pub use clicker_capture::{CaptureBuffer, ClickPointCapture};
 pub use clicker_presets::{
     delete_preset, duplicate_preset, export_preset_to_path, import_preset_from_path,
     list_preset_summaries, list_presets, load_preset, rename_preset, save_preset,
@@ -89,7 +91,8 @@ pub use quick_access::{
 pub use record::{postprocess_actions, RecordOptions, RecordPostProcess, RecordSession};
 pub use schema::{
     macro_to_json, parse_macro_json, ActionNode, CompareOp, Condition, HttpHeader, KeyMods,
-    MacroDocument, MacroValue, Operand, SchemaError, Trigger, SCHEMA_VERSION_CURRENT,
+    MacroDocument, MacroProcessFilterMode, MacroValue, Operand, SchemaError, Trigger,
+    SCHEMA_VERSION_CURRENT,
     SCHEMA_VERSION_V1, SCHEMA_VERSION_V4, SCHEMA_VERSION_V5,
 };
 pub use script_library::{

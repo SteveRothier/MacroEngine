@@ -63,13 +63,23 @@ impl ScreenGeom {
 }
 
 /// IPC / UI form of [`ScreenGeom`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+///
+/// `x/y/width/height` are physical pixels on the virtual desktop, so the UI can
+/// map a pointer to screen coordinates without DPI math; `scale_factor` is
+/// informational (labels, hints) and never used to scale those fields.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScreenGeomDto {
     pub x: i32,
     pub y: i32,
     pub width: i32,
     pub height: i32,
+    #[serde(default = "default_scale_factor")]
+    pub scale_factor: f64,
+}
+
+fn default_scale_factor() -> f64 {
+    1.0
 }
 
 impl Default for ScreenGeomDto {
@@ -79,7 +89,19 @@ impl Default for ScreenGeomDto {
             y: 0,
             width: 1920,
             height: 1080,
+            scale_factor: default_scale_factor(),
         }
+    }
+}
+
+impl ScreenGeomDto {
+    pub fn with_scale_factor(mut self, scale_factor: f64) -> Self {
+        self.scale_factor = if scale_factor.is_finite() && scale_factor > 0.0 {
+            scale_factor
+        } else {
+            default_scale_factor()
+        };
+        self
     }
 }
 
@@ -90,6 +112,7 @@ impl From<ScreenGeom> for ScreenGeomDto {
             y: g.y,
             width: g.w,
             height: g.h,
+            scale_factor: default_scale_factor(),
         }
     }
 }

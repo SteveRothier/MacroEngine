@@ -33,6 +33,30 @@ export function ClickerTargetSection({ editor: e }: Props) {
     <div className="caster-clicker-section caster-clicker-target-panel">
       <p className="caster-clicker-hint">{t("clicker.target.priorityHint")}</p>
 
+      <div className="caster-settings-row">
+        <div className="caster-settings-row-label">
+          <span>{t("clicker.target.capture")}</span>
+          <p>{t("clicker.target.captureHint")}</p>
+        </div>
+        <div className="caster-settings-row-control">
+          <button
+            type="button"
+            className={[
+              "caster-btn",
+              e.capturingPoints ? "caster-btn-danger-ghost" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            disabled={e.editDisabled || !mouseOnly || e.picking}
+            onClick={() => void e.onTogglePointCapture()}
+          >
+            {e.capturingPoints
+              ? t("clicker.target.captureStop", { n: e.capturedCount })
+              : t("clicker.target.captureStart")}
+          </button>
+        </div>
+      </div>
+
       <div
         className="caster-segmented caster-segmented--wide caster-clicker-target-modes"
         role="group"

@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Download,
+  FilePlus2,
   LayoutTemplate,
   MoreHorizontal,
   Pause,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { DropdownMenu, EditorToolbar, useToast } from "../ui/shell";
 import type { DropdownEntry } from "../ui/shell";
+import { promptAction } from "../ui";
 import {
   chordLabel,
   triggerHotkeyLabel,
@@ -29,11 +31,43 @@ type Props = {
   editor: ClickerEditor;
   onBack: () => void;
   hotkeys: HotkeyBindings;
+  /** Called with the new preset id after « Sauver comme nouveau preset ». */
+  onSavedAsNew?: (id: string) => void;
 };
 
-export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
+export function ClickerTitleBarTools({
+  editor,
+  onBack,
+  hotkeys,
+  onSavedAsNew,
+}: Props) {
   const t = useT();
   const toast = useToast();
+
+  const saveAsNew = async () => {
+    const raw = await promptAction({
+      title: t("clicker.prompts.saveAsNewTitle"),
+      message: t("clicker.prompts.saveAsNewMessage"),
+      defaultValue: `${editor.presetName || editor.selectedPreset} copie`.trim(),
+      confirmLabel: t("common.save"),
+      placeholder: t("clicker.prompts.saveAsNewPlaceholder"),
+    });
+    const name = raw?.trim();
+    if (!name) return;
+    try {
+      const id = await editor.onSaveAsNewPreset(name);
+      toast.success(t("clicker.toasts.presetCreated", { name: id }));
+      onSavedAsNew?.(id);
+    } catch (e: unknown) {
+      const msg =
+        typeof e === "string"
+          ? e
+          : e && typeof e === "object" && "message" in e
+            ? String((e as { message?: unknown }).message)
+            : t("clicker.toasts.saveAsNewFailed");
+      toast.error(msg);
+    }
+  };
   const modeLabel =
     editor.mode === "toggle"
       ? t("clicker.toolbar.toggle")
@@ -74,6 +108,12 @@ export function ClickerTitleBarTools({ editor, onBack, hotkeys }: Props) {
           },
         );
       },
+    },
+    {
+      id: "save-as-new",
+      label: t("clicker.toolbar.saveAsNew"),
+      icon: <FilePlus2 size={14} />,
+      onSelect: () => void saveAsNew(),
     },
     {
       id: "templates",
