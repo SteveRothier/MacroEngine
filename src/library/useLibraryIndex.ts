@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { resolveLocale, tStatic, type AppLocale } from "../i18n";
 import { vkLabel, formatKeyChord } from "../macros/types";
+import { mergeShellPrefs } from "../settings/settingsTypes";
 import type {
   LibraryFilterId,
   LibraryFolder,
@@ -24,8 +26,12 @@ type ClickerSummary = {
   mode: string;
 };
 
-function macroMetaLabel(m: MacroSummary): string {
-  const count = `${m.actionCount} action${m.actionCount === 1 ? "" : "s"}`;
+function libraryLocale(): AppLocale {
+  return resolveLocale(mergeShellPrefs().uiLocale);
+}
+
+function macroMetaLabel(m: MacroSummary, locale: AppLocale): string {
+  const count = tStatic(locale, "library.meta.actionsCount", { n: m.actionCount });
   const key = m.triggerKey?.trim();
   if (!key) return count;
   const n = Number(key);
@@ -36,15 +42,15 @@ function macroMetaLabel(m: MacroSummary): string {
   return `${count} · ${label}`;
 }
 
-function clickerModeLabel(mode: string): string {
+function clickerModeLabel(mode: string, locale: AppLocale): string {
   const m = mode.toLowerCase();
-  if (m === "hold") return "Maintenir";
-  if (m === "toggle") return "Basculer";
+  if (m === "hold") return tStatic(locale, "library.meta.hold");
+  if (m === "toggle") return tStatic(locale, "library.meta.toggle");
   return mode;
 }
 
-function clickerMetaLabel(p: ClickerSummary): string {
-  return `${p.cps.toFixed(0)} CPS · ${clickerModeLabel(p.mode)}`;
+function clickerMetaLabel(p: ClickerSummary, locale: AppLocale): string {
+  return `${p.cps.toFixed(0)} CPS · ${clickerModeLabel(p.mode, locale)}`;
 }
 
 export function useLibraryIndex(
@@ -88,16 +94,17 @@ export function useLibraryIndex(
         favoriteIds: favoritesOnly ? options.favoriteIds : [],
       });
 
+      const locale = libraryLocale();
       let metaMap = new Map<string, string>();
       if (kind === "macro") {
         const macros = await invoke<MacroSummary[]>("list_macro_library");
         for (const m of macros) {
-          metaMap.set(m.name, macroMetaLabel(m));
+          metaMap.set(m.name, macroMetaLabel(m, locale));
         }
       } else {
         const presets = await invoke<ClickerSummary[]>("list_clicker_library");
         for (const p of presets) {
-          metaMap.set(p.name, clickerMetaLabel(p));
+          metaMap.set(p.name, clickerMetaLabel(p, locale));
         }
       }
 

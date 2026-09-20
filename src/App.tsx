@@ -8,6 +8,8 @@ import { ErrorBoundary } from "./ui/shell/ErrorBoundary";
 import { ZoneOverlayView } from "./clicker/ZoneOverlayView";
 import { type EngineStatus } from "./macros/types";
 import { applyTheme, readStoredTheme } from "./theme";
+import { LocaleProvider, useT } from "./i18n";
+import { mergeShellPrefs } from "./settings/settingsTypes";
 import "./App.css";
 import "./ui/shell/tokens.css";
 import "./ui/shell/shell.css";
@@ -70,6 +72,16 @@ function OverlayView() {
 }
 
 function PickOverlayView() {
+  const prefs = mergeShellPrefs();
+  return (
+    <LocaleProvider preference={prefs.uiLocale}>
+      <PickOverlayInner />
+    </LocaleProvider>
+  );
+}
+
+function PickOverlayInner() {
+  const t = useT();
   const [pos, setPos] = useState({ sx: 0, sy: 0 });
 
   useEffect(() => {
@@ -119,11 +131,15 @@ function PickOverlayView() {
   }, []);
 
   return (
-    <div className="pick-overlay" role="dialog" aria-label="Choisir un point">
+    <div
+      className="pick-overlay"
+      role="dialog"
+      aria-label={t("shell.pickTitle")}
+    >
       <div className="pick-overlay-banner">
-        <strong>Choisir un point</strong>
+        <strong>{t("shell.pickTitle")}</strong>
         <span>
-          Clic gauche = valider · Esc / clic droit = annuler · {pos.sx}, {pos.sy}
+          {t("shell.pickHint", { x: String(pos.sx), y: String(pos.sy) })}
         </span>
       </div>
     </div>

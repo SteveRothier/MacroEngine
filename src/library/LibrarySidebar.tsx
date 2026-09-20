@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Icons } from "../ui";
+import { useT } from "../i18n";
 import {
   ContextMenu,
   useContextMenuState,
@@ -177,9 +178,11 @@ function ItemMenu({
   onRestore: () => void;
   onDelete?: () => void;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const items = buildLibraryItemMenuItems(item, {
+    t,
     folders,
     trashed,
     onMove,
@@ -205,8 +208,8 @@ function ItemMenu({
       <button
         type="button"
         className="icon-ghost library-item-menu-btn"
-        title="Actions"
-        aria-label={`Actions pour ${item.name}`}
+        title={t("library.actions")}
+        aria-label={t("library.actionsFor", { name: item.name })}
         onClick={() => setOpen((v) => !v)}
       >
         <MoreVertical size={14} aria-hidden />
@@ -229,7 +232,7 @@ function ItemMenu({
           ))}
           {item.locked && !trashed ? (
             <p className="hint library-menu-locked-hint">
-              Verrouillé — déverrouille pour renommer ou supprimer.
+              {t("library.lockedHint")}
             </p>
           ) : null}
         </div>
@@ -277,8 +280,10 @@ function LibraryItemRow({
   onItemPointerDown: (id: string, e: ReactPointerEvent) => void;
   suppressClickRef: MutableRefObject<boolean>;
 }) {
+  const t = useT();
   const ctxMenu = useContextMenuState();
   const menuItems = buildLibraryItemMenuItems(item, {
+    t,
     folders,
     trashed: item.trashed,
     onMove,
@@ -324,7 +329,7 @@ function LibraryItemRow({
             .filter(Boolean)
             .join(" ")}
           disabled={disabled}
-          title={item.favorite ? "Retirer des favoris" : "Favori"}
+          title={item.favorite ? t("library.unfavorite") : t("library.favorite")}
           aria-pressed={item.favorite}
           onClick={() => onToggleFavorite(item.id)}
         >
@@ -375,9 +380,9 @@ function LibraryItemRow({
         </span>
       </div>
       <span className="library-item-badges">
-        {item.dirty ? <span className="library-dirty">modifié</span> : null}
+        {item.dirty ? <span className="library-dirty">{t("library.modified")}</span> : null}
         {item.locked ? (
-          <span className="library-lock" title="Verrouillé">
+          <span className="library-lock" title={t("library.locked")}>
             <Lock size={14} aria-hidden />
           </span>
         ) : null}
@@ -400,7 +405,7 @@ function LibraryItemRow({
             type="button"
             className="icon-ghost danger-text"
             disabled={disabled}
-            title="Supprimer"
+            title={t("library.delete")}
             onClick={() => onDelete(item.id)}
           >
             <Trash2 size={14} aria-hidden />
@@ -416,7 +421,7 @@ function LibraryItemRow({
         onSelect={(id) => {
           menuItems.find((entry) => entry.id === id)?.onSelect?.();
         }}
-        ariaLabel={`Actions pour ${item.name}`}
+        ariaLabel={t("library.actionsFor", { name: item.name })}
       />
     </li>
   );
@@ -446,6 +451,7 @@ export function LibrarySidebar({
   onRenameRequest,
   onToggleFavorite,
 }: Props) {
+  const t = useT();
   const lib = useLibraryIndex(kind, {
     activeId,
     favoriteIds,
@@ -467,7 +473,6 @@ export function LibrarySidebar({
   const moveItemRef = useRef(lib.moveItem);
   const setExpandedRef = useRef(setExpanded);
 
-  const kindLabel = kind === "macro" ? "macro" : "preset";
   const showTree =
     lib.filterId === "__all" && !lib.query.trim();
 
@@ -671,7 +676,7 @@ export function LibrarySidebar({
   }
 
   return (
-    <aside className="library-sidebar macro-library" aria-label={`Bibliothèque ${title}`}>
+    <aside className="library-sidebar macro-library" aria-label={t("library.libraryTitle", { title })}>
       <div className="library-head">
         <div className="library-head-row">
           <div>
@@ -682,26 +687,28 @@ export function LibrarySidebar({
         <input
           type="search"
           className="library-search"
-          placeholder={`Rechercher ${kind === "macro" ? "macros" : "presets"}…`}
+          placeholder={t("library.searchPlaceholder", {
+            kind: kind === "macro" ? t("library.kindMacro") : t("library.kindPreset"),
+          })}
           value={lib.query}
           disabled={disabled}
-          aria-label="Rechercher"
+          aria-label={t("library.search")}
           onChange={(e) => lib.setQuery(e.target.value)}
         />
       </div>
 
       <div className="library-actions-row">
         <button type="button" className="ghost" disabled={disabled} onClick={onCreate}>
-          + Nouveau
+          {t("library.newItem")}
         </button>
         <button
           type="button"
           className="ghost"
           disabled={disabled}
-          title="Nouveau dossier"
+          title={t("library.newFolder")}
           onClick={() => setNewFolder((v) => !v)}
         >
-          <FolderPlus size={14} aria-hidden /> Dossier
+          <FolderPlus size={14} aria-hidden /> {t("library.folder")}
         </button>
       </div>
 
@@ -710,7 +717,7 @@ export function LibrarySidebar({
           <input
             type="text"
             value={folderName}
-            placeholder="Nom du dossier"
+            placeholder={t("library.folderName")}
             disabled={disabled}
             onChange={(e) => setFolderName(e.target.value)}
             onKeyDown={(e) => {
@@ -719,7 +726,7 @@ export function LibrarySidebar({
             }}
           />
           <button type="button" className="primary" disabled={disabled} onClick={() => void submitFolder()}>
-            OK
+            {t("library.ok")}
           </button>
         </div>
       ) : null}
@@ -727,12 +734,17 @@ export function LibrarySidebar({
       {empty ? (
         <p className="library-empty hint">
           {lib.loading
-            ? "Chargement…"
+            ? t("library.loading")
             : lib.query
-              ? "Aucun résultat."
+              ? t("library.noResults")
               : lib.filterId === "__trash"
-                ? "Corbeille vide."
-                : `Aucun ${kindLabel} — crée-en un.`}
+                ? t("library.trashEmpty")
+                : t("library.emptyKind", {
+                    kind:
+                      kind === "macro"
+                        ? t("library.kindMacro")
+                        : t("library.kindPreset"),
+                  })}
         </p>
       ) : showTree ? (
         <ul className="library-tree" data-library-tree="">
@@ -787,7 +799,7 @@ export function LibrarySidebar({
                     data-library-drop-folder={folder.id}
                   >
                     {children.length === 0 ? (
-                      <li className="library-tree-empty hint">Vide</li>
+                      <li className="library-tree-empty hint">{t("library.emptyFolder")}</li>
                     ) : (
                       children.map((item) => renderItem(item))
                     )}

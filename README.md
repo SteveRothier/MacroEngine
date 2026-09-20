@@ -4,10 +4,11 @@ Automatisation Windows locale — **clicker** + **macros** (Tauri 2 + React + Ru
 
 ## Statut
 
-Bibliothèque unifiée (macros / presets), verrou bout-en-bout, undo/dirty, Automations (favoris/récents), tests Vitest + Rust, CI GitHub Actions.
+Bibliothèque unifiée (macros / presets clicker / scripts JS·TS), Accueil (favoris/récents/lancement), verrou bout-en-bout, undo/dirty, tests Vitest + Rust, CI GitHub Actions (`.github/workflows/`).
 
 - Guide utilisateur : [`docs/user-guide.md`](docs/user-guide.md)
 - Checklist smoke : [`docs/smoke-checklist.md`](docs/smoke-checklist.md)
+- Notes de version : [`docs/RELEASE.md`](docs/RELEASE.md)
 - Index des notes de jalons : [`docs/README.md`](docs/README.md)
 
 Windows uniquement pour hotkeys globales, capture et injection d’entrée.

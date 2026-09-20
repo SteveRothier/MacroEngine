@@ -62,12 +62,17 @@ Panneau sous l’éditeur : logs `script:` et messages de session / erreurs Boa 
 | `get` / `set` | — | Variables macro |
 | `log` | — | Journal (`script: …`) |
 | `return` | — | Valeur pour `resultVar` |
+| `sleep` | `allowInput` | Pause (bloquée si entrée désactivée) |
+| `click`, `moveTo`, `mouseDown` / `mouseUp`, `wheel`, `keyTap` / `keyDown` / `keyUp` | `allowInput` | Souris / clavier |
 | `fetch` | `allowNetwork` | HTTP synchrone → `{ status, body }` |
 | `clipboardRead` / `clipboardWrite` | `allowClipboard` | Presse-papiers (M4a) |
 | `readFile` / `writeFile` | `allowFs` | Uniquement sous `script-data/` (M4a) |
 | `runMacro(macroId)` | `allowMacroControl` | Macro imbriquée, profondeur max 3 (M4b) |
+| `runProcess(...)` | `allowProcess` | Lancer un processus (`command`, `args`, `wait`, `timeoutMs`) |
 
-**Exclu :** `mouse` / `keyboard` / `process` / `window` / `screen` depuis JS.
+**Non exposé :** pas d’API `window` / `screen` depuis JS.
+
+**Dry-run :** bascule titlebar — les appels host sensibles sont journalisés (`script: dry-run skipped …`) sans effet de bord.
 
 ## Session autonome (M5)
 
@@ -75,9 +80,11 @@ Panneau sous l’éditeur : logs `script:` et messages de session / erreurs Boa 
 - **Stop** / **F8** → `request_cancel` (même jeton que macros)
 - Exclusion mutuelle clicker / macro / record / script
 
-## Éditeur (M6) — décision
+## Éditeur (M6)
 
-Conserver le **textarea** monospace. Monaco, coloration avancée ou debugger step **uniquement** si la complexité réelle des scripts et l’usage le justifient. Hors engagement actuel.
+Éditeur actuel : **CodeMirror** (`ScriptSourceEditor`) — coloration JS/TS, numéros de ligne, replis, lint basique.
+
+Pas-à-pas léger sur les appels host : **prévu** ; debugger Monaco step **hors scope** actuel.
 
 ## Exemples (presets UI)
 
@@ -97,7 +104,7 @@ Surfaces : menu Exemples de l’éditeur Script ; mode Inline des props `script.
 
 `%APPDATA%/com.steverothier.caster/scripts/*.json`  
 IPC : `list` / `load` / `save` / `delete` / `run_script_session_cmd`  
-Flags doc : `allowNetwork`, `allowClipboard`, `allowFs`, `allowMacroControl`, `paramValues`
+Flags doc : `allowNetwork`, `allowClipboard`, `allowFs`, `allowMacroControl`, `allowInput`, `allowProcess`, `paramValues`
 
 ## Runtime
 

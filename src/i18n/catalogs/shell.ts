@@ -109,6 +109,8 @@ export const shell = defineCatalog({
     navAutomations: "Automations",
     navRuns: "Runs",
     mainNavAria: "Navigation principale",
+    pickTitle: "Choisir un point",
+    pickHint: "Clic gauche = valider · Esc / clic droit = annuler · {x}, {y}",
   },
   en: {
     sessionEnded: "Session ended",
@@ -217,5 +219,7 @@ export const shell = defineCatalog({
     navAutomations: "Automations",
     navRuns: "Runs",
     mainNavAria: "Main navigation",
+    pickTitle: "Pick a point",
+    pickHint: "Left click = confirm · Esc / right click = cancel · {x}, {y}",
   },
 });

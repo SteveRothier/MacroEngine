@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { tStatic } from "../i18n";
 import { buildLibraryItemMenuItems } from "../library/libraryItemMenuItems";
 import type { LibraryItemView } from "../library/types";
+
+const t = (key: string, vars?: Record<string, string | number>) =>
+  tStatic("fr", key, vars);
 
 const item: LibraryItemView = {
   id: "Demo",
@@ -16,6 +20,7 @@ describe("buildLibraryItemMenuItems", () => {
   it("offers trash when not in trash view", () => {
     const onTrash = vi.fn();
     const items = buildLibraryItemMenuItems(item, {
+      t,
       folders: [],
       trashed: false,
       onMove: vi.fn(),
@@ -32,6 +37,7 @@ describe("buildLibraryItemMenuItems", () => {
     const items = buildLibraryItemMenuItems(
       { ...item, trashed: true },
       {
+        t,
         folders: [],
         trashed: true,
         onMove: vi.fn(),

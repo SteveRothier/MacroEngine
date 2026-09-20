@@ -7,6 +7,7 @@ import { macros } from "./macros";
 import { clicker } from "./clicker";
 import { scripts } from "./scripts";
 import { runs } from "./runs";
+import { library } from "./library";
 import type { AppLocale } from "../locales";
 
 /**
@@ -27,6 +28,7 @@ export const catalogs = {
     clicker: clicker.fr,
     scripts: scripts.fr,
     runs: runs.fr,
+    library: library.fr,
   },
   en: {
     common: common.en,
@@ -38,6 +40,7 @@ export const catalogs = {
     clicker: clicker.en,
     scripts: scripts.en,
     runs: runs.en,
+    library: library.en,
   },
 } satisfies Record<
   AppLocale,
@@ -51,6 +54,7 @@ export const catalogs = {
     clicker: (typeof clicker)[AppLocale];
     scripts: (typeof scripts)[AppLocale];
     runs: (typeof runs)[AppLocale];
+    library: (typeof library)[AppLocale];
   }
 >;
 

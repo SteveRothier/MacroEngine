@@ -1,7 +1,9 @@
+import type { TFunction } from "../i18n";
 import type { MenuItemDef } from "../ui/shell";
 import type { LibraryItemView } from "./types";
 
 export type LibraryItemMenuActions = {
+  t: TFunction;
   folders: { id: string; name: string }[];
   trashed: boolean;
   onMove: (folderId: string | null) => void;
@@ -22,6 +24,7 @@ export function buildLibraryItemMenuItems(
   actions: LibraryItemMenuActions,
 ): MenuItemDef[] {
   const {
+    t,
     folders,
     trashed,
     onMove,
@@ -36,21 +39,25 @@ export function buildLibraryItemMenuItems(
   } = actions;
   const items: MenuItemDef[] = [];
   if (onRename && !item.locked) {
-    items.push({ id: "rename", label: "Renommer", onSelect: onRename });
+    items.push({ id: "rename", label: t("library.menu.rename"), onSelect: onRename });
   }
   if (onDuplicate) {
-    items.push({ id: "duplicate", label: "Dupliquer", onSelect: onDuplicate });
+    items.push({
+      id: "duplicate",
+      label: t("library.menu.duplicate"),
+      onSelect: onDuplicate,
+    });
   }
   items.push({
     id: "lock",
-    label: item.locked ? "Déverrouiller" : "Verrouiller",
+    label: item.locked ? t("library.menu.unlock") : t("library.menu.lock"),
     onSelect: onToggleLock,
   });
   if (folders.length > 0 && !item.locked) {
     if (item.folderId != null) {
       items.push({
         id: "move-root",
-        label: "Déplacer → Racine",
+        label: t("library.menu.moveRoot"),
         onSelect: () => onMove(null),
       });
     }
@@ -58,7 +65,7 @@ export function buildLibraryItemMenuItems(
       if (f.id === item.folderId) continue;
       items.push({
         id: `move-${f.id}`,
-        label: `Déplacer → ${f.name}`,
+        label: t("library.menu.moveTo", { name: f.name }),
         onSelect: () => onMove(f.id),
       });
     }
@@ -73,17 +80,21 @@ export function buildLibraryItemMenuItems(
     for (const to of targets) {
       items.push({
         id: `convert-${to}`,
-        label: `Convertir → ${to}`,
+        label: t("library.menu.convertTo", { kind: to }),
         onSelect: () => onConvertTo(to),
       });
     }
   }
   if (trashed) {
-    items.push({ id: "restore", label: "Restaurer", onSelect: onRestore });
+    items.push({
+      id: "restore",
+      label: t("library.menu.restore"),
+      onSelect: onRestore,
+    });
     if (onDelete && !item.locked) {
       items.push({
         id: "delete",
-        label: "Supprimer définitivement",
+        label: t("library.menu.deleteForever"),
         danger: true,
         onSelect: onDelete,
       });
@@ -91,7 +102,7 @@ export function buildLibraryItemMenuItems(
   } else if (!item.locked) {
     items.push({
       id: "trash",
-      label: "Mettre à la corbeille",
+      label: t("library.menu.trash"),
       danger: true,
       onSelect: onTrash,
     });

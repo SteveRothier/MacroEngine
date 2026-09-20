@@ -1,5 +1,5 @@
 /**
- * Backlog produit Clicker — Phase 3.
+ * Backlog produit Clicker — Phase 4.
  * Annoté au fur et à mesure des livraisons.
  */
 export type ClickerBacklogItem = {
@@ -11,51 +11,45 @@ export type ClickerBacklogItem = {
 
 export const CLICKER_FEATURE_BACKLOG: readonly ClickerBacklogItem[] = [
   {
-    id: "presets-templates",
-    title: "Profils / presets rapides",
+    id: "process-filter-feedback",
+    title: "Feedback filtre process",
     summary:
-      "Templates « CPS fixe curseur », « Grille 3 points », « Zones bords seuls » appliqués en un clic. (livré — menu ⋯)",
+      "Compteur de ticks bloqués par le filtre + ligne journal (évite « ça marche pas »).",
     priority: 1,
   },
   {
-    id: "target-mini-map",
-    title: "Mini-carte cible",
+    id: "process-filter-per-preset",
+    title: "Filtre process par preset",
     summary:
-      "Preview miniature des points et du point fixe dans l’onglet Cible. (livré — TargetMiniMap)",
+      "inherit / off / local + liste locale (parité macros processFilter).",
     priority: 2,
   },
   {
-    id: "session-pause",
-    title: "Pause / reprise session",
+    id: "zone-start-session",
+    title: "Zone Start = démarrer / reprendre",
     summary:
-      "Bouton Pause dans la barre + raccourci F7 dédié (au-delà des zones pause). (livré)",
+      "La zone Start lance ou reprend la session clicker (plus seulement unpause tick).",
     priority: 3,
   },
   {
-    id: "limits-combined",
-    title: "Limites combinées (ET)",
+    id: "multi-monitor-dpi",
+    title: "Multi-moniteur / DPI",
     summary:
-      "Stop au premier seuil atteint : clics ET durée configurables simultanément. (livré — LimitMode Both)",
+      "Géométrie cohérente overlay, pick, points et read_pixel hors écran principal.",
     priority: 4,
   },
   {
-    id: "pixel-condition",
-    title: "Condition pixel / couleur",
+    id: "template-packs-save-preset",
+    title: "Packs templates + sauver preset",
     summary:
-      "Stop ou pause si la couleur sous (x, y) change. (livré — read_pixel + Limites)",
+      "Packs templates étendus et action « Sauver comme nouveau preset ».",
     priority: 5,
   },
   {
-    id: "chain-macro",
-    title: "Enchaînement clicker → macro",
+    id: "capture-to-points",
+    title: "Capture → points clicker",
     summary:
-      "Lancer une macro à la fin de session (limites ou stopWhenComplete). (livré — onCompleteMacro)",
+      "Mode court : enregistrer des clics souris → ClickPoint[] (pas le record macro).",
     priority: 6,
-  },
-  {
-    id: "session-stats",
-    title: "Stats session",
-    summary: "Graphique CPS sur 30 s dans un panneau léger. (livré — sparkline)",
-    priority: 7,
   },
 ] as const;
