@@ -20,7 +20,7 @@ use crate::record::{postprocess_actions, RecordOptions, RecordPostProcess, Recor
 use crate::schema::{ActionNode, MacroDocument, SCHEMA_VERSION_CURRENT};
 use crate::settings::ProcessFilter;
 use crate::state::{EngineState, StateTransitionError};
-use crate::stop_zones::ScreenGeom;
+use crate::stop_zones::{zone_hit, ScreenGeom, ZoneAction};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ActiveKind {
@@ -148,7 +148,74 @@ impl AppState {
                     worker.dispatch_hotkey(cmd);
                 }
             });
+        // Idle arm: entering a Start safety zone launches the clicker (edge-triggered).
+        let arm = state.clone();
+        let _ = std::thread::Builder::new()
+            .name("start-zone-arm".into())
+            .spawn(move || arm.run_start_zone_arm_loop());
         state
+    }
+
+    /// True when the cursor sits on a safety zone whose action is Start.
+    fn cursor_in_start_zone(&self) -> bool {
+        let cfg = self.clicker_config();
+        if !cfg
+            .stop_zones
+            .iter()
+            .any(|z| z.is_safety() && z.action() == ZoneAction::Start)
+        {
+            return false;
+        }
+        let Ok(pos) = self.injector.cursor_position() else {
+            return false;
+        };
+        let geom = self.zone_screen();
+        zone_hit(&cfg.stop_zones, pos, geom) == Some(ZoneAction::Start)
+    }
+
+    /// Polls the cursor while Idle; a rising edge into a Start zone starts the
+    /// clicker with `clicker_config()`. While non-Idle, tracks occupancy so a
+    /// session that ends with the cursor still in Start does not auto-relaunch.
+    fn run_start_zone_arm_loop(&self) {
+        let mut was_in_start = false;
+        let mut seeded = false;
+        loop {
+            std::thread::sleep(Duration::from_millis(15));
+            if self.is_picking() {
+                was_in_start = self.cursor_in_start_zone();
+                seeded = true;
+                continue;
+            }
+            let state = self.state();
+            if state != EngineState::Idle {
+                was_in_start = self.cursor_in_start_zone();
+                seeded = true;
+                continue;
+            }
+            if *self.active.lock().expect("active lock") != ActiveKind::None {
+                continue;
+            }
+            let in_start = self.cursor_in_start_zone();
+            if !seeded {
+                was_in_start = in_start;
+                seeded = true;
+                continue;
+            }
+            if in_start && !was_in_start {
+                let cfg = self.clicker_config();
+                self.bus.publish(EngineEvent::Log {
+                    level: LogLevel::Info,
+                    message: "start zone started the clicker session".into(),
+                });
+                if let Err(e) = self.start_clicker(cfg) {
+                    self.bus.publish(EngineEvent::Log {
+                        level: LogLevel::Warn,
+                        message: format!("start zone launch failed: {e}"),
+                    });
+                }
+            }
+            was_in_start = in_start;
+        }
     }
 
     pub fn state(&self) -> EngineState {
@@ -1804,9 +1871,10 @@ pub fn format_vk_label(vk: u16) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input::{MouseButton, RecordingInjector};
+    use crate::input::{MouseButton, Point, RecordingInjector};
     use crate::schema::{ActionNode, MacroProcessFilterMode, Trigger, SCHEMA_VERSION_CURRENT};
     use crate::settings::ProcessFilter;
+    use crate::stop_zones::{ClickSampleMode, StopZone, ZoneAction, ZoneKind};
     use std::sync::{Arc, Mutex};
 
     #[test]
@@ -2101,5 +2169,96 @@ mod tests {
         let err = app.start_script_session("mod1", false, false).unwrap_err();
         assert_eq!(err, "module_not_runnable");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn start_zone_cfg() -> ClickerConfig {
+        let mut cfg = ClickerConfig {
+            cps: 80.0,
+            mode: ClickMode::Toggle,
+            stop_zones: vec![StopZone::Custom {
+                id: "start".into(),
+                x: 0,
+                y: 0,
+                width: 80,
+                height: 80,
+                action: ZoneAction::Start,
+                kind: ZoneKind::Safety,
+                color: String::new(),
+                click_mode: ClickSampleMode::Random,
+            }],
+            ..Default::default()
+        };
+        cfg.limits_enabled = true;
+        cfg.limit_mode = crate::clicker::LimitMode::Clicks;
+        cfg.max_clicks = Some(3);
+        cfg
+    }
+
+    #[test]
+    fn start_zone_launches_idle_session_on_enter() {
+        let inj = Arc::new(RecordingInjector::new());
+        // Seed outside the Start zone so the first Idle poll does not fire.
+        inj.set_cursor(Point { x: 400, y: 400 });
+        let app = AppState::with_injector(Arc::clone(&inj) as Arc<dyn MouseInjector>);
+        app.set_zone_screen(ScreenGeom::from_size(1920, 1080));
+        app.set_clicker_config(start_zone_cfg());
+
+        // Let the arm thread seed occupancy (outside → was_in_start=false).
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(app.state(), EngineState::Idle);
+
+        inj.set_cursor(Point { x: 20, y: 20 });
+        let deadline = Instant::now() + Duration::from_millis(800);
+        while app.state() != EngineState::Running && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            app.state(),
+            EngineState::Running,
+            "entering Start zone should launch clicker"
+        );
+        app.stop_clicker();
+        assert_eq!(app.state(), EngineState::Idle);
+    }
+
+    #[test]
+    fn start_zone_no_relaunch_while_cursor_stays() {
+        let inj = Arc::new(RecordingInjector::new());
+        inj.set_cursor(Point { x: 400, y: 400 });
+        let app = AppState::with_injector(Arc::clone(&inj) as Arc<dyn MouseInjector>);
+        app.set_zone_screen(ScreenGeom::from_size(1920, 1080));
+        app.set_clicker_config(start_zone_cfg());
+        std::thread::sleep(Duration::from_millis(50));
+
+        inj.set_cursor(Point { x: 20, y: 20 });
+        let deadline = Instant::now() + Duration::from_millis(800);
+        while app.state() != EngineState::Running && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(app.state(), EngineState::Running);
+        app.stop_clicker();
+        assert_eq!(app.state(), EngineState::Idle);
+
+        // Cursor still in Start — must not relaunch without leave+re-enter.
+        std::thread::sleep(Duration::from_millis(120));
+        assert_eq!(
+            app.state(),
+            EngineState::Idle,
+            "staying in Start after stop must not relaunch"
+        );
+
+        inj.set_cursor(Point { x: 400, y: 400 });
+        std::thread::sleep(Duration::from_millis(50));
+        inj.set_cursor(Point { x: 20, y: 20 });
+        let deadline2 = Instant::now() + Duration::from_millis(800);
+        while app.state() != EngineState::Running && Instant::now() < deadline2 {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(
+            app.state(),
+            EngineState::Running,
+            "leave then re-enter Start should launch again"
+        );
+        app.stop_clicker();
     }
 }

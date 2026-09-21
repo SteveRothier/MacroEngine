@@ -28,7 +28,7 @@ export const CLICKER_FEATURE_BACKLOG: readonly ClickerBacklogItem[] = [
     id: "zone-start-session",
     title: "Zone Start = démarrer / reprendre",
     summary:
-      "La zone Start lance ou reprend la session clicker (plus seulement unpause tick) (livré — la zone Start relâche le PauseGate, y compris pendant l’attente de pause ; l’état moteur repasse en Running. Démarrage d’une session arrêtée non couvert).",
+      "La zone Start lance ou reprend la session clicker (livré — resume PauseGate pendant la session ; cold-start Idle→Running edge-triggered via watcher curseur + clicker_config()).",
     priority: 3,
   },
   {
