@@ -18,6 +18,7 @@ import {
 } from "../clicker/clickerTypes";
 import { useClickerSettingsApi } from "../clicker/useClickerSettings";
 import { Select, useToast } from "../ui/shell";
+import { WheelNumberInput } from "../ui/WheelNumberInput";
 import { confirmChoice } from "../ui";
 import type { HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
@@ -654,15 +655,13 @@ export function SettingsView({
                       <p>{t("settings.application.defaultTimeoutMsHint")}</p>
                     </div>
                     <div className="caster-settings-row-control">
-                      <input
-                        type="number"
+                      <WheelNumberInput
                         className="caster-input"
                         min={0}
                         step={1000}
                         value={scripts.defaultTimeoutMs}
                         aria-label={t("settings.application.defaultTimeoutMs")}
-                        onChange={(e) => {
-                          const n = Number(e.target.value);
+                        onValueChange={(n) => {
                           persistScriptsPrefs({
                             defaultTimeoutMs: Number.isFinite(n)
                               ? Math.max(0, Math.floor(n))

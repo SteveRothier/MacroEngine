@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useT } from "../i18n";
 import { KbdChip } from "../ui";
+import { WheelNumberInput } from "../ui/WheelNumberInput";
 import {
   eventToVk,
   hotkeyTriggerMatches,
@@ -144,15 +145,12 @@ export function MacroMetaBar({
       </label>
       <label className="caster-macro-meta-row">
         <span className="caster-macro-meta-label">{t("macros.toolbar.metaRepeat")}</span>
-        <input
+        <WheelNumberInput
           className="caster-macro-meta-input caster-macro-meta-input--repeat"
-          type="number"
           min={0}
           value={doc.repeatCount}
           disabled={locked}
-          onChange={(e) =>
-            onChange({ ...doc, repeatCount: Number(e.target.value) })
-          }
+          onValueChange={(n) => onChange({ ...doc, repeatCount: n })}
         />
       </label>
       <div className="caster-macro-meta-row caster-macro-meta-row--hotkey">

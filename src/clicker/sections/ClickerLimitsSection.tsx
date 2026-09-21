@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Select } from "../../ui/shell";
+import { Select, useToast } from "../../ui/shell";
+import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { useT } from "../../i18n";
+import { pickScreenPointDetailed } from "../../pick";
 import type { ClickerEditor } from "../useClickerEditor";
 import {
   DEFAULT_PIXEL_CONDITION,
@@ -23,6 +25,7 @@ function limitChoice(e: ClickerEditor): LimitChoice {
 
 export function ClickerLimitsSection({ editor: e }: Props) {
   const t = useT();
+  const toast = useToast();
   const choice = limitChoice(e);
   const [macros, setMacros] = useState<string[]>([]);
   const pixel = e.pixelCondition ?? DEFAULT_PIXEL_CONDITION;
@@ -58,14 +61,20 @@ export function ClickerLimitsSection({ editor: e }: Props) {
 
   const onPickPixel = async () => {
     try {
-      const p = await invoke<{ x: number; y: number }>("pick_point");
+      const result = await pickScreenPointDetailed();
+      if (!result.ok) {
+        if (result.reason === "timeout" || result.reason === "error") {
+          toast.info(t("macros.params.pickCancelled"));
+        }
+        return;
+      }
       const sample = await invoke<{
         x: number;
         y: number;
         r: number;
         g: number;
         b: number;
-      }>("read_pixel", { x: p.x, y: p.y });
+      }>("read_pixel", { x: result.point.x, y: result.point.y });
       patchPixel({
         enabled: true,
         x: sample.x,
@@ -123,13 +132,13 @@ export function ClickerLimitsSection({ editor: e }: Props) {
       {showClicks ? (
         <label className="caster-field caster-clicker-limits-field">
           <span>{t("clicker.limits.maxClicks")}</span>
-          <input
-            type="number"
+          <WheelNumberInput
             min={1}
             placeholder="100"
             value={e.maxClicks}
             disabled={e.editDisabled}
-            onChange={(ev) => e.setMaxClicks(ev.target.value)}
+            onValueChange={(n) => e.setMaxClicks(String(n))}
+            onEmptyChange={() => e.setMaxClicks("")}
           />
         </label>
       ) : null}
@@ -137,13 +146,13 @@ export function ClickerLimitsSection({ editor: e }: Props) {
       {showTime ? (
         <label className="caster-field caster-clicker-limits-field">
           <span>{t("clicker.limits.durationSec")}</span>
-          <input
-            type="number"
+          <WheelNumberInput
             min={1}
             placeholder="60"
             value={e.maxDurationSec}
             disabled={e.editDisabled}
-            onChange={(ev) => e.setMaxDurationSec(ev.target.value)}
+            onValueChange={(n) => e.setMaxDurationSec(String(n))}
+            onEmptyChange={() => e.setMaxDurationSec("")}
           />
         </label>
       ) : null}
@@ -197,15 +206,12 @@ export function ClickerLimitsSection({ editor: e }: Props) {
           />
           <label className="caster-field caster-clicker-limits-field">
             <span>{t("clicker.limits.tolerance")}</span>
-            <input
-              type="number"
+            <WheelNumberInput
               min={0}
               max={255}
               value={pixel.tolerance}
               disabled={e.editDisabled || !pixel.enabled}
-              onChange={(ev) =>
-                patchPixel({ tolerance: Number(ev.target.value) || 0 })
-              }
+              onValueChange={(n) => patchPixel({ tolerance: n || 0 })}
             />
           </label>
           <div

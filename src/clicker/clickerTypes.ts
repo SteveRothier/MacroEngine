@@ -77,6 +77,21 @@ export type ClickSampleMode = "random" | "center";
 export type ClickZoneOrder = "random" | "sequence";
 export type Corner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
 export type Edge = "left" | "right" | "top" | "bottom";
+
+/** Unified selection for the zone map / sidebar (custom, edge, or corner). */
+export type ZoneSelection =
+  | { kind: "custom"; id: string }
+  | { kind: "edge"; id: Edge }
+  | { kind: "corner"; id: Corner };
+
+export function zoneSelectionEquals(
+  a: ZoneSelection | null | undefined,
+  b: ZoneSelection | null | undefined,
+): boolean {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return a.kind === b.kind && a.id === b.id;
+}
 export type ClickTarget =
   | { type: "currentCursor" }
   | { type: "fixed"; x: number; y: number };
@@ -241,6 +256,17 @@ export type DisplayDto = {
   scaleFactor: number;
   isPrimary: boolean;
 };
+
+/** ScreenGeom used by zone clamp / preview — same metrics as the display dropdown. */
+export function screenGeomFromDisplay(d: DisplayDto): ScreenGeomDto {
+  return {
+    x: d.x,
+    y: d.y,
+    width: d.width,
+    height: d.height,
+    scaleFactor: d.scaleFactor,
+  };
+}
 
 export const DEFAULT_CLICKER: ClickerConfigPayload = {
   button: "left",

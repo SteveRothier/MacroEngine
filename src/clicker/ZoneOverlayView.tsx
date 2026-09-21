@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useT } from "../i18n";
 import {
   FALLBACK_SCREEN_GEOM,
   type ScreenGeomDto,
@@ -44,6 +45,7 @@ type ZonesHost = Window & {
 };
 
 export function ZoneOverlayView() {
+  const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const [geom, setGeom] = useState<ScreenGeomDto>(FALLBACK_SCREEN_GEOM);
   const [zones, setZones] = useState<StopZone[]>([]);
@@ -230,8 +232,8 @@ export function ZoneOverlayView() {
       />
       {drawing ? (
         <div className="zone-overlay-banner">
-          <strong>Dessiner une zone</strong>
-          <span>Glisse pour dessiner · Esc / clic droit = annuler</span>
+          <strong>{t("clicker.zones.overlayBannerTitle")}</strong>
+          <span>{t("clicker.zones.overlayBannerHint")}</span>
         </div>
       ) : null}
     </div>

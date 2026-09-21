@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { ScreenGeomDto } from "./clickerTypes";
 import {
+  EMPTY_ZONE_MODEL,
   clamp,
+  clampCustomExtent,
+  clampZoneModel,
   clientToScreen,
   deltaToScreen,
   geomScaleFactor,
   nextCustomZoneColor,
 } from "./zoneGeom";
+import type { CustomZone } from "./clickerTypes";
 
 function domRect(
   left: number,
@@ -111,5 +115,53 @@ describe("zoneGeom", () => {
     expect(
       geomScaleFactor({ x: 0, y: 0, width: 800, height: 600, scaleFactor: 1.5 }),
     ).toBe(1.5);
+  });
+
+  it("clampCustomExtent clamps x/y/w/h into the display", () => {
+    const geom: ScreenGeomDto = { x: 100, y: 50, width: 800, height: 600 };
+    const z: CustomZone = {
+      id: "z1",
+      x: 120,
+      y: 80,
+      width: 40,
+      height: 40,
+      action: "stop",
+      kind: "safety",
+      color: "#f00",
+      clickMode: "random",
+    };
+    expect(clampCustomExtent(z, { x: 0, width: 900 }, geom)).toEqual({
+      ...z,
+      x: 100,
+      width: 800,
+    });
+    expect(clampCustomExtent(z, { width: 4, height: 4 }, geom)).toEqual({
+      ...z,
+      width: 8,
+      height: 8,
+    });
+  });
+
+  it("clampZoneModel clamps edges and corners into the display", () => {
+    const geom: ScreenGeomDto = { x: 0, y: 0, width: 800, height: 600 };
+    const model = clampZoneModel(
+      {
+        ...EMPTY_ZONE_MODEL,
+        edges: { ...EMPTY_ZONE_MODEL.edges, left: true, top: true },
+        edgeMargin: {
+          ...EMPTY_ZONE_MODEL.edgeMargin,
+          left: 9999,
+          top: 9999,
+        },
+        corners: { ...EMPTY_ZONE_MODEL.corners, topLeft: true },
+        cornerWidth: { ...EMPTY_ZONE_MODEL.cornerWidth, topLeft: 5000 },
+        cornerHeight: { ...EMPTY_ZONE_MODEL.cornerHeight, topLeft: 5000 },
+      },
+      geom,
+    );
+    expect(model.edgeMargin.left).toBe(800);
+    expect(model.edgeMargin.top).toBe(600);
+    expect(model.cornerWidth.topLeft).toBe(800);
+    expect(model.cornerHeight.topLeft).toBe(600);
   });
 });

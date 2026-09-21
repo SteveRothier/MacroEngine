@@ -130,7 +130,7 @@ export function clamp(n: number, min: number, max: number) {
 
 export function pct(px: number, total: number) {
   if (total <= 0) return 0;
-  return (px / total) * 100;
+  return clamp((px / total) * 100, 0, 100);
 }
 
 /** Scale factor to display in the UI; never used to convert coordinates. */
@@ -371,7 +371,7 @@ export function buildZoneBands(
       kind: "edge",
       id: edge,
       action: "stop",
-      ...edgePct(edge, model.edgeMargin[edge]),
+      ...edgePct(edge, clampEdgeMargin(edge, model.edgeMargin[edge], g)),
     });
   });
 
@@ -400,8 +400,8 @@ export function buildZoneBands(
         color: model.cornerColor,
         ...cornerPct(
           corner,
-          model.cornerWidth[corner],
-          model.cornerHeight[corner],
+          clampCornerWidth(model.cornerWidth[corner], g),
+          clampCornerHeight(model.cornerHeight[corner], g),
         ),
       });
     },
@@ -472,4 +472,29 @@ export function clampCustomExtent(
     Math.max(g.y, g.y + g.height - height),
   );
   return { ...z, x, y, width, height };
+}
+
+/** Clamp every edge/corner/custom extent into the active display. */
+export function clampZoneModel(model: ZoneModel, geom: ScreenGeomDto): ZoneModel {
+  const g = geom.width > 0 && geom.height > 0 ? geom : FALLBACK_SCREEN_GEOM;
+  const edgeMargin = { ...model.edgeMargin };
+  for (const edge of EDGE_IDS) {
+    edgeMargin[edge] = clampEdgeMargin(edge, edgeMargin[edge], g);
+  }
+  const cornerWidth = { ...model.cornerWidth };
+  const cornerHeight = { ...model.cornerHeight };
+  for (const corner of CORNERS) {
+    cornerWidth[corner] = clampCornerWidth(cornerWidth[corner], g);
+    cornerHeight[corner] = clampCornerHeight(cornerHeight[corner], g);
+  }
+  const customZones = model.customZones.map((z) =>
+    clampCustomExtent(z, {}, g),
+  );
+  return {
+    ...model,
+    edgeMargin,
+    cornerWidth,
+    cornerHeight,
+    customZones,
+  };
 }

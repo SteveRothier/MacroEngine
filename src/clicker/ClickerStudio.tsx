@@ -26,6 +26,8 @@ type Props = {
   onOpenProcessSettings?: () => void;
   /** New preset id created via « Sauver comme nouveau preset ». */
   onSavedAsNew?: (id: string) => void;
+  /** When false (keep-mounted but hidden), ignore titlebar ownership. */
+  active?: boolean;
 };
 
 type InspectorTab = "entry" | "target" | "zones" | "limits";
@@ -42,6 +44,7 @@ export function ClickerStudio({
   hotkeys,
   onOpenProcessSettings,
   onSavedAsNew,
+  active = true,
 }: Props) {
   const t = useT();
   const [tab, setTab] = useState<InspectorTab>("entry");
@@ -76,6 +79,7 @@ export function ClickerStudio({
       hotkeys={hotkeys}
       onSavedAsNew={onSavedAsNew}
     />,
+    { active },
   );
 
   return (

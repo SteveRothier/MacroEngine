@@ -1,5 +1,6 @@
 import type { ClickerEditor } from "../useClickerEditor";
 import { useT } from "../../i18n";
+import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { TargetMiniMap } from "../TargetMiniMap";
 
 type Props = { editor: ClickerEditor };
@@ -161,14 +162,13 @@ export function ClickerTargetSection({ editor: e }: Props) {
                   </button>
                   <label className="caster-clicker-point-coord">
                     <span className="sr-only">X</span>
-                    <input
-                      type="number"
+                    <WheelNumberInput
                       value={pt.x}
                       disabled={e.editDisabled}
-                      onChange={(ev) =>
+                      onValueChange={(n) =>
                         e.setPoints((prev) =>
                           prev.map((p, j) =>
-                            j === i ? { ...p, x: Number(ev.target.value) } : p,
+                            j === i ? { ...p, x: n } : p,
                           ),
                         )
                       }
@@ -176,14 +176,13 @@ export function ClickerTargetSection({ editor: e }: Props) {
                   </label>
                   <label className="caster-clicker-point-coord">
                     <span className="sr-only">Y</span>
-                    <input
-                      type="number"
+                    <WheelNumberInput
                       value={pt.y}
                       disabled={e.editDisabled}
-                      onChange={(ev) =>
+                      onValueChange={(n) =>
                         e.setPoints((prev) =>
                           prev.map((p, j) =>
-                            j === i ? { ...p, y: Number(ev.target.value) } : p,
+                            j === i ? { ...p, y: n } : p,
                           ),
                         )
                       }
@@ -194,22 +193,18 @@ export function ClickerTargetSection({ editor: e }: Props) {
                     title={t("clicker.target.clicksOnPoint")}
                   >
                     <span>×</span>
-                    <input
-                      type="number"
+                    <WheelNumberInput
                       min={1}
                       max={9999}
                       value={pt.clicks}
                       disabled={e.editDisabled}
-                      onChange={(ev) =>
+                      onValueChange={(n) =>
                         e.setPoints((prev) =>
                           prev.map((p, j) =>
                             j === i
                               ? {
                                   ...p,
-                                  clicks: Math.max(
-                                    1,
-                                    Number(ev.target.value) || 1,
-                                  ),
+                                  clicks: Math.max(1, n || 1),
                                 }
                               : p,
                           ),
@@ -222,22 +217,18 @@ export function ClickerTargetSection({ editor: e }: Props) {
                     title={t("clicker.target.randomRadius")}
                   >
                     <span>R</span>
-                    <input
-                      type="number"
+                    <WheelNumberInput
                       min={0}
                       max={500}
                       value={pt.radius}
                       disabled={e.editDisabled}
-                      onChange={(ev) =>
+                      onValueChange={(n) =>
                         e.setPoints((prev) =>
                           prev.map((p, j) =>
                             j === i
                               ? {
                                   ...p,
-                                  radius: Math.max(
-                                    0,
-                                    Number(ev.target.value) || 0,
-                                  ),
+                                  radius: Math.max(0, n || 0),
                                 }
                               : p,
                           ),

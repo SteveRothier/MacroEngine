@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { MacroValue } from "../macros/types";
+import { WheelNumberInput } from "../ui/WheelNumberInput";
 import {
   parseParamDefs,
   paramValueAsString,
@@ -119,9 +120,19 @@ function ParamControl({
           checked={Boolean(value ?? def.default ?? false)}
           onChange={(e) => onChange(def.name, e.target.checked)}
         />
+      ) : def.type === "number" ? (
+        <WheelNumberInput
+          disabled={disabled}
+          value={paramValueAsString(value, def.default)}
+          onValueChange={(n) => onChange(def.name, n)}
+          onEmptyChange={() =>
+            onChange(def.name, parseParamInput("number", ""))
+          }
+          onBlur={onBlurField}
+        />
       ) : (
         <input
-          type={def.type === "number" ? "number" : "text"}
+          type="text"
           disabled={disabled}
           value={paramValueAsString(value, def.default)}
           onChange={(e) =>

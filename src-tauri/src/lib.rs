@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use caster_engine::{
     assert_not_locked, convert_library_item_lang, create_library_folder, create_macro, delete_library_folder, delete_macro,
@@ -40,6 +40,9 @@ struct SettingsDir(PathBuf);
 
 /// Set when the picker webview has registered click/Esc handlers (`picker://ready`).
 static PICKER_READY: AtomicBool = AtomicBool::new(false);
+
+/// Wall-clock start of an active zone-draw session (failsafe timeout).
+struct ZoneDrawWatch(Mutex<Option<Instant>>);
 
 /// When true, frontend must not show main after paint (autostart + minimize_to_tray).
 struct BootStayHidden(Mutex<bool>);
@@ -324,6 +327,7 @@ fn begin_zone_overlay_draw(
     app: AppHandle,
     engine: State<'_, AppState>,
     snap: State<'_, Mutex<ZoneOverlaySnap>>,
+    watch: State<'_, ZoneDrawWatch>,
 ) -> Result<(), String> {
     {
         let mut s = snap.lock().map_err(|e| e.to_string())?;
@@ -332,6 +336,9 @@ fn begin_zone_overlay_draw(
         let payload = s.clone();
         drop(s);
         emit_zones_state(&app, &payload);
+    }
+    if let Ok(mut w) = watch.0.lock() {
+        *w = Some(Instant::now());
     }
     apply_zone_window(&app, &engine, true, true)?;
     if let Some(win) = app.get_webview_window("zones") {
@@ -346,8 +353,12 @@ fn complete_zone_overlay_draw(
     app: AppHandle,
     engine: State<'_, AppState>,
     snap: State<'_, Mutex<ZoneOverlaySnap>>,
+    watch: State<'_, ZoneDrawWatch>,
     rect: Option<DrawnRect>,
 ) -> Result<(), String> {
+    if let Ok(mut w) = watch.0.lock() {
+        *w = None;
+    }
     let visible = {
         let mut s = snap.lock().map_err(|e| e.to_string())?;
         s.drawing = false;
@@ -1214,6 +1225,7 @@ fn get_engine_state(app: AppHandle, engine: State<'_, AppState>) -> EngineStatus
     if !engine.is_picking() {
         let _ = ensure_picker_released(&app, &engine);
     }
+    ensure_zone_draw_released(&app, &engine);
     status_of(&engine, None)
 }
 
@@ -2154,6 +2166,54 @@ fn ensure_picker_released(app: &AppHandle, engine: &AppState) -> Result<(), Stri
     hide_picker_inner(app, engine)
 }
 
+/// Cancel orphan zone-draw sessions and park a capturing zones webview when idle.
+fn ensure_zone_draw_released(app: &AppHandle, engine: &AppState) {
+    const ZONE_DRAW_FAILSAFE_MS: u64 = 35_000;
+
+    let timed_out = app.try_state::<ZoneDrawWatch>().is_some_and(|w| {
+        w.0.lock().ok().is_some_and(|g| {
+            g.is_some_and(|started| started.elapsed() > Duration::from_millis(ZONE_DRAW_FAILSAFE_MS))
+        })
+    });
+
+    if timed_out {
+        log::warn!("zones failsafe: draw timed out — forcing cancel");
+        if let Some(watch) = app.try_state::<ZoneDrawWatch>() {
+            if let Ok(mut w) = watch.0.lock() {
+                *w = None;
+            }
+        }
+        if let Some(snap) = app.try_state::<Mutex<ZoneOverlaySnap>>() {
+            if let Ok(mut s) = snap.lock() {
+                s.drawing = false;
+            }
+        }
+        park_zone_overlay(app);
+        restore_zone_overlay(app, engine);
+        let _ = app.emit("zones://draw-cancel", ());
+        return;
+    }
+
+    let drawing = app
+        .try_state::<Mutex<ZoneOverlaySnap>>()
+        .and_then(|s| s.lock().ok().map(|g| g.drawing))
+        .unwrap_or(false);
+    if drawing {
+        return;
+    }
+
+    if let Some(win) = app.get_webview_window("zones") {
+        let visible = win.is_visible().unwrap_or(false);
+        if visible {
+            log::warn!("zones failsafe: webview visible while not drawing — parking");
+            park_zone_overlay(app);
+            restore_zone_overlay(app, engine);
+        } else {
+            let _ = win.set_ignore_cursor_events(true);
+        }
+    }
+}
+
 fn wire_engine_events(handle: AppHandle, engine: &AppState) {
     let emit_handle = handle.clone();
     let engine_for_events = engine.clone();
@@ -2242,6 +2302,7 @@ pub fn run() {
             maintenance: MaintenancePrefs::default(),
         }))
         .manage(Mutex::new(ZoneOverlaySnap::default()))
+        .manage(ZoneDrawWatch(Mutex::new(None)))
         .manage(Arc::new(NativeZoneOverlay::new()))
         .manage(BootStayHidden(Mutex::new(false)))
         .setup(move |app| {
@@ -2323,6 +2384,17 @@ pub fn run() {
                 let _ = zones.set_ignore_cursor_events(true);
                 let _ = zones.set_always_on_top(false);
                 let _ = zones.hide();
+            }
+            // Boot hygiene: never resume a capturing zone-draw from a prior session.
+            if let Some(snap) = app.try_state::<Mutex<ZoneOverlaySnap>>() {
+                if let Ok(mut s) = snap.lock() {
+                    s.drawing = false;
+                }
+            }
+            if let Some(watch) = app.try_state::<ZoneDrawWatch>() {
+                if let Ok(mut w) = watch.0.lock() {
+                    *w = None;
+                }
             }
 
             let tray_locale = resolve_ui_locale(settings.shell.ui_locale);

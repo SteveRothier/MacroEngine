@@ -10,6 +10,7 @@ import type {
   TimingMode,
 } from "../clickerTypes";
 import { Select } from "../../ui/shell";
+import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { useT } from "../../i18n";
 import { ClickerProcessFilterRow } from "./ClickerProcessFilterRow";
 import { ClickerTriggerRow } from "./ClickerTriggerRow";
@@ -329,13 +330,12 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
               <span>{t("clicker.entry.cpsMin")}</span>
             </div>
             <div className="caster-settings-row-control">
-              <input
-                type="number"
+              <WheelNumberInput
                 min={0}
                 max={500}
                 value={e.cpsMin}
                 disabled={e.editDisabled}
-                onChange={(ev) => e.setCpsMin(Number(ev.target.value) || 0)}
+                onValueChange={(n) => e.setCpsMin(n)}
               />
             </div>
           </div>
@@ -344,13 +344,12 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
               <span>{t("clicker.entry.cpsMax")}</span>
             </div>
             <div className="caster-settings-row-control">
-              <input
-                type="number"
+              <WheelNumberInput
                 min={0}
                 max={500}
                 value={e.cpsMax}
                 disabled={e.editDisabled}
-                onChange={(ev) => e.setCpsMax(Number(ev.target.value) || 0)}
+                onValueChange={(n) => e.setCpsMax(n)}
               />
             </div>
           </div>

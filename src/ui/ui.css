@@ -799,6 +799,49 @@ select:disabled {
   inset: 0;
 }
 
+.zone-map.is-drawing {
+  cursor: crosshair;
+}
+
+.zone-map.is-drawing .zone-band {
+  pointer-events: none;
+}
+
+.zone-map-preview .zone-corner:not(.on),
+.zone-map-preview .zone-edge:not(.on) {
+  opacity: 0.28;
+  background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-muted) 35%, transparent);
+  cursor: pointer;
+}
+
+.zone-map-preview .zone-custom:not(.selected) {
+  opacity: 0.55;
+}
+
+.zone-map-preview .zone-custom.selected,
+.zone-map-preview .zone-edge.selected,
+.zone-map-preview .zone-corner.selected {
+  outline: 2px solid color-mix(in srgb, var(--zone-fill, var(--accent)) 95%, white);
+  background: color-mix(in srgb, var(--zone-fill, var(--accent)) 88%, transparent);
+  z-index: 6;
+}
+
+.zone-map-preview .zone-edge.selected.zone-action-stop {
+  outline-color: color-mix(in srgb, var(--danger) 95%, white);
+  background: color-mix(in srgb, var(--danger) 88%, transparent);
+}
+
+.zone-map-preview .zone-edge.selected.zone-action-pause {
+  outline-color: color-mix(in srgb, #c9a227 95%, white);
+  background: color-mix(in srgb, #c9a227 88%, transparent);
+}
+
+.zone-map-preview .zone-edge.selected.zone-action-start {
+  outline-color: color-mix(in srgb, var(--ok) 95%, white);
+  background: color-mix(in srgb, var(--ok) 88%, transparent);
+}
+
 .zone-map-cross {
   position: absolute;
   inset: 0;
@@ -833,19 +876,212 @@ select:disabled {
   position: absolute;
   box-sizing: border-box;
   outline: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  overflow: visible;
 }
 
 .zone-xy {
   position: absolute;
   left: 4px;
   top: 3px;
-  z-index: 1;
+  z-index: 2;
   font-size: 10px;
   line-height: 1;
   color: var(--text);
-  opacity: 0.8;
+  opacity: 0.7;
   pointer-events: none;
   white-space: nowrap;
+  text-shadow:
+    0 0 3px color-mix(in srgb, var(--surface, #111) 80%, transparent),
+    0 1px 2px color-mix(in srgb, var(--surface, #111) 60%, transparent);
+}
+
+.zone-map-preview .zone-band.on .zone-xy {
+  opacity: 0.7;
+}
+
+.zone-map-preview .zone-custom.selected .zone-xy,
+.zone-map-preview .zone-edge.selected .zone-xy,
+.zone-map-preview .zone-corner.selected .zone-xy {
+  opacity: 1;
+  font-weight: 600;
+}
+
+/* Thin flush strips: label spills inward (into the map). */
+.zone-map-preview .zone-edge.is-flush-w .zone-xy {
+  left: 100%;
+  margin-left: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.zone-map-preview .zone-edge.is-flush-e .zone-xy {
+  left: auto;
+  right: 100%;
+  margin-right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.zone-map-preview .zone-edge.is-flush-n .zone-xy {
+  top: 100%;
+  margin-top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.zone-map-preview .zone-edge.is-flush-s .zone-xy {
+  top: auto;
+  bottom: 100%;
+  margin-bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Tall/wide strips that would clip outside the map: keep label inside. */
+.zone-map-preview .zone-band.label-inside-n .zone-xy {
+  top: 4px;
+  bottom: auto;
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+.zone-map-preview .zone-band.label-inside-s .zone-xy {
+  top: auto;
+  bottom: 4px;
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+}
+
+.zone-map-preview .zone-band.label-inside-w .zone-xy {
+  left: 4px;
+  right: auto;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+.zone-map-preview .zone-band.label-inside-e .zone-xy {
+  left: auto;
+  right: 4px;
+  top: 50%;
+  margin: 0;
+  transform: translateY(-50%);
+}
+
+/* Corners: keep labels inside the corner rect. */
+.zone-map-preview .zone-corner.is-flush-w.is-flush-n .zone-xy {
+  left: 4px;
+  top: 4px;
+  margin: 0;
+  transform: none;
+}
+
+.zone-map-preview .zone-corner.is-flush-e.is-flush-n .zone-xy {
+  left: auto;
+  right: 4px;
+  top: 4px;
+  margin: 0;
+  transform: none;
+}
+
+.zone-map-preview .zone-corner.is-flush-w.is-flush-s .zone-xy {
+  left: 4px;
+  top: auto;
+  bottom: 4px;
+  margin: 0;
+  transform: none;
+}
+
+.zone-map-preview .zone-corner.is-flush-e.is-flush-s .zone-xy {
+  left: auto;
+  right: 4px;
+  top: auto;
+  bottom: 4px;
+  margin: 0;
+  transform: none;
+}
+
+/* Custom zones flush to map edges: keep coords inside the rect. */
+.zone-map-preview .zone-custom.is-flush-s .zone-xy {
+  top: auto;
+  bottom: 4px;
+}
+
+.zone-map-preview .zone-custom.is-flush-e .zone-xy {
+  left: auto;
+  right: 4px;
+}
+
+.zone-map-preview .zone-custom.is-flush-s.is-flush-e .zone-xy {
+  left: auto;
+  right: 4px;
+  top: auto;
+  bottom: 4px;
+}
+
+/* Invisible hit pad so 1px strips remain grabbable. */
+.zone-hit-extend {
+  position: absolute;
+  pointer-events: auto;
+  z-index: 0;
+}
+
+.zone-edge.is-flush-w .zone-hit-extend {
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: max(100%, 14px);
+}
+
+.zone-edge.is-flush-e .zone-hit-extend {
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: max(100%, 14px);
+}
+
+.zone-edge.is-flush-n .zone-hit-extend {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: max(100%, 14px);
+}
+
+.zone-edge.is-flush-s .zone-hit-extend {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: max(100%, 14px);
+}
+
+.zone-corner.is-flush-w.is-flush-n .zone-hit-extend {
+  left: 0;
+  top: 0;
+  width: max(100%, 14px);
+  height: max(100%, 14px);
+}
+
+.zone-corner.is-flush-e.is-flush-n .zone-hit-extend {
+  right: 0;
+  top: 0;
+  width: max(100%, 14px);
+  height: max(100%, 14px);
+}
+
+.zone-corner.is-flush-w.is-flush-s .zone-hit-extend {
+  left: 0;
+  bottom: 0;
+  width: max(100%, 14px);
+  height: max(100%, 14px);
+}
+
+.zone-corner.is-flush-e.is-flush-s .zone-hit-extend {
+  right: 0;
+  bottom: 0;
+  width: max(100%, 14px);
+  height: max(100%, 14px);
 }
 
 .zone-edge { z-index: 1; }
@@ -864,16 +1100,15 @@ select:disabled {
 
 .zone-map-preview .zone-corner,
 .zone-map-preview .zone-edge {
-  background: transparent;
-  border: 1px dashed color-mix(in srgb, var(--text-muted) 45%, transparent);
   cursor: pointer;
 }
 
 .zone-map-preview .zone-corner.on,
+.zone-edge.on,
 .zone-custom.on,
 .zone-draft.on {
-  background: color-mix(in srgb, var(--zone-fill, #7c5cbf) 38%, transparent);
-  border: 1px solid color-mix(in srgb, var(--zone-fill, #7c5cbf) 75%, transparent);
+  background: color-mix(in srgb, var(--zone-fill, #7c5cbf) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--zone-fill, #7c5cbf) 95%, white);
 }
 
 .zone-custom.is-movable {
@@ -885,142 +1120,28 @@ select:disabled {
 }
 
 .zone-edge.zone-action-stop.on {
-  background: color-mix(in srgb, var(--danger) 32%, transparent);
-  border: 1px solid color-mix(in srgb, var(--danger) 70%, transparent);
+  background: color-mix(in srgb, var(--danger) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 95%, white);
 }
 
 .zone-edge.zone-action-pause.on {
-  background: color-mix(in srgb, #c9a227 36%, transparent);
-  border: 1px solid color-mix(in srgb, #c9a227 75%, transparent);
+  background: color-mix(in srgb, #c9a227 80%, transparent);
+  border: 1px solid color-mix(in srgb, #c9a227 95%, white);
 }
 
 .zone-edge.zone-action-start.on {
-  background: color-mix(in srgb, var(--ok) 32%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ok) 70%, transparent);
+  background: color-mix(in srgb, var(--ok) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ok) 95%, white);
 }
 
 .zone-band.is-resizing {
   will-change: left, top, width, height;
 }
 
-.zone-handle {
-  appearance: none;
-  position: absolute;
-  z-index: 2;
-  display: block;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
-  min-height: 0;
-  height: auto;
-  width: auto;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  color: transparent;
-  font-size: 0;
-  line-height: 0;
-  opacity: 1;
-  transform: none;
-  touch-action: none;
-}
-
-.zone-handle:hover,
-.zone-handle.is-active,
-.zone-handle:focus-visible {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  outline: none;
-  transform: none;
-}
-
-.zone-handle::after {
-  content: "";
-  position: absolute;
-  background: transparent;
-  pointer-events: none;
-}
-
-.zone-handle:hover::after,
-.zone-handle.is-active::after {
-  background: var(--accent);
-}
-
-.zone-band:has(.zone-handle-se:hover) .zone-handle-e::after,
-.zone-band:has(.zone-handle-se:hover) .zone-handle-s::after,
-.zone-band:has(.zone-handle-se.is-active) .zone-handle-e::after,
-.zone-band:has(.zone-handle-se.is-active) .zone-handle-s::after,
-.zone-band:has(.zone-handle-sw:hover) .zone-handle-w::after,
-.zone-band:has(.zone-handle-sw:hover) .zone-handle-s::after,
-.zone-band:has(.zone-handle-sw.is-active) .zone-handle-w::after,
-.zone-band:has(.zone-handle-sw.is-active) .zone-handle-s::after,
-.zone-band:has(.zone-handle-ne:hover) .zone-handle-e::after,
-.zone-band:has(.zone-handle-ne:hover) .zone-handle-n::after,
-.zone-band:has(.zone-handle-ne.is-active) .zone-handle-e::after,
-.zone-band:has(.zone-handle-ne.is-active) .zone-handle-n::after,
-.zone-band:has(.zone-handle-nw:hover) .zone-handle-w::after,
-.zone-band:has(.zone-handle-nw:hover) .zone-handle-n::after,
-.zone-band:has(.zone-handle-nw.is-active) .zone-handle-w::after,
-.zone-band:has(.zone-handle-nw.is-active) .zone-handle-n::after {
-  background: var(--accent);
-}
-
-.zone-handle-e,
-.zone-handle-w {
-  top: 0;
-  width: 14px;
-  height: 100%;
-  cursor: ew-resize;
-}
-
-.zone-handle-e { right: 0; }
-.zone-handle-w { left: 0; }
-
-.zone-handle-e::after {
-  top: 0;
-  bottom: 0;
-  right: -1px;
-  width: 2px;
-}
-
-.zone-handle-w::after {
-  top: 0;
-  bottom: 0;
-  left: -1px;
-  width: 2px;
-}
-
-.zone-handle-n,
-.zone-handle-s {
-  left: 0;
-  height: 14px;
-  width: 100%;
-  cursor: ns-resize;
-}
-
-.zone-handle-n { top: 0; }
-.zone-handle-s { bottom: 0; }
-
-.zone-handle-n::after {
-  left: 0;
-  right: 0;
-  top: -1px;
-  height: 2px;
-}
-
-.zone-handle-s::after {
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-}
-
 .zone-map-overlay .zone-corner.on,
 .zone-map-overlay .zone-custom.on {
-  background: color-mix(in srgb, var(--zone-fill, #7c5cbf) 38%, transparent);
-  border-color: color-mix(in srgb, var(--zone-fill, #7c5cbf) 85%, transparent);
+  background: color-mix(in srgb, var(--zone-fill, #7c5cbf) 85%, transparent);
+  border-color: color-mix(in srgb, var(--zone-fill, #7c5cbf) 95%, white);
 }
 
 .zone-map-overlay .zone-edge.zone-action-pause.on {
@@ -1035,42 +1156,6 @@ select:disabled {
 
 .zone-map-overlay .zone-corner:not(.on) {
   display: none;
-}
-
-.zone-handle-nw,
-.zone-handle-ne,
-.zone-handle-sw,
-.zone-handle-se {
-  width: 10px;
-  height: 10px;
-  cursor: nwse-resize;
-}
-
-.zone-handle-ne,
-.zone-handle-sw {
-  cursor: nesw-resize;
-}
-
-.zone-handle-nw { top: 0; left: 0; }
-.zone-handle-ne { top: 0; right: 0; }
-.zone-handle-sw { bottom: 0; left: 0; }
-.zone-handle-se { bottom: 0; right: 0; }
-
-.zone-band.is-flush-e .zone-handle-e { width: 18px; }
-.zone-band.is-flush-w .zone-handle-w { width: 18px; }
-.zone-band.is-flush-n .zone-handle-n { height: 18px; }
-.zone-band.is-flush-s .zone-handle-s { height: 18px; }
-
-.zone-move-hit {
-  position: absolute;
-  inset: 10px;
-  z-index: 1;
-  cursor: grab;
-  touch-action: none;
-}
-
-.zone-custom.is-movable.is-resizing .zone-move-hit {
-  cursor: grabbing;
 }
 
 .zone-px-edit {

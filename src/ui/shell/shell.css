@@ -3590,10 +3590,18 @@ body.action-list-is-dragging .action-list-item {
   padding: 4px 6px;
   border-radius: var(--caster-radius-sm);
   background: color-mix(in srgb, var(--caster-text-primary) 3%, transparent);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.caster-clicker-zone-edge.selected,
+.caster-clicker-zone-corner-row.selected {
+  border-color: var(--caster-accent);
+  background: var(--caster-accent-soft);
 }
 
 .caster-clicker-zone-edge input[type="number"] {
-  width: 40px;
+  width: 56px;
   margin-left: auto;
   padding: 2px 4px;
   font-size: var(--caster-text-xs);
@@ -3677,6 +3685,60 @@ body.action-list-is-dragging .action-list-item {
   border: 1px solid var(--caster-border-subtle);
   border-radius: var(--caster-radius-md);
   background: var(--caster-bg-input);
+}
+
+.caster-clicker-zone-xywh {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--caster-space-2);
+}
+
+.caster-clicker-zone-xywh input[type="number"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.caster-clicker-zone-corner-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: var(--caster-radius-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.caster-clicker-zone-size-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding-left: 22px;
+}
+
+.caster-clicker-zone-size {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--caster-text-xs);
+  color: var(--caster-text-muted);
+}
+
+.caster-clicker-zone-size input[type="number"] {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--caster-border-subtle);
+  border-radius: var(--caster-radius-sm);
+  background: var(--caster-bg-input);
+  color: var(--caster-text-primary);
+  font: inherit;
+}
+
+.caster-clicker-zone-toolbar .caster-btn-ghost.active {
+  border-color: color-mix(in srgb, var(--caster-accent) 55%, var(--caster-border-subtle));
+  background: color-mix(in srgb, var(--caster-accent) 18%, transparent);
+  color: var(--caster-text-primary);
 }
 
 .caster-field--compact {

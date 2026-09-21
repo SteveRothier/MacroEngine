@@ -262,6 +262,8 @@ impl StopZone {
                 ..
             } => {
                 let (cw, ch) = Self::corner_wh(*size_px, *width_px, *height_px);
+                let cw = cw.min(sw.max(1));
+                let ch = ch.min(sh.max(1));
                 let (x0, y0, x1, y1) = match corner {
                     ScreenCorner::TopLeft => (ox, oy, ox + cw, oy + ch),
                     ScreenCorner::TopRight => (ox + sw - cw, oy, ox + sw, oy + ch),
@@ -271,7 +273,10 @@ impl StopZone {
                 point.x >= x0 && point.x < x1 && point.y >= y0 && point.y < y1
             }
             StopZone::Edge { edge, margin_px } => {
-                let m = (*margin_px).max(1);
+                let m = match edge {
+                    ScreenEdge::Left | ScreenEdge::Right => (*margin_px).max(1).min(sw.max(1)),
+                    ScreenEdge::Top | ScreenEdge::Bottom => (*margin_px).max(1).min(sh.max(1)),
+                };
                 match edge {
                     ScreenEdge::Left => point.x >= ox && point.x < ox + m,
                     ScreenEdge::Right => point.x >= ox + sw - m && point.x < ox + sw,
@@ -355,6 +360,8 @@ impl StopZone {
                 color,
             } => {
                 let (cw, ch) = Self::corner_wh(*size_px, *width_px, *height_px);
+                let cw = cw.min(sw.max(1));
+                let ch = ch.min(sh.max(1));
                 let (x, y) = match corner {
                     ScreenCorner::TopLeft => (ox, oy),
                     ScreenCorner::TopRight => (ox + sw - cw, oy),
@@ -371,7 +378,10 @@ impl StopZone {
                 }
             }
             StopZone::Edge { edge, margin_px } => {
-                let m = (*margin_px).max(1);
+                let m = match edge {
+                    ScreenEdge::Left | ScreenEdge::Right => (*margin_px).max(1).min(sw.max(1)),
+                    ScreenEdge::Top | ScreenEdge::Bottom => (*margin_px).max(1).min(sh.max(1)),
+                };
                 let (x, y, w, h) = match edge {
                     ScreenEdge::Left => (ox, oy, m, sh),
                     ScreenEdge::Right => (ox + sw - m, oy, m, sh),

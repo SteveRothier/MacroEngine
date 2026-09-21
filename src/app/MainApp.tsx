@@ -222,7 +222,9 @@ function MainAppInner({
   }, []);
 
   const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
-  const [docRemountKey, setDocRemountKey] = useState(0);
+  const [docRemountKeys, setDocRemountKeys] = useState<Record<string, number>>(
+    {},
+  );
 
   const onThemeChange = useCallback((next: ThemeMode) => {
     setTheme(next);
@@ -416,7 +418,10 @@ function MainAppInner({
     const activeId =
       workspace.shellView.type === "doc" ? workspace.shellView.tabId : null;
     if (activeId === tabId) {
-      setDocRemountKey((k) => k + 1);
+      setDocRemountKeys((prev) => ({
+        ...prev,
+        [tabId]: (prev[tabId] ?? 0) + 1,
+      }));
     }
     setWorkspace((ws) => selectDocTab(ws, tabId));
   }, [goHome, workspace.shellView]);
@@ -595,15 +600,15 @@ function MainAppInner({
     [],
   );
 
-  const activeDocTabId =
-    workspace.shellView.type === "doc" ? workspace.shellView.tabId : null;
-
   const onActiveDocDirtyChange = useCallback(
-    (_id: string, dirty: boolean) => {
-      if (!activeDocTabId) return;
-      setWorkspace((ws) => setTabDirty(ws, activeDocTabId, dirty));
+    (resourceId: string, dirty: boolean) => {
+      setWorkspace((ws) => {
+        const tab = ws.tabs.find((t) => t.resourceId === resourceId);
+        if (!tab) return ws;
+        return setTabDirty(ws, tab.id, dirty);
+      });
     },
-    [activeDocTabId],
+    [],
   );
 
   const activeDocId = activeDoc?.id;
@@ -970,7 +975,6 @@ function MainAppInner({
     workspace.shellView.type === "home" ||
     workspace.shellView.type === "library";
   const showSettings = workspace.shellView.type === "settings";
-  const showDoc = workspace.shellView.type === "doc" && !!activeDoc;
 
   const homeTable = (
     <div
@@ -1035,13 +1039,14 @@ function MainAppInner({
   );
 
   const stageInner = (() => {
-    if (showSettings) {
-      const section = workspace.shellView.type === "settings"
-        ? (workspace.shellView.section ?? settingsSection)
-        : settingsSection;
-      return (
+    const settingsPane =
+      showSettings ? (
         <SettingsView
-          section={section}
+          section={
+            workspace.shellView.type === "settings"
+              ? (workspace.shellView.section ?? settingsSection)
+              : settingsSection
+          }
           onSectionChange={(s) => {
             setSettingsSection(s);
             setWorkspace((ws) => openSettings(ws, s));
@@ -1065,80 +1070,107 @@ function MainAppInner({
           onScriptsPrefsChange={setScriptsPrefs}
           onAccueilPrefsChange={setAccueilPrefs}
         />
-      );
-    }
+      ) : null;
 
-    if (showDoc && activeDoc) {
-      if (activeDoc.kind === "macro") {
+    const docPanes = workspace.tabs.map((tab) => {
+      const isVisible =
+        workspace.shellView.type === "doc" &&
+        workspace.shellView.tabId === tab.id;
+      const remount = docRemountKeys[tab.id] ?? 0;
+      const editor = (() => {
+        if (tab.kind === "macro") {
+          return (
+            <MacroEditorView
+              key={`${tab.id}:${remount}`}
+              active={isVisible}
+              macroId={tab.resourceId}
+              onBack={goHome}
+              onDirtyChange={onActiveDocDirtyChange}
+              onRenamed={(_from, to) => {
+                setWorkspace((ws) => renameDocTab(ws, tab.id, to, to));
+                bumpRefresh();
+              }}
+              engineState={status.state}
+              onStatus={setStatus}
+              onOpenScript={(id, label) => openDoc("script", id, label ?? id)}
+            />
+          );
+        }
+        if (tab.kind === "script") {
+          return (
+            <ScriptEditorView
+              key={`${tab.id}:${remount}`}
+              active={isVisible}
+              scriptId={tab.resourceId}
+              onBack={goHome}
+              onDirtyChange={onActiveDocDirtyChange}
+              onLabelChange={(name) => {
+                setWorkspace((ws) => setTabLabel(ws, tab.id, name));
+              }}
+              onOpenSettings={() =>
+                setWorkspace((ws) => openSettings(ws, "application"))
+              }
+              onOpenMacro={(id, label) => openDoc("macro", id, label ?? id)}
+              scriptsPrefs={scriptsPrefs}
+            />
+          );
+        }
         return (
-          <MacroEditorView
-            key={`${activeDocTabId}:${docRemountKey}`}
-            macroId={activeDoc.resourceId}
+          <ClickerStudio
+            key={`${tab.id}:${remount}`}
+            active={isVisible}
+            presetId={tab.resourceId}
             onBack={goHome}
+            status={status}
+            onStatus={setStatus}
+            refresh={refresh}
+            theme={theme}
+            onThemeChange={onThemeChange}
             onDirtyChange={onActiveDocDirtyChange}
             onRenamed={(_from, to) => {
-              if (!activeDocTabId) return;
-              setWorkspace((ws) => renameDocTab(ws, activeDocTabId, to, to));
+              setWorkspace((ws) => renameDocTab(ws, tab.id, to, to));
               bumpRefresh();
             }}
-            engineState={status.state}
-            onStatus={setStatus}
-            onOpenScript={(id, label) => openDoc("script", id, label ?? id)}
-          />
-        );
-      }
-      if (activeDoc.kind === "script") {
-        return (
-          <ScriptEditorView
-            key={`${activeDocTabId}:${docRemountKey}`}
-            scriptId={activeDoc.resourceId}
-            onBack={goHome}
-            onDirtyChange={onActiveDocDirtyChange}
-            onLabelChange={(name) => {
-              if (!activeDocTabId) return;
-              setWorkspace((ws) => setTabLabel(ws, activeDocTabId, name));
+            hotkeys={hotkeys}
+            onOpenProcessSettings={() => goSettings("security")}
+            onSavedAsNew={(id) => {
+              bumpRefresh();
+              openDoc("clicker", id);
             }}
-            onOpenSettings={() =>
-              setWorkspace((ws) => openSettings(ws, "application"))
-            }
-            onOpenMacro={(id, label) => openDoc("macro", id, label ?? id)}
-            scriptsPrefs={scriptsPrefs}
           />
         );
-      }
-      return (
-        <ClickerStudio
-          key={`${activeDocTabId}:${docRemountKey}`}
-          presetId={activeDoc.resourceId}
-          onBack={goHome}
-          status={status}
-          onStatus={setStatus}
-          refresh={refresh}
-          theme={theme}
-          onThemeChange={onThemeChange}
-          onDirtyChange={onActiveDocDirtyChange}
-          onRenamed={(_from, to) => {
-            if (!activeDocTabId) return;
-            setWorkspace((ws) => renameDocTab(ws, activeDocTabId, to, to));
-            bumpRefresh();
-          }}
-          hotkeys={hotkeys}
-          onOpenProcessSettings={() => goSettings("security")}
-          onSavedAsNew={(id) => {
-            bumpRefresh();
-            openDoc("clicker", id);
-          }}
-        />
-      );
-    }
+      })();
 
-    return null;
+      return (
+        <div
+          key={tab.id}
+          className="caster-stage-doc"
+          hidden={!isVisible}
+          style={isVisible ? { height: "100%" } : { display: "none" }}
+          aria-hidden={!isVisible}
+          ref={(el) => {
+            if (!el) return;
+            if (!isVisible) el.setAttribute("inert", "");
+            else el.removeAttribute("inert");
+          }}
+        >
+          {editor}
+        </div>
+      );
+    });
+
+    return (
+      <>
+        {settingsPane}
+        {docPanes}
+      </>
+    );
   })();
 
   const stage = (
     <>
       {homeTable}
-      {showSettings || showDoc ? (
+      {showSettings || workspace.tabs.length > 0 ? (
         <Suspense fallback={<EditorSuspenseFallback />}>{stageInner}</Suspense>
       ) : null}
     </>

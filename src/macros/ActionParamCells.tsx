@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useT, type TFunction } from "../i18n";
 import { pickScreenPointDetailed } from "../pick";
 import { Select, useToast, type ActionPickerEntry } from "../ui/shell";
+import { WheelNumberInput } from "../ui/WheelNumberInput";
 import { ActionProps } from "./ActionProps";
 import { actionDetail } from "./actionLabels";
 import type { KeyMods, MacroAction } from "./types";
@@ -47,11 +48,6 @@ function modsOf(action: { mods?: KeyMods }): KeyMods {
     alt: !!action.mods?.alt,
     shift: !!action.mods?.shift,
   };
-}
-
-function parseNum(raw: string): number {
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : 0;
 }
 
 function CompactXY({
@@ -106,23 +102,21 @@ function CompactXY({
       ) : null}
       {!isCursor ? (
         <>
-          <input
+          <WheelNumberInput
             className="action-cell-input action-cell-num"
-            type="number"
             disabled={disabled || picking}
             value={x ?? 0}
             title={t("macros.params.coordX")}
             aria-label={t("macros.params.coordX")}
-            onChange={(e) => onChangeXY(parseNum(e.target.value), y ?? 0)}
+            onValueChange={(n) => onChangeXY(n, y ?? 0)}
           />
-          <input
+          <WheelNumberInput
             className="action-cell-input action-cell-num"
-            type="number"
             disabled={disabled || picking}
             value={y ?? 0}
             title={t("macros.params.coordY")}
             aria-label={t("macros.params.coordY")}
-            onChange={(e) => onChangeXY(x ?? 0, parseNum(e.target.value))}
+            onValueChange={(n) => onChangeXY(x ?? 0, n)}
           />
           <button
             type="button"
@@ -262,15 +256,14 @@ export function ActionParamCells({
   if (action.type === "delay") {
     return (
       <div className="action-cell-edit">
-        <input
+        <WheelNumberInput
           className="action-cell-input action-cell-num action-cell-num--wide"
-          type="number"
           min={0}
           disabled={disabled}
           value={action.ms}
           title={t("macros.params.durationMs")}
           aria-label={t("macros.params.durationMsAria")}
-          onChange={(e) => onChange({ ...action, ms: parseNum(e.target.value) })}
+          onValueChange={(n) => onChange({ ...action, ms: n })}
         />
         <span className="action-cell-unit">{t("macros.params.unitMs")}</span>
       </div>
@@ -331,16 +324,13 @@ export function ActionParamCells({
   if (action.type === "mouse.wheel") {
     return (
       <div className="action-cell-edit">
-        <input
+        <WheelNumberInput
           className="action-cell-input action-cell-num"
-          type="number"
           disabled={disabled}
           value={action.delta}
           title={t("macros.params.wheelDeltaShort")}
           aria-label={t("macros.params.wheelDeltaAria")}
-          onChange={(e) =>
-            onChange({ ...action, delta: parseNum(e.target.value) })
-          }
+          onValueChange={(n) => onChange({ ...action, delta: n })}
         />
         <CompactXY
           x={action.x}

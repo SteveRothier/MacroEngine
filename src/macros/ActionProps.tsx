@@ -5,6 +5,7 @@ import { pickScreenPointDetailed } from "../pick";
 import { Segmented } from "../ui";
 import { ActionPickerMenu, DropdownMenu, Select, Tooltip, useToast } from "../ui/shell";
 import type { ActionPickerEntry, DropdownEntry } from "../ui/shell";
+import { WheelNumberInput } from "../ui/WheelNumberInput";
 import type { CompareOp, KeyMods, MacroAction, MacroValue, Operand } from "./types";
 import type { ScriptDoc } from "../scripts/types";
 import { ScriptParamsFields } from "../scripts/ScriptParamsFields";
@@ -160,34 +161,20 @@ function PointFields({
           <>
             <label className="caster-field">
               <span>{t("macros.params.coordX")}</span>
-              <input
-                type="number"
+              <WheelNumberInput
                 disabled={disabled || picking}
                 value={x ?? ""}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === "") {
-                    onChangeXY(null, y ?? null);
-                    return;
-                  }
-                  onChangeXY(Number(raw), y ?? null);
-                }}
+                onValueChange={(n) => onChangeXY(n, y ?? null)}
+                onEmptyChange={() => onChangeXY(null, y ?? null)}
               />
             </label>
             <label className="caster-field">
               <span>{t("macros.params.coordY")}</span>
-              <input
-                type="number"
+              <WheelNumberInput
                 disabled={disabled || picking}
                 value={y ?? ""}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === "") {
-                    onChangeXY(x ?? null, null);
-                    return;
-                  }
-                  onChangeXY(x ?? null, Number(raw));
-                }}
+                onValueChange={(n) => onChangeXY(x ?? null, n)}
+                onEmptyChange={() => onChangeXY(x ?? null, null)}
               />
             </label>
             <div
@@ -214,24 +201,18 @@ function PointFields({
     <>
       <label className="caster-field">
         <span>{t("macros.params.coordX")}</span>
-        <input
-          type="number"
+        <WheelNumberInput
           disabled={disabled || picking}
           value={x ?? ""}
-          onChange={(e) => {
-            onChangeXY(Number(e.target.value), y ?? 0);
-          }}
+          onValueChange={(n) => onChangeXY(n, y ?? 0)}
         />
       </label>
       <label className="caster-field">
         <span>{t("macros.params.coordY")}</span>
-        <input
-          type="number"
+        <WheelNumberInput
           disabled={disabled || picking}
           value={y ?? ""}
-          onChange={(e) => {
-            onChangeXY(x ?? 0, Number(e.target.value));
-          }}
+          onValueChange={(n) => onChangeXY(x ?? 0, n)}
         />
       </label>
       <div className="caster-field props-point-actions" style={{ gridColumn: "1 / -1" }}>
@@ -357,13 +338,10 @@ export function ActionProps({
       <div className="props-grid">
         <label className="caster-field">
           <span>{t("macros.params.wheelDelta")}</span>
-          <input
-            type="number"
+          <WheelNumberInput
             disabled={disabled || picking}
             value={action.delta}
-            onChange={(e) =>
-              onChange({ ...action, delta: Number(e.target.value) })
-            }
+            onValueChange={(n) => onChange({ ...action, delta: n })}
           />
         </label>
         <PointFields
@@ -383,12 +361,11 @@ export function ActionProps({
     return (
       <label className="caster-field">
         <span>{t("macros.params.durationMs")}</span>
-        <input
-          type="number"
+        <WheelNumberInput
           min={0}
           disabled={disabled}
           value={action.ms}
-          onChange={(e) => onChange({ ...action, ms: Number(e.target.value) })}
+          onValueChange={(n) => onChange({ ...action, ms: n })}
         />
       </label>
     );
@@ -433,14 +410,11 @@ export function ActionProps({
         </label>
         <label className="caster-field">
           <span>{t("macros.params.httpTimeout")}</span>
-          <input
-            type="number"
+          <WheelNumberInput
             min={0}
             disabled={disabled}
             value={action.timeoutMs ?? 10000}
-            onChange={(e) =>
-              onChange({ ...action, timeoutMs: Number(e.target.value) })
-            }
+            onValueChange={(n) => onChange({ ...action, timeoutMs: n })}
           />
         </label>
         <label className="caster-field">
@@ -994,13 +968,11 @@ export function ActionProps({
         </label>
         <label className="caster-field">
           <span>{t("macros.params.maxIterations")}</span>
-          <input
-            type="number"
+          <WheelNumberInput
             disabled={disabled}
             min={1}
             value={action.maxIterations ?? 10000}
-            onChange={(e) => {
-              const n = Number(e.target.value);
+            onValueChange={(n) => {
               onChange({
                 ...action,
                 maxIterations: Number.isFinite(n)
@@ -1309,13 +1281,12 @@ function ScriptRunProps({
           <div className="caster-scriptrun-section-body props-grid">
             <label className="caster-field">
               <span>{t("macros.params.httpTimeout")}</span>
-              <input
-                type="number"
+              <WheelNumberInput
                 min={0}
                 disabled={disabled}
                 value={action.timeoutMs ?? 10000}
-                onChange={(e) =>
-                  onChange({ ...action, timeoutMs: Number(e.target.value) })
+                onValueChange={(n) =>
+                  onChange({ ...action, timeoutMs: n })
                 }
               />
             </label>

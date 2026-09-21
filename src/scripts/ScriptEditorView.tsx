@@ -95,6 +95,8 @@ type Props = {
   onOpenSettings?: () => void;
   onOpenMacro?: (macroId: string, label?: string) => void;
   scriptsPrefs?: ScriptsPrefs;
+  /** When false (keep-mounted but hidden), ignore global shortcuts / titlebar. */
+  active?: boolean;
 };
 
 function normalizeDoc(doc: ScriptDoc): ScriptDoc {
@@ -135,6 +137,7 @@ export function ScriptEditorView({
   onOpenSettings: _onOpenSettings,
   onOpenMacro,
   scriptsPrefs: scriptsPrefsProp,
+  active = true,
 }: Props) {
   const t = useT();
   const { locale } = useLocale();
@@ -224,6 +227,7 @@ export function ScriptEditorView({
   );
 
   useEffect(() => {
+    if (!active) return;
     let un: (() => void) | undefined;
     void listen<{ message?: string | null }>("engine://log", (e) => {
       const msg = e.payload.message?.trim();
@@ -247,9 +251,10 @@ export function ScriptEditorView({
       un = fn;
     });
     return () => un?.();
-  }, [pushConsole, t]);
+  }, [active, pushConsole, t]);
 
   useEffect(() => {
+    if (!active) return;
     let un: (() => void) | undefined;
     void listen<{
       state?: string;
@@ -272,10 +277,10 @@ export function ScriptEditorView({
       un = fn;
     });
     return () => un?.();
-  }, []);
+  }, [active]);
 
   useEffect(() => {
-    if (!running) return;
+    if (!active || !running) return;
     let un: (() => void) | undefined;
     void listen<{ method?: string | null }>("engine://script-step", (e) => {
       const method = e.payload.method?.trim();
@@ -284,7 +289,7 @@ export function ScriptEditorView({
       un = fn;
     });
     return () => un?.();
-  }, [running]);
+  }, [active, running]);
 
   const syncRunningFromStatus = useCallback((status: EngineStatus) => {
     if (isScriptSessionBusy(status)) {
@@ -444,6 +449,7 @@ export function ScriptEditorView({
   }, []);
 
   useEffect(() => {
+    if (!active) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
@@ -452,7 +458,7 @@ export function ScriptEditorView({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [flushAutosave]);
+  }, [active, flushAutosave]);
 
   function patch(partial: Partial<ScriptDoc>) {
     if (locked) return;
@@ -731,6 +737,7 @@ export function ScriptEditorView({
         if (doc) void persistNow(doc);
       }}
     />,
+    { active },
   );
 
   if (!draft) {

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
@@ -21,6 +21,11 @@ describe("zoneOverlay IPC helpers", () => {
     vi.mocked(invoke).mockReset();
     vi.mocked(listen).mockReset();
     vi.mocked(listen).mockResolvedValue(() => {});
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("setZoneOverlayVisible invokes set_zone_overlay_visible", async () => {
@@ -58,6 +63,9 @@ describe("zoneOverlay IPC helpers", () => {
     vi.mocked(invoke).mockRejectedValue(new Error("no window"));
     const result = await drawSafetyZone();
     expect(result).toBeNull();
+    expect(invoke).toHaveBeenCalledWith("complete_zone_overlay_draw", {
+      rect: null,
+    });
   });
 
   it("drawSafetyZone resolves rect from zones://drawn", async () => {
@@ -76,5 +84,17 @@ describe("zoneOverlay IPC helpers", () => {
     const result = await drawSafetyZone();
     expect(result).toEqual(rect);
     expect(invoke).toHaveBeenCalledWith("begin_zone_overlay_draw");
+  });
+
+  it("drawSafetyZone times out and cancels backend draw", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    vi.mocked(listen).mockResolvedValue(() => {});
+    const pending = drawSafetyZone();
+    await vi.advanceTimersByTimeAsync(30_000);
+    const result = await pending;
+    expect(result).toBeNull();
+    expect(invoke).toHaveBeenCalledWith("complete_zone_overlay_draw", {
+      rect: null,
+    });
   });
 });

@@ -73,17 +73,23 @@ export function useTitleBarDispatch() {
 
 /**
  * Titre titlebar + toolbar éditeur dans la barre secondaire (sous la titlebar).
+ * Pass `active: false` when the editor is keep-mounted but hidden.
  */
-export function useTitleBarSlot(pageTitle: string | undefined, toolbar: ReactNode) {
+export function useTitleBarSlot(
+  pageTitle: string | undefined,
+  toolbar: ReactNode,
+  opts?: { active?: boolean },
+) {
+  const active = opts?.active !== false;
   const dispatch = useContext(TitleBarDispatchContext);
   const state = useContext(TitleBarStateContext);
 
   useEffect(() => {
-    if (!dispatch) return;
+    if (!dispatch || !active) return;
     dispatch.setPageTitle(pageTitle);
     return () => dispatch.setPageTitle(undefined);
-  }, [dispatch, pageTitle]);
+  }, [dispatch, pageTitle, active]);
 
-  if (!state?.subToolbarHost) return null;
+  if (!active || !state?.subToolbarHost) return null;
   return createPortal(toolbar, state.subToolbarHost);
 }

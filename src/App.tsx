@@ -173,7 +173,12 @@ export default function App() {
     return <PickOverlayView />;
   }
   if (label === "zones") {
-    return <ZoneOverlayView />;
+    const prefs = mergeShellPrefs();
+    return (
+      <LocaleProvider preference={prefs.uiLocale}>
+        <ZoneOverlayView />
+      </LocaleProvider>
+    );
   }
   return (
     <ErrorBoundary>

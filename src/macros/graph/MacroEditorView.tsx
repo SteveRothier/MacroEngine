@@ -80,6 +80,8 @@ type Props = {
   engineState: string;
   onStatus: (s: EngineStatus) => void;
   onOpenScript?: (scriptId: string, label?: string) => void;
+  /** When false (keep-mounted but hidden), ignore global shortcuts / titlebar. */
+  active?: boolean;
 };
 
 function saveErrorMessage(e: unknown, t: TFunction): string {
@@ -108,6 +110,7 @@ export function MacroEditorView({
   onStatus,
   engineState,
   onOpenScript,
+  active = true,
 }: Props) {
   const t = useT();
   const automationPrefs = mergeAutomationPrefs();
@@ -433,6 +436,7 @@ export function MacroEditorView({
   }, [syncHistoryFlags, updateDoc]);
 
   useEffect(() => {
+    if (!active) return;
     function onKey(e: KeyboardEvent) {
       if (lockedRef.current || recording) return;
       const mod = e.ctrlKey || e.metaKey;
@@ -457,7 +461,7 @@ export function MacroEditorView({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [recording, redo, undo]);
+  }, [active, recording, redo, undo]);
 
   const commitRename = useCallback(
     async (rawName: string) => {
@@ -580,6 +584,7 @@ export function MacroEditorView({
   );
 
   useEffect(() => {
+    if (!active) return;
     function onKey(e: KeyboardEvent) {
       if (lockedRef.current || recording || editorLocked) return;
       if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
@@ -603,7 +608,7 @@ export function MacroEditorView({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editorLocked, onRunFrom, recording, t, toast]);
+  }, [active, editorLocked, onRunFrom, recording, t, toast]);
 
   const onStartRecord = useCallback(async () => {
     if (locked || recording) return;
@@ -916,6 +921,7 @@ export function MacroEditorView({
         />
       }
     />,
+    { active },
   );
 
   return (

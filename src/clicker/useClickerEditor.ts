@@ -30,8 +30,12 @@ import {
   type ScreenGeomDto,
   type TimingMode,
   type ZoneKind,
+  type ZoneSelection,
+  screenGeomFromDisplay,
 } from "./clickerTypes";
 import { useClickerSettingsApi } from "./useClickerSettings";
+import { pickScreenPointDetailed } from "../pick";
+import { useToast } from "../ui/shell";
 import {
   drawSafetyZone,
   pushZoneOverlayState,
@@ -39,7 +43,10 @@ import {
 } from "./zoneOverlay";
 import {
   EMPTY_ZONE_MODEL,
+  clampCustomExtent,
+  clampZoneModel,
   modelFromStopZones,
+  moveCustom,
   nextCustomZoneColor,
   stopZonesFromModel,
   type ZoneModel,
@@ -72,6 +79,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const { presetId, status, onStatus, refresh, onDirtyChange, onRenamed, theme } =
     opts;
   const t = useT();
+  const toast = useToast();
   const { loadSettings, saveBundle } = useClickerSettingsApi();
   const onDirtyChangeRef = useRef(onDirtyChange);
   onDirtyChangeRef.current = onDirtyChange;
@@ -115,7 +123,9 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const [clickZoneOrder, setClickZoneOrder] =
     useState<ClickZoneOrder>("random");
   const [zoneModel, setZoneModel] = useState<ZoneModel>(EMPTY_ZONE_MODEL);
-  const [selectedZoneId, setSelectedZoneId] = useState<string | null>(null);
+  const [zoneSelection, setZoneSelection] = useState<ZoneSelection | null>(
+    null,
+  );
   const [zoneOverlayVisible, setZoneOverlayVisibleState] = useState(false);
   const [screenGeom, setScreenGeom] =
     useState<ScreenGeomDto>(FALLBACK_SCREEN_GEOM);
@@ -296,14 +306,16 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     } else {
       setTargetFixed(false);
     }
-    setZoneModel(modelFromStopZones(c.stopZones ?? []));
-    setSelectedZoneId(null);
+    setZoneModel(
+      clampZoneModel(modelFromStopZones(c.stopZones ?? []), screenGeom),
+    );
+    setZoneSelection(null);
     setPresetFilterMode(c.processFilter ?? "inherit");
     setLocalProcessFilter({
       ...DEFAULT_PROCESS_FILTER,
       ...(c.localProcessFilter ?? {}),
     });
-  }, []);
+  }, [screenGeom]);
 
   const persistUi = useCallback(
     async (
@@ -499,13 +511,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
           displayId: id,
         });
         setActiveDisplayId(id);
-        setScreenGeom({
-          x: display.x,
-          y: display.y,
-          width: display.width,
-          height: display.height,
-          scaleFactor: display.scaleFactor,
-        });
+        setScreenGeom(screenGeomFromDisplay(display));
         await persistUi(undefined, undefined, undefined, id);
       } catch {
         /* ignore */
@@ -545,25 +551,41 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     setPicking(true);
     setPickingPointIndex(null);
     try {
-      const p = await invoke<{ x: number; y: number }>("pick_point");
+      const result = await pickScreenPointDetailed();
+      if (!result.ok) {
+        if (result.reason === "timeout" || result.reason === "error") {
+          toast.info(t("macros.params.pickCancelled"));
+        }
+        return;
+      }
       setTargetFixed(true);
-      setTargetX(p.x);
-      setTargetY(p.y);
+      setTargetX(result.point.x);
+      setTargetY(result.point.y);
       await persistUi();
     } finally {
       setPicking(false);
     }
-  }, [persistUi]);
+  }, [persistUi, t, toast]);
 
   const onPickPoint = useCallback(
     async (index: number) => {
       setPicking(true);
       setPickingPointIndex(index);
       try {
-        const p = await invoke<{ x: number; y: number }>("pick_point");
+        const result = await pickScreenPointDetailed();
+        if (!result.ok) {
+          if (result.reason === "timeout" || result.reason === "error") {
+            toast.info(t("macros.params.pickCancelled"));
+          }
+          return;
+        }
         setPointsEnabled(true);
         setPoints((prev) =>
-          prev.map((pt, j) => (j === index ? { ...pt, x: p.x, y: p.y } : pt)),
+          prev.map((pt, j) =>
+            j === index
+              ? { ...pt, x: result.point.x, y: result.point.y }
+              : pt,
+          ),
         );
         await persistUi();
       } finally {
@@ -571,7 +593,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         setPickingPointIndex(null);
       }
     },
-    [persistUi],
+    [persistUi, t, toast],
   );
 
   const finishPointCapture = useCallback(async () => {
@@ -631,6 +653,39 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     };
   }, []);
 
+  const addCustomZone = useCallback(
+    (
+      rect: { x: number; y: number; width: number; height: number },
+      kind: ZoneKind = "safety",
+    ) => {
+      const id = newZoneId();
+      setZoneModel((m) => {
+        const color = nextCustomZoneColor(m.customZones.map((z) => z.color));
+        const newZone = clampCustomExtent(
+          {
+            id,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            action: "stop",
+            kind,
+            color,
+            clickMode: "random",
+          },
+          {},
+          screenGeom,
+        );
+        return {
+          ...m,
+          customZones: [...m.customZones, newZone],
+        };
+      });
+      setZoneSelection({ kind: "custom", id });
+    },
+    [screenGeom],
+  );
+
   const onDrawZone = useCallback(
     async (kind: ZoneKind = "safety") => {
       setDrawing(true);
@@ -640,30 +695,12 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         }
         const r = await drawSafetyZone();
         if (!r) return;
-        const color = nextCustomZoneColor(
-          zoneModel.customZones.map((z) => z.color),
-        );
-        const newZone: CustomZone = {
-          id: newZoneId(),
-          x: r.x,
-          y: r.y,
-          width: r.width,
-          height: r.height,
-          action: kind === "click" ? "stop" : "stop",
-          kind,
-          color,
-          clickMode: "random",
-        };
-        setZoneModel((m) => ({
-          ...m,
-          customZones: [...m.customZones, newZone],
-        }));
-        setSelectedZoneId(newZone.id);
+        addCustomZone(r, kind);
       } finally {
         setDrawing(false);
       }
     },
-    [screenGeom, zoneModel, zoneOverlayVisible],
+    [addCustomZone, screenGeom, zoneModel, zoneOverlayVisible],
   );
 
   const updateCustomZone = useCallback(
@@ -674,6 +711,56 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
           z.id === id ? { ...z, ...patch } : z,
         ),
       }));
+    },
+    [],
+  );
+
+  const removeCustomZone = useCallback((id: string) => {
+    setZoneModel((m) => ({
+      ...m,
+      customZones: m.customZones.filter((z) => z.id !== id),
+    }));
+    setZoneSelection((cur) =>
+      cur?.kind === "custom" && cur.id === id ? null : cur,
+    );
+  }, []);
+
+  const duplicateCustomZone = useCallback(
+    (id: string) => {
+      let newId: string | null = null;
+      setZoneModel((m) => {
+        const src = m.customZones.find((z) => z.id === id);
+        if (!src) return m;
+        newId = newZoneId();
+        const color = nextCustomZoneColor(m.customZones.map((z) => z.color));
+        const offset = moveCustom(src, 16, 16, screenGeom);
+        const clone: CustomZone = {
+          ...offset,
+          id: newId,
+          color,
+        };
+        return {
+          ...m,
+          customZones: [...m.customZones, clone],
+        };
+      });
+      if (newId) setZoneSelection({ kind: "custom", id: newId });
+    },
+    [screenGeom],
+  );
+
+  const moveCustomZoneOrder = useCallback(
+    (id: string, where: "front" | "back") => {
+      setZoneModel((m) => {
+        const idx = m.customZones.findIndex((z) => z.id === id);
+        if (idx < 0) return m;
+        const next = [...m.customZones];
+        const [zone] = next.splice(idx, 1);
+        if (!zone) return m;
+        if (where === "front") next.push(zone);
+        else next.unshift(zone);
+        return { ...m, customZones: next };
+      });
     },
     [],
   );
@@ -859,13 +946,43 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   }, [loadSettings, presetId]);
 
   useEffect(() => {
+    void invoke<DisplayDto[]>("list_displays")
+      .then((list) => {
+        setDisplays(list);
+      })
+      .catch(() => setDisplays([]));
     void invoke<ScreenGeomDto>("get_screen_geom")
       .then(setScreenGeom)
       .catch(() => setScreenGeom(FALLBACK_SCREEN_GEOM));
-    void invoke<DisplayDto[]>("list_displays")
-      .then(setDisplays)
-      .catch(() => setDisplays([]));
   }, []);
+
+  // Keep screenGeom in lockstep with the selected display (same source as the dropdown).
+  useEffect(() => {
+    if (displays.length === 0) return;
+    const active =
+      displays.find((d) => d.id === activeDisplayId) ??
+      displays.find((d) => d.isPrimary) ??
+      displays[0];
+    if (!active) return;
+    if (activeDisplayId == null) setActiveDisplayId(active.id);
+    setScreenGeom((prev) => {
+      const next = screenGeomFromDisplay(active);
+      if (
+        prev.x === next.x &&
+        prev.y === next.y &&
+        prev.width === next.width &&
+        prev.height === next.height &&
+        prev.scaleFactor === next.scaleFactor
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [displays, activeDisplayId]);
+
+  useEffect(() => {
+    setZoneModel((m) => clampZoneModel(m, screenGeom));
+  }, [screenGeom]);
 
   useEffect(() => {
     void (async () => {
@@ -1072,8 +1189,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     setClickZoneOrder,
     zoneModel,
     setZoneModel,
-    selectedZoneId,
-    setSelectedZoneId,
+    zoneSelection,
+    setZoneSelection,
     zoneOverlayVisible,
     setZoneOverlayVisible: setZoneOverlayVisibleState,
     screenGeom,
@@ -1120,7 +1237,11 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     onPick,
     onPickPoint,
     onDrawZone,
+    addCustomZone,
     updateCustomZone,
+    removeCustomZone,
+    duplicateCustomZone,
+    moveCustomZoneOrder,
     onSavePreset,
     onSaveAsNewPreset,
     onLoadPreset,
