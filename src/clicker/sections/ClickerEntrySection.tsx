@@ -170,6 +170,9 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
             />
           </div>
         </div>
+        <p className="caster-clicker-hint caster-clicker-entry-trigger-hint">
+          {t("clicker.entry.triggerHintMeta")}
+        </p>
       </div>
 
       <div className="caster-clicker-entry-col">

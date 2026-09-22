@@ -106,3 +106,35 @@ export const CLICKER_PHASE_5_BACKLOG: readonly ClickerBacklogItem[] = [
     priority: 5,
   },
 ] as const;
+
+/** Phase 6 — polish UX clicker après Phase 5. */
+export const CLICKER_PHASE_6_BACKLOG: readonly ClickerBacklogItem[] = [
+  {
+    id: "dedupe-preset-name-editors",
+    title: "Un seul éditeur de nom",
+    summary:
+      "Éviter le doublon titlebar vs meta bar (livré — titlebar en lecture seule, rename via ClickerMetaBar).",
+    priority: 1,
+  },
+  {
+    id: "entry-trigger-hint",
+    title: "Rappel déclencheur dans Entrée",
+    summary:
+      "Lien court vers la meta bar pour le raccourci preset (livré — hint sous Mode hotkey).",
+    priority: 2,
+  },
+  {
+    id: "session-stats-empty",
+    title: "Empty state stats hors session",
+    summary:
+      "Panneau stats visible à l’arrêt avec message + export désactivé (livré).",
+    priority: 3,
+  },
+  {
+    id: "ci-clicker-coverage",
+    title: "CI filet clicker",
+    summary:
+      "Vitest sessionStatsExport + cargo caster-engine déjà couverts par ci.yml (npm test / cargo test) (livré — rien à ajouter).",
+    priority: 4,
+  },
+] as const;

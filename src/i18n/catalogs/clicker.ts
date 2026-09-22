@@ -105,6 +105,7 @@ export const clicker = defineCatalog({
       statsCopyFailed: "Impossible de copier les stats",
       statsExported: "Stats exportées",
       statsExportFailed: "Échec de l’export des stats",
+      empty: "Aucune session — lancez le preset pour voir les stats.",
     },
     fileFilter: "Preset clicker",
     segments: {
@@ -149,6 +150,8 @@ export const clicker = defineCatalog({
       key: "Touche",
       keyShift: "Majuscule (Shift)",
       hotkeyMode: "Mode hotkey",
+      triggerHintMeta:
+        "Déclencheur du preset : barre du haut (Nom + Raccourci), comme pour les macros.",
       timingMode: "Mode",
       timingAria: "Timing",
       cadence: "Cadence",
@@ -514,6 +517,7 @@ export const clicker = defineCatalog({
       statsCopyFailed: "Could not copy stats",
       statsExported: "Stats exported",
       statsExportFailed: "Could not export stats",
+      empty: "No session — start the preset to see stats.",
     },
     fileFilter: "Clicker preset",
     segments: {
@@ -558,6 +562,8 @@ export const clicker = defineCatalog({
       key: "Key",
       keyShift: "Shift",
       hotkeyMode: "Hotkey mode",
+      triggerHintMeta:
+        "Preset trigger: top bar (Name + Hotkey), same as macros.",
       timingMode: "Mode",
       timingAria: "Timing",
       cadence: "Rate",

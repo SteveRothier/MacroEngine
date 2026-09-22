@@ -786,6 +786,18 @@ button.caster-btn.caster-btn-primary {
   font-weight: 600;
 }
 
+.caster-titlebar-name-label {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--caster-text-sm, 13px);
+  font-weight: 600;
+  color: var(--caster-text);
+  user-select: none;
+}
+
 .caster-titlebar-name-input.caster-titlebar-name-input--wide {
   width: 200px;
   max-width: 280px;
@@ -3482,6 +3494,16 @@ body.action-list-is-dragging .action-list-item {
   min-height: 24px;
   padding: 0 8px;
   font-size: 11px;
+}
+
+.caster-clicker-session-stats-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--caster-text-muted);
+}
+
+.caster-clicker-entry-trigger-hint {
+  margin: 4px 0 0;
 }
 
 .caster-clicker-session-stats-body {

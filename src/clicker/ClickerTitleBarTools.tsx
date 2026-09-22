@@ -162,18 +162,12 @@ export function ClickerTitleBarTools({
           >
             <ArrowLeft size={14} aria-hidden />
           </button>
-          <input
-            className="caster-titlebar-name-input"
-            value={editor.presetName}
-            disabled={editor.editDisabled || !editor.selectedPreset}
-            placeholder={t("clicker.toolbar.presetName")}
-            aria-label={t("clicker.toolbar.presetName")}
-            onChange={(e) => editor.setPresetName(e.target.value)}
-            onBlur={(e) => void editor.onRenamePreset(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") e.currentTarget.blur();
-            }}
-          />
+          <span
+            className="caster-titlebar-name-label"
+            title={editor.presetName || editor.selectedPreset || undefined}
+          >
+            {editor.presetName || editor.selectedPreset || t("clicker.toolbar.presetName")}
+          </span>
           {editor.locked ? (
             <span
               className="caster-clicker-lock"

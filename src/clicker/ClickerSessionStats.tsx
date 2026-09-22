@@ -84,7 +84,8 @@ export function ClickerSessionStats({
     }
   };
 
-  if (!running && samples.length === 0) return null;
+  const idle = !running && samples.length === 0;
+  const canExport = !idle;
 
   return (
     <div className="caster-clicker-session-stats">
@@ -102,6 +103,7 @@ export function ClickerSessionStats({
           <button
             type="button"
             className="caster-btn caster-btn-ghost caster-clicker-session-stats-btn"
+            disabled={!canExport}
             onClick={() => void onCopy()}
           >
             {t("clicker.session.copyStats")}
@@ -109,6 +111,7 @@ export function ClickerSessionStats({
           <button
             type="button"
             className="caster-btn caster-btn-ghost caster-clicker-session-stats-btn"
+            disabled={!canExport}
             onClick={() => void onSave("json")}
           >
             {t("clicker.session.exportJson")}
@@ -116,6 +119,7 @@ export function ClickerSessionStats({
           <button
             type="button"
             className="caster-btn caster-btn-ghost caster-clicker-session-stats-btn"
+            disabled={!canExport}
             onClick={() => void onSave("csv")}
           >
             {t("clicker.session.exportCsv")}
@@ -124,6 +128,12 @@ export function ClickerSessionStats({
       </div>
       {open ? (
         <div className="caster-clicker-session-stats-body">
+          {idle ? (
+            <p className="caster-clicker-session-stats-empty">
+              {t("clicker.session.empty")}
+            </p>
+          ) : (
+            <>
           <svg
             className="caster-clicker-sparkline"
             viewBox="0 0 120 28"
@@ -164,6 +174,8 @@ export function ClickerSessionStats({
               </span>
             ) : null}
           </div>
+            </>
+          )}
         </div>
       ) : null}
     </div>
