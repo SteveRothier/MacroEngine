@@ -111,6 +111,9 @@ export const shell = defineCatalog({
     mainNavAria: "Navigation principale",
     pickTitle: "Choisir un point",
     pickHint: "Clic gauche = valider · Esc / clic droit = annuler · {x}, {y}",
+    pickPixelTitle: "Échantillonner une couleur",
+    pickPixelHint:
+      "Clic gauche = couleur sous le curseur · Esc / clic droit = annuler · {x}, {y}",
   },
   en: {
     sessionEnded: "Session ended",
@@ -221,5 +224,8 @@ export const shell = defineCatalog({
     mainNavAria: "Main navigation",
     pickTitle: "Pick a point",
     pickHint: "Left click = confirm · Esc / right click = cancel · {x}, {y}",
+    pickPixelTitle: "Sample a color",
+    pickPixelHint:
+      "Left click = color under cursor · Esc / right click = cancel · {x}, {y}",
   },
 });

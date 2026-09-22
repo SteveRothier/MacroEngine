@@ -205,6 +205,77 @@ async fn pick_screen_point_native(app: AppHandle) -> Result<PickedPoint, String>
     result
 }
 
+/// Color pick uses start/get/stop_pixel_color_capture (point-capture style).
+#[tauri::command]
+fn pick_pixel_color() -> Result<PixelSampleDto, String> {
+    Err("use start_pixel_color_capture".into())
+}
+
+#[tauri::command]
+fn get_cursor_position(engine: State<'_, AppState>) -> Result<PickedPoint, String> {
+    engine.pick_point_now()
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PixelCaptureState {
+    active: bool,
+    cancelled: bool,
+    sample: Option<PixelSampleDto>,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PixelSampleDto {
+    x: i32,
+    y: i32,
+    r: u8,
+    g: u8,
+    b: u8,
+}
+
+fn pixel_capture_state_of(engine: &AppState) -> PixelCaptureState {
+    let (active, cancelled, sample) = engine.pixel_color_capture_state();
+    PixelCaptureState {
+        active,
+        cancelled,
+        sample: sample.map(|s| PixelSampleDto {
+            x: s.x,
+            y: s.y,
+            r: s.r,
+            g: s.g,
+            b: s.b,
+        }),
+    }
+}
+
+#[tauri::command]
+fn start_pixel_color_capture(
+    engine: State<'_, AppState>,
+) -> Result<PixelCaptureState, String> {
+    engine.start_pixel_color_capture()?;
+    Ok(pixel_capture_state_of(&engine))
+}
+
+#[tauri::command]
+fn get_pixel_color_capture_state(engine: State<'_, AppState>) -> PixelCaptureState {
+    pixel_capture_state_of(&engine)
+}
+
+#[tauri::command]
+fn stop_pixel_color_capture(
+    engine: State<'_, AppState>,
+) -> Result<Option<PixelSampleDto>, String> {
+    let sample = engine.stop_pixel_color_capture()?;
+    Ok(sample.map(|s| PixelSampleDto {
+        x: s.x,
+        y: s.y,
+        r: s.r,
+        g: s.g,
+        b: s.b,
+    }))
+}
+
 /// Legacy stubs — picker webview path is unused; prefer pick_screen_point_native.
 #[tauri::command]
 fn confirm_screen_pick(_app: AppHandle, _engine: State<'_, AppState>) -> Result<PickedPoint, String> {
@@ -1814,23 +1885,13 @@ fn resume_clicker(engine: State<'_, AppState>) -> Result<EngineStatusPayload, St
     Ok(status_of(&engine, Some("clicker resumed".into())))
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct PixelSample {
-    x: i32,
-    y: i32,
-    r: u8,
-    g: u8,
-    b: u8,
-}
-
 #[tauri::command]
-fn read_pixel(engine: State<'_, AppState>, x: i32, y: i32) -> Result<PixelSample, String> {
+fn read_pixel(engine: State<'_, AppState>, x: i32, y: i32) -> Result<PixelSampleDto, String> {
     let (r, g, b) = engine
         .injector()
         .read_pixel(x, y)
         .map_err(|e| e.to_string())?;
-    Ok(PixelSample { x, y, r, g, b })
+    Ok(PixelSampleDto { x, y, r, g, b })
 }
 
 #[tauri::command]
@@ -2816,6 +2877,11 @@ pub fn run() {
             pick_point,
             show_screen_picker,
             pick_screen_point_native,
+            pick_pixel_color,
+            get_cursor_position,
+            start_pixel_color_capture,
+            get_pixel_color_capture_state,
+            stop_pixel_color_capture,
             confirm_screen_pick,
             cancel_screen_pick,
             complete_screen_pick,

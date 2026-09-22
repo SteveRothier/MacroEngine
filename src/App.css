@@ -381,6 +381,44 @@ html[data-window="picker"] {
   font-variant-numeric: tabular-nums;
 }
 
+.pick-overlay-cross {
+  position: fixed;
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  pointer-events: none;
+  z-index: 1;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.pick-overlay-cross::before,
+.pick-overlay-cross::after {
+  content: "";
+  position: absolute;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+.pick-overlay-cross::before {
+  left: 50%;
+  top: -6px;
+  bottom: -6px;
+  width: 1px;
+  transform: translateX(-50%);
+}
+
+.pick-overlay-cross::after {
+  top: 50%;
+  left: -6px;
+  right: -6px;
+  height: 1px;
+  transform: translateY(-50%);
+}
+
 .macro-workspace,
 .clicker-panel {
   width: 100%;

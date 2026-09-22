@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use crate::cancel::CancellationToken;
 use crate::clicker::{ClickMode, ClickPoint, ClickerConfig, ClickerSession};
-use crate::clicker_capture::ClickPointCapture;
+use crate::clicker_capture::{ClickPointCapture, PixelColorCapture, PixelSample};
 use crate::event_bus::{EngineEvent, EventBus, LogLevel, ZoneFeedbackKind};
 use crate::hotkeys::{
     default_bindings, update_live_bindings, update_live_clicker_triggers,
@@ -92,6 +92,8 @@ pub struct AppState {
     process_filter: Arc<Mutex<ProcessFilter>>,
     /// Active « capturer des points » session for the clicker editor.
     point_capture: Arc<Mutex<Option<Arc<ClickPointCapture>>>>,
+    /// Active one-shot « pick couleur » session for clicker limits.
+    pixel_capture: Arc<Mutex<Option<Arc<PixelColorCapture>>>>,
 }
 
 struct AppStateInner {
@@ -142,6 +144,7 @@ impl AppState {
             zone_screen: Arc::new(Mutex::new(ScreenGeom::from_size(1920, 1080))),
             process_filter: Arc::new(Mutex::new(ProcessFilter::default())),
             point_capture: Arc::new(Mutex::new(None)),
+            pixel_capture: Arc::new(Mutex::new(None)),
         };
         let worker = state.clone();
         let _ = std::thread::Builder::new()
@@ -850,6 +853,14 @@ impl AppState {
             .is_some();
         if capturing {
             let _ = self.stop_clicker_point_capture();
+        }
+        let pixel_capturing = self
+            .pixel_capture
+            .lock()
+            .expect("pixel capture")
+            .is_some();
+        if pixel_capturing {
+            let _ = self.stop_pixel_color_capture();
         }
         if matches!(
             self.state(),
@@ -1762,6 +1773,12 @@ impl AppState {
         if self.is_recording() {
             return Err("record is active".into());
         }
+        {
+            let pixel = self.pixel_capture.lock().expect("pixel capture");
+            if pixel.as_ref().is_some_and(|c| c.is_running()) {
+                return Err("pixel color capture is active".into());
+            }
+        }
         let mut guard = self.point_capture.lock().expect("point capture");
         if guard.as_ref().is_some_and(|c| c.is_running()) {
             return Err("point capture already active".into());
@@ -1811,6 +1828,76 @@ impl AppState {
             },
         });
         Ok(points)
+    }
+
+    /// Start one-shot pixel color capture (Esc / right-click cancels).
+    pub fn start_pixel_color_capture(&self) -> Result<(), String> {
+        if matches!(self.state(), EngineState::Running | EngineState::Paused) {
+            return Err("cannot sample color while a session is running".into());
+        }
+        if self.is_recording() {
+            return Err("record is active".into());
+        }
+        {
+            let points = self.point_capture.lock().expect("point capture");
+            if points.as_ref().is_some_and(|c| c.is_running()) {
+                return Err("point capture is active".into());
+            }
+        }
+        let mut guard = self.pixel_capture.lock().expect("pixel capture");
+        if guard.as_ref().is_some_and(|c| c.is_running()) {
+            return Err("pixel color capture already active".into());
+        }
+        if let Some(previous) = guard.take() {
+            let _ = previous.finish();
+        }
+        *guard = Some(Arc::new(PixelColorCapture::start(self.injector())));
+        drop(guard);
+        self.bus.publish(EngineEvent::Log {
+            level: LogLevel::Info,
+            message: "échantillon couleur démarré (clic gauche · Échap / clic droit pour annuler)"
+                .into(),
+        });
+        Ok(())
+    }
+
+    /// `(active, cancelled, sample)` for the pick-color UI poll.
+    pub fn pixel_color_capture_state(&self) -> (bool, bool, Option<PixelSample>) {
+        let guard = self.pixel_capture.lock().expect("pixel capture");
+        match guard.as_ref() {
+            Some(capture) => (
+                capture.is_running(),
+                capture.was_cancelled(),
+                capture.sample(),
+            ),
+            None => (false, false, None),
+        }
+    }
+
+    /// Stop pixel capture and return the sample if one was taken.
+    pub fn stop_pixel_color_capture(&self) -> Result<Option<PixelSample>, String> {
+        let capture = self
+            .pixel_capture
+            .lock()
+            .expect("pixel capture")
+            .take()
+            .ok_or_else(|| "pixel color capture not active".to_string())?;
+        let cancelled = capture.was_cancelled();
+        let sample = capture.finish();
+        self.bus.publish(EngineEvent::Log {
+            level: LogLevel::Info,
+            message: if cancelled {
+                "échantillon couleur annulé".into()
+            } else if let Some(s) = &sample {
+                format!(
+                    "échantillon couleur · rgb({},{},{}) @ ({},{})",
+                    s.r, s.g, s.b, s.x, s.y
+                )
+            } else {
+                "échantillon couleur terminé sans sample".into()
+            },
+        });
+        Ok(sample)
     }
 
     pub fn injector(&self) -> Arc<dyn MouseInjector> {

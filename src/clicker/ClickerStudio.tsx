@@ -91,6 +91,16 @@ export function ClickerStudio({
         metrics={editor.metrics}
         running={editor.running}
         paused={editor.sessionPaused}
+        limits={{
+          enabled: editor.limitsEnabled,
+          mode: editor.limitMode,
+          maxClicks:
+            editor.maxClicks === "" ? null : Number(editor.maxClicks) || null,
+          maxDurationSec:
+            editor.maxDurationSec === ""
+              ? null
+              : Number(editor.maxDurationSec) || null,
+        }}
       />
       <div className="caster-clicker-center">
         <div className="caster-settings-pane-inner caster-clicker-settings">

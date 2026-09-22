@@ -200,6 +200,137 @@ fn capture_loop(shared: &CaptureShared, injector: &dyn MouseInjector) {
     shared.running.store(false, Ordering::SeqCst);
 }
 
+/// One-shot screen color sample (same polling style as [`ClickPointCapture`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PixelSample {
+    pub x: i32,
+    pub y: i32,
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+struct PixelCaptureShared {
+    sample: Mutex<Option<PixelSample>>,
+    stop: AtomicBool,
+    running: AtomicBool,
+    cancelled: AtomicBool,
+    /// Ignore LMB edges until this instant (UI button that started capture).
+    armed_at: Instant,
+}
+
+/// Wait for one left-click, then `read_pixel` at the cursor. Esc / RMB cancels.
+pub struct PixelColorCapture {
+    shared: Arc<PixelCaptureShared>,
+    thread: Mutex<Option<JoinHandle<()>>>,
+}
+
+pub const PIXEL_CAPTURE_TIMEOUT: Duration = Duration::from_secs(60);
+
+impl PixelColorCapture {
+    pub fn start(injector: Arc<dyn MouseInjector>) -> Self {
+        let shared = Arc::new(PixelCaptureShared {
+            sample: Mutex::new(None),
+            stop: AtomicBool::new(false),
+            running: AtomicBool::new(true),
+            cancelled: AtomicBool::new(false),
+            armed_at: Instant::now() + UI_STOP_DISCARD,
+        });
+        let worker = Arc::clone(&shared);
+        let handle = thread::Builder::new()
+            .name("pixel-color-capture".into())
+            .spawn(move || {
+                pixel_capture_loop(worker.as_ref(), injector.as_ref());
+            })
+            .ok();
+        if handle.is_none() {
+            shared.running.store(false, Ordering::SeqCst);
+        }
+        Self {
+            shared,
+            thread: Mutex::new(handle),
+        }
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.shared.running.load(Ordering::SeqCst)
+    }
+
+    pub fn was_cancelled(&self) -> bool {
+        self.shared.cancelled.load(Ordering::SeqCst)
+    }
+
+    pub fn sample(&self) -> Option<PixelSample> {
+        self.shared
+            .sample
+            .lock()
+            .ok()
+            .and_then(|g| *g)
+    }
+
+    /// Stop the thread and return the sample if one was taken (None if cancelled / empty).
+    pub fn finish(&self) -> Option<PixelSample> {
+        self.shared.stop.store(true, Ordering::SeqCst);
+        if let Some(handle) = self.thread.lock().ok().and_then(|mut g| g.take()) {
+            let _ = handle.join();
+        }
+        if self.was_cancelled() {
+            return None;
+        }
+        self.sample()
+    }
+}
+
+fn pixel_capture_loop(shared: &PixelCaptureShared, injector: &dyn MouseInjector) {
+    let deadline = Instant::now() + PIXEL_CAPTURE_TIMEOUT;
+    let mut was_down = button_down();
+    let mut was_escape = escape_down();
+    let mut was_rbutton = right_button_down();
+    while !shared.stop.load(Ordering::SeqCst) {
+        if Instant::now() >= deadline {
+            shared.cancelled.store(true, Ordering::SeqCst);
+            break;
+        }
+        let esc = escape_down();
+        if esc && !was_escape {
+            shared.cancelled.store(true, Ordering::SeqCst);
+            break;
+        }
+        was_escape = esc;
+        let rbutton = right_button_down();
+        if rbutton && !was_rbutton {
+            shared.cancelled.store(true, Ordering::SeqCst);
+            break;
+        }
+        was_rbutton = rbutton;
+        let down = button_down();
+        if down && !was_down && Instant::now() >= shared.armed_at {
+            if let Ok(p) = injector.cursor_position() {
+                match injector.read_pixel(p.x, p.y) {
+                    Ok((r, g, b)) => {
+                        if let Ok(mut slot) = shared.sample.lock() {
+                            *slot = Some(PixelSample {
+                                x: p.x,
+                                y: p.y,
+                                r,
+                                g,
+                                b,
+                            });
+                        }
+                        break;
+                    }
+                    Err(_) => {
+                        // Keep waiting for another click if GetPixel fails once.
+                    }
+                }
+            }
+        }
+        was_down = down;
+        thread::sleep(POLL);
+    }
+    shared.running.store(false, Ordering::SeqCst);
+}
+
 #[cfg(windows)]
 fn button_down() -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
@@ -306,5 +437,14 @@ mod tests {
         assert!(points.is_empty());
         assert!(!capture.is_running());
         assert!(!capture.was_cancelled());
+    }
+
+    #[test]
+    fn pixel_color_capture_finish_stops_cleanly() {
+        let inj: Arc<dyn MouseInjector> = Arc::new(RecordingInjector::new());
+        let capture = PixelColorCapture::start(inj);
+        let sample = capture.finish();
+        assert!(sample.is_none());
+        assert!(!capture.is_running());
     }
 }

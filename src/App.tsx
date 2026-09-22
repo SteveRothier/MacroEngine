@@ -83,6 +83,8 @@ function PickOverlayView() {
 function PickOverlayInner() {
   const t = useT();
   const [pos, setPos] = useState({ sx: 0, sy: 0 });
+  const [mode, setMode] = useState<"point" | "pixel">("point");
+  const isPixel = mode === "pixel";
 
   useEffect(() => {
     document.documentElement.dataset.window = "picker";
@@ -100,6 +102,38 @@ function PickOverlayInner() {
   }, []);
 
   useEffect(() => {
+    let unMode: (() => void) | undefined;
+    void listen<string>("picker://mode", (e) => {
+      setMode(e.payload === "pixel" ? "pixel" : "point");
+    }).then((un) => {
+      unMode = un;
+    });
+    return () => unMode?.();
+  }, []);
+
+  useEffect(() => {
+    // Pixel mode: overlay is click-through; poll native cursor for the banner/crosshair.
+    if (!isPixel) return;
+    let alive = true;
+    const tick = async () => {
+      try {
+        const p = await invoke<{ x: number; y: number }>("get_cursor_position");
+        if (!alive) return;
+        setPos({ sx: p.x, sy: p.y });
+      } catch {
+        /* ignore */
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 50);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, [isPixel]);
+
+  useEffect(() => {
+    if (isPixel) return; // clicks handled natively while click-through
     let armed = true;
     let confirming = { current: false };
     const onMove = (e: MouseEvent) => {
@@ -157,20 +191,39 @@ function PickOverlayInner() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };
-  }, []);
+  }, [isPixel]);
+
+  useEffect(() => {
+    if (!isPixel) return;
+    void emit("picker://ready");
+  }, [isPixel]);
+
+  const title = isPixel ? t("shell.pickPixelTitle") : t("shell.pickTitle");
+  const hint = isPixel
+    ? t("shell.pickPixelHint", { x: String(pos.sx), y: String(pos.sy) })
+    : t("shell.pickHint", { x: String(pos.sx), y: String(pos.sy) });
+
+  // GetCursorPos is screen-absolute; overlay is monitor-local.
+  const crossLeft = pos.sx - (typeof window !== "undefined" ? window.screenX : 0);
+  const crossTop = pos.sy - (typeof window !== "undefined" ? window.screenY : 0);
 
   return (
     <div
-      className="pick-overlay"
+      className={["pick-overlay", isPixel ? "pick-overlay--pixel" : ""].join(" ")}
       role="dialog"
-      aria-label={t("shell.pickTitle")}
+      aria-label={title}
     >
       <div className="pick-overlay-banner">
-        <strong>{t("shell.pickTitle")}</strong>
-        <span>
-          {t("shell.pickHint", { x: String(pos.sx), y: String(pos.sy) })}
-        </span>
+        <strong>{title}</strong>
+        <span>{hint}</span>
       </div>
+      {isPixel ? (
+        <div
+          className="pick-overlay-cross"
+          style={{ left: crossLeft, top: crossTop }}
+          aria-hidden
+        />
+      ) : null}
     </div>
   );
 }
