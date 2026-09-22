@@ -21,6 +21,7 @@ import {
 } from "../settings/settingsTypes";
 import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
+import { useZoneFeedbackToasts } from "../clicker/useZoneFeedbackToasts";
 import {
   AppShell,
   CommandPalette,
@@ -43,7 +44,7 @@ import {
   promptAction,
   ScriptLanguageHost,
 } from "../ui";
-import { applyTheme, readStoredTheme, subscribeSystemTheme, type ThemeMode } from "../theme";
+import { applyTheme, normalizeTheme, readStoredTheme, type ThemeMode } from "../theme";
 import { stateLabel, sessionLabel } from "../ui/labels";
 import { LocaleProvider, useLocale, useT } from "../i18n";
 import { loadLastStudio, pushRecent, saveLastStudio } from "./recent";
@@ -209,6 +210,7 @@ function MainAppInner({
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("application");
   const [refreshKey, setRefreshKey] = useState(0);
   const { lines: journalLines, clear: clearJournal } = useEngineLog();
+  useZoneFeedbackToasts();
   const [journalOpen, setJournalOpen] = useState(readJournalOpen);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -233,7 +235,6 @@ function MainAppInner({
 
   useEffect(() => {
     applyTheme(theme);
-    return subscribeSystemTheme(theme, () => applyTheme("system"));
   }, [theme]);
 
   useEffect(() => {
@@ -257,8 +258,8 @@ function MainAppInner({
     void invoke<AppSettings>("get_settings")
       .then((s) => {
         if (typeof s.advancedUi === "boolean") setAdvanced(s.advancedUi);
-        if (s.theme === "dark" || s.theme === "light" || s.theme === "system") {
-          onThemeChange(s.theme);
+        if (s.theme != null) {
+          onThemeChange(normalizeTheme(s.theme));
         }
         if (typeof s.journalOpen === "boolean") setJournalOpen(s.journalOpen);
         const sh = mergeShellPrefs(s.shell);

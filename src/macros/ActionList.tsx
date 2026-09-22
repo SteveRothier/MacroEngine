@@ -89,6 +89,10 @@ type Props = {
 const DRAG_THRESHOLD_PX = 6;
 const EDGE_HYSTERESIS_PX = 6;
 const FLIP_MS = 200;
+/** Extra hit area past the last row so dropping at end is easy. */
+const LIST_END_SLACK_PX = 64;
+/** On the last row, "after" starts earlier (top 28% = before, rest = after). */
+const LAST_ROW_AFTER_RATIO = 0.28;
 const AUTO_SCROLL_EDGE_PX = 48;
 const AUTO_SCROLL_MAX_PX = 18;
 
@@ -237,10 +241,55 @@ function hitTestListDrop(
   fromIndex: number,
   rows: FlatRow[],
   prev: DropEdge | null,
+  listEl: HTMLElement | null,
 ): DropEdge | null {
+  if (rows.length === 0) return null;
+  const lastIndex = rows.length - 1;
+  const fromPath = rows[fromIndex]?.path;
+  if (!fromPath) return null;
+
   const el = document.elementFromPoint(x, y);
-  if (!el || !(el instanceof Element)) return null;
-  const row = el.closest(".action-list-item[data-list-index]");
+  let row =
+    el instanceof Element
+      ? (el.closest(".action-list-item[data-list-index]") as HTMLElement | null)
+      : null;
+
+  // Empty padding / below last row → drop after last (macros + long lists).
+  if (!row && listEl) {
+    const lastRow = listEl.querySelector(
+      `.action-list-item[data-list-index="${lastIndex}"]`,
+    ) as HTMLElement | null;
+    if (lastRow) {
+      const listRect = listEl.getBoundingClientRect();
+      const lastRect = lastRow.getBoundingClientRect();
+      const afterLine = lastRect.top + lastRect.height * LAST_ROW_AFTER_RATIO;
+      const bottomLimit =
+        Math.max(listRect.bottom, lastRect.bottom) + LIST_END_SLACK_PX;
+      if (y >= afterLine && y <= bottomLimit && fromIndex !== lastIndex) {
+        const hitPath = rows[lastIndex]?.path;
+        if (hitPath && !isAncestorPath(fromPath, hitPath)) {
+          return { index: lastIndex, edge: "after" };
+        }
+      }
+      const firstRow = listEl.querySelector(
+        `.action-list-item[data-list-index="0"]`,
+      ) as HTMLElement | null;
+      if (firstRow && fromIndex !== 0) {
+        const firstRect = firstRow.getBoundingClientRect();
+        if (
+          y >= listRect.top - LIST_END_SLACK_PX &&
+          y < firstRect.top + firstRect.height * 0.5
+        ) {
+          const hitPath = rows[0]?.path;
+          if (hitPath && !isAncestorPath(fromPath, hitPath)) {
+            return { index: 0, edge: "before" };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
   if (!(row instanceof HTMLElement)) return null;
   const raw = row.getAttribute("data-list-index");
   if (raw == null) return null;
@@ -248,19 +297,21 @@ function hitTestListDrop(
   if (!Number.isFinite(index) || index < 0 || index >= rows.length) return null;
   if (index === fromIndex) return null;
 
-  const fromPath = rows[fromIndex]?.path;
   const hitPath = rows[index]?.path;
-  if (!fromPath || !hitPath) return null;
+  if (!hitPath) return null;
   if (isAncestorPath(fromPath, hitPath)) return null;
 
   const rect = row.getBoundingClientRect();
-  const mid = rect.top + rect.height / 2;
+  const isLast = index === lastIndex;
+  const splitY = isLast
+    ? rect.top + rect.height * LAST_ROW_AFTER_RATIO
+    : rect.top + rect.height / 2;
   const prevEdge = prev?.index === index ? prev.edge : null;
   let edge: "before" | "after";
-  if (prevEdge && Math.abs(y - mid) < EDGE_HYSTERESIS_PX) {
+  if (prevEdge && Math.abs(y - splitY) < EDGE_HYSTERESIS_PX) {
     edge = prevEdge;
   } else {
-    edge = y < mid ? "before" : "after";
+    edge = y < splitY ? "before" : "after";
   }
   return { index, edge };
 }
@@ -780,6 +831,7 @@ export function ActionList({
         session.from,
         rowsRef.current,
         dropEdgeRef.current,
+        listRef.current,
       );
       dropEdgeRef.current = hit;
       setDropEdge(hit);
@@ -802,6 +854,7 @@ export function ActionList({
             from,
             currentRows,
             dropEdgeRef.current,
+            listRef.current,
           )
         : null;
 

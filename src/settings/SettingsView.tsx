@@ -759,7 +759,6 @@ export function SettingsView({
                           [
                             ["light", "common.light"],
                             ["dark", "common.dark"],
-                            ["system", "common.system"],
                           ] as const
                         ).map(([value, labelKey]) => (
                           <button

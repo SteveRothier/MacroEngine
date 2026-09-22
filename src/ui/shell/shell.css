@@ -783,14 +783,6 @@ button.caster-btn.caster-btn-primary {
 .caster-titlebar-name-input {
   width: 140px;
   max-width: 180px;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--caster-border-subtle);
-  border-radius: var(--caster-radius-sm);
-  background: var(--caster-bg-input);
-  color: var(--caster-text-primary);
-  font: inherit;
-  font-size: 12px;
   font-weight: 600;
 }
 
@@ -1674,18 +1666,7 @@ button.caster-sidebar-item,
 
 .caster-dialog-input {
   width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
-  border: 1px solid var(--caster-border-subtle);
-  border-radius: var(--caster-radius-md);
-  background: var(--caster-bg-input);
-  color: var(--caster-text-primary);
-  font-size: var(--caster-text-sm);
   outline: none;
-}
-
-.caster-dialog-input:focus {
-  border-color: var(--caster-accent);
 }
 
 .caster-dialog-actions {
@@ -2237,16 +2218,7 @@ button.caster-sidebar-item,
   letter-spacing: 0.04em;
 }
 
-.caster-field input,
-.caster-field select,
-.caster-field textarea {
-  padding: 8px 10px;
-  border-radius: var(--caster-radius-sm);
-  border: 1px solid var(--caster-border-subtle);
-  background: var(--caster-bg-input);
-  color: var(--caster-text-primary);
-  font: inherit;
-}
+/* .caster-field input/select/textarea chrome: shared macro control block */
 
 .caster-tabs {
   display: flex;
@@ -2443,16 +2415,7 @@ button.caster-sidebar-item,
   white-space: nowrap;
 }
 
-.caster-macro-meta-input {
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--caster-border-subtle);
-  border-radius: var(--caster-radius-md);
-  background: var(--caster-bg-input);
-  color: var(--caster-text-primary);
-  font: inherit;
-  font-size: var(--caster-text-sm, 12px);
-}
+/* .caster-macro-meta-input chrome: shared macro control block */
 
 .caster-macro-meta-input--name {
   width: min(200px, 28vw);
@@ -2538,7 +2501,7 @@ button.caster-sidebar-item,
 .caster-root .action-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 36px;
   border: none;
   border-radius: 0;
   background: transparent;
@@ -2717,8 +2680,25 @@ button.caster-sidebar-item,
   color: var(--caster-text-secondary);
 }
 
+/* Shared form control chrome — macro action-cell look app-wide */
+.caster-root input[type="text"],
+.caster-root input[type="number"],
+.caster-root input[type="search"],
+.caster-root input[type="password"],
+.caster-root input:not([type]),
+.caster-root select,
+.caster-root textarea,
 .caster-root .action-cell-input,
-.caster-root .action-cell-select {
+.caster-root .action-cell-select,
+.caster-root .caster-select,
+.caster-root .caster-select-trigger.caster-select,
+.caster-root .caster-select-trigger.caster-clicker-zone-select,
+.caster-root .caster-dialog-input,
+.caster-root .caster-macro-meta-input,
+.caster-root .caster-titlebar-name-input,
+.caster-field input,
+.caster-field select,
+.caster-field textarea {
   box-sizing: border-box;
   height: 28px;
   padding: 0 8px;
@@ -2730,8 +2710,44 @@ button.caster-sidebar-item,
   font-size: 12px;
   line-height: 26px;
   min-width: 0;
-  flex-shrink: 0;
   vertical-align: middle;
+}
+
+.caster-root textarea,
+.caster-field textarea {
+  height: auto;
+  min-height: 56px;
+  line-height: 1.4;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.caster-root input[type="text"]:focus-visible,
+.caster-root input[type="number"]:focus-visible,
+.caster-root input[type="search"]:focus-visible,
+.caster-root input[type="password"]:focus-visible,
+.caster-root input:not([type]):focus-visible,
+.caster-root select:focus-visible,
+.caster-root textarea:focus-visible,
+.caster-root .action-cell-input:focus-visible,
+.caster-root .action-cell-select:focus-visible,
+.caster-root .caster-select:focus-visible,
+.caster-root .caster-select-trigger.caster-select:focus-visible,
+.caster-root .caster-select-trigger.caster-clicker-zone-select:focus-visible,
+.caster-root .caster-dialog-input:focus-visible,
+.caster-root .caster-macro-meta-input:focus-visible,
+.caster-root .caster-titlebar-name-input:focus-visible,
+.caster-field input:focus-visible,
+.caster-field select:focus-visible,
+.caster-field textarea:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--caster-accent) 55%, var(--caster-border-subtle));
+  box-shadow: var(--caster-focus-ring);
+}
+
+.caster-root .action-cell-input,
+.caster-root .action-cell-select {
+  flex-shrink: 0;
 }
 
 .caster-root .action-cell-select {
@@ -3473,6 +3489,40 @@ body.action-list-is-dragging .action-list-item {
   position: absolute;
   transform: translate(-50%, -50%);
   z-index: 1;
+  pointer-events: none;
+}
+
+.caster-clicker-target-marker.interactive {
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+
+.caster-clicker-target-marker.interactive.dragging,
+.caster-clicker-target-map-canvas.dragging .caster-clicker-target-marker.interactive {
+  cursor: grabbing;
+  z-index: 2;
+}
+
+.caster-clicker-target-marker.selected .caster-clicker-target-marker-dot {
+  outline: 2px solid var(--caster-fg);
+  outline-offset: 2px;
+}
+
+.caster-clicker-target-map-canvas {
+  position: absolute;
+  inset: 0;
+  touch-action: none;
+  background: color-mix(in srgb, var(--caster-bg-elevated) 70%, transparent);
+}
+
+.caster-clicker-target-map-canvas.editable {
+  cursor: default;
+}
+
+.caster-clicker-point-row.selected {
+  background: color-mix(in srgb, var(--caster-accent) 12%, transparent);
+  border-radius: var(--caster-radius-sm, 4px);
 }
 
 .caster-clicker-target-marker-dot {
@@ -3482,7 +3532,7 @@ body.action-list-is-dragging .action-list-item {
   height: 18px;
   padding: 0 4px;
   border-radius: 999px;
-  background: var(--caster-accent);
+  background: var(--target-fill, var(--caster-accent));
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -3515,7 +3565,7 @@ body.action-list-is-dragging .action-list-item {
 .caster-clicker-points-list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 28px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -3526,6 +3576,55 @@ body.action-list-is-dragging .action-list-item {
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  cursor: grab;
+  border-radius: var(--caster-radius-sm, 4px);
+  padding: 2px 4px;
+  position: relative;
+}
+
+.caster-clicker-point-row.is-drag-source {
+  opacity: 0.35;
+  outline: 1px dashed color-mix(in srgb, var(--caster-accent) 45%, var(--caster-border-subtle));
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--caster-accent) 6%, transparent);
+}
+
+.caster-clicker-point-row.drop-before,
+.caster-clicker-point-row.drop-after {
+  box-shadow: none;
+}
+
+.caster-clicker-point-row.drop-before::before,
+.caster-clicker-point-row.drop-after::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  height: 7px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--caster-accent) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--caster-accent) 40%, transparent);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.caster-clicker-point-row.drop-before::before {
+  top: -4px;
+}
+
+.caster-clicker-point-row.drop-after::after {
+  bottom: -4px;
+}
+
+.caster-clicker-point-ord {
+  flex: 0 0 auto;
+  min-width: 1.25rem;
+  font-size: var(--caster-text-xs);
+  font-weight: 700;
+  color: var(--caster-text-muted);
+  text-align: center;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .caster-clicker-point-pick {
@@ -3535,20 +3634,12 @@ body.action-list-is-dragging .action-list-item {
   font-size: var(--caster-text-xs);
 }
 
-.caster-clicker-point-coord input {
-  width: 72px;
-}
-
 .caster-clicker-point-mini {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: var(--caster-text-xs);
   color: var(--caster-text-muted);
-}
-
-.caster-clicker-point-mini input {
-  width: 48px;
 }
 
 .caster-clicker-point-remove {
@@ -3603,8 +3694,6 @@ body.action-list-is-dragging .action-list-item {
 .caster-clicker-zone-edge input[type="number"] {
   width: 56px;
   margin-left: auto;
-  padding: 2px 4px;
-  font-size: var(--caster-text-xs);
 }
 
 .caster-clicker-zone-px {
@@ -3726,13 +3815,6 @@ body.action-list-is-dragging .action-list-item {
 .caster-clicker-zone-size input[type="number"] {
   width: 100%;
   min-width: 0;
-  height: 26px;
-  padding: 0 6px;
-  border: 1px solid var(--caster-border-subtle);
-  border-radius: var(--caster-radius-sm);
-  background: var(--caster-bg-input);
-  color: var(--caster-text-primary);
-  font: inherit;
 }
 
 .caster-clicker-zone-toolbar .caster-btn-ghost.active {
@@ -3760,14 +3842,7 @@ body.action-list-is-dragging .action-list-item {
 .caster-clicker-zone-select {
   min-width: 140px;
   max-width: 220px;
-  height: 28px;
-  padding: 0 8px;
-  border: 1px solid var(--caster-border-subtle);
-  border-radius: var(--caster-radius-sm);
-  background: var(--caster-bg-input);
-  color: var(--caster-text-primary);
-  font: inherit;
-  font-size: var(--caster-text-xs);
+  width: auto;
 }
 
 button.caster-select-trigger.caster-clicker-zone-select {
@@ -4962,7 +5037,7 @@ body.caster-pointer-reorder-dragging {
   flex: 1 1 auto;
   min-width: 140px;
   max-width: 420px;
-  height: 26px;
+  height: 28px;
 }
 
 .caster-automations-search-icon {
@@ -4979,11 +5054,8 @@ body.caster-pointer-reorder-dragging {
   width: 100%;
   min-width: 0;
   max-width: none;
-  height: 26px;
   padding: 0 8px 0 26px !important;
-  font-size: 12px;
-  line-height: 1;
-  border-radius: var(--caster-radius-sm);
+  line-height: 26px;
 }
 
 .caster-automations-sort-select,
@@ -4991,9 +5063,6 @@ body.caster-pointer-reorder-dragging {
 .caster-automations-folder-select,
 .caster-select-trigger.caster-select.caster-automations-folder-select {
   min-width: 120px;
-  height: 26px;
-  padding: 0 6px;
-  font-size: 12px;
 }
 
 .caster-automations-list-body {
@@ -5552,16 +5621,7 @@ button.caster-auto-colhead-label:focus-visible {
   opacity: 0.7;
 }
 
-.caster-script-param-field input[type="text"],
-.caster-script-param-field input[type="number"] {
-  height: 28px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid var(--caster-border-subtle);
-  background: var(--caster-bg);
-  color: var(--caster-text);
-  font-size: 12px;
-}
+/* .caster-script-param-field input chrome: shared macro control block */
 
 .caster-script-params-overflow {
   position: relative;
@@ -6599,13 +6659,6 @@ body,
 
 .caster-select {
   width: 100%;
-  height: 32px;
-  padding: 0 8px;
-  border-radius: 6px;
-  border: 1px solid var(--caster-border-subtle);
-  background: var(--caster-bg-input, var(--caster-bg));
-  color: var(--caster-text-primary);
-  font-size: 12px;
 }
 
 .caster-select-root {
@@ -6673,16 +6726,10 @@ body,
 
 .caster-select-trigger.caster-select {
   width: 100%;
-  height: 32px;
-  padding: 0 8px;
 }
 
 .caster-select-trigger.action-cell-select {
-  height: 28px;
-  padding: 0 8px;
-  padding-right: 8px;
   flex-shrink: 0;
-  line-height: 26px;
 }
 
 .caster-select-menu {

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileCode2 } from "lucide-react";
-import { pickScreenPointDetailed } from "../pick";
 import { Segmented } from "../ui";
-import { ActionPickerMenu, DropdownMenu, Select, Tooltip, useToast } from "../ui/shell";
+import { ActionPickerMenu, DropdownMenu, Select, Tooltip } from "../ui/shell";
 import type { ActionPickerEntry, DropdownEntry } from "../ui/shell";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
 import type { CompareOp, KeyMods, MacroAction, MacroValue, Operand } from "./types";
@@ -92,8 +91,6 @@ type PointFieldsProps = {
   y: number | null | undefined;
   optional?: boolean;
   disabled?: boolean;
-  picking: boolean;
-  setPicking: (v: boolean) => void;
   onChangeXY: (x: number | null, y: number | null) => void;
   hint?: ReactNode;
 };
@@ -103,31 +100,12 @@ function PointFields({
   y,
   optional = false,
   disabled,
-  picking,
-  setPicking,
   onChangeXY,
   hint,
 }: PointFieldsProps) {
   const t = useT();
-  const toast = useToast();
   const mode: "cursor" | "position" =
     optional && x == null && y == null ? "cursor" : "position";
-
-  async function onPick() {
-    setPicking(true);
-    try {
-      const result = await pickScreenPointDetailed();
-      if (!result.ok) {
-        if (result.reason === "timeout" || result.reason === "error") {
-          toast.info(t("macros.params.pickCancelled"));
-        }
-        return;
-      }
-      onChangeXY(result.point.x, result.point.y);
-    } finally {
-      setPicking(false);
-    }
-  }
 
   if (optional) {
     return (
@@ -137,7 +115,7 @@ function PointFields({
           <Segmented
             ariaLabel={t("macros.params.positionModeAria")}
             value={mode}
-            disabled={disabled || picking}
+            disabled={disabled}
             options={[
               { value: "cursor", label: t("macros.params.cursor") },
               { value: "position", label: t("macros.params.position") },
@@ -162,7 +140,7 @@ function PointFields({
             <label className="caster-field">
               <span>{t("macros.params.coordX")}</span>
               <WheelNumberInput
-                disabled={disabled || picking}
+                disabled={disabled}
                 value={x ?? ""}
                 onValueChange={(n) => onChangeXY(n, y ?? null)}
                 onEmptyChange={() => onChangeXY(null, y ?? null)}
@@ -171,26 +149,17 @@ function PointFields({
             <label className="caster-field">
               <span>{t("macros.params.coordY")}</span>
               <WheelNumberInput
-                disabled={disabled || picking}
+                disabled={disabled}
                 value={y ?? ""}
                 onValueChange={(n) => onChangeXY(x ?? null, n)}
                 onEmptyChange={() => onChangeXY(x ?? null, null)}
               />
             </label>
-            <div
-              className="caster-field props-point-actions"
-              style={{ gridColumn: "1 / -1" }}
-            >
-              <button
-                type="button"
-                disabled={disabled || picking}
-                onClick={() => void onPick()}
-              >
-                {picking
-                  ? t("macros.params.pickOverlay")
-                  : t("macros.params.pickScreen")}
-              </button>
-            </div>
+            {hint ? (
+              <p className="hint" style={{ gridColumn: "1 / -1" }}>
+                {hint}
+              </p>
+            ) : null}
           </>
         )}
       </>
@@ -202,7 +171,7 @@ function PointFields({
       <label className="caster-field">
         <span>{t("macros.params.coordX")}</span>
         <WheelNumberInput
-          disabled={disabled || picking}
+          disabled={disabled}
           value={x ?? ""}
           onValueChange={(n) => onChangeXY(n, y ?? 0)}
         />
@@ -210,21 +179,16 @@ function PointFields({
       <label className="caster-field">
         <span>{t("macros.params.coordY")}</span>
         <WheelNumberInput
-          disabled={disabled || picking}
+          disabled={disabled}
           value={y ?? ""}
           onValueChange={(n) => onChangeXY(x ?? 0, n)}
         />
       </label>
-      <div className="caster-field props-point-actions" style={{ gridColumn: "1 / -1" }}>
-        <button
-          type="button"
-          disabled={disabled || picking}
-          onClick={() => void onPick()}
-        >
-          {picking ? t("macros.params.pickOverlay") : t("macros.params.pickScreen")}
-        </button>
-        {hint ? <p className="hint">{hint}</p> : null}
-      </div>
+      {hint ? (
+        <p className="hint" style={{ gridColumn: "1 / -1" }}>
+          {hint}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -237,7 +201,6 @@ export function ActionProps({
   onOpenScript,
 }: Props) {
   const t = useT();
-  const [picking, setPicking] = useState(false);
 
   if (!action) {
     return null;
@@ -251,7 +214,7 @@ export function ActionProps({
           <Select
             className="caster-select"
             value={action.button ?? "left"}
-            disabled={disabled || picking}
+            disabled={disabled}
             options={mouseButtonOpts(t)}
             onChange={(v) =>
               onChange({
@@ -266,8 +229,6 @@ export function ActionProps({
           y={action.y}
           optional
           disabled={disabled}
-          picking={picking}
-          setPicking={setPicking}
           onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
           hint={t("macros.params.clickAtCursorHint")}
         />
@@ -282,8 +243,6 @@ export function ActionProps({
           x={action.x}
           y={action.y}
           disabled={disabled}
-          picking={picking}
-          setPicking={setPicking}
           onChangeXY={(nx, ny) =>
             onChange({
               ...action,
@@ -305,7 +264,7 @@ export function ActionProps({
           <Select
             className="caster-select"
             value={action.button ?? "left"}
-            disabled={disabled || picking}
+            disabled={disabled}
             options={mouseButtonOpts(t)}
             onChange={(v) =>
               onChange({
@@ -320,8 +279,6 @@ export function ActionProps({
           y={action.y}
           optional
           disabled={disabled}
-          picking={picking}
-          setPicking={setPicking}
           onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
         />
         <p className="hint" style={{ gridColumn: "1 / -1" }}>
@@ -339,7 +296,7 @@ export function ActionProps({
         <label className="caster-field">
           <span>{t("macros.params.wheelDelta")}</span>
           <WheelNumberInput
-            disabled={disabled || picking}
+            disabled={disabled}
             value={action.delta}
             onValueChange={(n) => onChange({ ...action, delta: n })}
           />
@@ -349,8 +306,6 @@ export function ActionProps({
           y={action.y}
           optional
           disabled={disabled}
-          picking={picking}
-          setPicking={setPicking}
           onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
         />
       </div>

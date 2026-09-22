@@ -1,17 +1,11 @@
-export type ThemeMode = "light" | "dark" | "system";
+export type ThemeMode = "light" | "dark";
 export type ColorScheme = "light" | "dark";
 
 const STORAGE_KEY = "caster-theme";
 const LEGACY_STORAGE_KEY = "macroengine-theme";
 
 export function resolvedColorScheme(theme: ThemeMode): ColorScheme {
-  if (theme !== "system") return theme;
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return "light";
-  }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  return theme;
 }
 
 export function readStoredTheme(): ThemeMode {
@@ -19,16 +13,15 @@ export function readStoredTheme(): ThemeMode {
     const v =
       localStorage.getItem(STORAGE_KEY) ??
       localStorage.getItem(LEGACY_STORAGE_KEY);
-    if (v === "dark" || v === "light" || v === "system") {
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        localStorage.setItem(STORAGE_KEY, v);
-      }
-      return v;
+    const normalized = normalizeTheme(v);
+    if (!localStorage.getItem(STORAGE_KEY)) {
+      localStorage.setItem(STORAGE_KEY, normalized);
     }
+    return normalized;
   } catch {
     /* ignore */
   }
-  return "light";
+  return "dark";
 }
 
 /** Applies theme to the DOM. localStorage is a boot cache; settings.json is source of truth. */
@@ -41,26 +34,13 @@ export function applyTheme(theme: ThemeMode) {
   }
 }
 
+/** Coerce unknown / legacy `"system"` values to a concrete theme (default dark). */
 export function normalizeTheme(value: unknown): ThemeMode {
-  if (value === "dark" || value === "light" || value === "system") return value;
-  return "light";
+  if (value === "light") return "light";
+  if (value === "dark" || value === "system") return "dark";
+  return "dark";
 }
 
 export function cycleTheme(theme: ThemeMode): ThemeMode {
-  if (theme === "light") return "dark";
-  if (theme === "dark") return "system";
-  return "light";
-}
-
-export function subscribeSystemTheme(
-  theme: ThemeMode,
-  onChange: () => void,
-): () => void {
-  if (theme !== "system" || typeof window === "undefined") {
-    return () => undefined;
-  }
-  const mq = window.matchMedia("(prefers-color-scheme: dark)");
-  const handler = () => onChange();
-  mq.addEventListener("change", handler);
-  return () => mq.removeEventListener("change", handler);
+  return theme === "light" ? "dark" : "light";
 }

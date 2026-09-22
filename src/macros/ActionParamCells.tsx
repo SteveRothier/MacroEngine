@@ -1,8 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT, type TFunction } from "../i18n";
-import { pickScreenPointDetailed } from "../pick";
-import { Select, useToast, type ActionPickerEntry } from "../ui/shell";
+import { Select, type ActionPickerEntry } from "../ui/shell";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
 import { ActionProps } from "./ActionProps";
 import { actionDetail } from "./actionLabels";
@@ -64,32 +63,14 @@ function CompactXY({
   onChangeXY: (x: number | null, y: number | null) => void;
 }) {
   const t = useT();
-  const toast = useToast();
-  const [picking, setPicking] = useState(false);
   const isCursor = optional && x == null && y == null;
-
-  async function onPick() {
-    setPicking(true);
-    try {
-      const result = await pickScreenPointDetailed();
-      if (!result.ok) {
-        if (result.reason === "timeout" || result.reason === "error") {
-          toast.info(t("macros.params.pickCancelled"));
-        }
-        return;
-      }
-      onChangeXY(result.point.x, result.point.y);
-    } finally {
-      setPicking(false);
-    }
-  }
 
   return (
     <>
       {optional ? (
         <Select
           className="action-cell-select"
-          disabled={disabled || picking}
+          disabled={disabled}
           value={isCursor ? "cursor" : "position"}
           title={t("macros.params.position")}
           ariaLabel={t("macros.params.position")}
@@ -104,7 +85,7 @@ function CompactXY({
         <>
           <WheelNumberInput
             className="action-cell-input action-cell-num"
-            disabled={disabled || picking}
+            disabled={disabled}
             value={x ?? 0}
             title={t("macros.params.coordX")}
             aria-label={t("macros.params.coordX")}
@@ -112,21 +93,12 @@ function CompactXY({
           />
           <WheelNumberInput
             className="action-cell-input action-cell-num"
-            disabled={disabled || picking}
+            disabled={disabled}
             value={y ?? 0}
             title={t("macros.params.coordY")}
             aria-label={t("macros.params.coordY")}
             onValueChange={(n) => onChangeXY(x ?? 0, n)}
           />
-          <button
-            type="button"
-            className="action-cell-btn"
-            disabled={disabled || picking}
-            title={t("macros.params.pickScreen")}
-            onClick={() => void onPick()}
-          >
-            {picking ? "…" : "⌖"}
-          </button>
         </>
       ) : null}
     </>
