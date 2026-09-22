@@ -20,9 +20,9 @@ export type ClickerTemplate = {
 
 function gridPoints(): ClickPoint[] {
   return [
-    { x: 400, y: 300, clicks: 1, radius: 0 },
-    { x: 960, y: 540, clicks: 1, radius: 0 },
-    { x: 1520, y: 780, clicks: 1, radius: 0 },
+    { x: 400, y: 300, clicks: 1, radius: 0, pauseAfterMs: 0 },
+    { x: 960, y: 540, clicks: 1, radius: 0, pauseAfterMs: 0 },
+    { x: 1520, y: 780, clicks: 1, radius: 0, pauseAfterMs: 0 },
   ];
 }
 

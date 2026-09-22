@@ -136,7 +136,11 @@ export function ClickerTitleBarTools({
       id: "import",
       label: t("clicker.toolbar.import"),
       icon: <Upload size={14} />,
-      onSelect: () => void editor.onImportPreset(),
+      onSelect: () => {
+        void editor.onImportPreset().then((id) => {
+          if (id) onSavedAsNew?.(id);
+        });
+      },
     },
     {
       id: "export",

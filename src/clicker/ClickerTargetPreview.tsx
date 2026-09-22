@@ -86,7 +86,7 @@ export function ClickerTargetPreview({ editor: e }: Props) {
   const addPointAt = (x: number, y: number) => {
     const nextIndex = e.points.length;
     e.setPointsEnabled(true);
-    e.setPoints((prev) => [...prev, { x, y, clicks: 1, radius: 0 }]);
+    e.setPoints((prev) => [...prev, { x, y, clicks: 1, radius: 0, pauseAfterMs: 0 }]);
     e.setSelectedPointIndex(nextIndex);
   };
 

@@ -53,6 +53,7 @@ impl CaptureBuffer {
                 y: p.y,
                 clicks: 1,
                 radius: 0,
+                pause_after_ms: 0,
             });
         }
         self.last_at = Some(at);

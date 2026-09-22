@@ -119,7 +119,14 @@ export type StopZone =
       clickMode?: ClickSampleMode;
     };
 
-export type ClickPoint = { x: number; y: number; clicks: number; radius: number };
+export type ClickPoint = {
+  x: number;
+  y: number;
+  clicks: number;
+  radius: number;
+  /** Pause after this point's clicks, before the next point (ms). */
+  pauseAfterMs: number;
+};
 
 /** Same shape as macro triggers (manual | hotkey). */
 export type ClickerTrigger =

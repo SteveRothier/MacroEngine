@@ -74,7 +74,7 @@ export const CLICKER_PHASE_5_BACKLOG: readonly ClickerBacklogItem[] = [
     id: "preset-export-import",
     title: "Export / import preset JSON",
     summary:
-      "Sauvegarder et restaurer un preset clicker (config + zones + points) via fichier, pour partage et backup.",
+      "Sauvegarder et restaurer un preset clicker (config + zones + points) via fichier, pour partage et backup (livré — dialogues Tauri + titlebar Import/Export, toasts, ouverture d’onglet à l’import).",
     priority: 1,
   },
   {
@@ -88,7 +88,7 @@ export const CLICKER_PHASE_5_BACKLOG: readonly ClickerBacklogItem[] = [
     id: "point-per-click-delay",
     title: "Délai ms par point",
     summary:
-      "Étendre ClickPoint avec pauseAfterMs et UI 2e rangée type macro (intervalle entre points de la séquence).",
+      "Étendre ClickPoint avec pauseAfterMs et UI 2e rangée type macro (intervalle entre points de la séquence) (livré — champ ms par point, serde default, sleep annulable dans la boucle).",
     priority: 3,
   },
   {

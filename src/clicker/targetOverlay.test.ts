@@ -26,7 +26,7 @@ describe("targetOverlay IPC helpers", () => {
   it("pushTargetOverlayState forwards geom, mode, fixed and points", async () => {
     vi.mocked(invoke).mockResolvedValue(undefined);
     const geom = { x: 0, y: 0, width: 1920, height: 1080 };
-    const points = [{ x: 10, y: 20, clicks: 1, radius: 5 }];
+    const points = [{ x: 10, y: 20, clicks: 1, radius: 5, pauseAfterMs: 0 }];
     await pushTargetOverlayState({
       geom: geom as never,
       mode: "sequence",

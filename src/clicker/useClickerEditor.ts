@@ -361,7 +361,15 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     setRandomPct(c.randomPct ?? 0);
     setClickZoneOrder(c.clickZoneOrder ?? "random");
     setPointsEnabled(!!c.pointsEnabled);
-    setPoints(c.points ?? []);
+    setPoints(
+      (c.points ?? []).map((p) => ({
+        x: p.x,
+        y: p.y,
+        clicks: Math.max(1, p.clicks ?? 1),
+        radius: Math.max(0, p.radius ?? 0),
+        pauseAfterMs: Math.max(0, p.pauseAfterMs ?? 0),
+      })),
+    );
     setStopWhenComplete(!!c.stopWhenComplete);
     if (c.target?.type === "fixed") {
       setTargetFixed(true);
@@ -949,11 +957,15 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         name: string;
         config: ClickerConfigPayload;
       }>("import_clicker_preset_path", { path });
+      toast.success(t("clicker.toasts.presetImported", { name: preset.name }));
       await onLoadPreset(preset.name, { skipDirtyGuard: true });
+      return preset.name;
     } catch (e) {
       console.error(e);
+      toast.error(t("clicker.toasts.importFailed"));
+      return null;
     }
-  }, [onLoadPreset, resolveDirtyBeforeSwitch, t]);
+  }, [onLoadPreset, resolveDirtyBeforeSwitch, t, toast]);
 
   const onExportPreset = useCallback(async () => {
     if (!selectedPreset) return;
@@ -976,10 +988,12 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         name: selectedPreset,
         path,
       });
+      toast.success(t("clicker.toasts.presetExported"));
     } catch (e) {
       console.error(e);
+      toast.error(t("clicker.toasts.exportFailed"));
     }
-  }, [buildConfig, clearHistory, dirty, locked, selectedPreset, t]);
+  }, [buildConfig, clearHistory, dirty, locked, selectedPreset, t, toast]);
 
   useEffect(() => {
     void (async () => {

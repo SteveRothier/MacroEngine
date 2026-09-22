@@ -62,6 +62,10 @@ export const clicker = defineCatalog({
     toasts: {
       presetSaved: "Preset enregistré",
       presetCreated: "Preset « {name} » créé",
+      presetImported: "Preset importé · « {name} »",
+      presetExported: "Preset exporté",
+      importFailed: "Échec de l’import",
+      exportFailed: "Échec de l’export",
       saveAsNewFailed: "Impossible de créer le preset",
       saveFailed: "Échec de l’enregistrement",
       templateApplied: "Modèle appliqué · {label}",
@@ -171,6 +175,8 @@ export const clicker = defineCatalog({
       pickOnScreen: "Choisir à l'écran",
       clicksOnPoint: "Clics sur ce point",
       randomRadius: "Rayon aléatoire (px)",
+      pauseAfterMs: "Pause après ce point (ms)",
+      pauseAfterMsUnit: "ms",
       removePoint: "Supprimer le point",
       capture: "Capturer des points",
       captureHint:
@@ -451,6 +457,10 @@ export const clicker = defineCatalog({
     toasts: {
       presetSaved: "Preset saved",
       presetCreated: "Preset “{name}” created",
+      presetImported: "Preset imported · “{name}”",
+      presetExported: "Preset exported",
+      importFailed: "Import failed",
+      exportFailed: "Export failed",
       saveAsNewFailed: "Could not create the preset",
       saveFailed: "Failed to save",
       templateApplied: "Template applied · {label}",
@@ -560,6 +570,8 @@ export const clicker = defineCatalog({
       pickOnScreen: "Pick on screen",
       clicksOnPoint: "Clicks on this point",
       randomRadius: "Random radius (px)",
+      pauseAfterMs: "Pause after this point (ms)",
+      pauseAfterMsUnit: "ms",
       removePoint: "Remove point",
       capture: "Capture points",
       captureHint:

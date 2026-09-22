@@ -3688,13 +3688,20 @@ body.action-list-is-dragging .action-list-item {
 
 .caster-clicker-point-row {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
   cursor: grab;
   border-radius: var(--caster-radius-sm, 4px);
   padding: 2px 4px;
   position: relative;
+}
+
+.caster-clicker-point-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .caster-clicker-point-row.is-drag-source {
@@ -3755,6 +3762,19 @@ body.action-list-is-dragging .action-list-item {
   gap: 4px;
   font-size: var(--caster-text-xs);
   color: var(--caster-text-muted);
+}
+
+.caster-clicker-point-pause {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 1.5rem;
+  font-size: var(--caster-text-xs);
+  color: var(--caster-text-muted);
+}
+
+.caster-clicker-point-pause-unit {
+  font-variant-numeric: tabular-nums;
 }
 
 .caster-clicker-point-remove {

@@ -163,7 +163,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
       const target = ev.target as HTMLElement;
       if (
         target.closest(
-          "input, button, label.caster-clicker-point-coord, label.caster-clicker-point-mini, .caster-clicker-point-remove",
+          "input, button, label.caster-clicker-point-coord, label.caster-clicker-point-mini, label.caster-clicker-point-pause, .caster-clicker-point-remove",
         )
       ) {
         return;
@@ -403,7 +403,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
               onClick={() => {
                 e.setPoints((prev) => [
                   ...prev,
-                  { x: 0, y: 0, clicks: 1, radius: 0 },
+                  { x: 0, y: 0, clicks: 1, radius: 0, pauseAfterMs: 0 },
                 ]);
                 e.setSelectedPointIndex(e.points.length);
               }}
@@ -442,6 +442,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
                     e.setSelectedPointIndex(i);
                   }}
                 >
+                  <div className="caster-clicker-point-main">
                   <span className="caster-clicker-point-ord" aria-hidden>
                     {i + 1}
                   </span>
@@ -546,6 +547,35 @@ export function ClickerTargetSection({ editor: e }: Props) {
                   >
                     ✕
                   </button>
+                  </div>
+                  <label
+                    className="caster-clicker-point-pause"
+                    title={t("clicker.target.pauseAfterMs")}
+                  >
+                    <span>{t("clicker.target.pauseAfterMs")}</span>
+                    <WheelNumberInput
+                      className={POINT_NUM_WIDE}
+                      min={0}
+                      max={600_000}
+                      value={pt.pauseAfterMs ?? 0}
+                      disabled={e.editDisabled}
+                      onValueChange={(n) =>
+                        e.setPoints((prev) =>
+                          prev.map((p, j) =>
+                            j === i
+                              ? {
+                                  ...p,
+                                  pauseAfterMs: Math.max(0, n || 0),
+                                }
+                              : p,
+                          ),
+                        )
+                      }
+                    />
+                    <span className="caster-clicker-point-pause-unit">
+                      {t("clicker.target.pauseAfterMsUnit")}
+                    </span>
+                  </label>
                 </li>
               ))}
             </ul>

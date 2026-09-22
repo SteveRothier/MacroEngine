@@ -128,6 +128,9 @@ pub struct ClickPoint {
     pub clicks: u32,
     #[serde(default)]
     pub radius: i32,
+    /// Pause after this point's clicks finish, before advancing to the next.
+    #[serde(default)]
+    pub pause_after_ms: u64,
 }
 
 fn default_point_clicks() -> u32 {
@@ -560,6 +563,22 @@ fn log_zone_feedback(bus: Option<&EventBus>, kind: ZoneFeedbackKind, message: &s
     }
 }
 
+/// Sleep up to `ms`, returning `false` if cancelled mid-wait.
+fn sleep_cancellable(ms: u64, cancel: &CancellationToken) -> bool {
+    if ms == 0 {
+        return true;
+    }
+    let until = Instant::now() + Duration::from_millis(ms);
+    while Instant::now() < until {
+        if cancel.is_cancelled() {
+            return false;
+        }
+        let remaining = until.saturating_duration_since(Instant::now());
+        thread::sleep(remaining.min(Duration::from_millis(10)));
+    }
+    !cancel.is_cancelled()
+}
+
 /// Block while the gate is paused. A Start zone under the cursor resumes the
 /// session, so the pause gate is polled instead of simply waited on.
 fn wait_while_paused_with_start_zone(
@@ -879,6 +898,7 @@ impl ClickerSession {
                     clicks_on_point += 1;
                     let need = points[point_idx].clicks.max(1);
                     if clicks_on_point >= need {
+                        let pause_ms = points[point_idx].pause_after_ms;
                         clicks_on_point = 0;
                         point_idx += 1;
                         if point_idx >= points.len() {
@@ -887,6 +907,10 @@ impl ClickerSession {
                             } else {
                                 point_idx = 0;
                             }
+                        }
+                        if pause_ms > 0 && !sleep_cancellable(pause_ms, cancel) {
+                            end_natural = false;
+                            break;
                         }
                     }
                 }
@@ -1326,12 +1350,14 @@ mod tests {
                     y: 10,
                     clicks: 2,
                     radius: 0,
+                    pause_after_ms: 0,
                 },
                 ClickPoint {
                     x: 20,
                     y: 20,
                     clicks: 1,
                     radius: 0,
+                    pause_after_ms: 0,
                 },
             ],
             ..Default::default()
@@ -1339,6 +1365,44 @@ mod tests {
         let n = ClickerSession::run(&cfg, &cancel, &inj, &metrics, None).unwrap();
         assert_eq!(n, 3);
         assert_eq!(inj.moves().len(), 3);
+    }
+
+    #[test]
+    fn click_points_pause_after_is_interruptible() {
+        let cancel = CancellationToken::new();
+        let inj = RecordingInjector::new();
+        let metrics = MetricsCollector::new();
+        let cancel_c = cancel.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(40));
+            cancel_c.cancel();
+        });
+        let cfg = ClickerConfig {
+            cps: 100.0,
+            points_enabled: true,
+            stop_when_complete: true,
+            points: vec![
+                ClickPoint {
+                    x: 10,
+                    y: 10,
+                    clicks: 1,
+                    radius: 0,
+                    pause_after_ms: 200,
+                },
+                ClickPoint {
+                    x: 20,
+                    y: 20,
+                    clicks: 1,
+                    radius: 0,
+                    pause_after_ms: 0,
+                },
+            ],
+            ..Default::default()
+        };
+        let n = ClickerSession::run(&cfg, &cancel, &inj, &metrics, None).unwrap();
+        // First point completes; pause is interrupted before second point.
+        assert_eq!(n, 1);
+        assert_eq!(inj.moves().len(), 1);
     }
 
     #[test]
