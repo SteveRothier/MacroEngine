@@ -34,13 +34,16 @@ import {
   screenGeomFromDisplay,
 } from "./clickerTypes";
 import { useClickerSettingsApi } from "./useClickerSettings";
-import { pickScreenPointDetailed } from "../pick";
 import { useToast } from "../ui/shell";
 import {
   drawSafetyZone,
   pushZoneOverlayState,
   setZoneOverlayVisible,
 } from "./zoneOverlay";
+import {
+  pushTargetOverlayState,
+  setTargetOverlayVisible,
+} from "./targetOverlay";
 import {
   EMPTY_ZONE_MODEL,
   clampCustomExtent,
@@ -51,6 +54,11 @@ import {
   stopZonesFromModel,
   type ZoneModel,
 } from "./zoneGeom";
+import {
+  pushHistEntry,
+  shouldCoalescePush,
+  type HistEntry,
+} from "./clickerHist";
 
 const HISTORY_MAX = 50;
 
@@ -127,6 +135,10 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     null,
   );
   const [zoneOverlayVisible, setZoneOverlayVisibleState] = useState(false);
+  const [targetOverlayVisible, setTargetOverlayVisibleState] = useState(false);
+  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(
+    null,
+  );
   const [screenGeom, setScreenGeom] =
     useState<ScreenGeomDto>(FALLBACK_SCREEN_GEOM);
   const [displays, setDisplays] = useState<DisplayDto[]>([]);
@@ -134,10 +146,9 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const [pointsEnabled, setPointsEnabled] = useState(false);
   const [points, setPoints] = useState<ClickPoint[]>([]);
   const [stopWhenComplete, setStopWhenComplete] = useState(false);
-  const [picking, setPicking] = useState(false);
-  const [pickingPointIndex, setPickingPointIndex] = useState<number | null>(null);
   const [capturingPoints, setCapturingPoints] = useState(false);
   const [capturedCount, setCapturedCount] = useState(0);
+  const [liveCapturePoints, setLiveCapturePoints] = useState<ClickPoint[]>([]);
   const [drawing, setDrawing] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [selectedPreset, setSelectedPreset] = useState("");
@@ -155,10 +166,13 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     DEFAULT_PROCESS_FILTER,
   );
 
-  const pastRef = useRef<ClickerConfigPayload[]>([]);
-  const futureRef = useRef<ClickerConfigPayload[]>([]);
+  const pastRef = useRef<HistEntry[]>([]);
+  const futureRef = useRef<HistEntry[]>([]);
   const baselineKeyRef = useRef<string>("");
   const skipHistoryRef = useRef(false);
+  const histCoalesceRef = useRef<{ labelKey: string; until: number } | null>(
+    null,
+  );
   const dirtyRef = useRef(false);
   const lockedRef = useRef(false);
   const selectedPresetRef = useRef("");
@@ -193,8 +207,58 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const clearHistory = useCallback(() => {
     pastRef.current = [];
     futureRef.current = [];
+    histCoalesceRef.current = null;
     syncHistFlags();
   }, [syncHistFlags]);
+
+  /** Snapshot current config into past before a mutation. */
+  const pushHistory = useCallback(
+    (labelKey: string, opts?: { coalesceMs?: number }) => {
+      if (locked || skipHistoryRef.current) return;
+      const now = Date.now();
+      if (
+        opts?.coalesceMs != null &&
+        shouldCoalescePush(histCoalesceRef.current, labelKey, now)
+      ) {
+        return;
+      }
+      if (opts?.coalesceMs != null) {
+        histCoalesceRef.current = {
+          labelKey,
+          until: now + opts.coalesceMs,
+        };
+      } else {
+        histCoalesceRef.current = null;
+      }
+      try {
+        pastRef.current = pushHistEntry(
+          pastRef.current,
+          {
+            config: structuredClone(buildConfigRef.current()),
+            labelKey,
+          },
+          HISTORY_MAX,
+        );
+        futureRef.current = [];
+        syncHistFlags();
+      } catch {
+        /* ignore */
+      }
+    },
+    [locked, syncHistFlags],
+  );
+
+  const setZoneModelWithHistory = useCallback(
+    (
+      labelKey: string,
+      updater: Parameters<typeof setZoneModel>[0],
+      opts?: { coalesceMs?: number },
+    ) => {
+      pushHistory(labelKey, opts);
+      setZoneModel(updater);
+    },
+    [pushHistory],
+  );
 
   const buildConfig = useCallback((): ClickerConfigPayload => {
     return {
@@ -433,6 +497,9 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       setDirty(false);
       clearHistory();
       await loadPresetLockedState(preset.name);
+      queueMicrotask(() => {
+        skipHistoryRef.current = false;
+      });
     },
     [
       applyConfig,
@@ -447,29 +514,49 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
 
   const undoConfig = useCallback(() => {
     if (locked || pastRef.current.length === 0) return;
-    const prev = pastRef.current[pastRef.current.length - 1]!;
+    const entry = pastRef.current[pastRef.current.length - 1]!;
     pastRef.current = pastRef.current.slice(0, -1);
-    futureRef.current = [
-      ...futureRef.current,
-      structuredClone(buildConfig()),
-    ].slice(-HISTORY_MAX);
+    futureRef.current = pushHistEntry(
+      futureRef.current,
+      {
+        config: structuredClone(buildConfig()),
+        labelKey: entry.labelKey,
+      },
+      HISTORY_MAX,
+    );
     syncHistFlags();
     skipHistoryRef.current = true;
-    applyConfig(prev);
-  }, [applyConfig, buildConfig, locked, syncHistFlags]);
+    applyConfig(entry.config);
+    toast.info(
+      t("clicker.toasts.undone", { label: t(entry.labelKey) }),
+    );
+    queueMicrotask(() => {
+      skipHistoryRef.current = false;
+    });
+  }, [applyConfig, buildConfig, locked, syncHistFlags, t, toast]);
 
   const redoConfig = useCallback(() => {
     if (locked || futureRef.current.length === 0) return;
-    const next = futureRef.current[futureRef.current.length - 1]!;
+    const entry = futureRef.current[futureRef.current.length - 1]!;
     futureRef.current = futureRef.current.slice(0, -1);
-    pastRef.current = [
-      ...pastRef.current,
-      structuredClone(buildConfig()),
-    ].slice(-HISTORY_MAX);
+    pastRef.current = pushHistEntry(
+      pastRef.current,
+      {
+        config: structuredClone(buildConfig()),
+        labelKey: entry.labelKey,
+      },
+      HISTORY_MAX,
+    );
     syncHistFlags();
     skipHistoryRef.current = true;
-    applyConfig(next);
-  }, [applyConfig, buildConfig, locked, syncHistFlags]);
+    applyConfig(entry.config);
+    toast.info(
+      t("clicker.toasts.redone", { label: t(entry.labelKey) }),
+    );
+    queueMicrotask(() => {
+      skipHistoryRef.current = false;
+    });
+  }, [applyConfig, buildConfig, locked, syncHistFlags, t, toast]);
 
   const discardChanges = useCallback(() => {
     if (!baselineKeyRef.current) return;
@@ -481,6 +568,9 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       applyConfig(baseline);
       setDirty(false);
       clearHistory();
+      queueMicrotask(() => {
+        skipHistoryRef.current = false;
+      });
     } catch {
       /* ignore */
     }
@@ -489,16 +579,10 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const applyTemplate = useCallback(
     (config: ClickerConfigPayload) => {
       if (locked) return;
-      try {
-        pastRef.current = [...pastRef.current, buildConfig()].slice(-HISTORY_MAX);
-        futureRef.current = [];
-        syncHistFlags();
-      } catch {
-        /* ignore */
-      }
+      pushHistory("clicker.history.templateApplied");
       applyConfig(config);
     },
-    [applyConfig, buildConfig, locked, syncHistFlags],
+    [applyConfig, locked, pushHistory],
   );
 
   const onSelectDisplay = useCallback(
@@ -547,55 +631,6 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     await refresh();
   }, [onStatus, refresh]);
 
-  const onPick = useCallback(async () => {
-    setPicking(true);
-    setPickingPointIndex(null);
-    try {
-      const result = await pickScreenPointDetailed();
-      if (!result.ok) {
-        if (result.reason === "timeout" || result.reason === "error") {
-          toast.info(t("macros.params.pickCancelled"));
-        }
-        return;
-      }
-      setTargetFixed(true);
-      setTargetX(result.point.x);
-      setTargetY(result.point.y);
-      await persistUi();
-    } finally {
-      setPicking(false);
-    }
-  }, [persistUi, t, toast]);
-
-  const onPickPoint = useCallback(
-    async (index: number) => {
-      setPicking(true);
-      setPickingPointIndex(index);
-      try {
-        const result = await pickScreenPointDetailed();
-        if (!result.ok) {
-          if (result.reason === "timeout" || result.reason === "error") {
-            toast.info(t("macros.params.pickCancelled"));
-          }
-          return;
-        }
-        setPointsEnabled(true);
-        setPoints((prev) =>
-          prev.map((pt, j) =>
-            j === index
-              ? { ...pt, x: result.point.x, y: result.point.y }
-              : pt,
-          ),
-        );
-        await persistUi();
-      } finally {
-        setPicking(false);
-        setPickingPointIndex(null);
-      }
-    },
-    [persistUi, t, toast],
-  );
-
   const finishPointCapture = useCallback(async () => {
     try {
       const captured = await invoke<ClickPoint[]>(
@@ -606,9 +641,13 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         setPointsEnabled(true);
       }
       return captured;
+    } catch {
+      // Already stopped (Esc / right-click cancel raced the poll).
+      return [] as ClickPoint[];
     } finally {
       setCapturingPoints(false);
       setCapturedCount(0);
+      setLiveCapturePoints([]);
     }
   }, []);
 
@@ -619,7 +658,10 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     }
     await invoke("start_clicker_point_capture");
     setCapturedCount(0);
+    setLiveCapturePoints([]);
     setCapturingPoints(true);
+    // Show markers on the real screen while capturing.
+    setTargetOverlayVisibleState(true);
   }, [capturingPoints, finishPointCapture]);
 
   // Poll progress so the button shows the count and reacts to Esc (cancel).
@@ -627,12 +669,16 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     if (!capturingPoints) return;
     let stopped = false;
     const id = window.setInterval(() => {
-      void invoke<{ active: boolean; count: number; cancelled: boolean }>(
-        "get_clicker_point_capture_state",
-      )
+      void invoke<{
+        active: boolean;
+        count: number;
+        cancelled: boolean;
+        points: ClickPoint[];
+      }>("get_clicker_point_capture_state")
         .then((s) => {
           if (stopped) return;
           setCapturedCount(s.count);
+          setLiveCapturePoints(s.points ?? []);
           if (!s.active) {
             stopped = true;
             void finishPointCapture().catch(() => {});
@@ -658,6 +704,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       rect: { x: number; y: number; width: number; height: number },
       kind: ZoneKind = "safety",
     ) => {
+      pushHistory("clicker.history.zoneAdded");
       const id = newZoneId();
       setZoneModel((m) => {
         const color = nextCustomZoneColor(m.customZones.map((z) => z.color));
@@ -683,7 +730,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       });
       setZoneSelection({ kind: "custom", id });
     },
-    [screenGeom],
+    [pushHistory, screenGeom],
   );
 
   const onDrawZone = useCallback(
@@ -704,7 +751,13 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   );
 
   const updateCustomZone = useCallback(
-    (id: string, patch: Partial<CustomZone>) => {
+    (
+      id: string,
+      patch: Partial<CustomZone>,
+      historyLabel?: string,
+      histOpts?: { coalesceMs?: number },
+    ) => {
+      if (historyLabel) pushHistory(historyLabel, histOpts);
       setZoneModel((m) => ({
         ...m,
         customZones: m.customZones.map((z) =>
@@ -712,21 +765,26 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         ),
       }));
     },
-    [],
+    [pushHistory],
   );
 
-  const removeCustomZone = useCallback((id: string) => {
-    setZoneModel((m) => ({
-      ...m,
-      customZones: m.customZones.filter((z) => z.id !== id),
-    }));
-    setZoneSelection((cur) =>
-      cur?.kind === "custom" && cur.id === id ? null : cur,
-    );
-  }, []);
+  const removeCustomZone = useCallback(
+    (id: string) => {
+      pushHistory("clicker.history.zoneDeleted");
+      setZoneModel((m) => ({
+        ...m,
+        customZones: m.customZones.filter((z) => z.id !== id),
+      }));
+      setZoneSelection((cur) =>
+        cur?.kind === "custom" && cur.id === id ? null : cur,
+      );
+    },
+    [pushHistory],
+  );
 
   const duplicateCustomZone = useCallback(
     (id: string) => {
+      pushHistory("clicker.history.zoneDuplicated");
       let newId: string | null = null;
       setZoneModel((m) => {
         const src = m.customZones.find((z) => z.id === id);
@@ -746,11 +804,12 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       });
       if (newId) setZoneSelection({ kind: "custom", id: newId });
     },
-    [screenGeom],
+    [pushHistory, screenGeom],
   );
 
   const moveCustomZoneOrder = useCallback(
     (id: string, where: "front" | "back") => {
+      pushHistory("clicker.history.zoneReordered");
       setZoneModel((m) => {
         const idx = m.customZones.findIndex((z) => z.id === id);
         if (idx < 0) return m;
@@ -762,7 +821,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         return { ...m, customZones: next };
       });
     },
-    [],
+    [pushHistory],
   );
 
   const onSavePreset = useCallback(async () => {
@@ -994,8 +1053,47 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   }, [zoneOverlayVisible, screenGeom, zoneModel]);
 
   useEffect(() => {
+    void (async () => {
+      const show = targetOverlayVisible || capturingPoints;
+      await setTargetOverlayVisible(show);
+      if (show) {
+        const mode =
+          capturingPoints || pointsEnabled
+            ? "sequence"
+            : targetFixed
+              ? "fixed"
+              : "cursor";
+        const overlayPoints =
+          mode === "sequence"
+            ? capturingPoints
+              ? [...points, ...liveCapturePoints]
+              : points
+            : [];
+        await pushTargetOverlayState({
+          geom: screenGeom,
+          mode,
+          fixed:
+            mode === "fixed" ? { x: targetX, y: targetY } : null,
+          points: overlayPoints,
+        });
+      }
+    })();
+  }, [
+    targetOverlayVisible,
+    capturingPoints,
+    liveCapturePoints,
+    screenGeom,
+    pointsEnabled,
+    targetFixed,
+    targetX,
+    targetY,
+    points,
+  ]);
+
+  useEffect(() => {
     return () => {
       void setZoneOverlayVisible(false);
+      void setTargetOverlayVisible(false);
     };
   }, []);
 
@@ -1039,11 +1137,15 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       isDirty &&
       pastRef.current.length === 0 &&
       baselineKeyRef.current &&
-      !locked
+      !locked &&
+      !skipHistoryRef.current
     ) {
       try {
         pastRef.current = [
-          JSON.parse(baselineKeyRef.current) as ClickerConfigPayload,
+          {
+            config: JSON.parse(baselineKeyRef.current) as ClickerConfigPayload,
+            labelKey: "clicker.history.baseline",
+          },
         ];
         futureRef.current = [];
         syncHistFlags();
@@ -1189,10 +1291,16 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     setClickZoneOrder,
     zoneModel,
     setZoneModel,
+    setZoneModelWithHistory,
+    pushHistory,
     zoneSelection,
     setZoneSelection,
     zoneOverlayVisible,
     setZoneOverlayVisible: setZoneOverlayVisibleState,
+    targetOverlayVisible,
+    setTargetOverlayVisible: setTargetOverlayVisibleState,
+    selectedPointIndex,
+    setSelectedPointIndex,
     screenGeom,
     displays,
     activeDisplayId,
@@ -1202,10 +1310,9 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     setPoints,
     stopWhenComplete,
     setStopWhenComplete,
-    picking,
-    pickingPointIndex,
     capturingPoints,
     capturedCount,
+    liveCapturePoints,
     onTogglePointCapture,
     processFilter,
     presetFilterMode,
@@ -1234,8 +1341,6 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     onStop,
     onPause,
     onResume,
-    onPick,
-    onPickPoint,
     onDrawZone,
     addCustomZone,
     updateCustomZone,

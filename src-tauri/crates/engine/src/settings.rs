@@ -13,9 +13,10 @@ use crate::hotkeys::HotkeyBindings;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum ThemeMode {
-    #[default]
     Light,
+    #[default]
     Dark,
+    /// Legacy; normalized to [`ThemeMode::Dark`] on load.
     System,
 }
 
@@ -495,7 +496,7 @@ impl Default for AppSettings {
             overlay_opacity: 1.0,
             hotkeys: HotkeyBindings::default(),
             process_filter: ProcessFilter::default(),
-            theme: ThemeMode::Light,
+            theme: ThemeMode::Dark,
             display_id: None,
             sidebar_collapsed: false,
             journal_open: false,
@@ -514,6 +515,9 @@ impl Default for AppSettings {
 
 /// Normalize appearance numeric fields after load/save.
 pub fn normalize_app_settings(s: &mut AppSettings) {
+    if s.theme == ThemeMode::System {
+        s.theme = ThemeMode::Dark;
+    }
     s.overlay_opacity = clamp_overlay_opacity(s.overlay_opacity);
     s.appearance.font_scale = clamp_font_scale(s.appearance.font_scale);
     if s.shell.recent_list_max == 0 {
@@ -587,15 +591,15 @@ mod tests {
         assert_eq!(loaded.hotkeys.macro_vk, 0x79);
         assert!(loaded.process_filter.enabled);
         assert_eq!(loaded.process_filter.names, vec!["notepad.exe"]);
-        assert_eq!(loaded.theme, ThemeMode::Light);
-        s.theme = ThemeMode::Dark;
+        assert_eq!(loaded.theme, ThemeMode::Dark);
+        s.theme = ThemeMode::Light;
         save_settings(&dir, &s).unwrap();
         let loaded2 = load_settings(&dir).unwrap();
-        assert_eq!(loaded2.theme, ThemeMode::Dark);
+        assert_eq!(loaded2.theme, ThemeMode::Light);
         s.theme = ThemeMode::System;
         save_settings(&dir, &s).unwrap();
         let loaded3 = load_settings(&dir).unwrap();
-        assert_eq!(loaded3.theme, ThemeMode::System);
+        assert_eq!(loaded3.theme, ThemeMode::Dark);
         s.close_to_tray = true;
         s.overlay_opacity = 0.5;
         s.sidebar_collapsed = true;

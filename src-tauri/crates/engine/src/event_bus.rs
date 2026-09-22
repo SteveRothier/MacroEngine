@@ -2,6 +2,34 @@ use std::sync::{Arc, Mutex};
 
 use crate::state::EngineState;
 
+/// Why a safety zone produced user-visible feedback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZoneFeedbackKind {
+    StopHit,
+    PauseEnter,
+    StartResume,
+    StartLaunch,
+}
+
+impl ZoneFeedbackKind {
+    pub fn action_label(self) -> &'static str {
+        match self {
+            ZoneFeedbackKind::StopHit => "stop",
+            ZoneFeedbackKind::PauseEnter => "pause",
+            ZoneFeedbackKind::StartResume | ZoneFeedbackKind::StartLaunch => "start",
+        }
+    }
+
+    pub fn kind_label(self) -> &'static str {
+        match self {
+            ZoneFeedbackKind::StopHit => "stopHit",
+            ZoneFeedbackKind::PauseEnter => "pauseEnter",
+            ZoneFeedbackKind::StartResume => "startResume",
+            ZoneFeedbackKind::StartLaunch => "startLaunch",
+        }
+    }
+}
+
 /// Events emitted by the engine toward observers (Tauri shell, tests).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EngineEvent {
@@ -24,6 +52,9 @@ pub enum EngineEvent {
     },
     ScriptStep {
         method: String,
+    },
+    ZoneFeedback {
+        kind: ZoneFeedbackKind,
     },
 }
 

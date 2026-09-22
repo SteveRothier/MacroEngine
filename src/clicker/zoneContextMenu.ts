@@ -48,10 +48,10 @@ export function runCustomZoneContextAction(
       e.moveCustomZoneOrder(zoneId, "back");
       break;
     case "makeSafety":
-      e.updateCustomZone(zoneId, { kind: "safety" });
+      e.updateCustomZone(zoneId, { kind: "safety" }, "clicker.history.zoneKindChanged");
       break;
     case "makeClick":
-      e.updateCustomZone(zoneId, { kind: "click" });
+      e.updateCustomZone(zoneId, { kind: "click" }, "clicker.history.zoneKindChanged");
       break;
     case "delete":
       e.removeCustomZone(zoneId);

@@ -140,11 +140,62 @@ pub struct OverlayBand {
     pub fill: u32,
 }
 
+/// Circular target marker for the native overlay (center + optional radius ring).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OverlayMarker {
+    pub x: i32,
+    pub y: i32,
+    /// Random click radius in px (0 = center dot only).
+    pub radius: i32,
+    /// COLORREF (R | G<<8 | B<<16).
+    pub fill: u32,
+}
+
 pub fn overlay_bands(zones: &[StopZone], screen: ScreenGeom) -> Vec<OverlayBand> {
     zones
         .iter()
         .map(|z| z.overlay_band(screen))
         .filter(|b| b.w > 0 && b.h > 0)
+        .collect()
+}
+
+/// Fixed-point blue (same as click-zone fill).
+pub const TARGET_FIXED_FILL: u32 = CLICK_FILL;
+
+/// Sequence palette (matches frontend CUSTOM_ZONE_PALETTE approx).
+pub const TARGET_SEQUENCE_FILLS: [u32; 8] = [
+    225 | (29 << 8) | (72 << 16),   // #e11d48
+    245 | (158 << 8) | (11 << 16),  // #f59e0b
+    16 | (185 << 8) | (129 << 16),  // #10b981
+    59 | (130 << 8) | (246 << 16),  // #3b82f6
+    139 | (92 << 8) | (246 << 16),  // #8b5cf6
+    236 | (72 << 8) | (153 << 16),  // #ec4899
+    20 | (184 << 8) | (166 << 16),  // #14b8a6
+    249 | (115 << 8) | (22 << 16),  // #f97316
+];
+
+pub fn overlay_markers_fixed(x: i32, y: i32) -> Vec<OverlayMarker> {
+    vec![OverlayMarker {
+        x,
+        y,
+        radius: 0,
+        fill: TARGET_FIXED_FILL,
+    }]
+}
+
+pub fn overlay_markers_points<'a, I>(points: I) -> Vec<OverlayMarker>
+where
+    I: IntoIterator<Item = (i32, i32, i32)>,
+{
+    points
+        .into_iter()
+        .enumerate()
+        .map(|(i, (x, y, radius))| OverlayMarker {
+            x,
+            y,
+            radius: radius.max(0),
+            fill: TARGET_SEQUENCE_FILLS[i % TARGET_SEQUENCE_FILLS.len()],
+        })
         .collect()
 }
 

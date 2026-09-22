@@ -66,7 +66,7 @@ pub use library_index::{
     LibraryItemDto, LibraryKind, ListLibraryQuery,
 };
 pub use env::MacroEnv;
-pub use event_bus::{EngineEvent, EventBus, LogLevel};
+pub use event_bus::{EngineEvent, EventBus, LogLevel, ZoneFeedbackKind};
 pub use hotkeys::{default_bindings, HotkeyBindings, HotkeyCallbacks, HotkeyHook};
 pub use input::{
     default_injector, list_visible_process_exes, InputError, MouseButton, MouseInjector, Point,
@@ -82,7 +82,7 @@ pub use macro_vm::MacroVm;
 pub use metrics::{ClickerMetrics, MetricsCollector};
 pub use pause::PauseGate;
 pub use picker::{
-    draw_zone_rect, pick_after_delay, pick_now, DrawnRect, PickedPoint, PickerError,
+    draw_zone_rect, pick_after_delay, pick_now, pick_on_click, DrawnRect, PickedPoint, PickerError,
 };
 pub use quick_access::{
     finalize_recent, load_quick_access, prune_orphans, push_recent, save_quick_access, set_favorite,
@@ -111,7 +111,8 @@ pub use settings::{
 };
 pub use state::{EngineError, EngineState, StateTransitionError};
 pub use stop_zones::{
-    overlay_bands, ClickSampleMode, OverlayBand, ScreenCorner, ScreenEdge, ScreenGeom, ScreenGeomDto,
-    StopZone, ZoneAction, ZoneKind,
+    overlay_bands, overlay_markers_fixed, overlay_markers_points, ClickSampleMode, OverlayBand,
+    OverlayMarker, ScreenCorner, ScreenEdge, ScreenGeom, ScreenGeomDto, StopZone, ZoneAction,
+    ZoneKind,
 };
 pub use zone_native_overlay::NativeZoneOverlay;

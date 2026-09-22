@@ -1,14 +1,14 @@
 //! One click-through Win32 layered window covering the selected monitor.
 //!
-//! Bands are painted inside a fixed-size HWND (same idea as the draw overlay:
-//! CSS/GDI rects, no SetWindowPos per drag). A dedicated thread pumps WM_PAINT.
+//! Bands and target markers are painted inside a fixed-size HWND. A dedicated
+//! thread pumps WM_PAINT.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use crate::stop_zones::{darken_fill, OverlayBand, ScreenGeom};
+use crate::stop_zones::{darken_fill, OverlayBand, OverlayMarker, ScreenGeom};
 
 #[cfg(windows)]
 use windows::core::w;
@@ -16,8 +16,8 @@ use windows::core::w;
 use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM};
 #[cfg(windows)]
 use windows::Win32::Graphics::Gdi::{
-    BeginPaint, CreateSolidBrush, DeleteObject, EndPaint, FillRect, FrameRect, InvalidateRect,
-    HBRUSH, PAINTSTRUCT,
+    BeginPaint, CreatePen, CreateSolidBrush, DeleteObject, Ellipse, EndPaint, FillRect, FrameRect,
+    SelectObject, HBRUSH, PAINTSTRUCT, PS_SOLID,
 };
 #[cfg(windows)]
 use windows::Win32::System::LibraryLoader::GetModuleHandleW;
@@ -38,11 +38,13 @@ const ALPHA: u8 = 100;
 const WM_SYNC: u32 = WM_APP + 32;
 #[cfg(windows)]
 const COLOR_KEY: u32 = 255 | (0 << 8) | (255 << 16);
+const DOT_RADIUS: i32 = 7;
 
 #[derive(Clone)]
 struct OverlayFrame {
     screen: ScreenGeom,
     bands: Vec<OverlayBand>,
+    markers: Vec<OverlayMarker>,
 }
 
 impl OverlayFrame {
@@ -55,11 +57,14 @@ impl OverlayFrame {
                 h: 0,
             },
             bands: Vec::new(),
+            markers: Vec::new(),
         }
     }
 
     fn is_hidden(&self) -> bool {
-        self.screen.w <= 0 || self.screen.h <= 0 || self.bands.is_empty()
+        self.screen.w <= 0
+            || self.screen.h <= 0
+            || (self.bands.is_empty() && self.markers.is_empty())
     }
 }
 
@@ -99,15 +104,22 @@ impl NativeZoneOverlay {
     }
 
     pub fn hide(&self) {
-        let _ = self.sync(ScreenGeom::from_size(0, 0), &[]);
+        let _ = self.sync(ScreenGeom::from_size(0, 0), &[], &[]);
     }
 
-    pub fn sync(&self, screen: ScreenGeom, bands: &[OverlayBand]) -> Result<(), String> {
+    pub fn sync(
+        &self,
+        screen: ScreenGeom,
+        bands: &[OverlayBand],
+        markers: &[OverlayMarker],
+    ) -> Result<(), String> {
         {
             let mut pending = self.pending.lock().map_err(|e| e.to_string())?;
             pending.screen = screen;
             pending.bands.clear();
             pending.bands.extend_from_slice(bands);
+            pending.markers.clear();
+            pending.markers.extend_from_slice(markers);
         }
         #[cfg(windows)]
         {
@@ -120,7 +132,7 @@ impl NativeZoneOverlay {
         }
         #[cfg(not(windows))]
         {
-            let _ = (screen, bands);
+            let _ = (screen, bands, markers);
         }
         Ok(())
     }
@@ -193,7 +205,10 @@ fn overlay_thread(
 
 #[cfg(windows)]
 fn apply_pending(pending: &Mutex<OverlayFrame>, host: &mut Option<Host>) {
-    let frame = pending.lock().map(|g| g.clone()).unwrap_or_else(|_| OverlayFrame::hidden());
+    let frame = pending
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_else(|_| OverlayFrame::hidden());
     if frame.is_hidden() {
         if let Some(h) = host.take() {
             unsafe {
@@ -202,7 +217,7 @@ fn apply_pending(pending: &Mutex<OverlayFrame>, host: &mut Option<Host>) {
                 let _ = DestroyWindow(hwnd);
             }
         }
-        set_paint_bands(ScreenGeom::from_size(0, 0), &[]);
+        set_paint_frame(ScreenGeom::from_size(0, 0), &[], &[]);
         return;
     }
     match host {
@@ -222,14 +237,14 @@ fn apply_pending(pending: &Mutex<OverlayFrame>, host: &mut Option<Host>) {
                 }
                 h.screen = frame.screen;
             }
-            set_paint_bands(frame.screen, &frame.bands);
+            set_paint_frame(frame.screen, &frame.bands, &frame.markers);
             unsafe {
                 let _ = InvalidateRect(Some(hwnd), None, true);
             }
         }
         None => match create_host(frame.screen) {
             Ok(h) => {
-                set_paint_bands(frame.screen, &frame.bands);
+                set_paint_frame(frame.screen, &frame.bands, &frame.markers);
                 unsafe {
                     let hwnd = HWND(h.hwnd as *mut std::ffi::c_void);
                     let _ = InvalidateRect(Some(hwnd), None, true);
@@ -240,6 +255,9 @@ fn apply_pending(pending: &Mutex<OverlayFrame>, host: &mut Option<Host>) {
         },
     }
 }
+
+#[cfg(windows)]
+use windows::Win32::Graphics::Gdi::InvalidateRect;
 
 #[cfg(windows)]
 fn create_host(screen: ScreenGeom) -> Result<Host, String> {
@@ -289,6 +307,7 @@ fn create_host(screen: ScreenGeom) -> Result<Host, String> {
 struct PaintState {
     screen: ScreenGeom,
     bands: Vec<OverlayBand>,
+    markers: Vec<OverlayMarker>,
 }
 
 #[cfg(windows)]
@@ -298,17 +317,48 @@ fn paint_state() -> &'static Mutex<PaintState> {
         Mutex::new(PaintState {
             screen: ScreenGeom::from_size(0, 0),
             bands: Vec::new(),
+            markers: Vec::new(),
         })
     })
 }
 
 #[cfg(windows)]
-fn set_paint_bands(screen: ScreenGeom, bands: &[OverlayBand]) {
+fn set_paint_frame(screen: ScreenGeom, bands: &[OverlayBand], markers: &[OverlayMarker]) {
     if let Ok(mut s) = paint_state().lock() {
         s.screen = screen;
         s.bands.clear();
         s.bands.extend_from_slice(bands);
+        s.markers.clear();
+        s.markers.extend_from_slice(markers);
     }
+}
+
+#[cfg(windows)]
+unsafe fn paint_ellipse(
+    hdc: windows::Win32::Graphics::Gdi::HDC,
+    cx: i32,
+    cy: i32,
+    radius: i32,
+    fill: u32,
+) {
+    let r = radius.clamp(1, 10_000);
+    let fill_brush = CreateSolidBrush(COLORREF(fill));
+    if fill_brush.0.is_null() {
+        return;
+    }
+    let border = darken_fill(fill);
+    let pen = CreatePen(PS_SOLID, 1, COLORREF(border));
+    if pen.0.is_null() {
+        let _ = DeleteObject(fill_brush.into());
+        return;
+    }
+    let old_brush = SelectObject(hdc, fill_brush.into());
+    let old_pen = SelectObject(hdc, pen.into());
+    let _ = Ellipse(hdc, cx - r, cy - r, cx + r, cy + r);
+    let _ = SelectObject(hdc, old_brush);
+    let _ = SelectObject(hdc, old_pen);
+    let _ = DeleteObject(fill_brush.into());
+    let _ = DeleteObject(pen.into());
 }
 
 #[cfg(windows)]
@@ -329,10 +379,17 @@ unsafe extern "system" fn wnd_proc(
             let key_brush = CreateSolidBrush(COLORREF(COLOR_KEY));
             let _ = FillRect(hdc, &rc, key_brush);
             let _ = DeleteObject(key_brush.into());
-            if let Ok(state) = paint_state().lock() {
-                let ox = state.screen.x;
-                let oy = state.screen.y;
-                for band in &state.bands {
+            // Clone then drop the lock before GDI work (avoid re-entrancy / deadlock).
+            let snapshot = paint_state().lock().ok().map(|s| {
+                (
+                    s.screen.x,
+                    s.screen.y,
+                    s.bands.clone(),
+                    s.markers.clone(),
+                )
+            });
+            if let Some((ox, oy, bands, markers)) = snapshot {
+                for band in &bands {
                     let fill = band.fill;
                     let border = darken_fill(fill);
                     let band_rc = RECT {
@@ -347,6 +404,14 @@ unsafe extern "system" fn wnd_proc(
                     let _ = FrameRect(hdc, &band_rc, border_brush);
                     let _ = DeleteObject(fill_brush.into());
                     let _ = DeleteObject(border_brush.into());
+                }
+                for marker in &markers {
+                    let cx = marker.x - ox;
+                    let cy = marker.y - oy;
+                    if marker.radius > 0 {
+                        paint_ellipse(hdc, cx, cy, marker.radius, marker.fill);
+                    }
+                    paint_ellipse(hdc, cx, cy, DOT_RADIUS, marker.fill);
                 }
             }
             let _ = EndPaint(hwnd, &ps);

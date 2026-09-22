@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use crate::cancel::CancellationToken;
 use crate::clicker::{ClickMode, ClickPoint, ClickerConfig, ClickerSession};
 use crate::clicker_capture::ClickPointCapture;
-use crate::event_bus::{EngineEvent, EventBus, LogLevel};
+use crate::event_bus::{EngineEvent, EventBus, LogLevel, ZoneFeedbackKind};
 use crate::hotkeys::{
     default_bindings, update_live_bindings, update_live_clicker_triggers,
     update_live_macro_triggers, HotkeyBindings, HotkeyCallbacks, HotkeyHook, TriggerBinding,
@@ -82,6 +82,8 @@ pub struct AppState {
     clicker_triggers: Arc<Mutex<std::collections::HashMap<TriggerBinding, String>>>,
     /// Optional UI teardown (e.g. hide fullscreen picker) on stop/emergency.
     ui_release: Arc<Mutex<Option<Arc<dyn Fn() + Send + Sync>>>>,
+    /// Optional Start-zone cold-start config (tray last-preset parity).
+    start_zone_config: Arc<Mutex<Option<Arc<dyn Fn() -> ClickerConfig + Send + Sync>>>>,
     /// True while the screen picker is actively capturing the cursor.
     picking: Arc<AtomicBool>,
     /// Selected physical display for zones / picker / HUD (not virtual desktop).
@@ -134,6 +136,7 @@ impl AppState {
             macro_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
             clicker_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
             ui_release: Arc::new(Mutex::new(None)),
+            start_zone_config: Arc::new(Mutex::new(None)),
             picking: Arc::new(AtomicBool::new(false)),
             display_id: Arc::new(Mutex::new(None)),
             zone_screen: Arc::new(Mutex::new(ScreenGeom::from_size(1920, 1080))),
@@ -174,8 +177,9 @@ impl AppState {
     }
 
     /// Polls the cursor while Idle; a rising edge into a Start zone starts the
-    /// clicker with `clicker_config()`. While non-Idle, tracks occupancy so a
-    /// session that ends with the cursor still in Start does not auto-relaunch.
+    /// clicker with the Start-zone config resolver (tray last-preset when set).
+    /// While non-Idle, tracks occupancy so a session that ends with the cursor
+    /// still in Start does not auto-relaunch.
     fn run_start_zone_arm_loop(&self) {
         let mut was_in_start = false;
         let mut seeded = false;
@@ -202,20 +206,42 @@ impl AppState {
                 continue;
             }
             if in_start && !was_in_start {
-                let cfg = self.clicker_config();
+                let cfg = self.resolve_start_zone_config();
                 self.bus.publish(EngineEvent::Log {
                     level: LogLevel::Info,
-                    message: "start zone started the clicker session".into(),
+                    message: "Zone Start — session démarrée".into(),
+                });
+                self.bus.publish(EngineEvent::ZoneFeedback {
+                    kind: ZoneFeedbackKind::StartLaunch,
                 });
                 if let Err(e) = self.start_clicker(cfg) {
                     self.bus.publish(EngineEvent::Log {
                         level: LogLevel::Warn,
-                        message: format!("start zone launch failed: {e}"),
+                        message: format!("Zone Start — échec du démarrage : {e}"),
                     });
                 }
             }
             was_in_start = in_start;
         }
+    }
+
+    pub fn set_start_zone_config_resolver(
+        &self,
+        cb: Arc<dyn Fn() -> ClickerConfig + Send + Sync>,
+    ) {
+        *self.start_zone_config.lock().expect("start_zone_config") = Some(cb);
+    }
+
+    fn resolve_start_zone_config(&self) -> ClickerConfig {
+        if let Some(cb) = self
+            .start_zone_config
+            .lock()
+            .expect("start_zone_config")
+            .clone()
+        {
+            return cb();
+        }
+        self.clicker_config()
     }
 
     pub fn state(&self) -> EngineState {
@@ -1708,6 +1734,16 @@ impl AppState {
         crate::picker::pick_now(self.injector.as_ref()).map_err(|e| e.to_string())
     }
 
+    /// Wait for the next left-click on screen (Esc / right-click cancel).
+    pub fn pick_point_on_click(
+        &self,
+        timeout: Duration,
+    ) -> Result<crate::picker::PickedPoint, String> {
+        let token = CancellationToken::new();
+        crate::picker::pick_on_click(self.injector.as_ref(), &token, timeout)
+            .map_err(|e| e.to_string())
+    }
+
     /// Drag LMB to define a custom zone rectangle (up to `timeout`).
     pub fn draw_zone_rect(
         &self,
@@ -1737,21 +1773,22 @@ impl AppState {
         drop(guard);
         self.bus.publish(EngineEvent::Log {
             level: LogLevel::Info,
-            message: "capture de points clicker démarrée (Échap pour annuler)".into(),
+            message: "capture de points clicker démarrée (Échap / clic droit pour annuler)".into(),
         });
         Ok(())
     }
 
-    /// `(active, count, cancelled)` for the capture progress UI.
-    pub fn clicker_point_capture_state(&self) -> (bool, usize, bool) {
+    /// `(active, count, cancelled, points)` for the capture progress UI / overlay.
+    pub fn clicker_point_capture_state(&self) -> (bool, usize, bool, Vec<ClickPoint>) {
         let guard = self.point_capture.lock().expect("point capture");
         match guard.as_ref() {
             Some(capture) => (
                 capture.is_running(),
                 capture.count(),
                 capture.was_cancelled(),
+                capture.snapshot_points(),
             ),
-            None => (false, 0, false),
+            None => (false, 0, false, Vec::new()),
         }
     }
 
@@ -1917,12 +1954,17 @@ mod tests {
             app.start_clicker_point_capture().is_err(),
             "a second capture must be refused"
         );
-        let (active, count, cancelled) = app.clicker_point_capture_state();
+        let (active, count, cancelled, points) = app.clicker_point_capture_state();
         assert!(active);
         assert_eq!(count, 0);
         assert!(!cancelled);
+        assert!(points.is_empty());
         assert!(app.stop_clicker_point_capture().unwrap().is_empty());
-        assert_eq!(app.clicker_point_capture_state(), (false, 0, false));
+        let (active2, count2, cancelled2, points2) = app.clicker_point_capture_state();
+        assert!(!active2);
+        assert_eq!(count2, 0);
+        assert!(!cancelled2);
+        assert!(points2.is_empty());
     }
 
     #[test]
@@ -2260,5 +2302,48 @@ mod tests {
             "leave then re-enter Start should launch again"
         );
         app.stop_clicker();
+    }
+
+    #[test]
+    fn start_zone_uses_config_resolver() {
+        let inj = Arc::new(RecordingInjector::new());
+        inj.set_cursor(Point { x: 400, y: 400 });
+        let app = AppState::with_injector(Arc::clone(&inj) as Arc<dyn MouseInjector>);
+        app.set_zone_screen(ScreenGeom::from_size(1920, 1080));
+
+        // Live config (Idle hit-test) allows 3 clicks; resolver launches with 1.
+        let mut live = start_zone_cfg();
+        live.max_clicks = Some(3);
+        app.set_clicker_config(live);
+
+        let mut launch = start_zone_cfg();
+        launch.max_clicks = Some(1);
+        let launch = Arc::new(Mutex::new(launch));
+        {
+            let launch = Arc::clone(&launch);
+            app.set_start_zone_config_resolver(Arc::new(move || {
+                launch.lock().expect("launch cfg").clone()
+            }));
+        }
+
+        std::thread::sleep(Duration::from_millis(50));
+        inj.set_cursor(Point { x: 20, y: 20 });
+        let deadline = Instant::now() + Duration::from_millis(800);
+        while app.state() != EngineState::Running && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(app.state(), EngineState::Running);
+
+        let done = Instant::now() + Duration::from_millis(500);
+        while app.state() == EngineState::Running && Instant::now() < done {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        app.join_worker_for_test();
+        assert_eq!(
+            app.metrics().clicks_emitted,
+            1,
+            "resolver config max_clicks=1 should apply"
+        );
+        assert_eq!(app.state(), EngineState::Idle);
     }
 }

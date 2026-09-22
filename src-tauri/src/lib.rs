@@ -11,7 +11,8 @@ use caster_engine::{
     list_library_items_from_index, list_macro_summaries, list_macros, list_preset_summaries,
     list_presets, list_script_summaries, list_scripts, load_macro, load_preset, load_quick_access,
     load_script, load_settings, load_accueil_order, list_visible_process_exes, macro_to_json,
-    move_library_item, overlay_bands, parse_macro_json, prepare_library_index, prune_orphans,
+    move_library_item, overlay_bands, overlay_markers_fixed, overlay_markers_points,
+    parse_macro_json, prepare_library_index, prune_orphans,
     purge_library_trash, remove_library_entry, rename_library_entry_key, rename_library_folder,
     rename_macro, rename_preset, restore_library_item, save_macro_checked, save_preset,
     save_preset_with_trigger, save_quick_access, save_script, save_settings, save_accueil_order,
@@ -24,7 +25,7 @@ use caster_engine::{
     ProcessFilter, QuickAccess, QuickKind, RecordOptions, ScreenGeom, ScreenGeomDto, ScriptDoc,
     ScriptLanguage, ScriptSourceDiagnostic, ScriptSummary, ScriptsPrefs, ShellPrefs, StopZone,
     ThemeMode, Trigger, UiLocale, WindowBounds, check_script_source, clamp_overlay_opacity,
-    settings_path,
+    pick_on_click, settings_path, CancellationToken,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -112,6 +113,36 @@ impl Default for ZoneOverlaySnap {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct TargetFixedDto {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TargetOverlaySnap {
+    visible: bool,
+    geom: ScreenGeomDto,
+    /// "cursor" | "fixed" | "sequence"
+    mode: String,
+    fixed: Option<TargetFixedDto>,
+    points: Vec<ClickPoint>,
+}
+
+impl Default for TargetOverlaySnap {
+    fn default() -> Self {
+        Self {
+            visible: false,
+            geom: ScreenGeomDto::default(),
+            mode: "cursor".into(),
+            fixed: None,
+            points: Vec::new(),
+        }
+    }
+}
+
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct EngineStatusPayload {
@@ -151,19 +182,50 @@ fn show_screen_picker(app: AppHandle, engine: State<'_, AppState>) -> Result<(),
     }
 }
 
+/// Native screen pick: wait for LMB (Esc / RMB cancel). No picker webview.
+/// Polling runs on a blocking pool so the UI event loop stays responsive.
 #[tauri::command]
-fn confirm_screen_pick(app: AppHandle, engine: State<'_, AppState>) -> Result<PickedPoint, String> {
-    let point = engine.pick_point_now()?;
-    hide_picker_inner(&app, &engine)?;
-    let _ = app.emit("picker://result", &point);
-    Ok(point)
+async fn pick_screen_point_native(app: AppHandle) -> Result<PickedPoint, String> {
+    let engine = app
+        .try_state::<AppState>()
+        .ok_or_else(|| "engine missing".to_string())?;
+    let injector = engine.injector();
+    engine.set_picking(true);
+    park_zone_overlay(&app);
+
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let token = CancellationToken::new();
+        pick_on_click(injector.as_ref(), &token, Duration::from_secs(15)).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("pick join: {e}"))?;
+
+    engine.set_picking(false);
+    restore_zone_overlay(&app, engine.inner());
+    result
+}
+
+/// Legacy stubs — picker webview path is unused; prefer pick_screen_point_native.
+#[tauri::command]
+fn confirm_screen_pick(_app: AppHandle, _engine: State<'_, AppState>) -> Result<PickedPoint, String> {
+    Err("use pick_screen_point_native".into())
 }
 
 #[tauri::command]
-fn cancel_screen_pick(app: AppHandle, engine: State<'_, AppState>) -> Result<(), String> {
+fn cancel_screen_pick(_app: AppHandle, _engine: State<'_, AppState>) -> Result<(), String> {
+    Err("use pick_screen_point_native".into())
+}
+
+/// Pick cursor + hide picker + restore overlays. Invoke from **main** only.
+#[tauri::command]
+fn complete_screen_pick(
+    app: AppHandle,
+    engine: State<'_, AppState>,
+) -> Result<PickedPoint, String> {
+    let point = engine.pick_point_now()?;
     hide_picker_inner(&app, &engine)?;
-    let _ = app.emit("picker://cancel", ());
-    Ok(())
+    restore_zone_overlay(&app, &engine);
+    Ok(point)
 }
 
 #[tauri::command]
@@ -178,14 +240,16 @@ struct ClickerCaptureState {
     active: bool,
     count: usize,
     cancelled: bool,
+    points: Vec<ClickPoint>,
 }
 
 fn capture_state_of(engine: &AppState) -> ClickerCaptureState {
-    let (active, count, cancelled) = engine.clicker_point_capture_state();
+    let (active, count, cancelled, points) = engine.clicker_point_capture_state();
     ClickerCaptureState {
         active,
         count,
         cancelled,
+        points,
     }
 }
 
@@ -225,6 +289,7 @@ fn set_active_display(
     engine: State<'_, AppState>,
     prefs: State<'_, Mutex<UiPrefs>>,
     snap: State<'_, Mutex<ZoneOverlaySnap>>,
+    target_snap: State<'_, Mutex<TargetOverlaySnap>>,
     // Callers send `displayId`; keep the snake_case name so Tauri maps it.
     display_id: Option<String>,
 ) -> Result<DisplayDto, String> {
@@ -234,9 +299,14 @@ fn set_active_display(
         let mut p = prefs.lock().map_err(|e| e.to_string())?;
         p.display_id = Some(display.id.clone());
     }
+    let geom = geom_dto_of_display(&display);
+    {
+        let mut t = target_snap.lock().map_err(|e| e.to_string())?;
+        t.geom = geom.clone();
+    }
     let overlay_on = {
         let mut s = snap.lock().map_err(|e| e.to_string())?;
-        s.geom = geom_dto_of_display(&display);
+        s.geom = geom;
         let payload = s.clone();
         let vis = s.visible;
         let drawing = s.drawing;
@@ -244,12 +314,18 @@ fn set_active_display(
         emit_zones_state(&app, &payload);
         vis || drawing
     };
+    let target_on = target_snap
+        .lock()
+        .map(|t| t.visible)
+        .unwrap_or(false);
     if overlay_on {
         let drawing = snap
             .lock()
             .map(|s| s.drawing)
             .unwrap_or(false);
         let _ = apply_zone_window(&app, &engine, true, drawing);
+    } else if target_on {
+        sync_native_overlay(&app, false, false);
     }
     let overlay_visible = prefs
         .lock()
@@ -2038,31 +2114,133 @@ fn apply_zone_window(
     Ok(())
 }
 
-fn sync_native_overlay(app: &AppHandle, visible: bool, capture: bool) {
+fn sync_native_overlay(app: &AppHandle, _zone_visible: bool, capture: bool) {
     let Some(native) = app.try_state::<Arc<NativeZoneOverlay>>() else {
         return;
     };
     let native = native.inner().clone();
-    if visible && !capture {
-        match app.try_state::<Mutex<ZoneOverlaySnap>>() {
-            Some(snap) => {
-                if let Ok(s) = snap.lock() {
-                    let geom = ScreenGeom::from(s.geom);
-                    let bands = overlay_bands(&s.zones, geom);
-                    if let Err(e) = native.sync(geom, &bands) {
-                        log::warn!("native zone overlay: {e}");
-                    }
-                    return;
-                }
-            }
-            None => {}
-        }
+    // Hide while drawing zones or while the screen picker is up (avoids racing
+    // a re-push of target/zone overlay over the picker webview).
+    let picker_up = app
+        .get_webview_window("picker")
+        .and_then(|w| w.is_visible().ok())
+        .unwrap_or(false);
+    if capture || picker_up {
+        native.hide();
+        return;
     }
-    native.hide();
+
+    let zone = app
+        .try_state::<Mutex<ZoneOverlaySnap>>()
+        .and_then(|s| s.lock().ok().map(|g| g.clone()));
+    let target = app
+        .try_state::<Mutex<TargetOverlaySnap>>()
+        .and_then(|s| s.lock().ok().map(|g| g.clone()));
+
+    let show_zones = zone
+        .as_ref()
+        .map(|z| z.visible && !z.drawing)
+        .unwrap_or(false);
+    let show_targets = target.as_ref().map(|t| t.visible).unwrap_or(false);
+    if !show_zones && !show_targets {
+        native.hide();
+        return;
+    }
+
+    let geom = if show_zones {
+        ScreenGeom::from(zone.as_ref().unwrap().geom.clone())
+    } else {
+        ScreenGeom::from(target.as_ref().unwrap().geom.clone())
+    };
+
+    let bands = if show_zones {
+        overlay_bands(&zone.as_ref().unwrap().zones, geom)
+    } else {
+        Vec::new()
+    };
+    let markers = if show_targets {
+        markers_from_target(target.as_ref().unwrap())
+    } else {
+        Vec::new()
+    };
+
+    if bands.is_empty() && markers.is_empty() {
+        native.hide();
+        return;
+    }
+    if let Err(e) = native.sync(geom, &bands, &markers) {
+        log::warn!("native zone/target overlay: {e}");
+    }
+}
+
+fn markers_from_target(s: &TargetOverlaySnap) -> Vec<caster_engine::OverlayMarker> {
+    match s.mode.as_str() {
+        "fixed" => match &s.fixed {
+            Some(f) => overlay_markers_fixed(f.x, f.y),
+            None => Vec::new(),
+        },
+        "sequence" => {
+            overlay_markers_points(s.points.iter().map(|p| (p.x, p.y, p.radius)))
+        }
+        _ => Vec::new(),
+    }
+}
+
+#[tauri::command]
+fn get_target_overlay_snapshot(
+    snap: State<'_, Mutex<TargetOverlaySnap>>,
+) -> TargetOverlaySnap {
+    snap.lock()
+        .map(|s| s.clone())
+        .unwrap_or_else(|p| p.into_inner().clone())
+}
+
+#[tauri::command]
+fn push_target_overlay_state(
+    app: AppHandle,
+    snap: State<'_, Mutex<TargetOverlaySnap>>,
+    geom: ScreenGeomDto,
+    mode: String,
+    fixed: Option<TargetFixedDto>,
+    points: Vec<ClickPoint>,
+) -> Result<(), String> {
+    let visible = {
+        let mut s = snap.lock().map_err(|e| e.to_string())?;
+        s.geom = geom;
+        s.mode = mode;
+        s.fixed = fixed;
+        s.points = points;
+        s.visible
+    };
+    if visible {
+        sync_native_overlay(&app, false, false);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_target_overlay_visible(
+    app: AppHandle,
+    engine: State<'_, AppState>,
+    snap: State<'_, Mutex<TargetOverlaySnap>>,
+    visible: bool,
+) -> Result<(), String> {
+    {
+        let mut s = snap.lock().map_err(|e| e.to_string())?;
+        s.visible = visible;
+        s.geom = geom_of(&app, &engine);
+    }
+    // Respect zone draw mode (capture) — hide native while drawing.
+    let zone_drawing = app
+        .try_state::<Mutex<ZoneOverlaySnap>>()
+        .and_then(|z| z.lock().ok().map(|s| s.drawing))
+        .unwrap_or(false);
+    sync_native_overlay(&app, false, zone_drawing);
+    Ok(())
 }
 
 fn park_zone_overlay(app: &AppHandle) {
-    sync_native_overlay(app, false, false);
+    sync_native_overlay(app, false, true);
     if let Some(win) = app.get_webview_window("zones") {
         let _ = win.set_ignore_cursor_events(true);
         let _ = win.hide();
@@ -2071,6 +2249,8 @@ fn park_zone_overlay(app: &AppHandle) {
 
 fn restore_zone_overlay(app: &AppHandle, engine: &AppState) {
     let Some(snap) = app.try_state::<Mutex<ZoneOverlaySnap>>() else {
+        // Still restore target-only native paint.
+        sync_native_overlay(app, false, false);
         return;
     };
     let Ok(s) = snap.lock() else {
@@ -2078,6 +2258,8 @@ fn restore_zone_overlay(app: &AppHandle, engine: &AppState) {
     };
     if s.visible || s.drawing {
         let _ = apply_zone_window(app, engine, s.visible, s.drawing);
+    } else {
+        sync_native_overlay(app, false, false);
     }
 }
 
@@ -2136,17 +2318,34 @@ fn show_picker_inner(app: &AppHandle) -> Result<(), String> {
 fn hide_picker_inner(app: &AppHandle, engine: &AppState) -> Result<(), String> {
     engine.set_picking(false);
     let Some(win) = app.get_webview_window("picker") else {
-        restore_zone_overlay(app, engine);
+        // No picker window — overlays restored by the main webview via
+        // `dismiss_screen_picker` / `complete_screen_pick` after the pick settles.
         return Ok(());
     };
     // Release mouse capture so the desktop / main window stay usable.
     let _ = win.set_ignore_cursor_events(true);
     let _ = win.set_always_on_top(false);
     win.hide().map_err(|e| e.to_string())?;
-    restore_zone_overlay(app, engine);
-    if let Some(main) = app.get_webview_window("main") {
-        let _ = main.set_focus();
-    }
+    // Do NOT set_focus(main): WebView2 often deadlocks when focus flips
+    // during picker teardown. Hide + ignore-cursor is enough.
+    Ok(())
+}
+
+#[tauri::command]
+fn restore_overlays_after_pick(
+    app: AppHandle,
+    engine: State<'_, AppState>,
+) -> Result<(), String> {
+    restore_zone_overlay(&app, &engine);
+    Ok(())
+}
+
+/// Hide the picker and restore overlays. Must be invoked from the **main**
+/// webview only — never from the picker (avoids hide-self deadlock).
+#[tauri::command]
+fn dismiss_screen_picker(app: AppHandle, engine: State<'_, AppState>) -> Result<(), String> {
+    hide_picker_inner(&app, &engine)?;
+    restore_zone_overlay(&app, &engine);
     Ok(())
 }
 
@@ -2251,8 +2450,43 @@ fn wire_engine_events(handle: AppHandle, engine: &AppState) {
                     serde_json::json!({ "method": method }),
                 );
             }
+            EngineEvent::ZoneFeedback { kind } => {
+                let _ = emit_handle.emit(
+                    "engine://zone",
+                    serde_json::json!({
+                        "action": kind.action_label(),
+                        "kind": kind.kind_label(),
+                    }),
+                );
+            }
         }
     });
+}
+
+/// Same resolution as tray « Relancer »: last clicker preset when enabled, else live config.
+fn resolve_start_zone_clicker_config(app: &AppHandle, engine: &AppState) -> ClickerConfig {
+    let shell = app
+        .try_state::<Mutex<UiPrefs>>()
+        .and_then(|p| p.lock().ok().map(|g| g.shell.clone()));
+    if let Some(shell) = shell.as_ref() {
+        if shell.tray_relaunch_last {
+            if let (Some(id), Some(dir)) = (
+                shell.last_clicker_id.as_ref(),
+                app.try_state::<SettingsDir>(),
+            ) {
+                match load_preset(&dir.0, id) {
+                    Ok(preset) => {
+                        engine.set_active_clicker_preset(Some(preset.name.clone()));
+                        return preset.config;
+                    }
+                    Err(e) => {
+                        log::warn!("start zone load preset failed: {e}");
+                    }
+                }
+            }
+        }
+    }
+    engine.clicker_config()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -2287,7 +2521,7 @@ pub fn run() {
             overlay_visible: false,
             overlay_opacity: 1.0,
             process_filter: ProcessFilter::default(),
-            theme: ThemeMode::Light,
+            theme: ThemeMode::Dark,
             display_id: None,
             sidebar_collapsed: false,
             journal_open: false,
@@ -2302,6 +2536,7 @@ pub fn run() {
             maintenance: MaintenancePrefs::default(),
         }))
         .manage(Mutex::new(ZoneOverlaySnap::default()))
+        .manage(Mutex::new(TargetOverlaySnap::default()))
         .manage(ZoneDrawWatch(Mutex::new(None)))
         .manage(Arc::new(NativeZoneOverlay::new()))
         .manage(BootStayHidden(Mutex::new(false)))
@@ -2349,6 +2584,14 @@ pub fn run() {
                 let eng = engine.clone();
                 engine.set_ui_release(Arc::new(move || {
                     let _ = hide_picker_inner(&handle, &eng);
+                }));
+            }
+
+            {
+                let handle = app.handle().clone();
+                let eng = engine.clone();
+                engine.set_start_zone_config_resolver(Arc::new(move || {
+                    resolve_start_zone_clicker_config(&handle, &eng)
                 }));
             }
 
@@ -2572,8 +2815,12 @@ pub fn run() {
             start_clicker,
             pick_point,
             show_screen_picker,
+            pick_screen_point_native,
             confirm_screen_pick,
             cancel_screen_pick,
+            complete_screen_pick,
+            restore_overlays_after_pick,
+            dismiss_screen_picker,
             start_zone_draw,
             get_screen_geom,
             list_displays,
@@ -2583,6 +2830,9 @@ pub fn run() {
             set_zone_overlay_visible,
             begin_zone_overlay_draw,
             complete_zone_overlay_draw,
+            get_target_overlay_snapshot,
+            push_target_overlay_state,
+            set_target_overlay_visible,
             start_clicker_point_capture,
             stop_clicker_point_capture,
             get_clicker_point_capture_state,

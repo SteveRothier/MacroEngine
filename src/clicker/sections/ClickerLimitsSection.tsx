@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Select, useToast } from "../../ui/shell";
+import { Select } from "../../ui/shell";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { useT } from "../../i18n";
-import { pickScreenPointDetailed } from "../../pick";
 import type { ClickerEditor } from "../useClickerEditor";
 import {
   DEFAULT_PIXEL_CONDITION,
@@ -25,7 +24,6 @@ function limitChoice(e: ClickerEditor): LimitChoice {
 
 export function ClickerLimitsSection({ editor: e }: Props) {
   const t = useT();
-  const toast = useToast();
   const choice = limitChoice(e);
   const [macros, setMacros] = useState<string[]>([]);
   const pixel = e.pixelCondition ?? DEFAULT_PIXEL_CONDITION;
@@ -57,35 +55,6 @@ export function ClickerLimitsSection({ editor: e }: Props) {
 
   const patchPixel = (patch: Partial<PixelCondition>) => {
     e.setPixelCondition({ ...pixel, ...patch });
-  };
-
-  const onPickPixel = async () => {
-    try {
-      const result = await pickScreenPointDetailed();
-      if (!result.ok) {
-        if (result.reason === "timeout" || result.reason === "error") {
-          toast.info(t("macros.params.pickCancelled"));
-        }
-        return;
-      }
-      const sample = await invoke<{
-        x: number;
-        y: number;
-        r: number;
-        g: number;
-        b: number;
-      }>("read_pixel", { x: result.point.x, y: result.point.y });
-      patchPixel({
-        enabled: true,
-        x: sample.x,
-        y: sample.y,
-        r: sample.r,
-        g: sample.g,
-        b: sample.b,
-      });
-    } catch {
-      /* cancelled */
-    }
   };
 
   const showClicks = choice === "clicks" || choice === "both";
@@ -191,14 +160,22 @@ export function ClickerLimitsSection({ editor: e }: Props) {
             />
             {t("clicker.limits.enabled")}
           </label>
-          <button
-            type="button"
-            className="caster-btn caster-btn-ghost"
-            disabled={e.editDisabled}
-            onClick={() => void onPickPixel()}
-          >
-            {t("clicker.limits.pickColor")}
-          </button>
+          <label className="caster-field caster-clicker-limits-field">
+            <span>X</span>
+            <WheelNumberInput
+              value={pixel.x}
+              disabled={e.editDisabled || !pixel.enabled}
+              onValueChange={(n) => patchPixel({ x: n })}
+            />
+          </label>
+          <label className="caster-field caster-clicker-limits-field">
+            <span>Y</span>
+            <WheelNumberInput
+              value={pixel.y}
+              disabled={e.editDisabled || !pixel.enabled}
+              onValueChange={(n) => patchPixel({ y: n })}
+            />
+          </label>
           <span
             className="caster-clicker-pixel-swatch"
             style={{ background: swatch }}

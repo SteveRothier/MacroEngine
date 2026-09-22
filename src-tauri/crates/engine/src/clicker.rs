@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 use crate::cancel::CancellationToken;
-use crate::event_bus::{EngineEvent, EventBus, LogLevel};
+use crate::event_bus::{EngineEvent, EventBus, LogLevel, ZoneFeedbackKind};
 use crate::input::{InputError, MouseButton, MouseInjector, Point};
 use crate::metrics::MetricsCollector;
 use crate::pause::PauseGate;
@@ -542,8 +542,21 @@ fn log_start_zone_resume(bus: Option<&EventBus>) {
     if let Some(bus) = bus {
         bus.publish(EngineEvent::Log {
             level: LogLevel::Info,
-            message: "start zone resumed the clicker session".into(),
+            message: "Zone Start — session reprise".into(),
         });
+        bus.publish(EngineEvent::ZoneFeedback {
+            kind: ZoneFeedbackKind::StartResume,
+        });
+    }
+}
+
+fn log_zone_feedback(bus: Option<&EventBus>, kind: ZoneFeedbackKind, message: &str, warn: bool) {
+    if let Some(bus) = bus {
+        bus.publish(EngineEvent::Log {
+            level: if warn { LogLevel::Warn } else { LogLevel::Info },
+            message: message.into(),
+        });
+        bus.publish(EngineEvent::ZoneFeedback { kind });
     }
 }
 
@@ -653,6 +666,7 @@ impl ClickerSession {
         let mut pixel_check_at = Instant::now()
             .checked_sub(Duration::from_millis(80))
             .unwrap_or_else(Instant::now);
+        let mut was_in_pause_zone = false;
 
         loop {
             if cancel.is_cancelled() {
@@ -746,21 +760,31 @@ impl ClickerSession {
             let mut pause_tick = false;
             match current_zone_action(config, injector, &zone_screen) {
                 Some(ZoneAction::Stop) => {
-                    if let Some(bus) = bus {
-                        bus.publish(EngineEvent::Log {
-                            level: LogLevel::Warn,
-                            message: "stop zone hit".into(),
-                        });
-                    }
+                    log_zone_feedback(
+                        bus,
+                        ZoneFeedbackKind::StopHit,
+                        "Zone Stop — session terminée",
+                        true,
+                    );
                     // Natural end (zone safety stop) — allow chain.
                     break;
                 }
                 Some(ZoneAction::Pause) => {
                     pause_tick = true;
+                    if !was_in_pause_zone {
+                        log_zone_feedback(
+                            bus,
+                            ZoneFeedbackKind::PauseEnter,
+                            "Zone Pause — session en pause",
+                            false,
+                        );
+                    }
+                    was_in_pause_zone = true;
                 }
                 Some(ZoneAction::Start) => {
                     // Clears the pause-zone tick and lifts a paused session.
                     pause_tick = false;
+                    was_in_pause_zone = false;
                     if let Some(gate) = pause {
                         if gate.is_paused() {
                             gate.resume();
@@ -768,7 +792,9 @@ impl ClickerSession {
                         }
                     }
                 }
-                None => {}
+                None => {
+                    was_in_pause_zone = false;
+                }
             }
 
             let period = {
@@ -1343,6 +1369,50 @@ mod tests {
         };
         let n = ClickerSession::run(&cfg, &cancel, &inj, &metrics, None).unwrap();
         assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn pause_zone_emits_feedback_once_on_enter() {
+        use crate::event_bus::ZoneFeedbackKind;
+        let cancel = CancellationToken::new();
+        let inj = RecordingInjector::new();
+        inj.set_cursor(Point { x: 15, y: 15 });
+        let metrics = MetricsCollector::new();
+        let bus = EventBus::new();
+        let kinds = Arc::new(Mutex::new(Vec::new()));
+        let kinds_c = Arc::clone(&kinds);
+        bus.subscribe(move |e| {
+            if let EngineEvent::ZoneFeedback { kind } = e {
+                kinds_c.lock().unwrap().push(kind);
+            }
+        });
+        let cancel_c = cancel.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(50));
+            cancel_c.cancel();
+        });
+        let cfg = ClickerConfig {
+            cps: 120.0,
+            stop_zones: vec![StopZone::Custom {
+                id: "p".into(),
+                x: 10,
+                y: 10,
+                width: 20,
+                height: 20,
+                action: ZoneAction::Pause,
+                kind: ZoneKind::Safety,
+                color: String::new(),
+                click_mode: ClickSampleMode::Random,
+            }],
+            ..Default::default()
+        };
+        let _ = ClickerSession::run(&cfg, &cancel, &inj, &metrics, Some(&bus)).unwrap();
+        let list = kinds.lock().unwrap().clone();
+        assert_eq!(
+            list.iter().filter(|k| **k == ZoneFeedbackKind::PauseEnter).count(),
+            1,
+            "PauseEnter should fire once while staying in the pause zone"
+        );
     }
 
     #[test]

@@ -2,7 +2,8 @@
 //!
 //! This is *not* the macro recorder: it only collects left-button screen
 //! positions and turns them into [`ClickPoint`]s. Repeated clicks on the same
-//! spot bump `clicks` instead of appending a duplicate point. Esc cancels.
+//! spot bump `clicks` instead of appending a duplicate point. Esc / right-click
+//! cancels.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -16,6 +17,8 @@ const POLL: Duration = Duration::from_millis(8);
 /// Same spot + quick repeat ⇒ one point with a higher `clicks` count.
 const SAME_SPOT_PX: i32 = 3;
 const SAME_SPOT_WINDOW: Duration = Duration::from_millis(900);
+/// Drop a point recorded in the same gesture as clicking Stop in the UI.
+const UI_STOP_DISCARD: Duration = Duration::from_millis(350);
 /// Safety net so a forgotten capture never polls forever.
 pub const CAPTURE_TIMEOUT: Duration = Duration::from_secs(300);
 
@@ -65,6 +68,18 @@ impl CaptureBuffer {
 
     pub fn points(&self) -> Vec<ClickPoint> {
         self.points.clone()
+    }
+
+    /// Remove the last point if it was pushed within `max_age` (Stop-button click).
+    pub fn discard_trailing_if_recent(&mut self, max_age: Duration) -> bool {
+        match self.last_at {
+            Some(at) if at.elapsed() <= max_age => {
+                self.points.pop();
+                self.last_at = None;
+                true
+            }
+            _ => false,
+        }
     }
 }
 
@@ -121,8 +136,19 @@ impl ClickPointCapture {
             .unwrap_or(0)
     }
 
+    /// Live snapshot without stopping the session (for overlay feedback).
+    pub fn snapshot_points(&self) -> Vec<ClickPoint> {
+        self.shared
+            .buffer
+            .lock()
+            .map(|b| b.points())
+            .unwrap_or_default()
+    }
+
     /// Ask the thread to stop, join it, and return what was captured.
     /// A cancelled session (Esc) yields no points.
+    /// The trailing point is dropped when it was recorded in the same gesture as
+    /// Stop (clicking « Terminer » must not become a capture point).
     pub fn finish(&self) -> Vec<ClickPoint> {
         self.shared.stop.store(true, Ordering::SeqCst);
         if let Some(handle) = self.thread.lock().ok().and_then(|mut g| g.take()) {
@@ -131,25 +157,35 @@ impl ClickPointCapture {
         if self.was_cancelled() {
             return Vec::new();
         }
-        self.shared
-            .buffer
-            .lock()
-            .map(|b| b.points())
-            .unwrap_or_default()
+        let Ok(mut buffer) = self.shared.buffer.lock() else {
+            return Vec::new();
+        };
+        let _ = buffer.discard_trailing_if_recent(UI_STOP_DISCARD);
+        buffer.points()
     }
 }
 
 fn capture_loop(shared: &CaptureShared, injector: &dyn MouseInjector) {
     let deadline = Instant::now() + CAPTURE_TIMEOUT;
     let mut was_down = button_down();
+    let mut was_escape = escape_down();
+    let mut was_rbutton = right_button_down();
     while !shared.stop.load(Ordering::SeqCst) {
         if Instant::now() >= deadline {
             break;
         }
-        if escape_down() {
+        let esc = escape_down();
+        if esc && !was_escape {
             shared.cancelled.store(true, Ordering::SeqCst);
             break;
         }
+        was_escape = esc;
+        let rbutton = right_button_down();
+        if rbutton && !was_rbutton {
+            shared.cancelled.store(true, Ordering::SeqCst);
+            break;
+        }
+        was_rbutton = rbutton;
         let down = button_down();
         if down && !was_down {
             if let Ok(p) = injector.cursor_position() {
@@ -172,6 +208,13 @@ fn button_down() -> bool {
 }
 
 #[cfg(windows)]
+fn right_button_down() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_RBUTTON};
+    let state = unsafe { GetAsyncKeyState(VK_RBUTTON.0 as i32) };
+    state < 0
+}
+
+#[cfg(windows)]
 fn escape_down() -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_ESCAPE};
     let state = unsafe { GetAsyncKeyState(VK_ESCAPE.0 as i32) };
@@ -181,6 +224,11 @@ fn escape_down() -> bool {
 // Off Windows the capture thread only waits for `stop` (no global hooks).
 #[cfg(not(windows))]
 fn button_down() -> bool {
+    false
+}
+
+#[cfg(not(windows))]
+fn right_button_down() -> bool {
     false
 }
 
@@ -227,6 +275,27 @@ mod tests {
         buffer.push(Point { x: 50, y: 60 }, now);
         buffer.push(Point { x: 50, y: 60 }, now + Duration::from_secs(2));
         assert_eq!(buffer.len(), 2);
+    }
+
+    #[test]
+    fn discard_trailing_drops_only_recent_point() {
+        let mut buffer = CaptureBuffer::new();
+        buffer.push(Point { x: 10, y: 10 }, Instant::now());
+        thread::sleep(Duration::from_millis(20));
+        buffer.push(Point { x: 20, y: 20 }, Instant::now());
+        assert_eq!(buffer.len(), 2);
+        assert!(buffer.discard_trailing_if_recent(UI_STOP_DISCARD));
+        assert_eq!(buffer.len(), 1);
+        assert_eq!((buffer.points()[0].x, buffer.points()[0].y), (10, 10));
+    }
+
+    #[test]
+    fn discard_trailing_keeps_old_last_point() {
+        let mut buffer = CaptureBuffer::new();
+        buffer.push(Point { x: 5, y: 5 }, Instant::now());
+        thread::sleep(UI_STOP_DISCARD + Duration::from_millis(50));
+        assert!(!buffer.discard_trailing_if_recent(UI_STOP_DISCARD));
+        assert_eq!(buffer.len(), 1);
     }
 
     #[test]

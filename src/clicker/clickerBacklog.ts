@@ -52,4 +52,57 @@ export const CLICKER_FEATURE_BACKLOG: readonly ClickerBacklogItem[] = [
       "Mode court : enregistrer des clics souris → ClickPoint[] (pas le record macro) (livré — module clicker_capture, commandes start/stop/state, bouton « Capturer des points » dans la section Cible, clics répétés = compteur, Échap annule).",
     priority: 6,
   },
+  {
+    id: "zone-start-last-preset",
+    title: "Start zone = dernier preset",
+    summary:
+      "Cold-start Idle via zone Start charge le dernier preset (parité tray tray_relaunch_last + last_clicker_id) (livré — resolver AppState branché depuis Tauri).",
+    priority: 7,
+  },
+  {
+    id: "zone-runtime-feedback",
+    title: "Feedback runtime zones",
+    summary:
+      "Journal FR + toast i18n pour Stop / Pause (edge) / Start resume / Start launch (livré — EngineEvent::ZoneFeedback → engine://zone).",
+    priority: 8,
+  },
+] as const;
+
+/** Phase 5 — prochaines livraisons clicker (non livré). */
+export const CLICKER_PHASE_5_BACKLOG: readonly ClickerBacklogItem[] = [
+  {
+    id: "preset-export-import",
+    title: "Export / import preset JSON",
+    summary:
+      "Sauvegarder et restaurer un preset clicker (config + zones + points) via fichier, pour partage et backup.",
+    priority: 1,
+  },
+  {
+    id: "session-stats-export",
+    title: "Export stats de session",
+    summary:
+      "Copier ou exporter CSV/JSON des compteurs de session (ticks, filtres, durée) depuis le panneau stats.",
+    priority: 2,
+  },
+  {
+    id: "point-per-click-delay",
+    title: "Délai ms par point",
+    summary:
+      "Étendre ClickPoint avec pauseAfterMs et UI 2e rangée type macro (intervalle entre points de la séquence).",
+    priority: 3,
+  },
+  {
+    id: "clicker-hotkey-parity",
+    title: "Parité hotkeys macro",
+    summary:
+      "Même UX capture/affichage des raccourcis clicker que dans l’éditeur macro (meta bar + conflits).",
+    priority: 4,
+  },
+  {
+    id: "engine-capture-tests",
+    title: "Tests Rust capture / zones",
+    summary:
+      "Couverture clicker_capture et stop_zones (discard trailing click, Terminer sans point fantôme).",
+    priority: 5,
+  },
 ] as const;

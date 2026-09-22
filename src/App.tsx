@@ -100,39 +100,60 @@ function PickOverlayInner() {
   }, []);
 
   useEffect(() => {
+    let armed = true;
+    let confirming = { current: false };
     const onMove = (e: MouseEvent) => {
       setPos({ sx: e.screenX, sy: e.screenY });
     };
-    const onClick = (e: MouseEvent) => {
+    // Emit-only: never invoke from the picker (hide/pick must run on main).
+    const onConfirm = (e: MouseEvent) => {
+      if (!armed || confirming.current) return;
+      if (e.button !== 0) return;
       e.preventDefault();
       e.stopPropagation();
-      void invoke("confirm_screen_pick");
+      confirming.current = true;
+      window.setTimeout(() => {
+        void emit("picker://request-confirm").catch(() => {
+          confirming.current = false;
+        });
+      }, 0);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        void invoke("cancel_screen_pick");
+        if (!armed || confirming.current) return;
+        confirming.current = true;
+        window.setTimeout(() => {
+          void emit("picker://request-cancel");
+        }, 0);
       }
     };
     const onContext = (e: MouseEvent) => {
       e.preventDefault();
-      void invoke("cancel_screen_pick");
+      if (!armed || confirming.current) return;
+      confirming.current = true;
+      window.setTimeout(() => {
+        void emit("picker://request-cancel");
+      }, 0);
     };
+    // `click` (not mousedown): avoids tearing down the picker mid-press.
+    window.addEventListener("click", onConfirm, true);
     window.addEventListener("mousemove", onMove);
-    window.addEventListener("mousedown", onClick);
     window.addEventListener("keydown", onKey);
     window.addEventListener("contextmenu", onContext);
     void emit("picker://ready");
     let unPrepare: (() => void) | undefined;
     void listen("picker://prepare", () => {
+      confirming.current = false;
       void emit("picker://ready");
     }).then((un) => {
       unPrepare = un;
     });
     return () => {
+      armed = false;
       unPrepare?.();
+      window.removeEventListener("click", onConfirm, true);
       window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mousedown", onClick);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };

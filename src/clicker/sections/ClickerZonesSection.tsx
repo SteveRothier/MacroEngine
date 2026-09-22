@@ -52,13 +52,17 @@ export function ClickerZonesSection({ editor: e }: Props) {
     getId: (z) => z.id,
     disabled: e.editDisabled,
     onReorder: (from, to) => {
-      e.setZoneModel((m) => {
-        const next = [...m.customZones];
-        const [moved] = next.splice(from, 1);
-        if (!moved) return m;
-        next.splice(to, 0, moved);
-        return { ...m, customZones: next };
-      });
+      e.setZoneModelWithHistory(
+        "clicker.history.zoneReordered",
+        (m) => {
+          const next = [...m.customZones];
+          const [moved] = next.splice(from, 1);
+          if (!moved) return m;
+          next.splice(to, 0, moved);
+          return { ...m, customZones: next };
+        },
+        { coalesceMs: 400 },
+      );
     },
   });
 
@@ -88,7 +92,12 @@ export function ClickerZonesSection({ editor: e }: Props) {
   ) {
     if (!selectedCustom) return;
     const next = clampCustomExtent(selectedCustom, patch, e.screenGeom);
-    e.updateCustomZone(selectedCustom.id, next);
+    e.updateCustomZone(
+      selectedCustom.id,
+      next,
+      "clicker.history.zoneSized",
+      { coalesceMs: 400 },
+    );
   }
 
   function applyEdgeDelta(
@@ -96,17 +105,21 @@ export function ClickerZonesSection({ editor: e }: Props) {
     delta: number,
   ) {
     if (e.editDisabled || !e.zoneModel.edges[edgeId]) return;
-    e.setZoneModel((m) => ({
-      ...m,
-      edgeMargin: {
-        ...m.edgeMargin,
-        [edgeId]: clampEdgeMargin(
-          edgeId,
-          m.edgeMargin[edgeId] + delta,
-          e.screenGeom,
-        ),
-      },
-    }));
+    e.setZoneModelWithHistory(
+      "clicker.history.zoneSized",
+      (m) => ({
+        ...m,
+        edgeMargin: {
+          ...m.edgeMargin,
+          [edgeId]: clampEdgeMargin(
+            edgeId,
+            m.edgeMargin[edgeId] + delta,
+            e.screenGeom,
+          ),
+        },
+      }),
+      { coalesceMs: 400 },
+    );
   }
 
   function applyCornerDelta(
@@ -115,28 +128,31 @@ export function ClickerZonesSection({ editor: e }: Props) {
     axisH: boolean,
   ) {
     if (e.editDisabled || !e.zoneModel.corners[cornerId]) return;
-    e.setZoneModel((m) =>
-      axisH
-        ? {
-            ...m,
-            cornerHeight: {
-              ...m.cornerHeight,
-              [cornerId]: clampCornerHeight(
-                m.cornerHeight[cornerId] + delta,
-                e.screenGeom,
-              ),
+    e.setZoneModelWithHistory(
+      "clicker.history.zoneSized",
+      (m) =>
+        axisH
+          ? {
+              ...m,
+              cornerHeight: {
+                ...m.cornerHeight,
+                [cornerId]: clampCornerHeight(
+                  m.cornerHeight[cornerId] + delta,
+                  e.screenGeom,
+                ),
+              },
+            }
+          : {
+              ...m,
+              cornerWidth: {
+                ...m.cornerWidth,
+                [cornerId]: clampCornerWidth(
+                  m.cornerWidth[cornerId] + delta,
+                  e.screenGeom,
+                ),
+              },
             },
-          }
-        : {
-            ...m,
-            cornerWidth: {
-              ...m.cornerWidth,
-              [cornerId]: clampCornerWidth(
-                m.cornerWidth[cornerId] + delta,
-                e.screenGeom,
-              ),
-            },
-          },
+      { coalesceMs: 400 },
     );
   }
 
@@ -206,10 +222,13 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   .join(" ")}
                 onClick={() => {
                   if (!e.zoneModel.corners[c.id]) {
-                    e.setZoneModel((m) => ({
-                      ...m,
-                      corners: { ...m.corners, [c.id]: true },
-                    }));
+                    e.setZoneModelWithHistory(
+                      "clicker.history.cornerToggled",
+                      (m) => ({
+                        ...m,
+                        corners: { ...m.corners, [c.id]: true },
+                      }),
+                    );
                   }
                   e.setZoneSelection({ kind: "corner", id: c.id });
                 }}
@@ -225,10 +244,13 @@ export function ClickerZonesSection({ editor: e }: Props) {
                     disabled={e.editDisabled}
                     onChange={(ev) => {
                       const on = ev.target.checked;
-                      e.setZoneModel((m) => ({
-                        ...m,
-                        corners: { ...m.corners, [c.id]: on },
-                      }));
+                      e.setZoneModelWithHistory(
+                        "clicker.history.cornerToggled",
+                        (m) => ({
+                          ...m,
+                          corners: { ...m.corners, [c.id]: on },
+                        }),
+                      );
                       if (on) {
                         e.setZoneSelection({ kind: "corner", id: c.id });
                       } else if (selected) {
@@ -252,13 +274,17 @@ export function ClickerZonesSection({ editor: e }: Props) {
                           e.setZoneSelection({ kind: "corner", id: c.id });
                         }}
                         onValueChange={(n) => {
-                          e.setZoneModel((m) => ({
-                            ...m,
-                            cornerWidth: {
-                              ...m.cornerWidth,
-                              [c.id]: clampCornerWidth(n, e.screenGeom),
-                            },
-                          }));
+                          e.setZoneModelWithHistory(
+                            "clicker.history.zoneSized",
+                            (m) => ({
+                              ...m,
+                              cornerWidth: {
+                                ...m.cornerWidth,
+                                [c.id]: clampCornerWidth(n, e.screenGeom),
+                              },
+                            }),
+                            { coalesceMs: 400 },
+                          );
                         }}
                       />
                     </label>
@@ -274,13 +300,17 @@ export function ClickerZonesSection({ editor: e }: Props) {
                           e.setZoneSelection({ kind: "corner", id: c.id });
                         }}
                         onValueChange={(n) => {
-                          e.setZoneModel((m) => ({
-                            ...m,
-                            cornerHeight: {
-                              ...m.cornerHeight,
-                              [c.id]: clampCornerHeight(n, e.screenGeom),
-                            },
-                          }));
+                          e.setZoneModelWithHistory(
+                            "clicker.history.zoneSized",
+                            (m) => ({
+                              ...m,
+                              cornerHeight: {
+                                ...m.cornerHeight,
+                                [c.id]: clampCornerHeight(n, e.screenGeom),
+                              },
+                            }),
+                            { coalesceMs: 400 },
+                          );
                         }}
                       />
                     </label>
@@ -313,10 +343,13 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   .join(" ")}
                 onClick={() => {
                   if (!e.zoneModel.edges[edge.id]) {
-                    e.setZoneModel((m) => ({
-                      ...m,
-                      edges: { ...m.edges, [edge.id]: true },
-                    }));
+                    e.setZoneModelWithHistory(
+                      "clicker.history.edgeToggled",
+                      (m) => ({
+                        ...m,
+                        edges: { ...m.edges, [edge.id]: true },
+                      }),
+                    );
                   }
                   e.setZoneSelection({ kind: "edge", id: edge.id });
                 }}
@@ -332,10 +365,13 @@ export function ClickerZonesSection({ editor: e }: Props) {
                     disabled={e.editDisabled}
                     onChange={(ev) => {
                       const on = ev.target.checked;
-                      e.setZoneModel((m) => ({
-                        ...m,
-                        edges: { ...m.edges, [edge.id]: on },
-                      }));
+                      e.setZoneModelWithHistory(
+                        "clicker.history.edgeToggled",
+                        (m) => ({
+                          ...m,
+                          edges: { ...m.edges, [edge.id]: on },
+                        }),
+                      );
                       if (on) {
                         e.setZoneSelection({ kind: "edge", id: edge.id });
                       } else if (selected) {
@@ -355,13 +391,17 @@ export function ClickerZonesSection({ editor: e }: Props) {
                     e.setZoneSelection({ kind: "edge", id: edge.id });
                   }}
                   onValueChange={(n) => {
-                    e.setZoneModel((m) => ({
-                      ...m,
-                      edgeMargin: {
-                        ...m.edgeMargin,
-                        [edge.id]: clampEdgeMargin(edge.id, n, e.screenGeom),
-                      },
-                    }));
+                    e.setZoneModelWithHistory(
+                      "clicker.history.zoneSized",
+                      (m) => ({
+                        ...m,
+                        edgeMargin: {
+                          ...m.edgeMargin,
+                          [edge.id]: clampEdgeMargin(edge.id, n, e.screenGeom),
+                        },
+                      }),
+                      { coalesceMs: 400 },
+                    );
                   }}
                 />
                 <span className="caster-clicker-zone-px">px</span>
@@ -473,9 +513,11 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   title={zoneActionHint(t, selectedCustom.action)}
                   options={zoneActionOpts}
                   onChange={(v) =>
-                    e.updateCustomZone(selectedCustom.id, {
-                      action: v as ZoneAction,
-                    })
+                    e.updateCustomZone(
+                      selectedCustom.id,
+                      { action: v as ZoneAction },
+                      "clicker.history.zoneActionChanged",
+                    )
                   }
                 />
               </label>
@@ -487,9 +529,11 @@ export function ClickerZonesSection({ editor: e }: Props) {
                   disabled={e.editDisabled}
                   options={zoneKindOpts}
                   onChange={(v) =>
-                    e.updateCustomZone(selectedCustom.id, {
-                      kind: v as ZoneKind,
-                    })
+                    e.updateCustomZone(
+                      selectedCustom.id,
+                      { kind: v as ZoneKind },
+                      "clicker.history.zoneKindChanged",
+                    )
                   }
                 />
               </label>

@@ -28,9 +28,9 @@ pub struct DrawnRect {
 pub enum PickerError {
     #[error(transparent)]
     Input(#[from] InputError),
-    #[error("picker cancelled")]
+    #[error("cancelled")]
     Cancelled,
-    #[error("zone draw timed out")]
+    #[error("timed out")]
     TimedOut,
 }
 
@@ -63,6 +63,67 @@ pub fn pick_now(injector: &dyn MouseInjector) -> Result<PickedPoint, PickerError
 /// Convenience: treat a [`Point`] as picked.
 pub fn from_point(p: Point) -> PickedPoint {
     PickedPoint { x: p.x, y: p.y }
+}
+
+/// Wait for the next left-click (or Esc / right-click cancel). No UI window.
+pub fn pick_on_click(
+    injector: &dyn MouseInjector,
+    cancel: &CancellationToken,
+    timeout: Duration,
+) -> Result<PickedPoint, PickerError> {
+    #[cfg(windows)]
+    {
+        pick_on_click_win32(injector, cancel, timeout)
+    }
+    #[cfg(not(windows))]
+    {
+        // Fallback: sample after a short aim delay.
+        pick_after_delay(injector, cancel, timeout.min(Duration::from_secs(2)))
+    }
+}
+
+#[cfg(windows)]
+fn pick_on_click_win32(
+    injector: &dyn MouseInjector,
+    cancel: &CancellationToken,
+    timeout: Duration,
+) -> Result<PickedPoint, PickerError> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, VK_ESCAPE, VK_LBUTTON, VK_RBUTTON,
+    };
+
+    let deadline = Instant::now() + timeout;
+
+    // Wait for LMB up so the UI click that started the pick is not captured.
+    while Instant::now() < deadline {
+        if cancel.is_cancelled() {
+            return Err(PickerError::Cancelled);
+        }
+        let down = unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) } < 0;
+        if !down {
+            break;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let mut was_down = false;
+    while Instant::now() < deadline {
+        if cancel.is_cancelled() {
+            return Err(PickerError::Cancelled);
+        }
+        let esc = unsafe { GetAsyncKeyState(VK_ESCAPE.0 as i32) } < 0;
+        let rmb = unsafe { GetAsyncKeyState(VK_RBUTTON.0 as i32) } < 0;
+        if esc || rmb {
+            return Err(PickerError::Cancelled);
+        }
+        let down = unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) } < 0;
+        if down && !was_down {
+            return pick_now(injector);
+        }
+        was_down = down;
+        thread::sleep(Duration::from_millis(10));
+    }
+    Err(PickerError::TimedOut)
 }
 
 /// Interactive zone draw: wait for LMB down → drag → LMB up (Windows).
@@ -170,6 +231,15 @@ mod tests {
         let cancel = CancellationToken::new();
         cancel.cancel();
         let err = pick_after_delay(&inj, &cancel, Duration::from_millis(50)).unwrap_err();
+        assert!(matches!(err, PickerError::Cancelled));
+    }
+
+    #[test]
+    fn pick_on_click_can_cancel() {
+        let inj = RecordingInjector::new();
+        let cancel = CancellationToken::new();
+        cancel.cancel();
+        let err = pick_on_click(&inj, &cancel, Duration::from_millis(50)).unwrap_err();
         assert!(matches!(err, PickerError::Cancelled));
     }
 

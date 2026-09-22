@@ -46,13 +46,13 @@ export function ClickerZonePreview({ editor: e }: Props) {
 
   const selectZone = (sel: ZoneSelection) => {
     if (sel.kind === "edge" && !e.zoneModel.edges[sel.id]) {
-      e.setZoneModel((m) => ({
+      e.setZoneModelWithHistory("clicker.history.edgeToggled", (m) => ({
         ...m,
         edges: { ...m.edges, [sel.id]: true },
       }));
     }
     if (sel.kind === "corner" && !e.zoneModel.corners[sel.id]) {
-      e.setZoneModel((m) => ({
+      e.setZoneModelWithHistory("clicker.history.cornerToggled", (m) => ({
         ...m,
         corners: { ...m.corners, [sel.id]: true },
       }));
@@ -155,33 +155,55 @@ export function ClickerZonePreview({ editor: e }: Props) {
               ctxMenu.openAt(x, y);
             }}
             onResizeEdge={(edge, marginPx) =>
-              e.setZoneModel((m) => ({
-                ...m,
-                edgeMargin: {
-                  ...m.edgeMargin,
-                  [edge]: clampEdgeMargin(edge, marginPx, e.screenGeom),
-                },
-              }))
+              e.setZoneModelWithHistory(
+                "clicker.history.zoneResized",
+                (m) => ({
+                  ...m,
+                  edgeMargin: {
+                    ...m.edgeMargin,
+                    [edge]: clampEdgeMargin(edge, marginPx, e.screenGeom),
+                  },
+                }),
+                { coalesceMs: 400 },
+              )
             }
             onResizeCorner={(corner, widthPx, heightPx) =>
-              e.setZoneModel((m) => ({
-                ...m,
-                cornerWidth: {
-                  ...m.cornerWidth,
-                  [corner]: clampCornerWidth(widthPx, e.screenGeom),
-                },
-                cornerHeight: {
-                  ...m.cornerHeight,
-                  [corner]: clampCornerHeight(heightPx, e.screenGeom),
-                },
-              }))
+              e.setZoneModelWithHistory(
+                "clicker.history.zoneResized",
+                (m) => ({
+                  ...m,
+                  cornerWidth: {
+                    ...m.cornerWidth,
+                    [corner]: clampCornerWidth(widthPx, e.screenGeom),
+                  },
+                  cornerHeight: {
+                    ...m.cornerHeight,
+                    [corner]: clampCornerHeight(heightPx, e.screenGeom),
+                  },
+                }),
+                { coalesceMs: 400 },
+              )
             }
-            onResizeCustom={(id, next) =>
-              e.setZoneModel((m) => ({
-                ...m,
-                customZones: m.customZones.map((z) => (z.id === id ? next : z)),
-              }))
-            }
+            onResizeCustom={(id, next) => {
+              const prev = e.zoneModel.customZones.find((z) => z.id === id);
+              const moved =
+                prev != null &&
+                prev.width === next.width &&
+                prev.height === next.height &&
+                (prev.x !== next.x || prev.y !== next.y);
+              e.setZoneModelWithHistory(
+                moved
+                  ? "clicker.history.zoneMoved"
+                  : "clicker.history.zoneResized",
+                (m) => ({
+                  ...m,
+                  customZones: m.customZones.map((z) =>
+                    z.id === id ? next : z,
+                  ),
+                }),
+                { coalesceMs: 400 },
+              );
+            }}
             onDrawComplete={(rect) => {
               if (!drawMode) return;
               e.addCustomZone(rect, drawMode);

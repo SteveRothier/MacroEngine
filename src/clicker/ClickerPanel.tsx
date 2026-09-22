@@ -216,7 +216,6 @@ export function ClickerPanel({
             options={[
               { value: "light", label: t("common.light") },
               { value: "dark", label: t("common.dark") },
-              { value: "system", label: t("common.system") },
             ]}
             onChange={(v) => void onThemeSelect(v as ThemeMode)}
           />,

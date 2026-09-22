@@ -186,7 +186,8 @@ export function ClickerTitleBarTools({
             type="button"
             className="caster-titlebar-btn caster-btn caster-btn-ghost"
             disabled={!editor.canUndo || editor.editDisabled}
-            title={t("clicker.toolbar.undo")}
+            title={t("clicker.toolbar.undoTitle")}
+            aria-label={t("clicker.toolbar.undo")}
             onClick={() => editor.undoConfig()}
           >
             <Undo2 size={14} aria-hidden />
@@ -195,7 +196,8 @@ export function ClickerTitleBarTools({
             type="button"
             className="caster-titlebar-btn caster-btn caster-btn-ghost"
             disabled={!editor.canRedo || editor.editDisabled}
-            title={t("clicker.toolbar.redo")}
+            title={t("clicker.toolbar.redoTitle")}
+            aria-label={t("clicker.toolbar.redo")}
             onClick={() => editor.redoConfig()}
           >
             <Redo2 size={14} aria-hidden />

@@ -6,6 +6,7 @@ import { useT } from "../i18n";
 import { ClickerSessionStats } from "./ClickerSessionStats";
 import { ClickerTitleBarTools } from "./ClickerTitleBarTools";
 import { ClickerZonePreview } from "./ClickerZonePreview";
+import { ClickerTargetPreview } from "./ClickerTargetPreview";
 import { ClickerEntrySection } from "./sections/ClickerEntrySection";
 import { ClickerLimitsSection } from "./sections/ClickerLimitsSection";
 import { ClickerTargetSection } from "./sections/ClickerTargetSection";
@@ -114,7 +115,12 @@ export function ClickerStudio({
                 onOpenProcessSettings={onOpenProcessSettings}
               />
             ) : null}
-            {tab === "target" ? <ClickerTargetSection editor={editor} /> : null}
+            {tab === "target" ? (
+              <div className="caster-clicker-zones-split">
+                <ClickerTargetSection editor={editor} />
+                <ClickerTargetPreview editor={editor} />
+              </div>
+            ) : null}
             {tab === "zones" ? (
               <div className="caster-clicker-zones-split">
                 <ClickerZonesSection editor={editor} />
