@@ -1,16 +1,19 @@
 import { useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useT } from "../i18n";
-import type { LimitMode } from "./clickerTypes";
+import { useToast } from "../ui/shell";
 import type { ClickerMetrics } from "./useClickerEditor";
+import {
+  buildSessionStatsSnapshot,
+  sessionStatsToCsv,
+  sessionStatsToJson,
+  type SessionLimitCaps,
+} from "./sessionStatsExport";
 
 type Sample = { t: number; cps: number };
 
-export type SessionLimitCaps = {
-  enabled: boolean;
-  mode: LimitMode;
-  maxClicks: number | null;
-  maxDurationSec: number | null;
-};
+export type { SessionLimitCaps };
 
 type Props = {
   samples: Sample[];
@@ -28,6 +31,7 @@ export function ClickerSessionStats({
   limits,
 }: Props) {
   const t = useT();
+  const toast = useToast();
   const [open, setOpen] = useState(true);
   const path = useMemo(() => sparklinePath(samples.map((s) => s.cps)), [samples]);
   const latest = samples.length > 0 ? samples[samples.length - 1]!.cps : 0;
@@ -44,19 +48,80 @@ export function ClickerSessionStats({
     limits.maxDurationSec != null &&
     limits.maxDurationSec > 0;
 
+  const snapshot = () =>
+    buildSessionStatsSnapshot({ metrics, samples, running, paused, limits });
+
+  const onCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(sessionStatsToJson(snapshot()));
+      toast.success(t("clicker.session.statsCopied"));
+    } catch {
+      toast.error(t("clicker.session.statsCopyFailed"));
+    }
+  };
+
+  const onSave = async (format: "json" | "csv") => {
+    try {
+      const snap = snapshot();
+      const body =
+        format === "json" ? sessionStatsToJson(snap) : sessionStatsToCsv(snap);
+      const filePath = await save({
+        defaultPath:
+          format === "json"
+            ? "clicker-session-stats.json"
+            : "clicker-session-stats.csv",
+        filters: [
+          format === "json"
+            ? { name: "JSON", extensions: ["json"] }
+            : { name: "CSV", extensions: ["csv"] },
+        ],
+      });
+      if (!filePath) return;
+      await invoke("write_text_file", { path: filePath, contents: body });
+      toast.success(t("clicker.session.statsExported"));
+    } catch {
+      toast.error(t("clicker.session.statsExportFailed"));
+    }
+  };
+
   if (!running && samples.length === 0) return null;
 
   return (
     <div className="caster-clicker-session-stats">
-      <button
-        type="button"
-        className="caster-clicker-session-stats-toggle"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        {t("clicker.session.stats")} {open ? "▾" : "▸"}
-        {paused ? t("clicker.session.paused") : ""}
-      </button>
+      <div className="caster-clicker-session-stats-header">
+        <button
+          type="button"
+          className="caster-clicker-session-stats-toggle"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+        >
+          {t("clicker.session.stats")} {open ? "▾" : "▸"}
+          {paused ? t("clicker.session.paused") : ""}
+        </button>
+        <div className="caster-clicker-session-stats-actions">
+          <button
+            type="button"
+            className="caster-btn caster-btn-ghost caster-clicker-session-stats-btn"
+            onClick={() => void onCopy()}
+          >
+            {t("clicker.session.copyStats")}
+          </button>
+          <button
+            type="button"
+            className="caster-btn caster-btn-ghost caster-clicker-session-stats-btn"
+            onClick={() => void onSave("json")}
+          >
+            {t("clicker.session.exportJson")}
+          </button>
+          <button
+            type="button"
+            className="caster-btn caster-btn-ghost caster-clicker-session-stats-btn"
+            onClick={() => void onSave("csv")}
+          >
+            {t("clicker.session.exportCsv")}
+          </button>
+        </div>
+      </div>
       {open ? (
         <div className="caster-clicker-session-stats-body">
           <svg

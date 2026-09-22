@@ -13,7 +13,6 @@ import { Select } from "../../ui/shell";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { useT } from "../../i18n";
 import { ClickerProcessFilterRow } from "./ClickerProcessFilterRow";
-import { ClickerTriggerRow } from "./ClickerTriggerRow";
 
 type Props = {
   editor: ClickerEditor;
@@ -171,7 +170,6 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
             />
           </div>
         </div>
-        <ClickerTriggerRow editor={e} />
       </div>
 
       <div className="caster-clicker-entry-col">

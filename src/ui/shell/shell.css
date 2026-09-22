@@ -3451,6 +3451,18 @@ body.action-list-is-dragging .action-list-item {
   background: var(--caster-surface-2, var(--caster-surface));
 }
 
+.caster-clicker-meta {
+  margin: 0 12px 8px;
+}
+
+.caster-clicker-session-stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .caster-clicker-session-stats-toggle {
   border: 0;
   background: transparent;
@@ -3458,6 +3470,18 @@ body.action-list-is-dragging .action-list-item {
   font-size: 12px;
   cursor: pointer;
   padding: 0;
+}
+
+.caster-clicker-session-stats-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.caster-clicker-session-stats-btn {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
 }
 
 .caster-clicker-session-stats-body {

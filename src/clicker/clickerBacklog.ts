@@ -81,7 +81,7 @@ export const CLICKER_PHASE_5_BACKLOG: readonly ClickerBacklogItem[] = [
     id: "session-stats-export",
     title: "Export stats de session",
     summary:
-      "Copier ou exporter CSV/JSON des compteurs de session (ticks, filtres, durée) depuis le panneau stats.",
+      "Copier ou exporter CSV/JSON des compteurs de session (ticks, filtres, durée) depuis le panneau stats (livré — Copier JSON, Enregistrer JSON/CSV via dialogue + write_text_file).",
     priority: 2,
   },
   {
@@ -95,14 +95,14 @@ export const CLICKER_PHASE_5_BACKLOG: readonly ClickerBacklogItem[] = [
     id: "clicker-hotkey-parity",
     title: "Parité hotkeys macro",
     summary:
-      "Même UX capture/affichage des raccourcis clicker que dans l’éditeur macro (meta bar + conflits).",
+      "Même UX capture/affichage des raccourcis clicker que dans l’éditeur macro (meta bar + conflits) (livré — ClickerMetaBar nom + raccourci style MacroMetaBar, conflits réservés / macros / clickers).",
     priority: 4,
   },
   {
     id: "engine-capture-tests",
     title: "Tests Rust capture / zones",
     summary:
-      "Couverture clicker_capture et stop_zones (discard trailing click, Terminer sans point fantôme).",
+      "Couverture clicker_capture et stop_zones (discard trailing click, Terminer sans point fantôme) (livré — tests CaptureBuffer / discard / finish + stop_zones zone_hit déjà en place).",
     priority: 5,
   },
 ] as const;

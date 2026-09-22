@@ -4,6 +4,7 @@ import type { EngineStatus, HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import { useT } from "../i18n";
 import { ClickerSessionStats } from "./ClickerSessionStats";
+import { ClickerMetaBar } from "./ClickerMetaBar";
 import { ClickerTitleBarTools } from "./ClickerTitleBarTools";
 import { ClickerZonePreview } from "./ClickerZonePreview";
 import { ClickerTargetPreview } from "./ClickerTargetPreview";
@@ -86,6 +87,7 @@ export function ClickerStudio({
   return (
     <div className="caster-page caster-clicker-studio">
       {titleBarPortal}
+      <ClickerMetaBar editor={editor} />
       <ClickerSessionStats
         samples={editor.cpsSamples}
         metrics={editor.metrics}

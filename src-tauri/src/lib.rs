@@ -1933,6 +1933,11 @@ fn export_clicker_preset_path(
 }
 
 #[tauri::command]
+fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    std::fs::write(path, contents).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn load_preset_macro(engine: State<'_, AppState>, name: String) -> Result<MacroDocument, String> {
     let raw = match name.as_str() {
         "click-delay" => include_str!("../presets/click-delay.macro.json"),
@@ -2951,6 +2956,7 @@ pub fn run() {
             export_macro_path,
             import_clicker_preset_path,
             export_clicker_preset_path,
+            write_text_file,
             load_preset_macro,
             start_record,
             pause_record,

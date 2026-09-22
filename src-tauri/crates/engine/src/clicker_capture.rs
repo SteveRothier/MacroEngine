@@ -386,6 +386,8 @@ mod tests {
         assert_eq!(points[0].clicks, 1);
         assert_eq!(points[1].clicks, 1);
         assert_eq!(points[1].radius, 0);
+        assert_eq!(points[0].pause_after_ms, 0);
+        assert_eq!(points[1].pause_after_ms, 0);
     }
 
     #[test]
