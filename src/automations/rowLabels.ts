@@ -50,7 +50,7 @@ export function favoriteTooltip(favorite: boolean, t: TFunction): string {
 }
 
 export function sortByLabel(
-  sortBy: "name" | "type" | "status",
+  sortBy: "name" | "type" | "status" | "lastRun" | "order",
   t: TFunction,
 ): string {
   switch (sortBy) {
@@ -60,11 +60,15 @@ export function sortByLabel(
       return t("automations.row.sortType");
     case "status":
       return t("automations.row.sortStatus");
+    case "lastRun":
+      return t("automations.row.sortLastRun");
+    case "order":
+      return t("automations.columns.order");
   }
 }
 
 export function filterPillTooltip(
-  filter: "all" | "favorites" | "recent",
+  filter: "all" | "favorites" | "recent" | "trash",
   t: TFunction,
 ): string {
   switch (filter) {
@@ -74,6 +78,8 @@ export function filterPillTooltip(
       return t("automations.filter.tipFavorites");
     case "recent":
       return t("automations.filter.tipRecent");
+    case "trash":
+      return t("automations.filter.tipTrash");
   }
 }
 

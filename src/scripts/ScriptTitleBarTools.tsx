@@ -1,5 +1,12 @@
 import { ArrowLeft, MoreHorizontal, Play, Square } from "lucide-react";
 import { useT, type TFunction } from "../i18n";
+import {
+  DEFAULT_PROCESS_FILTER,
+  ProcessFilterTool,
+  type ProcessFilter,
+  type ProcessFilterPreset,
+  type ProcessFilterScopeMode,
+} from "../process";
 import { DropdownMenu, EditorToolbar, Select, Tooltip } from "../ui/shell";
 import {
   ScriptPermissionsMenu,
@@ -36,6 +43,15 @@ type Props = {
   onStop: () => void;
   saveStatus: "idle" | "saving" | "saved" | "error";
   onRetrySave?: () => void;
+  processFilter?: ProcessFilter;
+  processFilterMode?: ProcessFilterScopeMode;
+  onProcessFilterModeChange?: (mode: ProcessFilterScopeMode) => void;
+  localProcessFilter?: ProcessFilter;
+  onLocalProcessFilterChange?: (filter: ProcessFilter) => void;
+  onGlobalProcessFilterChange?: (filter: ProcessFilter) => void;
+  onOpenProcessSettings?: () => void;
+  processFilterPresets?: ProcessFilterPreset[];
+  onProcessFilterPresetsChange?: (presets: ProcessFilterPreset[]) => void;
 };
 
 function busyTooltip(kind: EngineBusyKind, t: TFunction): string {
@@ -77,6 +93,15 @@ export function ScriptTitleBarTools({
   onStop,
   saveStatus,
   onRetrySave,
+  processFilter = DEFAULT_PROCESS_FILTER,
+  processFilterMode = "inherit",
+  onProcessFilterModeChange,
+  localProcessFilter = DEFAULT_PROCESS_FILTER,
+  onLocalProcessFilterChange,
+  onGlobalProcessFilterChange,
+  onOpenProcessSettings,
+  processFilterPresets,
+  onProcessFilterPresetsChange,
 }: Props) {
   const t = useT();
   const editDisabled = locked || loading;
@@ -242,7 +267,22 @@ export function ScriptTitleBarTools({
         </>
       }
       end={
-        running ? (
+        <>
+          {onProcessFilterModeChange && onLocalProcessFilterChange ? (
+            <ProcessFilterTool
+              filter={processFilter}
+              mode={processFilterMode}
+              onModeChange={onProcessFilterModeChange}
+              localFilter={localProcessFilter}
+              onLocalFilterChange={onLocalProcessFilterChange}
+              disabled={editDisabled || running}
+              onOpenSettings={onOpenProcessSettings}
+              onGlobalFilterChange={onGlobalProcessFilterChange}
+              presets={processFilterPresets}
+              onPresetsChange={onProcessFilterPresetsChange}
+            />
+          ) : null}
+          {running ? (
           <Tooltip content={t("scripts.toolbar.stopTip")}>
             <button
               type="button"
@@ -279,7 +319,8 @@ export function ScriptTitleBarTools({
               {t("scripts.toolbar.run")}
             </button>
           </Tooltip>
-        )
+        )}
+        </>
       }
     />
   );

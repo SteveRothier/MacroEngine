@@ -6,6 +6,8 @@ Automatisation Windows locale — **clicker** + **macros** (Tauri 2 + React + Ru
 
 Bibliothèque unifiée (macros / presets clicker / scripts JS·TS), Accueil (favoris/récents/lancement), verrou bout-en-bout, undo/dirty, tests Vitest + Rust, CI GitHub Actions (`.github/workflows/`).
 
+Clicker **Phase 22** (écran absent, purge âge, perf Accueil, tests), Phase 21 (Accueil highlight/récents, paste multi, jump ligne, zones multi), Phase 20 (convert soft-fail, points multi, dossiers imbriqués, journal disque, minimize→tray), Phase 19 (tray script, dossiers DnD, ActionList batch, journal niveaux, display, convert script→clicker).
+
 - Guide utilisateur : [`docs/user-guide.md`](docs/user-guide.md)
 - Checklist smoke : [`docs/smoke-checklist.md`](docs/smoke-checklist.md)
 - Notes de version : [`docs/RELEASE.md`](docs/RELEASE.md)

@@ -13,14 +13,21 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
     MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
     MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MOUSEINPUT, MOUSE_EVENT_FLAGS, VIRTUAL_KEY,
 };
-use windows::Win32::Graphics::Gdi::{GetDC, GetPixel, ReleaseDC, CLR_INVALID};
-use windows::Win32::UI::WindowsAndMessaging::{
-    EnumWindows, GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowThreadProcessId,
-    IsWindowVisible, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN,
-    SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+use windows::Win32::Graphics::Gdi::{
+    CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
+    GetPixel, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CLR_INVALID,
+    DIB_RGB_COLORS, HGDIOBJ,
 };
+use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
+use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON};
+use windows::Win32::UI::WindowsAndMessaging::{
+    DestroyIcon, DrawIconEx, EnumWindows, GetCursorPos, GetForegroundWindow, GetSystemMetrics,
+    GetWindowThreadProcessId, IsWindowVisible, DI_NORMAL, HICON, SM_CXSCREEN,
+    SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+};
+use windows::core::PCWSTR;
 
-use super::{InputError, MouseButton, MouseInjector, Point, INJECT_EXTRA_INFO};
+use super::{InputError, MouseButton, MouseInjector, Point, ProcessExeEntry, INJECT_EXTRA_INFO};
 use crate::stop_zones::ScreenGeom;
 
 /// Win32 `SendInput` injector (mouse + keyboard).
@@ -439,22 +446,152 @@ unsafe extern "system" fn collect_visible_exe(
     let mut pid = 0u32;
     let _ = GetWindowThreadProcessId(hwnd, Some(&mut pid));
     if let Some(path) = exe_for_pid(pid) {
-        let names = &mut *(lparam.0 as *mut Vec<String>);
+        let entries = &mut *(lparam.0 as *mut Vec<(String, String)>);
         let base = crate::settings::normalize_exe_name(&path);
-        if !base.is_empty() && !names.iter().any(|n| n == &base) {
-            names.push(base);
+        if !base.is_empty() && !entries.iter().any(|(n, _)| n == &base) {
+            entries.push((base, path));
         }
     }
     windows::core::BOOL(1)
 }
 
 pub(crate) fn list_visible_process_exes() -> Vec<String> {
-    let mut names: Vec<String> = Vec::new();
+    list_visible_process_exe_entries()
+        .into_iter()
+        .map(|e| e.name)
+        .collect()
+}
+
+fn exe_icon_data_url(path: &str) -> Option<String> {
     unsafe {
-        let _ = EnumWindows(Some(collect_visible_exe), LPARAM(&mut names as *mut _ as isize));
+        let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut info = SHFILEINFOW::default();
+        let ok = SHGetFileInfoW(
+            PCWSTR(wide.as_ptr()),
+            FILE_ATTRIBUTE_NORMAL,
+            Some(&mut info),
+            std::mem::size_of::<SHFILEINFOW>() as u32,
+            SHGFI_ICON | SHGFI_SMALLICON,
+        );
+        if ok == 0 || info.hIcon.is_invalid() {
+            return None;
+        }
+        let data_url = hicon_to_png_data_url(info.hIcon);
+        let _ = DestroyIcon(info.hIcon);
+        data_url
     }
-    names.sort();
-    names
+}
+
+fn hicon_to_png_data_url(hicon: HICON) -> Option<String> {
+    const SIZE: i32 = 16;
+    unsafe {
+        let screen = GetDC(None);
+        if screen.is_invalid() {
+            return None;
+        }
+        let mem_dc = CreateCompatibleDC(Some(screen));
+        if mem_dc.is_invalid() {
+            let _ = ReleaseDC(None, screen);
+            return None;
+        }
+        let bmp = CreateCompatibleBitmap(screen, SIZE, SIZE);
+        if bmp.is_invalid() {
+            let _ = DeleteDC(mem_dc);
+            let _ = ReleaseDC(None, screen);
+            return None;
+        }
+        let old = SelectObject(mem_dc, HGDIOBJ(bmp.0));
+        let drawn = DrawIconEx(
+            mem_dc,
+            0,
+            0,
+            hicon,
+            SIZE,
+            SIZE,
+            0,
+            None,
+            DI_NORMAL,
+        )
+        .is_ok();
+        let mut bmi = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: SIZE,
+                biHeight: -SIZE, // top-down
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0 as u32,
+                biSizeImage: 0,
+                biXPelsPerMeter: 0,
+                biYPelsPerMeter: 0,
+                biClrUsed: 0,
+                biClrImportant: 0,
+            },
+            bmiColors: [Default::default(); 1],
+        };
+        let mut bgra = vec![0u8; (SIZE * SIZE * 4) as usize];
+        let got = if drawn {
+            GetDIBits(
+                mem_dc,
+                bmp,
+                0,
+                SIZE as u32,
+                Some(bgra.as_mut_ptr() as *mut _),
+                &mut bmi,
+                DIB_RGB_COLORS,
+            )
+        } else {
+            0
+        };
+        let _ = SelectObject(mem_dc, old);
+        let _ = DeleteObject(HGDIOBJ(bmp.0));
+        let _ = DeleteDC(mem_dc);
+        let _ = ReleaseDC(None, screen);
+        if got == 0 {
+            return None;
+        }
+        // BGRA → RGBA; force opaque if alpha is zero (common for shell icons).
+        let mut rgba = Vec::with_capacity(bgra.len());
+        for chunk in bgra.chunks_exact(4) {
+            let (b, g, r, mut a) = (chunk[0], chunk[1], chunk[2], chunk[3]);
+            if a == 0 && (r | g | b) != 0 {
+                a = 255;
+            }
+            rgba.extend_from_slice(&[r, g, b, a]);
+        }
+        let mut png_bytes = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut png_bytes, SIZE as u32, SIZE as u32);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().ok()?;
+            writer.write_image_data(&rgba).ok()?;
+        }
+        let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &png_bytes);
+        Some(format!("data:image/png;base64,{b64}"))
+    }
+}
+
+pub(crate) fn list_visible_process_exe_entries() -> Vec<ProcessExeEntry> {
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    unsafe {
+        let _ = EnumWindows(
+            Some(collect_visible_exe),
+            LPARAM(&mut pairs as *mut _ as isize),
+        );
+    }
+    pairs.sort_by(|a, b| a.0.cmp(&b.0));
+    pairs
+        .into_iter()
+        .map(|(name, path)| {
+            let icon_data_url = exe_icon_data_url(&path);
+            ProcessExeEntry {
+                name,
+                path,
+                icon_data_url,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

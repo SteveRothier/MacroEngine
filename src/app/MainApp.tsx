@@ -11,25 +11,28 @@ import {
 } from "../macros/types";
 import {
   mergeAccueilPrefs,
+  mergeAppearancePrefs,
   mergeAutomationPrefs,
+  mergeConfirmationsPrefs,
   mergeScriptsPrefs,
   mergeShellPrefs,
   type AccueilPrefs,
+  type AppearancePrefs,
   type AutomationPrefs,
+  type ConfirmationsPrefs,
   type ScriptsPrefs,
   type ShellPrefs,
 } from "../settings/settingsTypes";
 import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
 import { useZoneFeedbackToasts } from "../clicker/useZoneFeedbackToasts";
+import { usePixelFeedbackToasts } from "../clicker/usePixelFeedbackToasts";
 import {
   AppShell,
-  CommandPalette,
   ToastProvider,
   useToast,
   WindowTitleBar,
   type BarContextAction,
-  type CommandItem,
   type DocumentTabItem,
   type StatusKind,
   type TabContextAction,
@@ -197,9 +200,14 @@ function MainAppInner({
   const [accueilPrefs, setAccueilPrefs] = useState<AccueilPrefs>(() =>
     mergeAccueilPrefs(),
   );
+  const [appearancePrefs, setAppearancePrefs] = useState<AppearancePrefs>(() =>
+    mergeAppearancePrefs(),
+  );
+  const [confirmationsPrefs, setConfirmationsPrefs] = useState<ConfirmationsPrefs>(
+    () => mergeConfirmationsPrefs(),
+  );
   const [workspace, setWorkspace] = useState<WorkspaceState>(() => loadWorkspace());
   const [theme, setTheme] = useState<ThemeMode>(() => readStoredTheme());
-  const [advanced, setAdvanced] = useState(false);
   const [hotkeys, setHotkeys] = useState<HotkeyBindings>(DEFAULT_HOTKEYS);
   const [status, setStatus] = useState<EngineStatus>({
     state: "idle",
@@ -209,10 +217,12 @@ function MainAppInner({
   const prevEngineState = useRef(status.state);
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("application");
   const [refreshKey, setRefreshKey] = useState(0);
-  const { lines: journalLines, clear: clearJournal } = useEngineLog();
+  const { lines: journalLines, clear: clearJournal } = useEngineLog(
+    shellPrefs.journalMaxLines,
+  );
   useZoneFeedbackToasts();
+  usePixelFeedbackToasts();
   const [journalOpen, setJournalOpen] = useState(readJournalOpen);
-  const [paletteOpen, setPaletteOpen] = useState(false);
 
   const running = status.state === "running" || status.state === "paused";
   const activeDoc = activeDocTab(workspace);
@@ -257,7 +267,6 @@ function MainAppInner({
   useEffect(() => {
     void invoke<AppSettings>("get_settings")
       .then((s) => {
-        if (typeof s.advancedUi === "boolean") setAdvanced(s.advancedUi);
         if (s.theme != null) {
           onThemeChange(normalizeTheme(s.theme));
         }
@@ -268,6 +277,8 @@ function MainAppInner({
         setAutomationPrefs(mergeAutomationPrefs(s.automation));
         setScriptsPrefs(mergeScriptsPrefs(s.scripts));
         setAccueilPrefs(mergeAccueilPrefs(s.accueil));
+        setAppearancePrefs(mergeAppearancePrefs(s.appearance));
+        setConfirmationsPrefs(mergeConfirmationsPrefs(s.confirmations));
         if (!sh.restoreWorkspaceTabs) {
           setWorkspace((ws) => selectHome({ ...ws, tabs: [] }));
         } else if (sh.startupView === "lastDocument") {
@@ -324,9 +335,21 @@ function MainAppInner({
     let un: (() => void) | undefined;
     void listen("app://confirm-quit", () => {
       void (async () => {
+        const sessionActive = status.state === "running" || status.state === "paused";
+        const dirtyTabs = workspace.tabs.filter((tab) => tab.dirty);
+        let message: string | null = null;
+        if (sessionActive && shellPrefs.confirmQuitIfRunning) {
+          message = t("shell.quitMessage");
+        } else if (dirtyTabs.length > 0 && shellPrefs.warnOnUnsavedQuit) {
+          message = t("shell.quitUnsavedMessage");
+        }
+        if (!message) {
+          void invoke("confirm_app_exit");
+          return;
+        }
         const ok = await confirmAction({
           title: t("shell.quitTitle"),
-          message: t("shell.quitMessage"),
+          message,
           confirmLabel: t("shell.quitConfirm"),
           danger: true,
         });
@@ -336,15 +359,25 @@ function MainAppInner({
       un = fn;
     });
     return () => un?.();
-  }, [t]);
+  }, [
+    shellPrefs.confirmQuitIfRunning,
+    shellPrefs.warnOnUnsavedQuit,
+    status.state,
+    t,
+    workspace.tabs,
+  ]);
 
   const rememberLastRun = useCallback(
-    async (kind: "macro" | "clicker", id: string) => {
+    async (kind: "macro" | "clicker" | "script", id: string) => {
       try {
         const current = await invoke<AppSettings>("get_settings");
         const nextShell = mergeShellPrefs({
           ...current.shell,
-          ...(kind === "clicker" ? { lastClickerId: id } : { lastMacroId: id }),
+          ...(kind === "clicker"
+            ? { lastClickerId: id }
+            : kind === "macro"
+              ? { lastMacroId: id }
+              : { lastScriptId: id }),
         });
         setShellPrefs(nextShell);
         await invoke("save_app_settings", {
@@ -364,6 +397,15 @@ function MainAppInner({
   }, [automationPrefs.focusFollowsRun, persistShell]);
 
   const onEmergencyStop = useCallback(async () => {
+    if (automationPrefs.confirmStopSession) {
+      const ok = await confirmAction({
+        title: t("shell.stopConfirmTitle"),
+        message: t("shell.stopConfirmMessage"),
+        confirmLabel: t("shell.stopConfirm"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
     void invoke<EngineStatus>("emergency_stop")
       .then((s) => {
         setStatus(s);
@@ -383,17 +425,26 @@ function MainAppInner({
           })
           .catch((e) => toast.error(launchErr(e, t("shell.cannotStop")))),
       );
-  }, [shellPrefs.goHomeAfterEmergency, t, toast]);
+  }, [
+    automationPrefs.confirmStopSession,
+    shellPrefs.goHomeAfterEmergency,
+    t,
+    toast,
+  ]);
 
   const openDoc = useCallback(
     (kind: DocTabKind, resourceId: string, label?: string) => {
       prefetchEditor(kind);
       setWorkspace((ws) => {
         const next = openDocTab(ws, kind, resourceId, label ?? resourceId);
-        if (kind === "macro" || kind === "clicker") {
+        if (kind === "macro" || kind === "clicker" || kind === "script") {
           pushRecent({ id: resourceId, kind, label: label ?? resourceId });
-          saveLastStudio({ id: resourceId, kind });
-          void rememberLastRun(kind, resourceId);
+          if (kind === "macro" || kind === "clicker") {
+            saveLastStudio({ id: resourceId, kind });
+            void rememberLastRun(kind, resourceId);
+          } else {
+            void rememberLastRun("script", resourceId);
+          }
         }
         return next;
       });
@@ -435,7 +486,7 @@ function MainAppInner({
         toast.info(t("shell.pinnedTab"));
         return;
       }
-      if (tab.dirty) {
+      if (tab.dirty && confirmationsPrefs.closeDirtyTab) {
         const ok = await confirmAction({
           title: t("shell.closeTitle"),
           message: t("shell.closeDirty", { label: tab.label }),
@@ -446,7 +497,7 @@ function MainAppInner({
       }
       setWorkspace((ws) => closeDocTab(ws, tabId));
     },
-    [t, toast, workspace.tabs],
+    [confirmationsPrefs.closeDirtyTab, t, toast, workspace.tabs],
   );
 
   const applyBatchTabClose = useCallback(
@@ -454,7 +505,7 @@ function MainAppInner({
       const closing = tabsClosedBy(workspace, apply(workspace));
       if (closing.length === 0) return;
       const dirty = closing.filter((t) => t.dirty);
-      if (dirty.length > 0) {
+      if (dirty.length > 0 && confirmationsPrefs.closeDirtyTab) {
         const message =
           dirty.length === 1
             ? t("shell.closeDirty", { label: dirty[0]!.label })
@@ -472,7 +523,7 @@ function MainAppInner({
       }
       setWorkspace(apply);
     },
-    [t, workspace],
+    [confirmationsPrefs.closeDirtyTab, t, workspace],
   );
 
   const onTabContextAction = useCallback(
@@ -748,12 +799,6 @@ function MainAppInner({
       const mod = e.ctrlKey || e.metaKey;
       if (!mod) return;
 
-      if (e.key === "k" && !e.shiftKey) {
-        e.preventDefault();
-        setPaletteOpen((o) => !o);
-        return;
-      }
-
       if (e.key === "w" && !e.shiftKey) {
         if (workspace.shellView.type !== "doc") return;
         e.preventDefault();
@@ -783,164 +828,6 @@ function MainAppInner({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onCreateMacro, onTabClose, workspace]);
-
-  const commandItems = useMemo((): CommandItem[] => {
-    const nav: CommandItem[] = [
-      {
-        id: "nav-home",
-        label: t("shell.navHome"),
-        hint: t("shell.navHomeHint"),
-        group: t("shell.navGroup"),
-        onSelect: () => goHome(),
-      },
-      {
-        id: "nav-settings",
-        label: t("shell.navSettings"),
-        hint: "Ctrl+,",
-        group: t("shell.navGroup"),
-        onSelect: () => goSettings("application"),
-      },
-      {
-        id: "nav-journal",
-        label: journalOpen ? t("shell.hideJournal") : t("shell.showJournal"),
-        group: t("shell.navGroup"),
-        onSelect: () => {
-          setJournalOpen((o) => {
-            const next = !o;
-            void persistShell({ journalOpen: next });
-            return next;
-          });
-        },
-      },
-    ];
-
-    const create: CommandItem[] = [
-      {
-        id: "create-macro",
-        label: t("shell.newMacro"),
-        hint: "Ctrl+T",
-        group: t("shell.createGroup"),
-        onSelect: () => void onCreateMacro(),
-      },
-      {
-        id: "create-clicker",
-        label: t("shell.newClicker"),
-        group: t("shell.createGroup"),
-        onSelect: () => void onCreateClicker(),
-      },
-      {
-        id: "create-script",
-        label: t("shell.newScript"),
-        group: t("shell.createGroup"),
-        onSelect: () => void onCreateScript(),
-      },
-    ];
-
-    const tabs: CommandItem[] = sortTabsForDisplay(workspace.tabs).map((tab) => ({
-      id: `tab-${tab.id}`,
-      label: tab.label,
-      hint: tab.kind,
-      group: t("shell.openTabs"),
-      onSelect: () => setWorkspace((ws) => selectDocTab(ws, tab.id)),
-    }));
-
-    const session: CommandItem[] = running
-      ? [
-          {
-            id: "stop-session",
-            label: t("shell.stopSession"),
-            group: t("shell.sessionGroup"),
-            onSelect: () => onEmergencyStop(),
-          },
-        ]
-      : [];
-
-    const actions: CommandItem[] = [
-      {
-        id: "home-order",
-        label: t("shell.homeSortManual"),
-        group: t("shell.actionsGroup"),
-        onSelect: () => {
-          goHome();
-          automationsPage.setDisplay({
-            ...automationsPage.display,
-            sortBy: "order",
-            sortDir: "asc",
-          });
-        },
-      },
-      {
-        id: "launch-focused",
-        label: t("shell.launchSelected"),
-        group: t("shell.actionsGroup"),
-        onSelect: () => {
-          const key = automationsPage.focusKey;
-          if (!key) {
-            const tabId =
-              workspace.shellView.type === "doc"
-                ? workspace.shellView.tabId
-                : null;
-            const tab = tabId
-              ? workspace.tabs.find((t) => t.id === tabId)
-              : null;
-            if (tab?.resourceId) {
-              if (tab.kind === "macro") void onLaunchMacro(tab.resourceId);
-              else if (tab.kind === "clicker") void onLaunchClicker(tab.resourceId);
-              else if (tab.kind === "script") {
-                void invoke("run_script_session_cmd", { id: tab.resourceId })
-                  .then(() => {
-                    bumpRefresh();
-                    toast.success(t("shell.scriptLaunched", { name: tab.label }));
-                  })
-                  .catch((e) =>
-                    toast.error(launchErr(e, t("shell.launchScriptFailed"))),
-                  );
-              }
-              return;
-            }
-            toast.info(t("shell.selectAutomation"));
-            return;
-          }
-          const colon = key.indexOf(":");
-          if (colon < 0) return;
-          const kind = key.slice(0, colon);
-          const id = key.slice(colon + 1);
-          if (kind === "macro") void onLaunchMacro(id);
-          else if (kind === "clicker") void onLaunchClicker(id);
-          else if (kind === "script") {
-            void invoke("run_script_session_cmd", { id })
-              .then(() => {
-                bumpRefresh();
-                toast.success(t("shell.scriptLaunched", { name: id }));
-              })
-              .catch((e) =>
-                toast.error(launchErr(e, t("shell.launchScriptFailed"))),
-              );
-          }
-        },
-      },
-    ];
-
-    return [...nav, ...create, ...tabs, ...session, ...actions];
-  }, [
-    automationsPage,
-    bumpRefresh,
-    goHome,
-    goSettings,
-    journalOpen,
-    onCreateClicker,
-    onCreateMacro,
-    onCreateScript,
-    onEmergencyStop,
-    onLaunchClicker,
-    onLaunchMacro,
-    persistShell,
-    running,
-    t,
-    toast,
-    workspace.shellView,
-    workspace.tabs,
-  ]);
 
   const sessionPill = useMemo((): { kind: StatusKind; label: string } | null => {
     if (!running && status.state === "idle") return null;
@@ -1034,6 +921,9 @@ function MainAppInner({
         onFocusKeyChange={automationsPage.setFocusKey}
         scriptsPrefs={scriptsPrefs}
         accueilPrefs={accueilPrefs}
+        automationPrefs={automationPrefs}
+        confirmationsPrefs={confirmationsPrefs}
+        recentListMax={shellPrefs.recentListMax}
         onOpenSettings={() => goSettings("application")}
       />
     </div>
@@ -1055,8 +945,6 @@ function MainAppInner({
           theme={theme}
           onThemeChange={onThemeChange}
           onHotkeysChange={setHotkeys}
-          advanced={advanced}
-          onAdvancedChange={setAdvanced}
           running={running}
           journalOpen={journalOpen}
           onJournalOpenChange={(v) => {
@@ -1070,6 +958,8 @@ function MainAppInner({
           onAutomationPrefsChange={setAutomationPrefs}
           onScriptsPrefsChange={setScriptsPrefs}
           onAccueilPrefsChange={setAccueilPrefs}
+          onAppearancePrefsChange={setAppearancePrefs}
+          onConfirmationsPrefsChange={setConfirmationsPrefs}
         />
       ) : null;
 
@@ -1087,6 +977,8 @@ function MainAppInner({
               macroId={tab.resourceId}
               onBack={goHome}
               onDirtyChange={onActiveDocDirtyChange}
+              automationPrefs={automationPrefs}
+              confirmationsPrefs={confirmationsPrefs}
               onRenamed={(_from, to) => {
                 setWorkspace((ws) => renameDocTab(ws, tab.id, to, to));
                 bumpRefresh();
@@ -1094,6 +986,8 @@ function MainAppInner({
               engineState={status.state}
               onStatus={setStatus}
               onOpenScript={(id, label) => openDoc("script", id, label ?? id)}
+              onOpenClicker={(id, label) => openDoc("clicker", id, label ?? id)}
+              onOpenProcessSettings={() => goSettings("security")}
             />
           );
         }
@@ -1180,6 +1074,10 @@ function MainAppInner({
   return (
     <>
       <AppShell
+        density={appearancePrefs.density}
+        accent={appearancePrefs.accent}
+        fontScale={appearancePrefs.fontScale}
+        reduceMotion={appearancePrefs.reduceMotion}
         titleBar={
           <WindowTitleBar
             tabs={documentTabs}
@@ -1208,7 +1106,7 @@ function MainAppInner({
               });
             }}
             journalOpen={journalOpen}
-            sessionStatus={sessionPill}
+            sessionStatus={shellPrefs.showSessionPill ? sessionPill : null}
             showStop={running}
             onStop={onEmergencyStop}
           />
@@ -1224,15 +1122,18 @@ function MainAppInner({
           setJournalOpen(open);
           void persistShell({ journalOpen: open });
         }}
+        emptyCta={{
+          label: t("runs.emptyCta"),
+          onClick: () => {
+            setJournalOpen(false);
+            void persistShell({ journalOpen: false });
+            goHome();
+          },
+        }}
       />
       <ConfirmHost />
       <PromptHost />
       <ScriptLanguageHost />
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        items={commandItems}
-      />
     </>
   );
 }

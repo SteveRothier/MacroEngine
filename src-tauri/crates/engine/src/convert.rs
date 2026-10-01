@@ -6,8 +6,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::clicker::{ClickMode, ClickTarget, ClickerConfig, InputKind, LimitMode};
-use crate::clicker_presets::load_preset;
+use crate::clicker::{
+    ClickMode, ClickPoint, ClickTarget, ClickZoneOrder, ClickerConfig, InputKind, LimitMode,
+};
+use crate::clicker_presets::{list_presets, load_preset, save_preset};
 use crate::library_index::{get_library_index, move_library_item, LibraryKind};
 use crate::macro_library::{create_macro, list_macros, load_macro, save_macro};
 use crate::schema::{
@@ -81,6 +83,20 @@ fn unique_script_name(config_dir: &Path, base: &str) -> Result<String, ConvertEr
         }
     }
     Err(ConvertError::Message("no free script name".into()))
+}
+
+fn unique_clicker_name(config_dir: &Path, base: &str) -> Result<String, ConvertError> {
+    let existing = list_presets(config_dir).map_err(|e| ConvertError::Message(e.to_string()))?;
+    if !existing.iter().any(|n| n == base) {
+        return Ok(base.to_string());
+    }
+    for i in 2..200 {
+        let candidate = format!("{base} ({i})");
+        if !existing.iter().any(|n| n == &candidate) {
+            return Ok(candidate);
+        }
+    }
+    Err(ConvertError::Message("no free clicker name".into()))
 }
 
 fn source_folder_id(
@@ -524,11 +540,8 @@ fn macro_has_input_actions(actions: &[ActionNode]) -> Vec<String> {
     out
 }
 
-fn clicker_is_trivial(cfg: &ClickerConfig) -> Result<(), Vec<String>> {
+fn clicker_complexity_drops(cfg: &ClickerConfig) -> Vec<String> {
     let mut reasons = Vec::new();
-    if cfg.points_enabled || !cfg.points.is_empty() {
-        reasons.push("points".into());
-    }
     if !cfg.stop_zones.is_empty() {
         reasons.push("stopZones".into());
     }
@@ -554,27 +567,82 @@ fn clicker_is_trivial(cfg: &ClickerConfig) -> Result<(), Vec<String>> {
     {
         reasons.push("onCompleteMacro".into());
     }
-    match &cfg.target {
-        ClickTarget::CurrentCursor | ClickTarget::Fixed { .. } => {}
-    }
     if !cfg.limits_enabled {
         reasons.push("unlimited run (need maxClicks or maxDuration)".into());
-    } else if !matches!(cfg.limit_mode, LimitMode::Clicks | LimitMode::Time | LimitMode::Both)
-    {
+    } else if !matches!(
+        cfg.limit_mode,
+        LimitMode::Clicks | LimitMode::Time | LimitMode::Both
+    ) {
         reasons.push("unsupported limitMode".into());
     }
-    if reasons.is_empty() {
-        Ok(())
-    } else {
-        Err(reasons)
-    }
+    reasons
 }
 
 fn clicker_to_macro_actions(cfg: &ClickerConfig) -> (Vec<ActionNode>, ConvertReport) {
+    let mut dropped = clicker_complexity_drops(cfg);
+    if cfg.points_enabled && !cfg.points.is_empty() {
+        let mut report = ConvertReport {
+            kept: vec!["mouse.click".into(), "delay".into(), "points".into()],
+            dropped: dropped.clone(),
+            warnings: vec![format!(
+                "Converted {} clicker point(s) to click+delay sequence",
+                cfg.points.len()
+            )],
+        };
+        if !dropped.is_empty() {
+            report.warnings.push(
+                "Clicker features beyond fixed clicks+delay are not converted".into(),
+            );
+        }
+        let mut actions = Vec::new();
+        for (i, p) in cfg.points.iter().enumerate() {
+            let clicks = p.clicks.max(1);
+            for c in 0..clicks {
+                actions.push(ActionNode::MouseClick {
+                    id: format!("p{i}c{c}"),
+                    button: "left".into(),
+                    x: Some(p.x),
+                    y: Some(p.y),
+                });
+                if c + 1 < clicks {
+                    let gap = if cfg.cps > 0.0 {
+                        (1000.0 / cfg.cps).round().max(1.0) as u64
+                    } else {
+                        100
+                    };
+                    actions.push(ActionNode::Delay {
+                        id: format!("p{i}d{c}"),
+                        ms: gap,
+                    });
+                }
+            }
+            if p.pause_after_ms > 0 && i + 1 < cfg.points.len() {
+                actions.push(ActionNode::Delay {
+                    id: format!("p{i}pause"),
+                    ms: p.pause_after_ms,
+                });
+            }
+        }
+        return (actions, report);
+    }
+
+    // Fixed / cursor burst path — reuse existing logic below via original body.
+    let (actions, mut report) = clicker_to_macro_actions_burst(cfg);
+    report.dropped.append(&mut dropped);
+    if !report.dropped.is_empty() {
+        report.warnings.push(
+            "Clicker features beyond fixed clicks+delay are not converted".into(),
+        );
+    }
+    (actions, report)
+}
+
+/// Burst conversion for non-points clicker.
+fn clicker_to_macro_actions_burst(cfg: &ClickerConfig) -> (Vec<ActionNode>, ConvertReport) {
     let mut report = ConvertReport {
         kept: vec!["mouse.click".into(), "delay".into()],
         dropped: Vec::new(),
-        warnings: vec!["Clicker features beyond fixed clicks+delay are not converted".into()],
+        warnings: Vec::new(),
     };
     let (x, y) = match &cfg.target {
         ClickTarget::Fixed { x, y } => (Some(*x), Some(*y)),
@@ -596,7 +664,9 @@ fn clicker_to_macro_actions(cfg: &ClickerConfig) -> (Vec<ActionNode>, ConvertRep
     } else {
         1
     };
-    report.warnings.push(format!("Generated {clicks} click(s) at ~{interval_ms} ms"));
+    report
+        .warnings
+        .push(format!("Generated {clicks} click(s) at ~{interval_ms} ms"));
     let mut actions = Vec::new();
     for i in 0..clicks {
         actions.push(ActionNode::MouseClick {
@@ -671,17 +741,58 @@ pub fn convert_library_item_lang(
                 report,
             })
         }
-        (LibraryKind::Macro, LibraryKind::Clicker) => {
-            Err(ConvertError::Message(
-                "macro→clicker only for trivial CPS patterns — not supported yet; convert refused"
-                    .into(),
-            ))
+        (LibraryKind::Macro, LibraryKind::Clicker) => macro_to_clicker(config_dir, id),
+        (LibraryKind::Script, LibraryKind::Clicker) => {
+            let mid = script_to_macro(config_dir, id)?;
+            let r = match macro_to_clicker(config_dir, &mid.new_id) {
+                Ok(r) => r,
+                Err(_) => script_to_clicker_stub(config_dir, id)?,
+            };
+            let mut report = r.report;
+            report.warnings.push(format!(
+                "Intermediate macro « {} » was also created",
+                mid.new_name
+            ));
+            Ok(ConvertResult {
+                new_id: r.new_id,
+                new_name: r.new_name,
+                to_kind: "clicker".into(),
+                report,
+            })
         }
-        (LibraryKind::Script, LibraryKind::Clicker) => Err(ConvertError::Message(
-            "script→clicker is not supported (orthogonal models)".into(),
-        )),
         _ => Err(ConvertError::Message("unsupported conversion".into())),
     }
+}
+
+/// When the intermediate macro is only a `script.run` wrap (no clicks), ship a stub clicker.
+fn script_to_clicker_stub(
+    config_dir: &Path,
+    id: &str,
+) -> Result<ConvertResult, ConvertError> {
+    let doc = load_script(config_dir, id).map_err(|e| ConvertError::Message(e.to_string()))?;
+    let folder = source_folder_id(config_dir, LibraryKind::Script, id)?;
+    let name = unique_clicker_name(config_dir, &format!("{} (clicker)", doc.name))?;
+    let mut cfg = ClickerConfig::default();
+    cfg.mode = ClickMode::Toggle;
+    cfg.input_kind = InputKind::Mouse;
+    cfg.target = ClickTarget::CurrentCursor;
+    cfg.cps = 5.0;
+    cfg.interval_ms = 200.0;
+    cfg.duty_cycle = 1.0;
+    save_preset(config_dir, &name, &cfg).map_err(|e| ConvertError::Message(e.to_string()))?;
+    assign_folder(config_dir, LibraryKind::Clicker, &name, folder)?;
+    Ok(ConvertResult {
+        new_id: name.clone(),
+        new_name: name,
+        to_kind: "clicker".into(),
+        report: ConvertReport {
+            kept: Vec::new(),
+            dropped: vec!["script body".into()],
+            warnings: vec![
+                "Clicker stub: script body cannot be transcribed to clicks".into(),
+            ],
+        },
+    })
 }
 
 fn script_to_macro(config_dir: &Path, id: &str) -> Result<ConvertResult, ConvertError> {
@@ -819,6 +930,8 @@ fn macro_to_script(
         allow_input,
         allow_process,
         param_values: Default::default(),
+        process_filter: Default::default(),
+        local_process_filter: Default::default(),
     };
     save_script(config_dir, &script).map_err(|e| ConvertError::Message(e.to_string()))?;
     assign_folder(config_dir, LibraryKind::Script, &script.id, folder)?;
@@ -833,15 +946,14 @@ fn macro_to_script(
 
 fn clicker_to_macro(config_dir: &Path, id: &str) -> Result<ConvertResult, ConvertError> {
     let preset = load_preset(config_dir, id).map_err(|e| ConvertError::Message(e.to_string()))?;
-    if let Err(reasons) = clicker_is_trivial(&preset.config) {
-        return Err(ConvertError::Message(format!(
-            "clicker too complex: {}",
-            reasons.join(", ")
-        )));
-    }
     let folder = source_folder_id(config_dir, LibraryKind::Clicker, id)?;
     let name = unique_macro_name(config_dir, &format!("{} (macro)", preset.name))?;
     let (actions, report) = clicker_to_macro_actions(&preset.config);
+    if actions.is_empty() {
+        return Err(ConvertError::Message(
+            "clicker→macro: no convertible clicks".into(),
+        ));
+    }
     let mut macro_doc = create_macro(config_dir, Some(&name))
         .map_err(|e| ConvertError::Message(e.to_string()))?;
     macro_doc.name = name.clone();
@@ -853,6 +965,243 @@ fn clicker_to_macro(config_dir: &Path, id: &str) -> Result<ConvertResult, Conver
         new_id: name.clone(),
         new_name: name,
         to_kind: "macro".into(),
+        report,
+    })
+}
+
+fn action_drop_label(action: &ActionNode) -> &'static str {
+    match action {
+        ActionNode::Delay { .. } => "orphan delay",
+        ActionNode::KeyTap { .. } | ActionNode::KeyDown { .. } | ActionNode::KeyUp { .. } => {
+            "keyboard"
+        }
+        ActionNode::MouseMove { .. }
+        | ActionNode::MouseDown { .. }
+        | ActionNode::MouseUp { .. }
+        | ActionNode::MouseWheel { .. } => "mouse non-click",
+        ActionNode::ControlIf { .. } => "control.if",
+        ActionNode::ControlWhile { .. } => "control.while",
+        ActionNode::ScriptRun { .. } => "script.run",
+        ActionNode::ProcessRun { .. } => "process.run",
+        ActionNode::MouseClick { .. } => "mouse.click",
+        ActionNode::HttpRequest { .. } => "http",
+        ActionNode::ClipboardSet { .. } | ActionNode::ClipboardGet { .. } => "clipboard",
+        ActionNode::VarSet { .. } | ActionNode::JsonPath { .. } => "variables",
+        _ => "unsupported",
+    }
+}
+
+fn macro_to_clicker_config(
+    actions: &[ActionNode],
+) -> Result<(ClickerConfig, ConvertReport), ConvertError> {
+    let mut clicks: Vec<(Option<i32>, Option<i32>)> = Vec::new();
+    let mut delays: Vec<u64> = Vec::new();
+    let mut dropped: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < actions.len() {
+        match &actions[i] {
+            ActionNode::MouseClick { button, x, y, .. } => {
+                if button != "left" {
+                    dropped.push(format!("mouse.click ({button})"));
+                    i += 1;
+                    continue;
+                }
+                clicks.push((*x, *y));
+                if i + 1 < actions.len() {
+                    if let ActionNode::Delay { ms, .. } = &actions[i + 1] {
+                        delays.push(*ms);
+                        i += 2;
+                        continue;
+                    }
+                }
+                i += 1;
+            }
+            ActionNode::Delay { .. } => {
+                dropped.push("orphan delay".into());
+                i += 1;
+            }
+            other => {
+                let label = action_drop_label(other);
+                if !dropped.iter().any(|d| d == label) {
+                    dropped.push(label.into());
+                }
+                i += 1;
+            }
+        }
+    }
+    if clicks.is_empty() {
+        return Err(ConvertError::Message(
+            "macro→clicker: no mouse.click actions".into(),
+        ));
+    }
+
+    // Prefer fixed clicks when mixed; drop the minority mode.
+    let all_cursor = clicks.iter().all(|(x, y)| x.is_none() && y.is_none());
+    let all_fixed = clicks.iter().all(|(x, y)| x.is_some() && y.is_some());
+    let (clicks, delays) = if !all_cursor && !all_fixed {
+        dropped.push("mixed cursor/fixed clicks".into());
+        let fixed_n = clicks
+            .iter()
+            .filter(|(x, y)| x.is_some() && y.is_some())
+            .count();
+        let cursor_n = clicks.len() - fixed_n;
+        let keep_fixed = fixed_n >= cursor_n;
+        let mut next_clicks = Vec::new();
+        let mut next_delays = Vec::new();
+        for (idx, c) in clicks.iter().enumerate() {
+            let is_fixed = c.0.is_some() && c.1.is_some();
+            if is_fixed == keep_fixed {
+                next_clicks.push(*c);
+                if let Some(d) = delays.get(idx) {
+                    next_delays.push(*d);
+                }
+            }
+        }
+        (next_clicks, next_delays)
+    } else {
+        (clicks, delays)
+    };
+    if clicks.is_empty() {
+        return Err(ConvertError::Message(
+            "macro→clicker: no usable mouse.click actions after filtering".into(),
+        ));
+    }
+    let all_cursor = clicks.iter().all(|(x, y)| x.is_none() && y.is_none());
+    let all_fixed = clicks.iter().all(|(x, y)| x.is_some() && y.is_some());
+
+    let distinct: Vec<(i32, i32)> = if all_fixed {
+        let mut seen = Vec::new();
+        for (x, y) in &clicks {
+            let pt = (x.unwrap(), y.unwrap());
+            if !seen.contains(&pt) {
+                seen.push(pt);
+            }
+        }
+        seen
+    } else {
+        Vec::new()
+    };
+
+    // Multi-point sequence when fixed coords differ.
+    if all_fixed && distinct.len() > 1 {
+        let mut points = Vec::new();
+        let mut idx = 0usize;
+        while idx < clicks.len() {
+            let (x, y) = (clicks[idx].0.unwrap(), clicks[idx].1.unwrap());
+            let mut count = 1u32;
+            while (idx + count as usize) < clicks.len() {
+                let (nx, ny) = (
+                    clicks[idx + count as usize].0.unwrap(),
+                    clicks[idx + count as usize].1.unwrap(),
+                );
+                if nx == x && ny == y {
+                    count += 1;
+                } else {
+                    break;
+                }
+            }
+            let pause = delays
+                .get(idx + count as usize - 1)
+                .copied()
+                .unwrap_or(0);
+            let pause_after = if (idx + count as usize) < clicks.len() {
+                pause
+            } else {
+                0
+            };
+            points.push(ClickPoint {
+                x,
+                y,
+                clicks: count,
+                radius: 0,
+                pause_after_ms: pause_after,
+            });
+            idx += count as usize;
+        }
+        let mut cfg = ClickerConfig::default();
+        cfg.points_enabled = true;
+        cfg.points = points;
+        cfg.click_zone_order = ClickZoneOrder::Sequence;
+        cfg.mode = ClickMode::Toggle;
+        cfg.input_kind = InputKind::Mouse;
+        cfg.duty_cycle = 1.0;
+        cfg.limits_enabled = true;
+        cfg.limit_mode = LimitMode::Clicks;
+        cfg.max_clicks = Some(clicks.len() as u64);
+        cfg.cps = 10.0;
+        cfg.interval_ms = 100.0;
+        cfg.target = ClickTarget::Fixed {
+            x: cfg.points[0].x,
+            y: cfg.points[0].y,
+        };
+        let mut report = ConvertReport {
+            kept: vec!["mouse.click".into(), "delay".into(), "points".into()],
+            dropped,
+            warnings: vec![format!(
+                "Clicker preset: {} point sequence ({} click(s))",
+                cfg.points.len(),
+                clicks.len()
+            )],
+        };
+        if !report.dropped.is_empty() {
+            report.warnings.push(
+                "Some macro actions were skipped during clicker conversion".into(),
+            );
+        }
+        return Ok((cfg, report));
+    }
+
+    let first = clicks[0];
+    let interval_ms = if delays.is_empty() {
+        100
+    } else {
+        let sum: u64 = delays.iter().sum();
+        (sum / delays.len() as u64).max(1)
+    };
+    let count = clicks.len() as u64;
+    let cps = 1000.0 / (interval_ms as f64);
+    let mut cfg = ClickerConfig::default();
+    cfg.cps = cps;
+    cfg.interval_ms = interval_ms as f64;
+    cfg.limits_enabled = true;
+    cfg.limit_mode = LimitMode::Clicks;
+    cfg.max_clicks = Some(count);
+    cfg.mode = ClickMode::Toggle;
+    cfg.input_kind = InputKind::Mouse;
+    cfg.duty_cycle = 1.0;
+    cfg.target = match first {
+        (Some(x), Some(y)) => ClickTarget::Fixed { x, y },
+        _ => {
+            let _ = all_cursor;
+            ClickTarget::CurrentCursor
+        }
+    };
+    let mut report = ConvertReport {
+        kept: vec!["mouse.click".into(), "delay".into()],
+        dropped,
+        warnings: vec![format!(
+            "Clicker preset: {count} click(s) @ ~{cps:.1} CPS ({interval_ms} ms)"
+        )],
+    };
+    if !report.dropped.is_empty() {
+        report.warnings.push(
+            "Some macro actions were skipped during clicker conversion".into(),
+        );
+    }
+    Ok((cfg, report))
+}
+
+fn macro_to_clicker(config_dir: &Path, id: &str) -> Result<ConvertResult, ConvertError> {
+    let doc = load_macro(config_dir, id).map_err(|e| ConvertError::Message(e.to_string()))?;
+    let (cfg, report) = macro_to_clicker_config(&doc.actions)?;
+    let folder = source_folder_id(config_dir, LibraryKind::Macro, id)?;
+    let name = unique_clicker_name(config_dir, &format!("{} (clicker)", doc.name))?;
+    save_preset(config_dir, &name, &cfg).map_err(|e| ConvertError::Message(e.to_string()))?;
+    assign_folder(config_dir, LibraryKind::Clicker, &name, folder)?;
+    Ok(ConvertResult {
+        new_id: name.clone(),
+        new_name: name,
+        to_kind: "clicker".into(),
         report,
     })
 }
@@ -892,6 +1241,8 @@ mod tests {
             allow_input: false,
             allow_process: false,
             param_values: Default::default(),
+            process_filter: Default::default(),
+            local_process_filter: Default::default(),
         };
         save_script(&dir, &doc).unwrap();
         let r = convert_library_item(
@@ -1028,6 +1379,198 @@ mod tests {
         assert!(s.source.contains("caster.sleep(50)"));
         assert!(s.allow_input);
         assert!(!s.source.contains("runMacro"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn macro_trivial_to_clicker() {
+        let dir = temp_dir();
+        let mut m = create_macro(&dir, Some("Burst")).unwrap();
+        let id = m.name.clone();
+        m.actions = vec![
+            ActionNode::MouseClick {
+                id: "c0".into(),
+                button: "left".into(),
+                x: Some(100),
+                y: Some(200),
+            },
+            ActionNode::Delay {
+                id: "d0".into(),
+                ms: 50,
+            },
+            ActionNode::MouseClick {
+                id: "c1".into(),
+                button: "left".into(),
+                x: Some(100),
+                y: Some(200),
+            },
+        ];
+        save_macro(&dir, &id, &m).unwrap();
+        let r = convert_library_item(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Clicker,
+            ConvertMode::Wrap,
+        )
+        .unwrap();
+        assert_eq!(r.to_kind, "clicker");
+        let preset = load_preset(&dir, &r.new_id).unwrap();
+        assert!(preset.config.limits_enabled);
+        assert_eq!(preset.config.max_clicks, Some(2));
+        assert!(matches!(
+            preset.config.target,
+            ClickTarget::Fixed { x: 100, y: 200 }
+        ));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn macro_complex_to_clicker_skips_non_clicks() {
+        let dir = temp_dir();
+        let mut m = create_macro(&dir, Some("Mixed")).unwrap();
+        let id = m.name.clone();
+        m.actions = vec![
+            ActionNode::KeyTap {
+                id: "k1".into(),
+                key: "A".into(),
+                mods: crate::schema::KeyMods::default(),
+            },
+            ActionNode::MouseClick {
+                id: "c1".into(),
+                button: "left".into(),
+                x: Some(10),
+                y: Some(20),
+            },
+            ActionNode::Delay {
+                id: "d1".into(),
+                ms: 50,
+            },
+            ActionNode::MouseClick {
+                id: "c2".into(),
+                button: "left".into(),
+                x: Some(10),
+                y: Some(20),
+            },
+        ];
+        save_macro(&dir, &id, &m).unwrap();
+        let r = convert_library_item(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Clicker,
+            ConvertMode::Wrap,
+        )
+        .unwrap();
+        assert_eq!(r.to_kind, "clicker");
+        assert!(r.report.dropped.iter().any(|d| d.contains("keyboard")));
+        let preset = load_preset(&dir, &r.new_id).unwrap();
+        assert_eq!(preset.config.max_clicks, Some(2));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn macro_only_non_clicks_still_refused() {
+        let dir = temp_dir();
+        let mut m = create_macro(&dir, Some("Complex")).unwrap();
+        let id = m.name.clone();
+        m.actions = vec![ActionNode::KeyTap {
+            id: "k1".into(),
+            key: "A".into(),
+            mods: crate::schema::KeyMods::default(),
+        }];
+        save_macro(&dir, &id, &m).unwrap();
+        let err = convert_library_item(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Clicker,
+            ConvertMode::Wrap,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("macro→clicker"));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn macro_cursor_clicks_to_clicker() {
+        let dir = temp_dir();
+        let mut m = create_macro(&dir, Some("CursorBurst")).unwrap();
+        let id = m.name.clone();
+        m.actions = vec![
+            ActionNode::MouseClick {
+                id: "c0".into(),
+                button: "left".into(),
+                x: None,
+                y: None,
+            },
+            ActionNode::Delay {
+                id: "d0".into(),
+                ms: 100,
+            },
+            ActionNode::MouseClick {
+                id: "c1".into(),
+                button: "left".into(),
+                x: None,
+                y: None,
+            },
+        ];
+        save_macro(&dir, &id, &m).unwrap();
+        let r = convert_library_item(
+            &dir,
+            LibraryKind::Macro,
+            &id,
+            LibraryKind::Clicker,
+            ConvertMode::Wrap,
+        )
+        .unwrap();
+        let preset = load_preset(&dir, &r.new_id).unwrap();
+        assert_eq!(preset.config.max_clicks, Some(2));
+        assert!(matches!(
+            preset.config.target,
+            ClickTarget::CurrentCursor
+        ));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn script_to_clicker_via_intermediate_macro() {
+        let dir = temp_dir();
+        let doc = ScriptDoc {
+            id: "s1".into(),
+            name: "Hello".into(),
+            source: "caster.log('hi');".into(),
+            language: Default::default(),
+            is_module: false,
+            allow_network: false,
+            allow_clipboard: false,
+            allow_fs: false,
+            allow_macro_control: false,
+            allow_input: false,
+            allow_process: false,
+            param_values: Default::default(),
+            process_filter: Default::default(),
+            local_process_filter: Default::default(),
+        };
+        save_script(&dir, &doc).unwrap();
+        let r = convert_library_item(
+            &dir,
+            LibraryKind::Script,
+            "s1",
+            LibraryKind::Clicker,
+            ConvertMode::Wrap,
+        )
+        .unwrap();
+        assert_eq!(r.to_kind, "clicker");
+        assert!(
+            r.report
+                .warnings
+                .iter()
+                .any(|w| w.contains("Intermediate macro")),
+            "expected intermediate macro warning: {:?}",
+            r.report.warnings
+        );
+        let _ = load_preset(&dir, &r.new_id).unwrap();
         let _ = fs::remove_dir_all(&dir);
     }
 }

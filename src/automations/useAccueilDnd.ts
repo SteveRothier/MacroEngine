@@ -355,3 +355,223 @@ export function useAccueilDnd({
     clearDrag,
   };
 }
+
+export type FolderSectionDropEdge = {
+  folderId: string;
+  edge: AccueilDropEdge;
+};
+
+type FolderReorderOptions = {
+  listScrollRef: RefObject<HTMLDivElement | null>;
+  folderIdsRef: RefObject<string[]>;
+  dragThresholdPx: number;
+  onReorder: (orderedIds: string[]) => void;
+};
+
+/**
+ * Pointer DnD between Accueil folder section headers; persists via caller.
+ */
+export function useFolderSectionDnd({
+  listScrollRef,
+  folderIdsRef,
+  dragThresholdPx,
+  onReorder,
+}: FolderReorderOptions) {
+  const [dragFolderId, setDragFolderId] = useState<string | null>(null);
+  const [dropEdge, setDropEdge] = useState<FolderSectionDropEdge | null>(null);
+  const [ghost, setGhost] = useState<{ name: string; x: number; y: number } | null>(
+    null,
+  );
+
+  const armedRef = useRef(false);
+  const suppressClickRef = useRef(false);
+  const sessionRef = useRef<{
+    folderId: string;
+    name: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const dropEdgeRef = useRef<FolderSectionDropEdge | null>(null);
+  const onReorderRef = useRef(onReorder);
+  onReorderRef.current = onReorder;
+  const thresholdRef = useRef(dragThresholdPx);
+  thresholdRef.current = dragThresholdPx;
+  const gestureIdRef = useRef(0);
+  const detachListenersRef = useRef<(() => void) | null>(null);
+
+  const clearDrag = useCallback((opts?: { suppressClick?: boolean }) => {
+    const suppress = opts?.suppressClick === true || armedRef.current;
+    gestureIdRef.current += 1;
+    detachListenersRef.current?.();
+    detachListenersRef.current = null;
+    sessionRef.current = null;
+    armedRef.current = false;
+    dropEdgeRef.current = null;
+    setDragFolderId(null);
+    setDropEdge(null);
+    setGhost(null);
+    if (suppress) {
+      suppressClickRef.current = true;
+      const swallow = (ev: Event) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        suppressClickRef.current = false;
+        window.removeEventListener("click", swallow, true);
+      };
+      window.addEventListener("click", swallow, true);
+      window.setTimeout(() => {
+        window.removeEventListener("click", swallow, true);
+        suppressClickRef.current = false;
+      }, 400);
+    }
+  }, []);
+
+  const autoScrollNearEdges = useCallback(
+    (clientY: number) => {
+      const list = listScrollRef.current;
+      if (!list) return;
+      const rect = list.getBoundingClientRect();
+      if (clientY < rect.top + AUTO_SCROLL_EDGE_PX) {
+        const t = 1 - (clientY - rect.top) / AUTO_SCROLL_EDGE_PX;
+        list.scrollTop -= Math.ceil(
+          AUTO_SCROLL_MAX_PX * Math.min(1, Math.max(0, t)),
+        );
+      } else if (clientY > rect.bottom - AUTO_SCROLL_EDGE_PX) {
+        const t = 1 - (rect.bottom - clientY) / AUTO_SCROLL_EDGE_PX;
+        list.scrollTop += Math.ceil(
+          AUTO_SCROLL_MAX_PX * Math.min(1, Math.max(0, t)),
+        );
+      }
+    },
+    [listScrollRef],
+  );
+
+  const onFolderPointerDown = useCallback(
+    (folderId: string, name: string, e: ReactPointerEvent) => {
+      if (e.button !== 0) return;
+      const target = e.target;
+      // Don't start reorder from the menu trail / dropdown.
+      if (
+        target instanceof Element &&
+        (target.closest(".caster-auto-row-trail") ||
+          target.closest(".caster-dropdown") ||
+          target.closest("[role='menu']"))
+      ) {
+        return;
+      }
+      clearDrag();
+      const pointerId = e.pointerId;
+      const gestureId = gestureIdRef.current;
+      sessionRef.current = {
+        folderId,
+        name,
+        pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+      };
+
+      const onMove = (ev: PointerEvent) => {
+        if (gestureIdRef.current !== gestureId) return;
+        const s = sessionRef.current;
+        if (!s || ev.pointerId !== s.pointerId) return;
+        if (!armedRef.current) {
+          const dx = ev.clientX - s.startX;
+          const dy = ev.clientY - s.startY;
+          if (Math.hypot(dx, dy) < thresholdRef.current) return;
+          armedRef.current = true;
+          setDragFolderId(s.folderId);
+          setGhost({ name: s.name, x: ev.clientX, y: ev.clientY });
+        }
+        autoScrollNearEdges(ev.clientY);
+        setGhost((g) => (g ? { ...g, x: ev.clientX, y: ev.clientY } : g));
+
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const header =
+          el instanceof Element
+            ? el.closest(".caster-auto-folder-section[data-folder-drop-id]")
+            : null;
+        if (!(header instanceof HTMLElement)) {
+          dropEdgeRef.current = null;
+          setDropEdge(null);
+          return;
+        }
+        const targetId = header.getAttribute("data-folder-drop-id");
+        if (!targetId || targetId === s.folderId) {
+          dropEdgeRef.current = null;
+          setDropEdge(null);
+          return;
+        }
+        const rect = header.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        const prev = dropEdgeRef.current;
+        let edge: AccueilDropEdge;
+        if (
+          prev &&
+          prev.folderId === targetId &&
+          Math.abs(ev.clientY - mid) < EDGE_HYSTERESIS_PX
+        ) {
+          edge = prev.edge;
+        } else {
+          edge = ev.clientY < mid ? "before" : "after";
+        }
+        const next = { folderId: targetId, edge };
+        dropEdgeRef.current = next;
+        setDropEdge(next);
+      };
+
+      const onUp = (ev: PointerEvent) => {
+        if (ev.pointerId !== pointerId) return;
+        if (gestureIdRef.current !== gestureId) return;
+        detachListenersRef.current?.();
+        detachListenersRef.current = null;
+
+        const s = sessionRef.current;
+        const armed = armedRef.current;
+        const edge = dropEdgeRef.current;
+        if (!armed || !s || !edge) {
+          clearDrag();
+          return;
+        }
+        const ids = [...folderIdsRef.current];
+        const from = ids.indexOf(s.folderId);
+        const to = ids.indexOf(edge.folderId);
+        if (from < 0 || to < 0 || from === to) {
+          clearDrag({ suppressClick: true });
+          return;
+        }
+        ids.splice(from, 1);
+        let insertAt = ids.indexOf(edge.folderId);
+        if (insertAt < 0) {
+          clearDrag({ suppressClick: true });
+          return;
+        }
+        if (edge.edge === "after") insertAt += 1;
+        ids.splice(insertAt, 0, s.folderId);
+        clearDrag({ suppressClick: true });
+        onReorderRef.current(ids);
+      };
+
+      const detach = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        window.removeEventListener("pointercancel", onUp);
+      };
+      detachListenersRef.current = detach;
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+    },
+    [autoScrollNearEdges, clearDrag, folderIdsRef],
+  );
+
+  return {
+    dragFolderId,
+    folderDropEdge: dropEdge,
+    folderGhost: ghost,
+    folderArmedRef: armedRef,
+    folderSuppressClickRef: suppressClickRef,
+    onFolderPointerDown,
+    clearFolderDrag: clearDrag,
+  };
+}

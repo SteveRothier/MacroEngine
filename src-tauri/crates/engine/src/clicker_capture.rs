@@ -220,7 +220,9 @@ struct PixelCaptureShared {
     armed_at: Instant,
 }
 
-/// Wait for one left-click, then `read_pixel` at the cursor. Esc / RMB cancels.
+/// Wait for one left-click, then `read_pixel` at the cursor.
+/// On Windows the LMB/RMB are swallowed (WH_MOUSE_LL) so the click does not
+/// activate the window under the cursor. Esc / RMB cancels.
 pub struct PixelColorCapture {
     shared: Arc<PixelCaptureShared>,
     thread: Mutex<Option<JoinHandle<()>>>,
@@ -241,7 +243,7 @@ impl PixelColorCapture {
         let handle = thread::Builder::new()
             .name("pixel-color-capture".into())
             .spawn(move || {
-                pixel_capture_loop(worker.as_ref(), injector.as_ref());
+                pixel_capture_loop(worker, injector);
             })
             .ok();
         if handle.is_none() {
@@ -282,11 +284,108 @@ impl PixelColorCapture {
     }
 }
 
-fn pixel_capture_loop(shared: &PixelCaptureShared, injector: &dyn MouseInjector) {
+fn pixel_capture_loop(shared: Arc<PixelCaptureShared>, injector: Arc<dyn MouseInjector>) {
+    #[cfg(windows)]
+    {
+        pixel_capture_loop_windows(shared, injector);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = injector;
+        let deadline = Instant::now() + PIXEL_CAPTURE_TIMEOUT;
+        while !shared.stop.load(Ordering::SeqCst) {
+            if Instant::now() >= deadline {
+                shared.cancelled.store(true, Ordering::SeqCst);
+                break;
+            }
+            thread::sleep(POLL);
+        }
+        shared.running.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Blocks LMB/RMB from reaching the desktop while sampling (WH_MOUSE_LL swallow).
+#[cfg(windows)]
+fn pixel_capture_loop_windows(shared: Arc<PixelCaptureShared>, injector: Arc<dyn MouseInjector>) {
+    use std::sync::OnceLock;
+    use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, DispatchMessageW, PeekMessageW, SetWindowsHookExW, TranslateMessage,
+        UnhookWindowsHookEx, MSLLHOOKSTRUCT, MSG, PM_REMOVE, WH_MOUSE_LL, WM_LBUTTONDOWN,
+        WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,
+    };
+
+    struct PixelHookBridge {
+        shared: Arc<PixelCaptureShared>,
+        pending_click: Mutex<Option<(i32, i32)>>,
+        pending_cancel: AtomicBool,
+    }
+
+    static BRIDGE: OnceLock<Mutex<Option<Arc<PixelHookBridge>>>> = OnceLock::new();
+
+    fn bridge_slot() -> &'static Mutex<Option<Arc<PixelHookBridge>>> {
+        BRIDGE.get_or_init(|| Mutex::new(None))
+    }
+
+    unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if code >= 0 {
+            if let Ok(guard) = bridge_slot().lock() {
+                if let Some(bridge) = guard.as_ref() {
+                    if bridge.shared.running.load(Ordering::SeqCst) {
+                        let msg = wparam.0 as u32;
+                        let info = &*(lparam.0 as *const MSLLHOOKSTRUCT);
+                        match msg {
+                            WM_LBUTTONDOWN => {
+                                if Instant::now() >= bridge.shared.armed_at
+                                    && !bridge.shared.stop.load(Ordering::SeqCst)
+                                {
+                                    if let Ok(mut slot) = bridge.pending_click.lock() {
+                                        if slot.is_none() {
+                                            *slot = Some((info.pt.x, info.pt.y));
+                                        }
+                                    }
+                                }
+                                // Always swallow while capture is active.
+                                return LRESULT(1);
+                            }
+                            WM_LBUTTONUP => return LRESULT(1),
+                            WM_RBUTTONDOWN => {
+                                bridge.pending_cancel.store(true, Ordering::SeqCst);
+                                return LRESULT(1);
+                            }
+                            WM_RBUTTONUP => return LRESULT(1),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        unsafe { CallNextHookEx(None, code, wparam, lparam) }
+    }
+
+    let bridge = Arc::new(PixelHookBridge {
+        shared: Arc::clone(&shared),
+        pending_click: Mutex::new(None),
+        pending_cancel: AtomicBool::new(false),
+    });
+    {
+        let mut slot = bridge_slot().lock().expect("pixel hook bridge");
+        *slot = Some(Arc::clone(&bridge));
+    }
+
+    let hook = unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), None, 0) };
+    if hook.is_err() {
+        shared.cancelled.store(true, Ordering::SeqCst);
+        shared.running.store(false, Ordering::SeqCst);
+        let mut slot = bridge_slot().lock().expect("pixel hook bridge");
+        *slot = None;
+        return;
+    }
+    let hook = hook.expect("hook");
+
     let deadline = Instant::now() + PIXEL_CAPTURE_TIMEOUT;
-    let mut was_down = button_down();
     let mut was_escape = escape_down();
-    let mut was_rbutton = right_button_down();
+    let mut msg = MSG::default();
     while !shared.stop.load(Ordering::SeqCst) {
         if Instant::now() >= deadline {
             shared.cancelled.store(true, Ordering::SeqCst);
@@ -298,38 +397,63 @@ fn pixel_capture_loop(shared: &PixelCaptureShared, injector: &dyn MouseInjector)
             break;
         }
         was_escape = esc;
-        let rbutton = right_button_down();
-        if rbutton && !was_rbutton {
+
+        if bridge.pending_cancel.load(Ordering::SeqCst) {
             shared.cancelled.store(true, Ordering::SeqCst);
             break;
         }
-        was_rbutton = rbutton;
-        let down = button_down();
-        if down && !was_down && Instant::now() >= shared.armed_at {
-            if let Ok(p) = injector.cursor_position() {
-                match injector.read_pixel(p.x, p.y) {
-                    Ok((r, g, b)) => {
-                        if let Ok(mut slot) = shared.sample.lock() {
-                            *slot = Some(PixelSample {
-                                x: p.x,
-                                y: p.y,
-                                r,
-                                g,
-                                b,
-                            });
-                        }
-                        break;
+
+        let click = bridge
+            .pending_click
+            .lock()
+            .ok()
+            .and_then(|mut g| g.take());
+        if let Some((x, y)) = click {
+            match injector.read_pixel(x, y) {
+                Ok((r, g, b)) => {
+                    if let Ok(mut slot) = shared.sample.lock() {
+                        *slot = Some(PixelSample { x, y, r, g, b });
                     }
-                    Err(_) => {
-                        // Keep waiting for another click if GetPixel fails once.
-                    }
+                    break;
+                }
+                Err(_) => {
+                    // Allow another click if GetPixel failed once.
                 }
             }
         }
-        was_down = down;
-        thread::sleep(POLL);
+
+        let has = unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) };
+        if has.as_bool() {
+            unsafe {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        } else {
+            thread::sleep(POLL);
+        }
+    }
+
+    shared.stop.store(true, Ordering::SeqCst);
+    // Keep `running` true so the hook still swallows LBUTTONUP until unhook.
+    let drain_until = Instant::now() + Duration::from_millis(80);
+    while Instant::now() < drain_until {
+        let has = unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) };
+        if has.as_bool() {
+            unsafe {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        } else {
+            thread::sleep(Duration::from_millis(8));
+        }
+    }
+
+    unsafe {
+        let _ = UnhookWindowsHookEx(hook);
     }
     shared.running.store(false, Ordering::SeqCst);
+    let mut slot = bridge_slot().lock().expect("pixel hook bridge");
+    *slot = None;
 }
 
 #[cfg(windows)]
@@ -353,7 +477,6 @@ fn escape_down() -> bool {
     state < 0
 }
 
-// Off Windows the capture thread only waits for `stop` (no global hooks).
 #[cfg(not(windows))]
 fn button_down() -> bool {
     false

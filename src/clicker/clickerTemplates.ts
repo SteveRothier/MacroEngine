@@ -11,7 +11,8 @@ export type ClickerTemplateId =
   | "grid-3-points"
   | "edge-zones"
   | "high-cps-pulse"
-  | "corner-safety";
+  | "corner-safety"
+  | "fixed-target-limited";
 
 export type ClickerTemplate = {
   id: ClickerTemplateId;
@@ -120,6 +121,22 @@ export const CLICKER_TEMPLATES: readonly ClickerTemplate[] = [
       points: [],
       stopWhenComplete: false,
       stopZones: cornerSafetyZones(),
+    }),
+  },
+  {
+    id: "fixed-target-limited",
+    build: () => ({
+      ...DEFAULT_CLICKER,
+      cps: 8,
+      mode: "toggle",
+      target: { type: "fixed", x: 960, y: 540 },
+      pointsEnabled: false,
+      points: [],
+      stopWhenComplete: false,
+      stopZones: [],
+      limitsEnabled: true,
+      limitMode: "clicks",
+      maxClicks: 50,
     }),
   },
 ] as const;

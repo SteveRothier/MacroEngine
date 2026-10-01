@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -10,19 +10,21 @@ use caster_engine::{
     export_preset_to_path, get_library_index, import_preset_from_path, list_library_items,
     list_library_items_from_index, list_macro_summaries, list_macros, list_preset_summaries,
     list_presets, list_script_summaries, list_scripts, load_macro, load_preset, load_quick_access,
-    load_script, load_settings, load_accueil_order, list_visible_process_exes, macro_to_json,
+    load_script, load_settings, load_accueil_order, list_visible_process_exe_entries,
+    list_visible_process_exes, macro_to_json,
     move_library_item, overlay_bands, overlay_markers_fixed, overlay_markers_points,
     parse_macro_json, prepare_library_index, prune_orphans,
-    purge_library_trash, remove_library_entry, rename_library_entry_key, rename_library_folder,
-    rename_macro, rename_preset, restore_library_item, save_macro_checked, save_preset,
-    save_preset_with_trigger, save_quick_access, save_script, save_settings, save_accueil_order,
+    purge_library_trash, purge_library_trash_older_than, count_library_trash_older_than,
+    remove_library_entry, rename_library_entry_key, rename_library_folder,
+    reorder_library_folders, rename_macro, rename_preset, restore_library_item, save_macro_checked, save_preset,
+    set_library_folder_parent, save_preset_with_trigger, save_quick_access, save_script, save_settings, save_accueil_order,
     set_favorite, set_library_item_locked, trash_library_item, normalize_app_settings, AccueilPrefs,
     AppearancePrefs, AppSettings, AppState, AutomationPrefs, ClickPoint, ClickerConfig,
     ClickerMetrics,
     ClickerPreset, ClickerPresetSummary, ConfirmationsPrefs, ConvertMode, ConvertResult, DrawnRect,
     EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto, LibraryKind,
-    ListLibraryQuery, MacroDocument, MacroSummary, MaintenancePrefs, NativeZoneOverlay, PickedPoint,
-    ProcessFilter, QuickAccess, QuickKind, RecordOptions, ScreenGeom, ScreenGeomDto, ScriptDoc,
+    ListLibraryQuery, LogLevel, MacroDocument, MacroSummary, MaintenancePrefs, NativeZoneOverlay, PickedPoint,
+    ProcessFilter, ProcessFilterPreset, QuickAccess, QuickKind, RecordOptions, ScreenGeom, ScreenGeomDto, ScriptDoc,
     ScriptLanguage, ScriptSourceDiagnostic, ScriptSummary, ScriptsPrefs, ShellPrefs, StopZone,
     ThemeMode, Trigger, UiLocale, WindowBounds, check_script_source, clamp_overlay_opacity,
     pick_on_click, settings_path, CancellationToken,
@@ -45,7 +47,7 @@ static PICKER_READY: AtomicBool = AtomicBool::new(false);
 /// Wall-clock start of an active zone-draw session (failsafe timeout).
 struct ZoneDrawWatch(Mutex<Option<Instant>>);
 
-/// When true, frontend must not show main after paint (autostart + minimize_to_tray).
+/// When true, frontend must not show main after paint (autostart + start_in_tray).
 struct BootStayHidden(Mutex<bool>);
 
 struct UiPrefs {
@@ -53,11 +55,13 @@ struct UiPrefs {
     overlay_visible: bool,
     overlay_opacity: f32,
     process_filter: ProcessFilter,
+    process_filter_presets: Vec<ProcessFilterPreset>,
     theme: ThemeMode,
     display_id: Option<String>,
     sidebar_collapsed: bool,
     journal_open: bool,
     close_to_tray: bool,
+    minimize_hides_to_tray: bool,
     start_with_windows: bool,
     accueil: AccueilPrefs,
     shell: ShellPrefs,
@@ -593,6 +597,23 @@ fn delete_library_folder_cmd(
 }
 
 #[tauri::command]
+fn reorder_library_folders_cmd(
+    dir: State<'_, SettingsDir>,
+    ordered_ids: Vec<String>,
+) -> Result<Vec<LibraryFolder>, String> {
+    reorder_library_folders(&dir.0, ordered_ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_library_folder_parent_cmd(
+    dir: State<'_, SettingsDir>,
+    id: String,
+    parent_id: Option<String>,
+) -> Result<LibraryFolder, String> {
+    set_library_folder_parent(&dir.0, id, parent_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn move_library_item_cmd(
     dir: State<'_, SettingsDir>,
     kind: String,
@@ -804,7 +825,7 @@ fn get_automations_home_cmd(
         .iter()
         .map(|s| (s.id.clone(), s.name.clone()))
         .collect();
-    let macros = list_library_items_from_index(
+    let mut macros = list_library_items_from_index(
         &index,
         &dir.0,
         LibraryKind::Macro,
@@ -812,7 +833,7 @@ fn get_automations_home_cmd(
         None,
     )
     .map_err(|e| e.to_string())?;
-    let clickers = list_library_items_from_index(
+    let mut clickers = list_library_items_from_index(
         &index,
         &dir.0,
         LibraryKind::Clicker,
@@ -820,14 +841,39 @@ fn get_automations_home_cmd(
         None,
     )
     .map_err(|e| e.to_string())?;
-    let scripts_library = list_library_items_from_index(
+    let mut scripts_library = list_library_items_from_index(
         &index,
         &dir.0,
         LibraryKind::Script,
-        empty_q,
+        empty_q.clone(),
         Some(&script_names),
     )
     .map_err(|e| e.to_string())?;
+    let trash_q = ListLibraryQuery {
+        include_trash: true,
+        ..empty_q
+    };
+    macros.items.extend(
+        list_library_items_from_index(&index, &dir.0, LibraryKind::Macro, trash_q.clone(), None)
+            .map_err(|e| e.to_string())?
+            .items,
+    );
+    clickers.items.extend(
+        list_library_items_from_index(&index, &dir.0, LibraryKind::Clicker, trash_q.clone(), None)
+            .map_err(|e| e.to_string())?
+            .items,
+    );
+    scripts_library.items.extend(
+        list_library_items_from_index(
+            &index,
+            &dir.0,
+            LibraryKind::Script,
+            trash_q,
+            Some(&script_names),
+        )
+        .map_err(|e| e.to_string())?
+        .items,
+    );
     let macro_summaries = enrich_macro_summaries_cmd(&dir.0)?;
     let clicker_summaries = list_preset_summaries(&dir.0).map_err(|e| e.to_string())?;
     let mut qa = load_quick_access(&dir.0).map_err(|e| e.to_string())?;
@@ -853,6 +899,11 @@ fn get_automations_home_cmd(
 #[tauri::command]
 fn list_process_exes() -> Vec<String> {
     list_visible_process_exes()
+}
+
+#[tauri::command]
+fn list_process_exe_entries() -> Vec<caster_engine::ProcessExeEntry> {
+    list_visible_process_exe_entries()
 }
 
 #[tauri::command]
@@ -928,6 +979,7 @@ enum ResolvedLocale {
 struct TrayStrings {
     relaunch_clicker: &'static str,
     relaunch_macro: &'static str,
+    relaunch_script: &'static str,
     stop: &'static str,
     overlay: &'static str,
     open: &'static str,
@@ -939,6 +991,7 @@ struct TrayStrings {
 const TRAY_FR: TrayStrings = TrayStrings {
     relaunch_clicker: "Relancer le dernier clicker",
     relaunch_macro: "Relancer la dernière macro",
+    relaunch_script: "Relancer le dernier script",
     stop: "Arrêter",
     overlay: "Afficher/Masquer overlay",
     open: "Ouvrir Caster",
@@ -950,6 +1003,7 @@ const TRAY_FR: TrayStrings = TrayStrings {
 const TRAY_EN: TrayStrings = TrayStrings {
     relaunch_clicker: "Relaunch last clicker",
     relaunch_macro: "Relaunch last macro",
+    relaunch_script: "Relaunch last script",
     stop: "Stop",
     overlay: "Show/Hide overlay",
     open: "Open Caster",
@@ -1042,6 +1096,10 @@ fn tray_tooltip(engine: &AppState, locale: ResolvedLocale) -> String {
                 Some(n) => format_macro_label(locale, &n),
                 None => "macro".into(),
             },
+            Some("script") => match name {
+                Some(n) => format!("script · {n}"),
+                None => "script".into(),
+            },
             Some("record") => strings.recording.into(),
             _ => strings.active.into(),
         };
@@ -1061,13 +1119,23 @@ fn build_tray_menu(
     let start = MenuItem::with_id(app, "start", s.relaunch_clicker, true, None::<&str>)?;
     let start_macro =
         MenuItem::with_id(app, "start_macro", s.relaunch_macro, true, None::<&str>)?;
+    let start_script =
+        MenuItem::with_id(app, "start_script", s.relaunch_script, true, None::<&str>)?;
     let stop = MenuItem::with_id(app, "stop", s.stop, true, None::<&str>)?;
     let overlay_item = MenuItem::with_id(app, "overlay", s.overlay, true, None::<&str>)?;
     let show = MenuItem::with_id(app, "show", s.open, true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", s.quit, true, None::<&str>)?;
     Menu::with_items(
         app,
-        &[&start, &start_macro, &stop, &overlay_item, &show, &quit],
+        &[
+            &start,
+            &start_macro,
+            &start_script,
+            &stop,
+            &overlay_item,
+            &show,
+            &quit,
+        ],
     )
 }
 
@@ -1125,11 +1193,13 @@ fn prefs_to_settings(engine: &AppState, p: &UiPrefs) -> AppSettings {
         overlay_opacity: p.overlay_opacity,
         hotkeys: engine.hotkey_bindings(),
         process_filter: p.process_filter.clone(),
+        process_filter_presets: p.process_filter_presets.clone(),
         theme: p.theme,
         display_id: p.display_id.clone(),
         sidebar_collapsed: p.sidebar_collapsed,
         journal_open: p.journal_open,
         close_to_tray: p.close_to_tray,
+        minimize_hides_to_tray: p.minimize_hides_to_tray,
         start_with_windows: p.start_with_windows,
         accueil: p.accueil.clone(),
         shell: p.shell.clone(),
@@ -1148,11 +1218,13 @@ fn apply_prefs(p: &mut UiPrefs, settings: &AppSettings) {
     p.overlay_visible = settings.overlay_visible;
     p.overlay_opacity = clamp_overlay_opacity(settings.overlay_opacity);
     p.process_filter = settings.process_filter.clone();
+    p.process_filter_presets = settings.process_filter_presets.clone();
     p.theme = settings.theme;
     p.display_id = settings.display_id.clone();
     p.sidebar_collapsed = settings.sidebar_collapsed;
     p.journal_open = settings.journal_open;
     p.close_to_tray = settings.close_to_tray;
+    p.minimize_hides_to_tray = settings.minimize_hides_to_tray;
     p.start_with_windows = settings.start_with_windows;
     p.accueil = settings.accueil.clone();
     p.shell = settings.shell.clone();
@@ -1223,7 +1295,7 @@ fn apply_main_window_shell(
             }
         }
     }
-    let stay_hidden = hide_for_autostart && shell.minimize_to_tray;
+    let stay_hidden = hide_for_autostart && shell.start_in_tray;
     if let Some(flag) = app.try_state::<BootStayHidden>() {
         if let Ok(mut g) = flag.0.lock() {
             *g = stay_hidden;
@@ -1293,11 +1365,18 @@ fn force_app_exit(app: &AppHandle, engine: &AppState) {
 }
 
 fn request_app_exit(app: &AppHandle, engine: &AppState) {
-    let confirm = app
+    let (confirm_running, warn_unsaved) = app
         .try_state::<Mutex<UiPrefs>>()
-        .and_then(|p| p.lock().ok().map(|g| g.shell.confirm_quit_if_running))
-        .unwrap_or(true);
-    if confirm && session_is_active(engine) {
+        .and_then(|p| {
+            p.lock().ok().map(|g| {
+                (
+                    g.shell.confirm_quit_if_running,
+                    g.shell.warn_on_unsaved_quit,
+                )
+            })
+        })
+        .unwrap_or((true, true));
+    if (confirm_running && session_is_active(engine)) || warn_unsaved {
         show_main_window(app);
         let _ = app.emit("app://confirm-quit", ());
         return;
@@ -1546,6 +1625,22 @@ fn purge_library_trash_cmd(dir: State<'_, SettingsDir>) -> Result<usize, String>
 }
 
 #[tauri::command]
+fn count_library_trash_older_than_cmd(
+    dir: State<'_, SettingsDir>,
+    days: u32,
+) -> Result<usize, String> {
+    count_library_trash_older_than(&dir.0, days).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn purge_library_trash_older_than_cmd(
+    dir: State<'_, SettingsDir>,
+    days: u32,
+) -> Result<usize, String> {
+    purge_library_trash_older_than(&dir.0, days).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn list_scripts_cmd(dir: State<'_, SettingsDir>) -> Result<Vec<ScriptDoc>, String> {
     list_scripts(&dir.0).map_err(|e| e.to_string())
 }
@@ -1625,6 +1720,16 @@ fn import_app_settings(
     let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let settings: AppSettings = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
     apply_loaded_settings(&app, &engine, &prefs, settings, true)
+}
+
+#[tauri::command]
+fn export_library_backup(dir: State<'_, SettingsDir>, path: String) -> Result<(), String> {
+    caster_engine::export_library_zip(&dir.0, Path::new(&path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn import_library_backup(dir: State<'_, SettingsDir>, path: String) -> Result<(), String> {
+    caster_engine::import_library_zip(&dir.0, Path::new(&path)).map_err(|e| e.to_string())
 }
 
 #[derive(Clone, Serialize)]
@@ -1935,6 +2040,98 @@ fn export_clicker_preset_path(
 #[tauri::command]
 fn write_text_file(path: String, contents: String) -> Result<(), String> {
     std::fs::write(path, contents).map_err(|e| e.to_string())
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JournalLineDto {
+    text: String,
+    level: String,
+}
+
+fn journal_path(dir: &Path) -> PathBuf {
+    dir.join("journal.jsonl")
+}
+
+fn stamp_journal_line(message: &str) -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    // Local wall-clock style via chrono is unavailable; keep HH:MM:SS from UTC offset approx.
+    let h = (secs / 3600) % 24;
+    let m = (secs / 60) % 60;
+    let s = secs % 60;
+    if message.starts_with('[') && message.len() > 10 && message.as_bytes().get(9) == Some(&b']') {
+        message.to_string()
+    } else {
+        format!("[{h:02}:{m:02}:{s:02}] {message}")
+    }
+}
+
+fn append_journal_line(dir: &Path, message: &str, level: LogLevel, max_lines: u32) {
+    let path = journal_path(dir);
+    let level_s = match level {
+        LogLevel::Debug => "debug",
+        LogLevel::Info => "info",
+        LogLevel::Warn => "warn",
+        LogLevel::Error => "error",
+    };
+    let line = JournalLineDto {
+        text: stamp_journal_line(message),
+        level: level_s.into(),
+    };
+    let Ok(serialized) = serde_json::to_string(&line) else {
+        return;
+    };
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(f, "{serialized}");
+    }
+    let cap = max_lines.clamp(40, 500) as usize;
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let mut lines: Vec<&str> = raw.lines().filter(|l| !l.trim().is_empty()).collect();
+    if lines.len() <= cap {
+        return;
+    }
+    lines = lines.split_off(lines.len() - cap);
+    let _ = std::fs::write(&path, format!("{}\n", lines.join("\n")));
+}
+
+#[tauri::command]
+fn load_journal_log_cmd(dir: State<'_, SettingsDir>) -> Result<Vec<JournalLineDto>, String> {
+    let path = journal_path(&dir.0);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if let Ok(dto) = serde_json::from_str::<JournalLineDto>(trimmed) {
+            out.push(dto);
+        }
+    }
+    Ok(out)
+}
+
+#[tauri::command]
+fn clear_journal_log_cmd(dir: State<'_, SettingsDir>) -> Result<(), String> {
+    let path = journal_path(&dir.0);
+    if path.exists() {
+        std::fs::write(&path, "").map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -2492,10 +2689,27 @@ fn wire_engine_events(handle: AppHandle, engine: &AppState) {
                 };
                 let _ = emit_handle.emit("engine://status", payload);
             }
-            EngineEvent::Log { message, .. } => {
-                log::info!("{message}");
-                let payload = status_of(&engine_for_events, Some(message));
-                let _ = emit_handle.emit("engine://log", payload);
+            EngineEvent::Log { message, level } => {
+                match level {
+                    LogLevel::Error => log::error!("{message}"),
+                    LogLevel::Warn => log::warn!("{message}"),
+                    LogLevel::Debug => log::debug!("{message}"),
+                    LogLevel::Info => log::info!("{message}"),
+                }
+                if let Some(dir) = emit_handle.try_state::<SettingsDir>() {
+                    let max = emit_handle
+                        .try_state::<Mutex<UiPrefs>>()
+                        .and_then(|p| p.lock().ok().map(|g| g.shell.journal_max_lines))
+                        .unwrap_or(80);
+                    append_journal_line(&dir.0, &message, level, max);
+                }
+                let _ = emit_handle.emit(
+                    "engine://log",
+                    serde_json::json!({
+                        "message": message,
+                        "level": level,
+                    }),
+                );
             }
             EngineEvent::ActionStarted { index, path, repeat } => {
                 log::info!("action start index={index} path={path:?} repeat={repeat}");
@@ -2521,6 +2735,14 @@ fn wire_engine_events(handle: AppHandle, engine: &AppState) {
                     "engine://zone",
                     serde_json::json!({
                         "action": kind.action_label(),
+                        "kind": kind.kind_label(),
+                    }),
+                );
+            }
+            EngineEvent::PixelFeedback { kind } => {
+                let _ = emit_handle.emit(
+                    "engine://pixel",
+                    serde_json::json!({
                         "kind": kind.kind_label(),
                     }),
                 );
@@ -2587,11 +2809,13 @@ pub fn run() {
             overlay_visible: false,
             overlay_opacity: 1.0,
             process_filter: ProcessFilter::default(),
+            process_filter_presets: Vec::new(),
             theme: ThemeMode::Dark,
             display_id: None,
             sidebar_collapsed: false,
             journal_open: false,
             close_to_tray: false,
+            minimize_hides_to_tray: false,
             start_with_windows: false,
             accueil: AccueilPrefs::default(),
             shell: ShellPrefs::default(),
@@ -2616,6 +2840,12 @@ pub fn run() {
                 .map_err(|e| format!("config dir: {e}"))?;
             std::fs::create_dir_all(&config_dir)?;
             let settings = load_settings(&config_dir).unwrap_or_default();
+            if settings.maintenance.auto_purge_trash_days > 0 {
+                let _ = purge_library_trash_older_than(
+                    &config_dir,
+                    settings.maintenance.auto_purge_trash_days,
+                );
+            }
             engine.set_clicker_config(settings.clicker.clone());
             engine.set_hotkey_bindings(settings.hotkeys.clone());
             engine.set_process_filter(settings.process_filter.clone());
@@ -2803,6 +3033,37 @@ pub fn run() {
                             }
                             update_tray_tooltip(app, &engine);
                         }
+                        "start_script" => {
+                            let shell = app
+                                .try_state::<Mutex<UiPrefs>>()
+                                .and_then(|p| p.lock().ok().map(|g| g.shell.clone()));
+                            if let Some(shell) = shell.as_ref() {
+                                if shell.tray_relaunch_last {
+                                    let id = shell
+                                        .last_script_id
+                                        .clone()
+                                        .filter(|s| !s.trim().is_empty())
+                                        .or_else(|| {
+                                            app.try_state::<SettingsDir>().and_then(|dir| {
+                                                load_settings(&dir.0)
+                                                    .ok()
+                                                    .and_then(|s| s.shell.last_script_id)
+                                                    .filter(|s| !s.trim().is_empty())
+                                            })
+                                        });
+                                    if let Some(id) = id {
+                                        if let Err(e) =
+                                            engine.start_script_session(&id, false, false)
+                                        {
+                                            log::warn!("tray script relaunch failed: {e}");
+                                        }
+                                    } else {
+                                        log::warn!("tray script relaunch: no last script");
+                                    }
+                                }
+                            }
+                            update_tray_tooltip(app, &engine);
+                        }
                         "stop" => {
                             let _ = hide_picker_inner(app, &engine);
                             engine.stop_clicker();
@@ -2847,8 +3108,16 @@ pub fn run() {
                         let _ = window.hide();
                     }
                 }
-                WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
+                WindowEvent::Resized(_) | WindowEvent::Moved(_) => {
                     let app = window.app_handle();
+                    let minimize_hides = app
+                        .try_state::<Mutex<UiPrefs>>()
+                        .and_then(|p| p.lock().ok().map(|g| g.minimize_hides_to_tray))
+                        .unwrap_or(false);
+                    if minimize_hides && window.is_minimized().unwrap_or(false) {
+                        let _ = window.hide();
+                        let _ = window.unminimize();
+                    }
                     if let Some(engine) = app.try_state::<AppState>() {
                         persist_main_window_bounds(app, &engine);
                     }
@@ -2868,6 +3137,8 @@ pub fn run() {
             open_path,
             reveal_library_entry,
             purge_library_trash_cmd,
+            count_library_trash_older_than_cmd,
+            purge_library_trash_older_than_cmd,
             list_scripts_cmd,
             load_script_cmd,
             save_script_cmd,
@@ -2877,6 +3148,8 @@ pub fn run() {
             check_script_source_cmd,
             export_app_settings,
             import_app_settings,
+            export_library_backup,
+            import_library_backup,
             request_cancel,
             start_clicker,
             pick_point,
@@ -2917,6 +3190,7 @@ pub fn run() {
             reset_accueil_order_cmd,
             get_automations_home_cmd,
             list_process_exes,
+            list_process_exe_entries,
             set_quick_favorite,
             launch_clicker_preset,
             launch_saved_macro,
@@ -2938,6 +3212,8 @@ pub fn run() {
             create_library_folder_cmd,
             rename_library_folder_cmd,
             delete_library_folder_cmd,
+            reorder_library_folders_cmd,
+            set_library_folder_parent_cmd,
             move_library_item_cmd,
             convert_library_item_cmd,
             set_library_item_locked_cmd,
@@ -2957,6 +3233,8 @@ pub fn run() {
             import_clicker_preset_path,
             export_clicker_preset_path,
             write_text_file,
+            load_journal_log_cmd,
+            clear_journal_log_cmd,
             load_preset_macro,
             start_record,
             pause_record,

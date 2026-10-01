@@ -24,8 +24,7 @@ describe("settingsTypes defaults", () => {
     });
   });
 
-  it("mergeShellPrefs keeps command palette on by default", () => {
-    expect(mergeShellPrefs(undefined).commandPaletteEnabled).toBe(true);
+  it("mergeShellPrefs fills defaults", () => {
     expect(mergeShellPrefs({ recentListMax: 20 }).recentListMax).toBe(20);
     expect(mergeShellPrefs({}).startupView).toBe(
       DEFAULT_SHELL_PREFS.startupView,

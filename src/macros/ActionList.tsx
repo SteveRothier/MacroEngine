@@ -62,15 +62,21 @@ type Props = {
   activePath: ActionPath | null;
   disabled?: boolean;
   readOnly?: boolean;
+  /** When false, Delete/Backspace removes without confirm dialog. */
+  confirmDeleteAction?: boolean;
   onSelect: (path: ActionPath) => void;
   onReorder: (fromPath: ActionPath, toPath: ActionPath) => void;
   onRemove: (path: ActionPath) => void;
+  /** Batch delete — single undo entry when provided. */
+  onRemoveMany?: (paths: ActionPath[]) => void;
   onDuplicate?: (path: ActionPath) => void;
+  onDuplicateMany?: (paths: ActionPath[]) => void;
   onMove?: (path: ActionPath, dir: -1 | 1) => void;
+  onMoveMany?: (paths: ActionPath[], dir: -1 | 1) => void;
   onRunFrom?: (path: ActionPath) => void;
   onInsertBefore?: (path: ActionPath, kind: MacroAction["type"]) => void;
   onInsertAfter?: (path: ActionPath, kind: MacroAction["type"]) => void;
-  onPasteAfter?: (path: ActionPath, action: MacroAction) => void;
+  onPasteAfter?: (path: ActionPath, action: MacroAction | MacroAction[]) => void;
   onAddKind?: (kind: MacroAction["type"]) => void;
   onOpenAddMenu?: () => void;
   onChangeAction?: (path: ActionPath, action: MacroAction) => void;
@@ -96,8 +102,8 @@ const LAST_ROW_AFTER_RATIO = 0.28;
 const AUTO_SCROLL_EDGE_PX = 48;
 const AUTO_SCROLL_MAX_PX = 18;
 
-/** In-memory step clipboard (not OS clipboard). */
-let actionClipboard: MacroAction | null = null;
+/** In-memory step clipboard (not OS clipboard). Multi when copying a selection. */
+let actionClipboard: MacroAction[] | null = null;
 
 function isEditableTarget(t: EventTarget | null): boolean {
   if (!(t instanceof HTMLElement)) return false;
@@ -334,11 +340,15 @@ export function ActionList({
   activePath,
   disabled,
   readOnly,
+  confirmDeleteAction = true,
   onSelect,
   onReorder,
   onRemove,
+  onRemoveMany,
   onDuplicate,
+  onDuplicateMany,
   onMove,
+  onMoveMany,
   onRunFrom,
   onInsertBefore,
   onInsertAfter,
@@ -365,6 +375,8 @@ export function ActionList({
   const [dropEdge, setDropEdge] = useState<DropEdge | null>(null);
   const [ghost, setGhost] = useState<DragGhost | null>(null);
   const [clipboardTick, setClipboardTick] = useState(0);
+  const [multiKeys, setMultiKeys] = useState<Set<string>>(() => new Set());
+  const multiAnchorRef = useRef<string | null>(null);
   const rowCtx = useContextMenuState();
   const emptyCtx = useContextMenuState();
   const [ctxPath, setCtxPath] = useState<ActionPath | null>(null);
@@ -382,24 +394,147 @@ export function ActionList({
   onRemoveRef.current = onRemove;
   onPasteAfterRef.current = onPasteAfter;
 
+  useEffect(() => {
+    if (!activePath) return;
+    const key = pathKey(activePath);
+    const el = listRef.current?.querySelector(
+      `[data-list-path="${CSS.escape(key)}"]`,
+    );
+    if (el instanceof HTMLElement) {
+      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [activePath]);
+
+  useEffect(() => {
+    if (!selectedPath) {
+      setMultiKeys(new Set());
+      multiAnchorRef.current = null;
+      return;
+    }
+    const key = pathKey(selectedPath);
+    setMultiKeys((prev) => {
+      if (prev.size <= 1 && prev.has(key)) return prev;
+      if (prev.has(key) && prev.size > 1) return prev;
+      return new Set([key]);
+    });
+    if (!multiAnchorRef.current) multiAnchorRef.current = key;
+  }, [selectedPath]);
+
+  const selectRow = (
+    path: ActionPath,
+    e?: { ctrlKey?: boolean; metaKey?: boolean; shiftKey?: boolean },
+  ) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    const key = pathKey(path);
+    const ctrl = !!(e?.ctrlKey || e?.metaKey);
+    const shift = !!e?.shiftKey;
+    if (shift && multiAnchorRef.current) {
+      const keys = rows.map((r) => pathKey(r.path));
+      const a = keys.indexOf(multiAnchorRef.current);
+      const b = keys.indexOf(key);
+      if (a >= 0 && b >= 0) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        setMultiKeys(new Set(keys.slice(lo, hi + 1)));
+        onSelect(path);
+        return;
+      }
+    }
+    if (ctrl) {
+      setMultiKeys((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        if (next.size === 0) next.add(key);
+        return next;
+      });
+      multiAnchorRef.current = key;
+      onSelect(path);
+      return;
+    }
+    multiAnchorRef.current = key;
+    setMultiKeys(new Set([key]));
+    onSelect(path);
+  };
+
+  const removeSelectedPaths = async () => {
+    const paths = rows
+      .filter((r) => multiKeys.has(pathKey(r.path)))
+      .map((r) => r.path);
+    if (paths.length === 0) return;
+    if (confirmDeleteAction) {
+      const ok = await confirmAction({
+        title: t("macros.confirm.deleteActionTitle"),
+        message:
+          paths.length > 1
+            ? t("macros.confirm.deleteActionsMessage", { n: paths.length })
+            : t("macros.confirm.deleteActionMessage"),
+        confirmLabel: t("automations.confirm.deleteConfirm"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    if (onRemoveMany && paths.length > 1) {
+      onRemoveMany(paths);
+    } else if (paths.length === 1) {
+      onRemove(paths[0]!);
+    } else {
+      const sorted = [...paths].sort((a, b) => {
+        if (a.length !== b.length) return b.length - a.length;
+        for (let i = 0; i < a.length; i++) {
+          if (a[i] !== b[i]) return (b[i] ?? 0) - (a[i] ?? 0);
+        }
+        return 0;
+      });
+      for (const p of sorted) onRemove(p);
+    }
+    setMultiKeys(new Set());
+    onClearSelection?.();
+  };
+
   const copyPath = (path: ActionPath) => {
     const src = getAtPath(actions, path);
     if (!src) return;
-    actionClipboard = structuredClone(src);
+    actionClipboard = [structuredClone(src)];
+    setClipboardTick((n) => n + 1);
+  };
+
+  const copySelectedPaths = () => {
+    const paths = rows
+      .filter((r) => multiKeys.has(pathKey(r.path)))
+      .map((r) => r.path);
+    if (paths.length === 0 && selectedPath) {
+      copyPath(selectedPath);
+      return;
+    }
+    const items: MacroAction[] = [];
+    for (const p of paths) {
+      const src = getAtPath(actions, p);
+      if (src) items.push(structuredClone(src));
+    }
+    if (items.length === 0) return;
+    actionClipboard = items;
     setClipboardTick((n) => n + 1);
   };
 
   const cutPath = (path: ActionPath) => {
     const src = getAtPath(actions, path);
     if (!src) return;
-    actionClipboard = structuredClone(src);
+    actionClipboard = [structuredClone(src)];
     setClipboardTick((n) => n + 1);
     onRemove(path);
   };
 
   const pasteAfterPath = (path: ActionPath) => {
-    if (!actionClipboard || !onPasteAfter) return;
-    onPasteAfter(path, structuredClone(actionClipboard));
+    if (!actionClipboard?.length || !onPasteAfter) return;
+    onPasteAfter(
+      path,
+      actionClipboard.length === 1
+        ? structuredClone(actionClipboard[0]!)
+        : structuredClone(actionClipboard),
+    );
   };
 
   const ctxRowItems: MenuItemDef[] = useMemo(() => {
@@ -471,7 +606,7 @@ export function ActionList({
         id: "paste",
         label: t("macros.menu.ctx.pasteAfter"),
         icon: <ClipboardPaste size={14} />,
-        disabled: !onPasteAfter || !actionClipboard,
+        disabled: !onPasteAfter || !actionClipboard?.length,
         onSelect: () => pasteAfterPath(ctxPath),
       },
       {
@@ -670,49 +805,60 @@ export function ActionList({
   ]);
 
   useEffect(() => {
-    if (locked || !selectedPath || selectedPath.length < 1) return;
-    const path = selectedPath;
+    if (locked || multiKeys.size < 1) return;
     function onKey(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
       const mod = e.ctrlKey || e.metaKey;
+      const primary =
+        selectedPath ??
+        rows.find((r) => multiKeys.has(pathKey(r.path)))?.path ??
+        null;
+      if (!primary) return;
       if (mod && (e.key === "c" || e.key === "C")) {
         e.preventDefault();
-        const src = getAtPath(actions, path);
-        if (!src) return;
-        actionClipboard = structuredClone(src);
-        setClipboardTick((n) => n + 1);
+        copySelectedPaths();
         return;
       }
       if (mod && (e.key === "x" || e.key === "X")) {
         e.preventDefault();
-        const src = getAtPath(actions, path);
+        if (multiKeys.size > 1) {
+          copySelectedPaths();
+          void removeSelectedPaths();
+          return;
+        }
+        const src = getAtPath(actions, primary);
         if (!src) return;
-        actionClipboard = structuredClone(src);
+        actionClipboard = [structuredClone(src)];
         setClipboardTick((n) => n + 1);
-        onRemoveRef.current(path);
+        onRemoveRef.current(primary);
         return;
       }
       if (mod && (e.key === "v" || e.key === "V")) {
-        if (!actionClipboard || !onPasteAfterRef.current) return;
+        if (!actionClipboard?.length || !onPasteAfterRef.current) return;
         e.preventDefault();
-        onPasteAfterRef.current(path, structuredClone(actionClipboard));
+        onPasteAfterRef.current(
+          primary,
+          actionClipboard.length === 1
+            ? structuredClone(actionClipboard[0]!)
+            : structuredClone(actionClipboard),
+        );
         return;
       }
       if (e.key !== "Delete" && e.key !== "Backspace") return;
       e.preventDefault();
-      void (async () => {
-        const ok = await confirmAction({
-          title: t("macros.confirm.deleteActionTitle"),
-          message: t("macros.confirm.deleteActionMessage"),
-          confirmLabel: t("automations.confirm.deleteConfirm"),
-          danger: true,
-        });
-        if (ok) onRemoveRef.current(path);
-      })();
+      void removeSelectedPaths();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [actions, locked, selectedPath, t]);
+  }, [
+    actions,
+    confirmDeleteAction,
+    locked,
+    multiKeys,
+    rows,
+    selectedPath,
+    t,
+  ]);
 
   let prevAbs = 0;
 
@@ -877,14 +1023,6 @@ export function ActionList({
     window.addEventListener("pointercancel", onUp);
   }
 
-  function selectRow(path: ActionPath) {
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
-    onSelect(path);
-  }
-
   const dragFromPath =
     dragFrom != null ? (rows[dragFrom]?.path ?? null) : null;
 
@@ -968,7 +1106,10 @@ export function ActionList({
               className={[
                 "action-list-item",
                 "has-hover-reveal",
-                pathsEqual(selectedPath, row.path) ? "selected" : "",
+                pathsEqual(selectedPath, row.path) ||
+                multiKeys.has(pathKey(row.path))
+                  ? "selected"
+                  : "",
                 pathsEqual(activePath, row.path) ? "active" : "",
                 row.depth > 0 ? "nested" : "",
                 row.branchLabel === "then" || row.branchLabel === "body"
@@ -998,7 +1139,7 @@ export function ActionList({
                 ) {
                   return;
                 }
-                selectRow(row.path);
+                selectRow(row.path, e);
               }}
               onContextMenu={
                 !readOnly && !locked
@@ -1090,6 +1231,90 @@ export function ActionList({
           </li>
         ) : null}
       </ul>
+
+      {!readOnly && !locked && multiKeys.size > 1 ? (
+        <div className="action-list-bulk" role="toolbar" aria-label={t("macros.bulk.aria")}>
+          <span className="action-list-bulk-count">
+            {t("macros.bulk.selected", { n: multiKeys.size })}
+          </span>
+          {onMove || onMoveMany ? (
+            <>
+              <button
+                type="button"
+                className="caster-btn caster-btn-ghost"
+                onClick={() => {
+                  const paths = rows
+                    .filter((r) => multiKeys.has(pathKey(r.path)))
+                    .map((r) => r.path);
+                  if (onMoveMany) {
+                    onMoveMany(paths, -1);
+                    return;
+                  }
+                  for (const p of paths) onMove?.(p, -1);
+                }}
+              >
+                <ArrowUp size={14} aria-hidden />
+                {t("macros.bulk.moveUp")}
+              </button>
+              <button
+                type="button"
+                className="caster-btn caster-btn-ghost"
+                onClick={() => {
+                  const paths = rows
+                    .filter((r) => multiKeys.has(pathKey(r.path)))
+                    .map((r) => r.path);
+                  if (onMoveMany) {
+                    onMoveMany(paths, 1);
+                    return;
+                  }
+                  for (const p of [...paths].reverse()) onMove?.(p, 1);
+                }}
+              >
+                <ArrowDown size={14} aria-hidden />
+                {t("macros.bulk.moveDown")}
+              </button>
+            </>
+          ) : null}
+          {onDuplicate || onDuplicateMany ? (
+            <button
+              type="button"
+              className="caster-btn caster-btn-ghost"
+              onClick={() => {
+                const paths = rows
+                  .filter((r) => multiKeys.has(pathKey(r.path)))
+                  .map((r) => r.path);
+                if (onDuplicateMany) {
+                  onDuplicateMany(paths);
+                } else {
+                  for (const p of [...paths].reverse()) onDuplicate?.(p);
+                }
+                setMultiKeys(new Set());
+              }}
+            >
+              <Copy size={14} aria-hidden />
+              {t("macros.bulk.duplicate")}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="caster-btn caster-btn-danger-ghost"
+            onClick={() => void removeSelectedPaths()}
+          >
+            <Trash2 size={14} aria-hidden />
+            {t("macros.bulk.delete")}
+          </button>
+          <button
+            type="button"
+            className="caster-btn caster-btn-ghost"
+            onClick={() => {
+              setMultiKeys(new Set());
+              onClearSelection?.();
+            }}
+          >
+            {t("common.cancel")}
+          </button>
+        </div>
+      ) : null}
 
       <ContextMenu
         open={rowCtx.open}

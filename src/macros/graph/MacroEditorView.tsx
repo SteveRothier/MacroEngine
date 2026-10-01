@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { confirmAction } from "../../ui";
@@ -9,13 +9,16 @@ import { MacroMetaBar } from "../MacroMetaBar";
 import {
   appendChild,
   duplicateAtPath,
+  duplicateManyAtPaths,
   emptyMacro,
-  flattenTree,
   getAtPath,
   insertAtPath,
   moveInParent,
+  moveManyInParent,
   pasteAfterAtPath,
+  pasteManyAfterAtPath,
   removeAtPath,
+  removeManyAtPaths,
   reorderAtPath,
   updateAtPath,
   type ActionPath,
@@ -23,44 +26,26 @@ import {
   type MacroAction,
   type MacroDocument,
 } from "../types";
-import { MacroCanvas } from "./MacroCanvas";
-import {
-  extractUiLayout,
-  macroToGraph,
-  type MacroGraphNode,
-  type MacroUiLayout,
-} from "./macroToGraph";
 import { MacroTitleBarTools } from "./MacroTitleBarTools";
 import { useTitleBarSlot } from "../../ui/shell/TitleBarContext";
-import { mergeAutomationPrefs } from "../../settings/settingsTypes";
+import {
+  mergeAutomationPrefs,
+  mergeConfirmationsPrefs,
+  type AutomationPrefs,
+  type ConfirmationsPrefs,
+} from "../../settings/settingsTypes";
 import { useT, type TFunction } from "../../i18n";
 import { runLibraryConvert } from "../../automations/convertLibraryItem";
+import {
+  DEFAULT_PROCESS_FILTER,
+  type ProcessFilter,
+  type ProcessFilterPreset,
+  type ProcessFilterScopeMode,
+  withLocalEnabled,
+} from "../../process";
 
 const AUTOSAVE_MS = 400;
 const HISTORY_MAX = 50;
-const MACRO_VIEW_KEY = "caster-macro-view";
-
-type EditorViewMode = "list" | "graph";
-
-function readEditorViewMode(): EditorViewMode {
-  try {
-    const v = sessionStorage.getItem(MACRO_VIEW_KEY);
-    if (v === "graph" || v === "list") return v;
-  } catch {
-    /* ignore */
-  }
-  return "list";
-}
-
-function findPathByActionId(
-  actions: MacroDocument["actions"],
-  actionId: string,
-): ActionPath | null {
-  for (const row of flattenTree(actions)) {
-    if (row.action.id === actionId) return row.path;
-  }
-  return null;
-}
 
 type HistoryEntry = {
   doc: MacroDocument;
@@ -80,8 +65,13 @@ type Props = {
   engineState: string;
   onStatus: (s: EngineStatus) => void;
   onOpenScript?: (scriptId: string, label?: string) => void;
+  onOpenClicker?: (clickerId: string, label?: string) => void;
+  /** Open global process filter settings (Sécurité). */
+  onOpenProcessSettings?: () => void;
   /** When false (keep-mounted but hidden), ignore global shortcuts / titlebar. */
   active?: boolean;
+  automationPrefs?: AutomationPrefs;
+  confirmationsPrefs?: ConfirmationsPrefs;
 };
 
 function saveErrorMessage(e: unknown, t: TFunction): string {
@@ -110,10 +100,19 @@ export function MacroEditorView({
   onStatus,
   engineState,
   onOpenScript,
+  onOpenClicker,
+  onOpenProcessSettings,
   active = true,
+  automationPrefs: automationPrefsProp,
+  confirmationsPrefs: confirmationsPrefsProp,
 }: Props) {
   const t = useT();
-  const automationPrefs = mergeAutomationPrefs();
+  const [automationPrefs, setAutomationPrefs] = useState(() =>
+    mergeAutomationPrefs(automationPrefsProp),
+  );
+  const [confirmationsPrefs, setConfirmationsPrefs] = useState(() =>
+    mergeConfirmationsPrefs(confirmationsPrefsProp),
+  );
   const toast = useToast();
   const [doc, setDoc] = useState<MacroDocument>(() => emptyMacro(macroId));
   const [dirty, setDirty] = useState(false);
@@ -122,19 +121,22 @@ export function MacroEditorView({
   const [selectedPath, setSelectedPath] = useState<ActionPath | null>(null);
   const [activePath, setActivePath] = useState<ActionPath | null>(null);
   const [locked, setLocked] = useState(false);
-  const [uiLayout, setUiLayout] = useState<MacroUiLayout | undefined>();
-  const [editorView, setEditorView] = useState<EditorViewMode>(readEditorViewMode);
   const [recording, setRecording] = useState(false);
   const [recordPaused, setRecordPaused] = useState(false);
   const [recordCount, setRecordCount] = useState(0);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [globalProcessFilter, setGlobalProcessFilter] = useState<ProcessFilter>(
+    DEFAULT_PROCESS_FILTER,
+  );
+  const [processFilterPresets, setProcessFilterPresets] = useState<
+    ProcessFilterPreset[]
+  >([]);
   const baselineRef = useRef("");
   const hydratedRef = useRef(false);
   const loadFailedRef = useRef(false);
   const autosaveTimer = useRef<number | null>(null);
   const docRef = useRef(doc);
-  const uiLayoutRef = useRef(uiLayout);
   const macroIdRef = useRef(macroId);
   const lockedRef = useRef(locked);
   const dirtyRef = useRef(dirty);
@@ -144,13 +146,70 @@ export function MacroEditorView({
   const loadGenRef = useRef(0);
 
   docRef.current = doc;
-  uiLayoutRef.current = uiLayout;
   macroIdRef.current = macroId;
   lockedRef.current = locked;
   dirtyRef.current = dirty;
   selectedPathRef.current = selectedPath;
 
   const editorLocked = locked || recording;
+
+  useEffect(() => {
+    setAutomationPrefs(mergeAutomationPrefs(automationPrefsProp));
+  }, [automationPrefsProp]);
+
+  useEffect(() => {
+    setConfirmationsPrefs(mergeConfirmationsPrefs(confirmationsPrefsProp));
+  }, [confirmationsPrefsProp]);
+
+  useEffect(() => {
+    void invoke<{
+      processFilter?: ProcessFilter;
+      processFilterPresets?: ProcessFilterPreset[];
+      automation?: AutomationPrefs;
+      confirmations?: ConfirmationsPrefs;
+    }>("get_settings")
+      .then((s) => {
+        setGlobalProcessFilter(s.processFilter ?? DEFAULT_PROCESS_FILTER);
+        setProcessFilterPresets(s.processFilterPresets ?? []);
+        if (!automationPrefsProp) {
+          setAutomationPrefs(mergeAutomationPrefs(s.automation));
+        }
+        if (!confirmationsPrefsProp) {
+          setConfirmationsPrefs(mergeConfirmationsPrefs(s.confirmations));
+        }
+      })
+      .catch(() => {
+        setGlobalProcessFilter(DEFAULT_PROCESS_FILTER);
+        setProcessFilterPresets([]);
+      });
+  }, [macroId, active, automationPrefsProp, confirmationsPrefsProp]);
+
+  const persistGlobalProcessFilter = useCallback(async (next: ProcessFilter) => {
+    setGlobalProcessFilter(next);
+    try {
+      const current = await invoke<Record<string, unknown>>("get_settings");
+      await invoke("save_app_settings", {
+        settings: { ...current, processFilter: next },
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persistProcessFilterPresets = useCallback(
+    async (next: ProcessFilterPreset[]) => {
+      setProcessFilterPresets(next);
+      try {
+        const current = await invoke<Record<string, unknown>>("get_settings");
+        await invoke("save_app_settings", {
+          settings: { ...current, processFilterPresets: next },
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
 
   const syncHistoryFlags = useCallback(() => {
     setCanUndo(pastRef.current.length > 0);
@@ -181,8 +240,6 @@ export function MacroEditorView({
         futureRef.current = [];
         setCanUndo(false);
         setCanRedo(false);
-        const ext = loaded as MacroDocument & { uiLayout?: MacroUiLayout };
-        setUiLayout(ext.uiLayout);
       } catch {
         if (!cancelled && loadId === loadGenRef.current) {
           loadFailedRef.current = true;
@@ -219,22 +276,11 @@ export function MacroEditorView({
     onDirtyChange?.(macroId, dirty);
   }, [dirty, macroId, onDirtyChange]);
 
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(MACRO_VIEW_KEY, editorView);
-    } catch {
-      /* ignore */
-    }
-  }, [editorView]);
-
   const persistNow = useCallback(
     async (nextDoc: MacroDocument, id: string) => {
       if (!hydratedRef.current || loadFailedRef.current) return;
       try {
-        const payload = { ...nextDoc, uiLayout: uiLayoutRef.current } as MacroDocument & {
-          uiLayout?: MacroUiLayout;
-        };
-        await invoke("save_saved_macro", { id, doc: payload });
+        await invoke("save_saved_macro", { id, doc: nextDoc });
         baselineRef.current = JSON.stringify(nextDoc);
         setDirty(false);
       } catch (e) {
@@ -293,10 +339,7 @@ export function MacroEditorView({
       ) {
         return;
       }
-      const payload = {
-        ...docRef.current,
-        uiLayout: uiLayoutRef.current,
-      } as MacroDocument & { uiLayout?: MacroUiLayout };
+      const payload = docRef.current;
       void invoke("save_saved_macro", {
         id: macroIdRef.current,
         doc: payload,
@@ -761,6 +804,18 @@ export function MacroEditorView({
     [doc, updateDoc],
   );
 
+  const onRemoveMany = useCallback(
+    (paths: ActionPath[]) => {
+      if (editorLocked || paths.length === 0) return;
+      updateDoc({
+        ...doc,
+        actions: removeManyAtPaths(doc.actions, paths),
+      });
+      setSelectedPath(null);
+    },
+    [doc, editorLocked, updateDoc],
+  );
+
   const onDuplicate = useCallback(
     (path: ActionPath) => {
       if (editorLocked) return;
@@ -768,6 +823,16 @@ export function MacroEditorView({
       if (!result) return;
       updateDoc({ ...doc, actions: result.actions });
       setSelectedPath(result.newPath);
+    },
+    [doc, editorLocked, updateDoc],
+  );
+
+  const onDuplicateMany = useCallback(
+    (paths: ActionPath[]) => {
+      if (editorLocked || paths.length === 0) return;
+      const result = duplicateManyAtPaths(doc.actions, paths);
+      updateDoc({ ...doc, actions: result.actions });
+      if (result.lastPath) setSelectedPath(result.lastPath);
     },
     [doc, editorLocked, updateDoc],
   );
@@ -780,6 +845,28 @@ export function MacroEditorView({
       const leaf = path[path.length - 1]!;
       updateDoc({ ...doc, actions: next });
       setSelectedPath([...path.slice(0, -1), leaf + dir]);
+    },
+    [doc, editorLocked, updateDoc],
+  );
+
+  const onMoveMany = useCallback(
+    (paths: ActionPath[], dir: -1 | 1) => {
+      if (editorLocked || paths.length === 0) return;
+      const next = moveManyInParent(doc.actions, paths, dir);
+      if (!next) return;
+      updateDoc({ ...doc, actions: next });
+      const parent = paths[0]!.slice(0, -1);
+      const indices = paths
+        .filter(
+          (p) =>
+            p.length === parent.length + 1 &&
+            parent.every((seg, i) => p[i] === seg),
+        )
+        .map((p) => p[p.length - 1]!);
+      if (indices.length > 0) {
+        const min = Math.min(...indices);
+        setSelectedPath([...parent, min + dir]);
+      }
     },
     [doc, editorLocked, updateDoc],
   );
@@ -811,9 +898,13 @@ export function MacroEditorView({
   );
 
   const onPasteAfter = useCallback(
-    (path: ActionPath, action: MacroAction) => {
+    (path: ActionPath, action: MacroAction | MacroAction[]) => {
       if (editorLocked) return;
-      const result = pasteAfterAtPath(doc.actions, path, action);
+      const batch = Array.isArray(action) ? action : [action];
+      const result =
+        batch.length === 1
+          ? pasteAfterAtPath(doc.actions, path, batch[0]!)
+          : pasteManyAfterAtPath(doc.actions, path, batch);
       if (!result) return;
       updateDoc({ ...doc, actions: result.actions });
       setSelectedPath(result.newPath);
@@ -822,40 +913,6 @@ export function MacroEditorView({
   );
 
   const [addMenuOpen, setAddMenuOpen] = useState(false);
-
-  const graph = useMemo(
-    () => macroToGraph(doc, uiLayout, t),
-    [doc, uiLayout, t],
-  );
-
-  const selectedNodeId = useMemo(() => {
-    if (!selectedPath) return null;
-    const action = getAtPath(doc.actions, selectedPath);
-    return action?.id ?? null;
-  }, [doc.actions, selectedPath]);
-
-  const onSelectGraphNode = useCallback(
-    (nodeId: string | null) => {
-      if (!nodeId) {
-        setSelectedPath(null);
-        return;
-      }
-      const path = findPathByActionId(doc.actions, nodeId);
-      setSelectedPath(path);
-    },
-    [doc.actions],
-  );
-
-  const onGraphChange = useCallback(
-    (nodes: MacroGraphNode[]) => {
-      if (editorLocked || !hydratedRef.current || loadFailedRef.current) return;
-      const layout = extractUiLayout({ nodes, edges: graph.edges });
-      setUiLayout(layout);
-      const payload = { ...docRef.current, uiLayout: layout };
-      setDirty(JSON.stringify(payload) !== baselineRef.current);
-    },
-    [editorLocked, graph.edges],
-  );
 
   const titleBarPortal = useTitleBarSlot(
     doc.name || macroId,
@@ -882,6 +939,34 @@ export function MacroEditorView({
       canRedo={canRedo}
       onUndo={editorLocked ? undefined : undo}
       onRedo={editorLocked ? undefined : redo}
+      processFilter={globalProcessFilter}
+      processFilterMode={doc.processFilter ?? "inherit"}
+      onProcessFilterModeChange={(mode: ProcessFilterScopeMode) => {
+        const cur = docRef.current;
+        updateDoc({
+          ...cur,
+          processFilter: mode,
+          ...(mode === "local"
+            ? {
+                localProcessFilter: withLocalEnabled(
+                  cur.localProcessFilter ?? DEFAULT_PROCESS_FILTER,
+                ),
+              }
+            : {}),
+        });
+      }}
+      localProcessFilter={doc.localProcessFilter ?? DEFAULT_PROCESS_FILTER}
+      onLocalProcessFilterChange={(localProcessFilter) =>
+        updateDoc({ ...docRef.current, localProcessFilter })
+      }
+      onOpenProcessSettings={onOpenProcessSettings}
+      onGlobalProcessFilterChange={(next) => {
+        void persistGlobalProcessFilter(next);
+      }}
+      processFilterPresets={processFilterPresets}
+      onProcessFilterPresetsChange={(next) => {
+        void persistProcessFilterPresets(next);
+      }}
       onConvertToScript={
         editorLocked
           ? undefined
@@ -903,6 +988,34 @@ export function MacroEditorView({
                 );
                 if (outcome.openAfter && onOpenScript) {
                   onOpenScript(
+                    outcome.result.newId,
+                    outcome.result.newName,
+                  );
+                }
+              })();
+            }
+      }
+      onConvertToClicker={
+        editorLocked
+          ? undefined
+          : () => {
+              void (async () => {
+                const outcome = await runLibraryConvert({
+                  fromKind: "macro",
+                  id: macroId,
+                  toKind: "clicker",
+                  name: doc.name || macroId,
+                  t,
+                });
+                if (!outcome) return;
+                toast.success(
+                  t("automations.convert.success", {
+                    name: outcome.result.newName,
+                    kind: t(`automations.convert.kind.${outcome.result.toKind}`),
+                  }),
+                );
+                if (outcome.openAfter && onOpenClicker) {
+                  onOpenClicker(
                     outcome.result.newId,
                     outcome.result.newName,
                   );
@@ -940,36 +1053,6 @@ export function MacroEditorView({
               open={addMenuOpen}
               onOpenChange={setAddMenuOpen}
             />
-            <div
-              className="caster-segmented"
-              role="group"
-              aria-label={t("macros.toolbar.viewListAria")}
-              style={{ marginLeft: "auto" }}
-            >
-              {(
-                [
-                  ["list", t("macros.toolbar.viewList"), t("macros.toolbar.viewListAria")],
-                  ["graph", t("macros.toolbar.viewGraph"), t("macros.toolbar.viewGraphAria")],
-                ] as const
-              ).map(([value, label, aria]) => (
-                <button
-                  key={value}
-                  type="button"
-                  className={[
-                    "caster-segmented-btn",
-                    editorView === value ? "active" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-label={aria}
-                  aria-pressed={editorView === value}
-                  disabled={editorLocked || !hydrated}
-                  onClick={() => setEditorView(value)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
           </div>
           <div
             className="caster-seq-scroll"
@@ -993,29 +1076,24 @@ export function MacroEditorView({
                 aria-busy="true"
                 aria-live="polite"
               />
-            ) : editorView === "graph" ? (
-              <MacroCanvas
-                graphNodes={graph.nodes}
-                graphEdges={graph.edges}
-                selectedNodeId={selectedNodeId}
-                onSelectNode={onSelectGraphNode}
-                onGraphChange={onGraphChange}
-                readOnly={editorLocked}
-              />
             ) : (
               <ActionList
                 actions={doc.actions}
                 selectedPath={selectedPath}
                 activePath={activePath}
                 readOnly={editorLocked}
+                confirmDeleteAction={confirmationsPrefs.deleteAction}
                 onSelect={setSelectedPath}
                 onReorder={(from, to) => {
                   const next = reorderAtPath(doc.actions, from, to);
                   if (next) updateDoc({ ...doc, actions: next });
                 }}
                 onRemove={onRemove}
+                onRemoveMany={onRemoveMany}
                 onDuplicate={onDuplicate}
+                onDuplicateMany={onDuplicateMany}
                 onMove={onMove}
+                onMoveMany={onMoveMany}
                 onRunFrom={editorLocked ? undefined : (path) => void onRunFrom(path)}
                 onInsertBefore={onInsertBefore}
                 onInsertAfter={onInsertAfter}

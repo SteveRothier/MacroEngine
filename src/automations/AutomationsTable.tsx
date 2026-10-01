@@ -59,6 +59,8 @@ import { AutomationRowMenu } from "./AutomationRowMenu";
 import { AutomationsToolbar } from "./AutomationsToolbar";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
+import { highlightQuery } from "./highlightQuery";
+import { loadRecent } from "../app/recent";
 import {
   commonConvertTargets,
   convertBatchSummaryMessage,
@@ -69,8 +71,11 @@ import {
 import {
   mergeAccueilPrefs,
   mergeAutomationPrefs,
+  mergeConfirmationsPrefs,
   mergeScriptsPrefs,
   type AccueilPrefs,
+  type AutomationPrefs,
+  type ConfirmationsPrefs,
   type ScriptsPrefs,
 } from "../settings/settingsTypes";
 import {
@@ -91,10 +96,11 @@ import {
 } from "./types";
 import {
   useAccueilDnd,
+  useFolderSectionDnd,
   type AccueilDropIntent,
 } from "./useAccueilDnd";
 import { useAccueilUndo } from "./useAccueilUndo";
-import { useUnifiedAutomations } from "./useUnifiedAutomations";
+import { useUnifiedAutomations, flattenFolderTree } from "./useUnifiedAutomations";
 
 type Props = {
   onNavigate: (route: AppRoute) => void;
@@ -128,6 +134,9 @@ type Props = {
   onLaunchFocusJournal?: () => void;
   scriptsPrefs?: ScriptsPrefs;
   accueilPrefs?: AccueilPrefs;
+  automationPrefs?: AutomationPrefs;
+  confirmationsPrefs?: ConfirmationsPrefs;
+  recentListMax?: number;
   onOpenSettings?: () => void;
   /** When false (Accueil keep-mounted but hidden), ignore global Accueil shortcuts. */
   active?: boolean;
@@ -209,6 +218,9 @@ export function AutomationsTable({
   onLaunchFocusJournal,
   scriptsPrefs: scriptsPrefsProp,
   accueilPrefs: accueilPrefsProp,
+  automationPrefs: automationPrefsProp,
+  confirmationsPrefs: confirmationsPrefsProp,
+  recentListMax: recentListMaxProp,
   onOpenSettings: _onOpenSettings,
   active = true,
 }: Props) {
@@ -216,8 +228,13 @@ export function AutomationsTable({
   const { locale } = useLocale();
   const empty = t("common.empty");
   const accueilPrefs = mergeAccueilPrefs(accueilPrefsProp);
-  const automationPrefs = mergeAutomationPrefs();
+  const automationPrefs = mergeAutomationPrefs(automationPrefsProp);
+  const confirmationsPrefs = mergeConfirmationsPrefs(confirmationsPrefsProp);
   const scriptsPrefs = mergeScriptsPrefs(scriptsPrefsProp);
+  const recentListMax = Math.min(
+    50,
+    Math.max(1, recentListMaxProp ?? 12),
+  );
   const toast = useToast();
   const searchInputRef = useRef<HTMLInputElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
@@ -228,6 +245,7 @@ export function AutomationsTable({
     refreshKey,
     query,
     filter,
+    recentListMax,
   });
   const afterUndoRef = useRef(async () => {
     await refresh({ silent: true });
@@ -274,8 +292,10 @@ export function AutomationsTable({
   const [createOpen, setCreateOpen] = useState(false);
   const [selectionAnchor, setSelectionAnchor] = useState<string | null>(null);
   const [focusKey, setFocusKeyState] = useState<string | null>(null);
+  const [focusFolderKey, setFocusFolderKey] = useState<string | null>(null);
   const setFocusKey = (key: string | null) => {
     setFocusKeyState(key);
+    if (key) setFocusFolderKey(null);
     onFocusKeyChange?.(key);
   };
   const ctxMenu = useContextMenuState();
@@ -516,6 +536,55 @@ export function AutomationsTable({
     },
   });
 
+  const [folderOrderOverride, setFolderOrderOverride] = useState<string[] | null>(
+    null,
+  );
+  const folderIdsRef = useRef<string[]>([]);
+  const orderedFolders = useMemo(() => {
+    if (!folderOrderOverride) return folders;
+    const byId = new Map(folders.map((f) => [f.id, f]));
+    const next: AutomationFolderOption[] = [];
+    for (const id of folderOrderOverride) {
+      const f = byId.get(id);
+      if (f) next.push(f);
+    }
+    for (const f of folders) {
+      if (!folderOrderOverride.includes(f.id)) next.push(f);
+    }
+    return next;
+  }, [folders, folderOrderOverride]);
+  folderIdsRef.current = orderedFolders.map((f) => f.id);
+
+  const commitFolderReorder = useCallback(
+    async (orderedIds: string[]) => {
+      setFolderOrderOverride(orderedIds);
+      try {
+        await invoke("reorder_library_folders_cmd", { orderedIds });
+        onRefresh?.();
+        await refresh({ silent: true });
+        setFolderOrderOverride(null);
+      } catch (e) {
+        setFolderOrderOverride(null);
+        toast.error(errMessage(e, t("automations.toast.moveFail")));
+      }
+    },
+    [onRefresh, refresh, t, toast],
+  );
+
+  const {
+    dragFolderId,
+    folderDropEdge,
+    folderGhost,
+    onFolderPointerDown,
+  } = useFolderSectionDnd({
+    listScrollRef,
+    folderIdsRef,
+    dragThresholdPx: accueilPrefs.dragThresholdPx,
+    onReorder: (orderedIds) => {
+      void commitFolderReorder(orderedIds);
+    },
+  });
+
   useEffect(() => {
     if (!accueilPrefs.rememberCollapsedSections) return;
     try {
@@ -664,7 +733,14 @@ export function AutomationsTable({
       if (display.sortBy === "type") cmp = a.kind.localeCompare(b.kind);
       else if (display.sortBy === "status")
         cmp = a.status.localeCompare(b.status);
-      else cmp = a.name.localeCompare(b.name, locale);
+      else if (display.sortBy === "lastRun") {
+        const aAt = a.lastRunAt ?? 0;
+        const bAt = b.lastRunAt ?? 0;
+        cmp = aAt - bAt;
+        if (cmp === 0) {
+          cmp = a.lastRunLabel.localeCompare(b.lastRunLabel, locale);
+        }
+      } else cmp = a.name.localeCompare(b.name, locale);
       if (cmp === 0) {
         const kr = kindRank(a.kind) - kindRank(b.kind);
         if (kr !== 0) return kr;
@@ -696,6 +772,7 @@ export function AutomationsTable({
       folder: AutomationFolderOption | null;
       kind: "folder" | "flat";
       items: AutomationRow[];
+      depth: number;
     };
 
     if (filter !== "all") {
@@ -706,12 +783,13 @@ export function AutomationsTable({
           folder: null,
           kind: "flat" as const,
           items: sorted,
+          depth: 0,
         },
       ];
     }
 
     const out: ListSection[] = [];
-    for (const f of folders) {
+    for (const { folder: f, depth } of flattenFolderTree(orderedFolders)) {
       const key = folderOptionKey(f);
       const items = sorted.filter(
         (r) => r.folderId != null && r.folderId === f.id,
@@ -722,6 +800,7 @@ export function AutomationsTable({
         folder: f,
         kind: "folder",
         items,
+        depth,
       });
     }
 
@@ -732,13 +811,24 @@ export function AutomationsTable({
       folder: null,
       kind: "flat",
       items: unfiled,
+      depth: 0,
     });
     return out;
-  }, [sorted, filter, folders]);
+  }, [sorted, filter, orderedFolders]);
 
   const selectedRows = useMemo(() => {
     return sorted.filter((r) => selected.has(rowKey(r)));
   }, [sorted, selected]);
+
+  const recentIdSet = useMemo(() => {
+    try {
+      return new Set(loadRecent().map((e) => `${e.kind}:${e.id}`));
+    } catch {
+      return new Set<string>();
+    }
+  }, [sorted]);
+
+  const virtualizeRows = sorted.length > 80;
 
   const emptyState = useMemo(() => {
     if (query.trim()) {
@@ -800,6 +890,23 @@ export function AutomationsTable({
         />
       );
     }
+    if (filter === "trash") {
+      return (
+        <EmptyState
+          title={t("automations.empty.noTrashTitle")}
+          lead={t("automations.empty.noTrashLead")}
+          actions={
+            <button
+              type="button"
+              className="caster-btn caster-btn-ghost"
+              onClick={() => onFilterChange?.("all")}
+            >
+              {t("automations.empty.seeAll")}
+            </button>
+          }
+        />
+      );
+    }
     return (
       <EmptyState
         title={t("automations.empty.noAutomationsTitle")}
@@ -834,6 +941,32 @@ export function AutomationsTable({
     t,
   ]);
 
+  async function onPurgeTrash() {
+    if (counts.trash <= 0) return;
+    if (confirmationsPrefs.purgeTrash) {
+      const ok = await confirmAction({
+        title: t("settings.data.purgeTitle"),
+        message: t("settings.data.purgeMessage"),
+        confirmLabel: t("settings.data.purge"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    try {
+      const n = await invoke<number>("purge_library_trash_cmd");
+      setSelected(new Set());
+      await refresh();
+      onRefresh?.();
+      toast.success(
+        n > 0
+          ? t("settings.data.purgeOk", { n })
+          : t("settings.data.purgeEmpty"),
+      );
+    } catch (e) {
+      toast.error(errMessage(e, t("settings.data.purgeFail")));
+    }
+  }
+
   async function onDeleteSelected() {
     if (selectedRows.length === 0) return;
     const ok = await confirmAction({
@@ -864,6 +997,32 @@ export function AutomationsTable({
       undoToast(t("automations.toast.trashed"));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.deleteFail")));
+    }
+  }
+
+  async function onRestoreSelected() {
+    if (selectedRows.length === 0) return;
+    try {
+      for (const r of selectedRows) {
+        await invoke("restore_library_item_cmd", { kind: r.kind, id: r.id });
+      }
+      setSelected(new Set());
+      await refresh();
+      onRefresh?.();
+      toast.success(t("automations.toast.restored"));
+    } catch (e) {
+      toast.error(errMessage(e, t("automations.toast.restoreFail")));
+    }
+  }
+
+  async function onRestoreOne(r: AutomationRow) {
+    try {
+      await invoke("restore_library_item_cmd", { kind: r.kind, id: r.id });
+      await refresh();
+      onRefresh?.();
+      toast.success(t("automations.toast.restored"));
+    } catch (e) {
+      toast.error(errMessage(e, t("automations.toast.restoreFail")));
     }
   }
 
@@ -936,7 +1095,7 @@ export function AutomationsTable({
     }
   }
 
-  async function onCreateFolder() {
+  async function onCreateFolder(parentId: string | null = null) {
     const name = await promptAction({
       title: t("automations.confirm.createFolderTitle"),
       defaultValue: "",
@@ -948,7 +1107,7 @@ export function AutomationsTable({
     try {
       const created = await invoke<{ id: string; name: string }>(
         "create_library_folder_cmd",
-        { kind: "macro", name: trimmed, parentId: null },
+        { kind: "macro", name: trimmed, parentId },
       );
       await refresh();
       onRefresh?.();
@@ -965,6 +1124,22 @@ export function AutomationsTable({
       undoToast(t("automations.toast.folderCreated", { name: created.name }));
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.folderCreateFail")));
+    }
+  }
+
+  async function onSetFolderParent(
+    target: AutomationFolderOption,
+    parentId: string | null,
+  ) {
+    try {
+      await invoke("set_library_folder_parent_cmd", {
+        id: target.id,
+        parentId,
+      });
+      await refresh();
+      onRefresh?.();
+    } catch (e) {
+      toast.error(errMessage(e, t("automations.toast.moveFail")));
     }
   }
 
@@ -1362,6 +1537,39 @@ export function AutomationsTable({
     });
   }
 
+  function goToFolder(r: AutomationRow) {
+    if (!r.folderId) return;
+    const folder = folders.find((f) => f.id === r.folderId);
+    if (!folder) return;
+    const sectionId = `folder:${folderOptionKey(folder)}`;
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      next.delete(sectionId);
+      // Expand ancestors so nested folders are visible.
+      let parentId = folder.parentId ?? null;
+      let guard = 0;
+      while (parentId && guard++ < 8) {
+        const parent = folders.find((f) => f.id === parentId);
+        if (!parent) break;
+        next.delete(`folder:${folderOptionKey(parent)}`);
+        parentId = parent.parentId ?? null;
+      }
+      return next;
+    });
+    onFilterChange?.("all");
+    requestAnimationFrame(() => {
+      const el = pageRef.current?.querySelector(
+        `[data-folder-section="${CSS.escape(sectionId)}"]`,
+      ) as HTMLElement | null;
+      el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      const rowEl = pageRef.current?.querySelector(
+        `[data-row-key="${CSS.escape(rowKey(r))}"]`,
+      ) as HTMLElement | null;
+      rowEl?.focus();
+      setFocusKey(rowKey(r));
+    });
+  }
+
   function setSortBy(sortBy: DisplayOptions["sortBy"]) {
     if (display.sortBy === sortBy) {
       onDisplayChange({
@@ -1369,7 +1577,11 @@ export function AutomationsTable({
         sortDir: display.sortDir === "asc" ? "desc" : "asc",
       });
     } else {
-      onDisplayChange({ ...display, sortBy, sortDir: "asc" });
+      onDisplayChange({
+        ...display,
+        sortBy,
+        sortDir: sortBy === "lastRun" ? "desc" : "asc",
+      });
     }
   }
 
@@ -1491,6 +1703,61 @@ export function AutomationsTable({
         return;
       }
 
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey
+      ) {
+        if (filter === "trash") return;
+        if (focusFolderKey) {
+          const folder = folders.find(
+            (f) => folderOptionKey(f) === focusFolderKey,
+          );
+          if (folder) {
+            e.preventDefault();
+            void onDeleteFolder(folder);
+          }
+          return;
+        }
+        const selectedActive = selectedRows.filter((r) => !r.trashed);
+        if (selectedActive.length > 0) {
+          e.preventDefault();
+          void onDeleteSelected();
+          return;
+        }
+        if (focusKey) {
+          const row = sorted.find((r) => rowKey(r) === focusKey);
+          if (row && !row.trashed) {
+            e.preventDefault();
+            void onDeleteOne(row);
+          }
+        }
+        return;
+      }
+
+      if (e.key === "F2" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        if (focusFolderKey) {
+          const folder = folders.find(
+            (f) => folderOptionKey(f) === focusFolderKey,
+          );
+          if (folder) {
+            e.preventDefault();
+            void onRenameFolder(folder);
+          }
+          return;
+        }
+        const key =
+          selected.size === 1 ? [...selected][0]! : focusKey;
+        if (!key) return;
+        const row = sorted.find((r) => rowKey(r) === key);
+        if (row && !row.trashed) {
+          e.preventDefault();
+          void onRenameOne(row);
+        }
+        return;
+      }
+
       if (e.key === "Enter" && focusKey) {
         const row = sorted.find((r) => rowKey(r) === focusKey);
         if (row) {
@@ -1503,7 +1770,22 @@ export function AutomationsTable({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectAllVisible/sorted via closure refresh
-  }, [active, selected.size, createOpen, focusKey, sorted, flatKeys, dragRow, accueilUndo, t, toast]);
+  }, [
+    active,
+    selected.size,
+    selectedRows,
+    filter,
+    createOpen,
+    focusKey,
+    focusFolderKey,
+    folders,
+    sorted,
+    flatKeys,
+    dragRow,
+    accueilUndo,
+    t,
+    toast,
+  ]);
 
   const moveFolders = useMemo(() => {
     const movable = selectedRows.filter(
@@ -1550,10 +1832,14 @@ export function AutomationsTable({
       onLock: () => void setRowLocked(ctxRow, true),
       onUnlock: () => void setRowLocked(ctxRow, false),
       onReveal: () => void onRevealOne(ctxRow),
+      onGoToFolder: ctxRow.folderId
+        ? () => goToFolder(ctxRow)
+        : undefined,
       moveFolders: rowFolders,
       onMoveToFolder: (folder) => void moveRowToFolder(ctxRow, folder),
       onConvertTo: (to) => scheduleConvertOne(ctxRow, to),
       onDelete: () => void onDeleteOne(ctxRow),
+      onRestore: () => void onRestoreOne(ctxRow),
       icons: automationRowMenuIcons(),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- handlers close over latest row
@@ -1664,6 +1950,7 @@ export function AutomationsTable({
             toast.error(t("automations.toast.redoFail"));
           });
         }}
+        onPurgeTrash={() => void onPurgeTrash()}
       />
 
       <div
@@ -1679,7 +1966,6 @@ export function AutomationsTable({
             <div className="caster-auto-colhead">
               <span className="caster-auto-colhead-check" aria-hidden />
               <div className="caster-auto-colhead-identity">
-                <span className="caster-auto-colhead-kind" aria-hidden />
                 <button
                   type="button"
                   role="columnheader"
@@ -1707,6 +1993,7 @@ export function AutomationsTable({
                     />
                   ) : null}
                 </button>
+                <span className="caster-auto-colhead-kind" aria-hidden />
                 <button
                   type="button"
                   role="columnheader"
@@ -1767,12 +2054,60 @@ export function AutomationsTable({
                 <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--secondary">
                   {t("automations.columns.folderMeta")}
                 </span>
-                <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--run">
+                <button
+                  type="button"
+                  role="columnheader"
+                  className={[
+                    "caster-auto-colhead-label",
+                    "caster-auto-row-prop",
+                    "caster-auto-row-prop--run",
+                    display.sortBy === "lastRun" ? "is-active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-sort={ariaSortFor("lastRun")}
+                  onClick={() => setSortBy("lastRun")}
+                >
                   {t("automations.columns.lastRun")}
-                </span>
-                <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--status">
+                  {display.sortBy === "lastRun" ? (
+                    <ChevronDown
+                      size={12}
+                      aria-hidden
+                      className={
+                        display.sortDir === "desc"
+                          ? "caster-auto-colhead-sort-icon is-desc"
+                          : "caster-auto-colhead-sort-icon"
+                      }
+                    />
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  role="columnheader"
+                  className={[
+                    "caster-auto-colhead-label",
+                    "caster-auto-row-prop",
+                    "caster-auto-row-prop--status",
+                    display.sortBy === "status" ? "is-active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-sort={ariaSortFor("status")}
+                  onClick={() => setSortBy("status")}
+                >
                   {t("automations.columns.status")}
-                </span>
+                  {display.sortBy === "status" ? (
+                    <ChevronDown
+                      size={12}
+                      aria-hidden
+                      className={
+                        display.sortDir === "desc"
+                          ? "caster-auto-colhead-sort-icon is-desc"
+                          : "caster-auto-colhead-sort-icon"
+                      }
+                    />
+                  ) : null}
+                </button>
               </div>
               <span className="caster-auto-colhead-trail" aria-hidden />
             </div>
@@ -1784,12 +2119,19 @@ export function AutomationsTable({
                   : null;
               const droppingOnFolder =
                 folderKey != null && dropFolderKey === folderKey;
+              const folderReorderOver =
+                folderKey != null &&
+                folderDropEdge?.folderId === folderKey;
               // Folder header/end drop → blue line at end of block (not full wash).
               const headerIsDropOver = droppingOnFolder;
               const folderEndLine =
                 droppingOnFolder && !collapsed && section.items.length > 0;
               const folderHeaderLine =
                 droppingOnFolder && (collapsed || section.items.length === 0);
+              const folderReorderBefore =
+                folderReorderOver && folderDropEdge?.edge === "before";
+              const folderReorderAfter =
+                folderReorderOver && folderDropEdge?.edge === "after";
               const lastFolderItemKey =
                 folderEndLine && section.items.length > 0
                   ? rowKey(section.items[section.items.length - 1]!)
@@ -1802,6 +2144,7 @@ export function AutomationsTable({
                 <div
                   key={section.id}
                   className="caster-automations-section"
+                  data-folder-section={section.id}
                   {...(folderKey
                     ? { "data-folder-drop-id": folderKey }
                     : {})}
@@ -1812,11 +2155,40 @@ export function AutomationsTable({
                         "caster-auto-folder-section",
                         headerIsDropOver ? "is-drop-target" : "",
                         folderHeaderLine ? "drop-after" : "",
+                        folderReorderBefore ? "drop-before" : "",
+                        folderReorderAfter ? "drop-after" : "",
+                        dragFolderId === folderKey ? "is-dragging" : "",
                         menuKey === section.id ? "is-menu-open" : "",
+                        focusFolderKey === folderKey ? "is-focused" : "",
                       ]
                         .filter(Boolean)
                         .join(" ")}
                       data-folder-drop-id={folderKey ?? undefined}
+                      style={
+                        section.depth > 0
+                          ? { paddingLeft: 12 + section.depth * 16 }
+                          : undefined
+                      }
+                      tabIndex={0}
+                      onPointerDown={(e) => {
+                        if (folderKey && section.folder) {
+                          onFolderPointerDown(folderKey, section.folder.name, e);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (folderKey) {
+                          setFocusFolderKey(folderKey);
+                          setFocusKeyState(null);
+                          onFocusKeyChange?.(null);
+                        }
+                      }}
+                      onClick={() => {
+                        if (folderKey) {
+                          setFocusFolderKey(folderKey);
+                          setFocusKeyState(null);
+                          onFocusKeyChange?.(null);
+                        }
+                      }}
                     >
                       <button
                         type="button"
@@ -1876,6 +2248,45 @@ export function AutomationsTable({
                                     void onRenameFolder(section.folder!),
                                 },
                                 {
+                                  id: "subfolder",
+                                  label: t("automations.folder.createChild"),
+                                  icon: <Folder size={14} />,
+                                  disabled: (section.depth ?? 0) >= 2,
+                                  onSelect: () =>
+                                    void onCreateFolder(section.folder!.id),
+                                },
+                                ...(section.folder?.parentId
+                                  ? [
+                                      {
+                                        id: "unfile-folder",
+                                        label: t("automations.folder.moveToRoot"),
+                                        onSelect: () =>
+                                          void onSetFolderParent(
+                                            section.folder!,
+                                            null,
+                                          ),
+                                      },
+                                    ]
+                                  : []),
+                                ...folders
+                                  .filter(
+                                    (f) =>
+                                      f.id !== section.folder!.id &&
+                                      f.id !== section.folder!.parentId,
+                                  )
+                                  .slice(0, 8)
+                                  .map((f) => ({
+                                    id: `nest-${f.id}`,
+                                    label: t("automations.folder.moveInto", {
+                                      name: f.name,
+                                    }),
+                                    onSelect: () =>
+                                      void onSetFolderParent(
+                                        section.folder!,
+                                        f.id,
+                                      ),
+                                  })),
+                                {
                                   id: "delete",
                                   label: t("automations.folder.delete"),
                                   icon: <Trash2 size={14} />,
@@ -1930,6 +2341,7 @@ export function AutomationsTable({
                               menuKey === key ? "is-menu-open" : "",
                               rowRunning ? "is-running" : "",
                               focusKey === key ? "is-focused" : "",
+                              virtualizeRows ? "is-virtualized" : "",
                               dragRow && rowKey(dragRow) === key
                                 ? "is-drag-source"
                                 : "",
@@ -1988,6 +2400,7 @@ export function AutomationsTable({
                                 aria-label={t("automations.row.selectAria", { name: r.name })}
                               />
                             </label>
+                            <span className="caster-auto-row-order" aria-hidden />
                             <div
                               className="caster-auto-row-identity"
                               onPointerDown={(e) => onRowPointerDown(r, e)}
@@ -2002,7 +2415,16 @@ export function AutomationsTable({
                                         aria-hidden
                                       />
                                     ) : null}
-                                    {r.name}
+                                    {query.trim()
+                                      ? highlightQuery(r.name, query)
+                                      : r.name}
+                                    {recentIdSet.has(`${r.kind}:${r.id}`) &&
+                                    filter !== "recent" ? (
+                                      <span className="caster-auto-row-recent-inline">
+                                        {" "}
+                                        · {t("automations.row.recentBadge")}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 </TruncatedTooltip>
                                 {subtitle ? (
@@ -2356,13 +2778,23 @@ export function AutomationsTable({
                 <ChevronDown size={14} aria-hidden />
               </DropdownMenu>
             ) : null}
-            <button
-              type="button"
-              className="caster-btn caster-btn-danger-ghost"
-              onClick={() => void onDeleteSelected()}
-            >
-              {t("automations.selection.trash")}
-            </button>
+            {filter === "trash" || selectedRows.every((r) => r.trashed) ? (
+              <button
+                type="button"
+                className="caster-btn caster-btn-primary"
+                onClick={() => void onRestoreSelected()}
+              >
+                {t("automations.selection.restore")}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="caster-btn caster-btn-danger-ghost"
+                onClick={() => void onDeleteSelected()}
+              >
+                {t("automations.selection.trash")}
+              </button>
+            )}
             <button
               type="button"
               className="caster-btn caster-btn-ghost"
@@ -2418,6 +2850,23 @@ export function AutomationsTable({
                 {kindLabel(dragGhost.kind, t)}
               </span>
               <span className="caster-auto-drag-ghost-name">{dragGhost.name}</span>
+            </div>,
+            document.body,
+          )
+        : null}
+      {folderGhost
+        ? createPortal(
+            <div
+              className="caster-auto-drag-ghost"
+              style={{
+                transform: `translate(${folderGhost.x + 12}px, ${folderGhost.y + 12}px)`,
+              }}
+              aria-hidden
+            >
+              <span className="caster-auto-type-badge caster-auto-type-badge--folder">
+                {t("automations.selection.folder")}
+              </span>
+              <span className="caster-auto-drag-ghost-name">{folderGhost.name}</span>
             </div>,
             document.body,
           )

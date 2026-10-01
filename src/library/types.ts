@@ -4,6 +4,7 @@ export type LibraryFolder = {
   id: string;
   name: string;
   parentId?: string | null;
+  sortOrder?: number;
 };
 
 export type LibraryItemDto = {

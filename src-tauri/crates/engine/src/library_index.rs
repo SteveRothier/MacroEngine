@@ -62,6 +62,8 @@ pub struct LibraryFolder {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
+    #[serde(default)]
+    pub sort_order: i32,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -73,6 +75,9 @@ pub struct LibraryEntryMeta {
     pub locked: bool,
     #[serde(default)]
     pub sort_order: i32,
+    /// Unix seconds when moved to trash (for auto-purge).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trashed_at: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,6 +235,9 @@ fn unify_legacy_folders(
                 folders.push(folder.clone());
             }
         }
+    }
+    for (i, f) in folders.iter_mut().enumerate() {
+        f.sort_order = i as i32;
     }
     (folders, remap)
 }
@@ -431,7 +439,13 @@ fn build_dto(
     script_names_hint: Option<&HashMap<String, String>>,
 ) -> Result<LibraryIndexDto, LibraryIndexError> {
     let key = kind_key(kind);
-    let folders = index.folders.clone();
+    let mut folders = index.folders.clone();
+    folders.sort_by(|a, b| {
+        a.sort_order
+            .cmp(&b.sort_order)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+            .then_with(|| a.id.cmp(&b.id))
+    });
     let trash = index.trash.get(key).cloned().unwrap_or_default();
     let q_lower = query.map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty());
 
@@ -537,15 +551,138 @@ pub fn create_library_folder(
         if !index.folders.iter().any(|f| &f.id == pid) {
             return Err(LibraryIndexError::Other("dossier parent introuvable".into()));
         }
+        let depth = folder_depth(&index.folders, Some(pid));
+        // Root child depth=1; grandchild depth=2; reject depth>=3 (max 3 levels).
+        if depth >= 3 {
+            return Err(LibraryIndexError::Other(
+                "profondeur de dossiers maximale (3) atteinte".into(),
+            ));
+        }
     }
     let folder = LibraryFolder {
         id: new_folder_id(),
         name: trimmed.to_string(),
         parent_id,
+        sort_order: index
+            .folders
+            .iter()
+            .map(|f| f.sort_order)
+            .max()
+            .unwrap_or(-1)
+            + 1,
     };
     index.folders.push(folder.clone());
     save_index(config_dir, &index)?;
     Ok(folder)
+}
+
+fn folder_depth(folders: &[LibraryFolder], parent_id: Option<&String>) -> i32 {
+    let mut depth = 0;
+    let mut cur = parent_id.cloned();
+    let mut guard = 0;
+    while let Some(id) = cur {
+        depth += 1;
+        guard += 1;
+        if guard > 32 {
+            break;
+        }
+        cur = folders
+            .iter()
+            .find(|f| f.id == id)
+            .and_then(|f| f.parent_id.clone());
+    }
+    depth
+}
+
+pub fn set_library_folder_parent(
+    config_dir: &Path,
+    id: String,
+    parent_id: Option<String>,
+) -> Result<LibraryFolder, LibraryIndexError> {
+    let mut index = load_index(config_dir)?;
+    if !index.folders.iter().any(|f| f.id == id) {
+        return Err(LibraryIndexError::Other("dossier introuvable".into()));
+    }
+    if let Some(ref pid) = parent_id {
+        if pid == &id {
+            return Err(LibraryIndexError::Other(
+                "un dossier ne peut pas être son propre parent".into(),
+            ));
+        }
+        if !index.folders.iter().any(|f| &f.id == pid) {
+            return Err(LibraryIndexError::Other("dossier parent introuvable".into()));
+        }
+        // Prevent cycles: pid must not be under id.
+        let mut cur = Some(pid.clone());
+        let mut guard = 0;
+        while let Some(cid) = cur {
+            if cid == id {
+                return Err(LibraryIndexError::Other(
+                    "cycle de dossiers interdit".into(),
+                ));
+            }
+            guard += 1;
+            if guard > 32 {
+                break;
+            }
+            cur = index
+                .folders
+                .iter()
+                .find(|f| f.id == cid)
+                .and_then(|f| f.parent_id.clone());
+        }
+        let depth = folder_depth(&index.folders, Some(pid));
+        if depth >= 3 {
+            return Err(LibraryIndexError::Other(
+                "profondeur de dossiers maximale (3) atteinte".into(),
+            ));
+        }
+    }
+    let folder = index
+        .folders
+        .iter_mut()
+        .find(|f| f.id == id)
+        .ok_or_else(|| LibraryIndexError::Other("dossier introuvable".into()))?;
+    folder.parent_id = parent_id;
+    let out = folder.clone();
+    save_index(config_dir, &index)?;
+    Ok(out)
+}
+
+pub fn reorder_library_folders(
+    config_dir: &Path,
+    ordered_ids: Vec<String>,
+) -> Result<Vec<LibraryFolder>, LibraryIndexError> {
+    if ordered_ids.is_empty() {
+        return Err(LibraryIndexError::Other("ordre de dossiers vide".into()));
+    }
+    let mut index = load_index(config_dir)?;
+    if ordered_ids.len() != index.folders.len() {
+        return Err(LibraryIndexError::Other(
+            "ordre de dossiers incomplet".into(),
+        ));
+    }
+    let mut by_id: HashMap<String, LibraryFolder> = index
+        .folders
+        .drain(..)
+        .map(|f| (f.id.clone(), f))
+        .collect();
+    let mut next = Vec::with_capacity(ordered_ids.len());
+    for (i, id) in ordered_ids.iter().enumerate() {
+        let mut folder = by_id.remove(id).ok_or_else(|| {
+            LibraryIndexError::Other(format!("dossier « {id} » introuvable"))
+        })?;
+        folder.sort_order = i as i32;
+        next.push(folder);
+    }
+    if !by_id.is_empty() {
+        return Err(LibraryIndexError::Other(
+            "ordre de dossiers incomplet".into(),
+        ));
+    }
+    index.folders = next.clone();
+    save_index(config_dir, &index)?;
+    Ok(next)
 }
 
 pub fn rename_library_folder(
@@ -720,20 +857,88 @@ pub fn trash_library_item(
     let mut index = load_index(config_dir)?;
     let trash = index.trash.entry(kind_key(kind).to_string()).or_default();
     if !trash.iter().any(|x| x == &id) {
-        trash.push(id);
+        trash.push(id.clone());
     }
+    let mut meta = entry_meta(&index, kind, &id);
+    meta.trashed_at = Some(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+    );
+    set_entry(&mut index, kind, &id, meta);
     save_index(config_dir, &index)?;
     Ok(())
 }
 
 /// Permanently delete every trashed library item (disk + index).
 pub fn purge_library_trash(config_dir: &Path) -> Result<usize, LibraryIndexError> {
-    let mut index = load_index(config_dir)?;
+    purge_library_trash_older_than(config_dir, 0)
+}
+
+/// Count trash entries that would be purged by [`purge_library_trash_older_than`].
+pub fn count_library_trash_older_than(
+    config_dir: &Path,
+    days: u32,
+) -> Result<usize, LibraryIndexError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let cutoff = if days == 0 {
+        None
+    } else {
+        Some(now.saturating_sub(u64::from(days) * 86_400))
+    };
+    let index = load_index(config_dir)?;
     let mut n = 0usize;
     for kind in [LibraryKind::Macro, LibraryKind::Clicker, LibraryKind::Script] {
         let key = kind_key(kind).to_string();
         let ids = index.trash.get(&key).cloned().unwrap_or_default();
         for id in ids {
+            let meta = entry_meta(&index, kind, &id);
+            let age_ok = match cutoff {
+                None => true,
+                Some(c) => meta.trashed_at.map(|t| t <= c).unwrap_or(false),
+            };
+            if age_ok {
+                n += 1;
+            }
+        }
+    }
+    Ok(n)
+}
+
+/// Purge trash entries older than `days`. When `days == 0`, purge all trash.
+pub fn purge_library_trash_older_than(
+    config_dir: &Path,
+    days: u32,
+) -> Result<usize, LibraryIndexError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let cutoff = if days == 0 {
+        None
+    } else {
+        Some(now.saturating_sub(u64::from(days) * 86_400))
+    };
+    let mut index = load_index(config_dir)?;
+    let mut n = 0usize;
+    for kind in [LibraryKind::Macro, LibraryKind::Clicker, LibraryKind::Script] {
+        let key = kind_key(kind).to_string();
+        let ids = index.trash.get(&key).cloned().unwrap_or_default();
+        let mut kept = Vec::new();
+        for id in ids {
+            let meta = entry_meta(&index, kind, &id);
+            let age_ok = match cutoff {
+                None => true,
+                Some(c) => meta.trashed_at.map(|t| t <= c).unwrap_or(false),
+            };
+            if !age_ok {
+                kept.push(id);
+                continue;
+            }
             match kind {
                 LibraryKind::Macro => {
                     let _ = delete_macro(config_dir, &id);
@@ -751,7 +956,7 @@ pub fn purge_library_trash(config_dir: &Path) -> Result<usize, LibraryIndexError
             n += 1;
         }
         if let Some(trash) = index.trash.get_mut(&key) {
-            trash.clear();
+            *trash = kept;
         }
     }
     save_index(config_dir, &index)?;
@@ -766,6 +971,9 @@ pub fn restore_library_item(
     let mut index = load_index(config_dir)?;
     let trash = index.trash.entry(kind_key(kind).to_string()).or_default();
     trash.retain(|x| x != &id);
+    let mut meta = entry_meta(&index, kind, &id);
+    meta.trashed_at = None;
+    set_entry(&mut index, kind, &id, meta);
     save_index(config_dir, &index)?;
     Ok(())
 }
@@ -991,6 +1199,8 @@ mod tests {
             allow_input: false,
             allow_process: false,
             param_values: Default::default(),
+            process_filter: Default::default(),
+            local_process_filter: Default::default(),
         };
         save_script(&dir, &doc).unwrap();
         let folder =
@@ -1044,6 +1254,107 @@ mod tests {
         let saved: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert!(saved["folders"].is_array());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn purge_trash_by_age() {
+        let dir = temp_dir();
+        create_macro(&dir, Some("OldTrash")).unwrap();
+        create_macro(&dir, Some("FreshTrash")).unwrap();
+        create_macro(&dir, Some("NoStamp")).unwrap();
+        trash_library_item(&dir, LibraryKind::Macro, "OldTrash".into()).unwrap();
+        trash_library_item(&dir, LibraryKind::Macro, "FreshTrash".into()).unwrap();
+        trash_library_item(&dir, LibraryKind::Macro, "NoStamp".into()).unwrap();
+
+        let mut index = load_index(&dir).unwrap();
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        index.entries.get_mut("macro").unwrap().get_mut("OldTrash").unwrap().trashed_at =
+            Some(now.saturating_sub(10 * 86_400));
+        index.entries.get_mut("macro").unwrap().get_mut("FreshTrash").unwrap().trashed_at =
+            Some(now);
+        index.entries.get_mut("macro").unwrap().get_mut("NoStamp").unwrap().trashed_at = None;
+        save_index(&dir, &index).unwrap();
+
+        let n = purge_library_trash_older_than(&dir, 7).unwrap();
+        assert_eq!(n, 1, "only OldTrash should be purged");
+        let after = load_index(&dir).unwrap();
+        let trash = after.trash.get("macro").cloned().unwrap_or_default();
+        assert!(!trash.iter().any(|id| id == "OldTrash"));
+        assert!(trash.iter().any(|id| id == "FreshTrash"));
+        assert!(trash.iter().any(|id| id == "NoStamp"));
+
+        let n0 = purge_library_trash_older_than(&dir, 0).unwrap();
+        assert_eq!(n0, 2, "days=0 purges remaining trash");
+        let emptied = load_index(&dir).unwrap();
+        assert!(emptied.trash.get("macro").map(|t| t.is_empty()).unwrap_or(true));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn reorder_folders_persists_sort_order() {
+        let dir = temp_dir();
+        let a = create_library_folder(&dir, LibraryKind::Macro, "Alpha".into(), None).unwrap();
+        let b = create_library_folder(&dir, LibraryKind::Macro, "Beta".into(), None).unwrap();
+        let c = create_library_folder(&dir, LibraryKind::Macro, "Gamma".into(), None).unwrap();
+        let ordered = reorder_library_folders(
+            &dir,
+            vec![c.id.clone(), a.id.clone(), b.id.clone()],
+        )
+        .unwrap();
+        assert_eq!(
+            ordered.iter().map(|f| f.id.as_str()).collect::<Vec<_>>(),
+            vec![c.id.as_str(), a.id.as_str(), b.id.as_str()]
+        );
+        assert_eq!(ordered[0].sort_order, 0);
+        assert_eq!(ordered[1].sort_order, 1);
+        assert_eq!(ordered[2].sort_order, 2);
+        let dto = get_library_index(&dir, LibraryKind::Macro).unwrap();
+        assert_eq!(
+            dto.folders.iter().map(|f| f.name.as_str()).collect::<Vec<_>>(),
+            vec!["Gamma", "Alpha", "Beta"]
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn nested_folders_parent_and_depth_cap() {
+        let dir = temp_dir();
+        let root =
+            create_library_folder(&dir, LibraryKind::Macro, "Root".into(), None).unwrap();
+        let child = create_library_folder(
+            &dir,
+            LibraryKind::Macro,
+            "Child".into(),
+            Some(root.id.clone()),
+        )
+        .unwrap();
+        assert_eq!(child.parent_id.as_deref(), Some(root.id.as_str()));
+        let grand = create_library_folder(
+            &dir,
+            LibraryKind::Macro,
+            "Grand".into(),
+            Some(child.id.clone()),
+        )
+        .unwrap();
+        assert_eq!(grand.parent_id.as_deref(), Some(child.id.as_str()));
+        let too_deep = create_library_folder(
+            &dir,
+            LibraryKind::Macro,
+            "TooDeep".into(),
+            Some(grand.id.clone()),
+        );
+        assert!(too_deep.is_err(), "depth > 2 children should fail");
+
+        let other =
+            create_library_folder(&dir, LibraryKind::Macro, "Other".into(), None).unwrap();
+        set_library_folder_parent(&dir, child.id.clone(), Some(other.id.clone())).unwrap();
+        let idx = load_index(&dir).unwrap();
+        let moved = idx.folders.iter().find(|f| f.id == child.id).unwrap();
+        assert_eq!(moved.parent_id.as_deref(), Some(other.id.as_str()));
         let _ = fs::remove_dir_all(&dir);
     }
 }

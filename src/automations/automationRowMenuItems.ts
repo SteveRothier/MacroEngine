@@ -13,12 +13,15 @@ export type AutomationRowMenuActions = {
   onLock?: () => void;
   onUnlock?: () => void;
   onReveal?: () => void;
+  /** Expand / scroll to the row's Accueil folder section. */
+  onGoToFolder?: () => void;
   /** Folders for « Déplacer vers > » (same kind). Null = Sans dossier. */
   moveFolders?: AutomationFolderOption[];
   onMoveToFolder?: (folder: AutomationFolderOption | null) => void;
   /** Convert to another kind (submenu targets). */
   onConvertTo?: (toKind: AutomationRow["kind"]) => void;
   onDelete: () => void;
+  onRestore?: () => void;
   icons?: {
     open?: ReactNode;
     launch?: ReactNode;
@@ -39,6 +42,25 @@ export function buildAutomationRowMenuItems(
   t: TFunction,
   actions: AutomationRowMenuActions,
 ): MenuItemDef[] {
+  if (row.trashed) {
+    const items: MenuItemDef[] = [
+      {
+        id: "open",
+        label: t("common.open"),
+        icon: actions.icons?.open,
+        onSelect: actions.onOpen,
+      },
+    ];
+    if (actions.onRestore) {
+      items.push({
+        id: "restore",
+        label: t("automations.selection.restore"),
+        onSelect: actions.onRestore,
+      });
+    }
+    return items;
+  }
+
   const items: MenuItemDef[] = [
     {
       id: "open",
@@ -143,6 +165,13 @@ export function buildAutomationRowMenuItems(
       label: t("automations.menu.row.reveal"),
       icon: actions.icons?.reveal,
       onSelect: actions.onReveal,
+    });
+  }
+  if (actions.onGoToFolder && row.folderId) {
+    items.push({
+      id: "go-folder",
+      label: t("automations.menu.row.goToFolder"),
+      onSelect: actions.onGoToFolder,
     });
   }
 

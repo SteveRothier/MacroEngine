@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::actions::registry::ActionError;
-use crate::schema::MacroValue;
+use crate::schema::{MacroProcessFilterMode, MacroValue};
+use crate::settings::ProcessFilter;
 
 #[derive(Debug, Error)]
 pub enum ScriptLibraryError {
@@ -63,6 +64,26 @@ pub struct ScriptDoc {
     /// Saved UI defaults for `//@param` values.
     #[serde(default)]
     pub param_values: HashMap<String, MacroValue>,
+    /// inherit / off / local — same semantics as macros.
+    #[serde(default, rename = "processFilter")]
+    pub process_filter: MacroProcessFilterMode,
+    #[serde(default, rename = "localProcessFilter")]
+    pub local_process_filter: ProcessFilter,
+}
+
+impl ScriptDoc {
+    pub fn effective_process_filter(
+        &self,
+        global: Option<std::sync::Arc<std::sync::Mutex<ProcessFilter>>>,
+    ) -> Option<std::sync::Arc<std::sync::Mutex<ProcessFilter>>> {
+        match self.process_filter {
+            MacroProcessFilterMode::Inherit => global,
+            MacroProcessFilterMode::Off => None,
+            MacroProcessFilterMode::Local => Some(std::sync::Arc::new(std::sync::Mutex::new(
+                self.local_process_filter.clone(),
+            ))),
+        }
+    }
 }
 
 /// Accueil / list metadata without source (avoids shipping large payloads).
@@ -297,6 +318,8 @@ mod tests {
             allow_input: false,
             allow_process: false,
             param_values: HashMap::new(),
+            process_filter: Default::default(),
+            local_process_filter: Default::default(),
         };
         save_script(&dir, &doc).unwrap();
         let loaded = load_script(&dir, "hello").unwrap();

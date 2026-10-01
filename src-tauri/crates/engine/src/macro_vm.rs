@@ -467,7 +467,7 @@ impl MacroVm {
                                 }
                             }
                             (
-                                doc.source,
+                                doc.source.clone(),
                                 {
                                     let config_dir = crate::script_library::config_dir_default();
                                     crate::script_runtime::ScriptOptions {
@@ -486,6 +486,9 @@ impl MacroVm {
                                         include_stack: None,
                                         dry_run: false,
                                         step_gate: None,
+                                        process_filter: doc.effective_process_filter(
+                                            process_filter.cloned(),
+                                        ),
                                     }
                                 },
                             )
@@ -510,6 +513,7 @@ impl MacroVm {
                                         include_stack: None,
                                         dry_run: false,
                                         step_gate: None,
+                                        process_filter: process_filter.cloned(),
                                     }
                                 },
                             )

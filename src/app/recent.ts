@@ -2,7 +2,7 @@ import type { AutomationRow } from "../automations/types";
 
 export type RecentAutomation = {
   id: string;
-  kind: "macro" | "clicker";
+  kind: "macro" | "clicker" | "script";
   label: string;
 };
 

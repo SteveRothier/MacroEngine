@@ -36,9 +36,9 @@ export function convertTargetsFor(
 ): AutomationKind[] {
   switch (kind) {
     case "script":
-      return ["macro"];
+      return ["macro", "clicker"];
     case "macro":
-      return ["script"];
+      return ["script", "clicker"];
     case "clicker":
       return ["macro", "script"];
   }
@@ -62,6 +62,112 @@ export function commonConvertTargets(
   return common ? [...common] : [];
 }
 
+/** Localize engine convert report tokens / warning sentences. */
+export function localizeConvertToken(token: string, t: TFunction): string {
+  switch (token) {
+    case "script.run wrap":
+      return t("automations.convert.tokens.scriptRunWrap");
+    case "runMacro wrap":
+      return t("automations.convert.tokens.runMacroWrap");
+    case "points":
+      return t("automations.convert.tokens.points");
+    case "stopZones":
+      return t("automations.convert.tokens.stopZones");
+    case "pixelCondition":
+      return t("automations.convert.tokens.pixelCondition");
+    case "jitter/random":
+      return t("automations.convert.tokens.jitter");
+    case "dutyCycle":
+      return t("automations.convert.tokens.dutyCycle");
+    case "hold mode":
+      return t("automations.convert.tokens.holdMode");
+    case "keyboard input":
+      return t("automations.convert.tokens.keyboardInput");
+    case "onCompleteMacro":
+      return t("automations.convert.tokens.onCompleteMacro");
+    case "keyboard":
+      return t("automations.convert.tokens.keyboard");
+    case "control.if":
+      return t("automations.convert.tokens.controlIf");
+    case "control.while":
+      return t("automations.convert.tokens.controlWhile");
+    case "script.run":
+      return t("automations.convert.tokens.scriptRun");
+    case "orphan delay":
+      return t("automations.convert.tokens.orphanDelay");
+    case "mixed cursor/fixed clicks":
+      return t("automations.convert.tokens.mixedClicks");
+    case "script body":
+      return t("automations.convert.tokens.scriptBody");
+    default:
+      return token;
+  }
+}
+
+export function localizeConvertWarning(warning: string, t: TFunction): string {
+  const trimmed = warning.trim();
+  if (trimmed === "Clicker features beyond fixed clicks+delay are not converted") {
+    return t("automations.convert.warnings.clickerLimited");
+  }
+  if (trimmed === "Macro wraps the original script via script.run") {
+    return t("automations.convert.warnings.macroWrapsScript");
+  }
+  if (
+    trimmed ===
+    "Script calls caster.runMacro; enable macro control permission"
+  ) {
+    return t("automations.convert.warnings.scriptRunMacroPerm");
+  }
+  if (
+    trimmed === "Some macro actions were skipped during clicker conversion"
+  ) {
+    return t("automations.convert.warnings.macroActionsSkipped");
+  }
+  if (trimmed === "Clicker stub: script body cannot be transcribed to clicks") {
+    return t("automations.convert.warnings.scriptClickerStub");
+  }
+  let m = /^Generated (\d+) click\(s\) at ~(\d+) ms$/.exec(trimmed);
+  if (m) {
+    return t("automations.convert.warnings.generatedClicks", {
+      clicks: m[1]!,
+      ms: m[2]!,
+    });
+  }
+  m = /^Intermediate macro « (.+) » was also created$/.exec(trimmed);
+  if (m) {
+    return t("automations.convert.warnings.intermediateMacro", {
+      name: m[1]!,
+    });
+  }
+  m =
+    /^Clicker preset: (\d+) click\(s\) @ ~([\d.]+) CPS \((\d+) ms\)$/.exec(
+      trimmed,
+    );
+  if (m) {
+    return t("automations.convert.warnings.clickerPreset", {
+      count: m[1]!,
+      cps: m[2]!,
+      ms: m[3]!,
+    });
+  }
+  m = /^Clicker preset: (\d+) point sequence \((\d+) click\(s\)\)$/.exec(trimmed);
+  if (m) {
+    return t("automations.convert.warnings.pointSequence", {
+      points: m[1]!,
+      clicks: m[2]!,
+    });
+  }
+  m = /^Converted (\d+) clicker point\(s\) to click\+delay sequence$/.exec(
+    trimmed,
+  );
+  if (m) {
+    return t("automations.convert.warnings.pointsToClicks", {
+      count: m[1]!,
+    });
+  }
+  return trimmed;
+}
+
 function formatReport(
   report: ConvertResultDto["report"],
   t: TFunction,
@@ -69,16 +175,22 @@ function formatReport(
   const lines: string[] = [];
   if (report.kept.length) {
     lines.push(
-      t("automations.convert.kept", { list: report.kept.join(", ") }),
+      t("automations.convert.kept", {
+        list: report.kept.map((x) => localizeConvertToken(x, t)).join(", "),
+      }),
     );
   }
   if (report.dropped.length) {
     lines.push(
-      t("automations.convert.dropped", { list: report.dropped.join(", ") }),
+      t("automations.convert.dropped", {
+        list: report.dropped.map((x) => localizeConvertToken(x, t)).join(", "),
+      }),
     );
   }
   if (report.warnings.length) {
-    lines.push(report.warnings.join("\n"));
+    lines.push(
+      report.warnings.map((w) => localizeConvertWarning(w, t)).join("\n"),
+    );
   }
   return lines.join("\n");
 }
@@ -356,7 +468,10 @@ export function convertBatchSummaryMessage(
   if (dropped.size) {
     lines.push(
       t("automations.convert.dropped", {
-        list: [...dropped].slice(0, 8).join(", "),
+        list: [...dropped]
+          .slice(0, 8)
+          .map((d) => localizeConvertToken(d, t))
+          .join(", "),
       }),
     );
   }

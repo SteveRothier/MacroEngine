@@ -1,9 +1,8 @@
-import { useCallback, useState } from "react";
+import { useCallback, useState, type KeyboardEvent } from "react";
 import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import type { EngineStatus, HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import { useT } from "../i18n";
-import { ClickerSessionStats } from "./ClickerSessionStats";
 import { ClickerMetaBar } from "./ClickerMetaBar";
 import { ClickerTitleBarTools } from "./ClickerTitleBarTools";
 import { ClickerZonePreview } from "./ClickerZonePreview";
@@ -26,13 +25,13 @@ type Props = {
   onRenamed?: (from: string, to: string) => void;
   hotkeys: HotkeyBindings;
   onOpenProcessSettings?: () => void;
-  /** New preset id created via « Sauver comme nouveau preset ». */
   onSavedAsNew?: (id: string) => void;
-  /** When false (keep-mounted but hidden), ignore titlebar ownership. */
   active?: boolean;
 };
 
 type InspectorTab = "entry" | "target" | "zones" | "limits";
+
+const TAB_IDS: InspectorTab[] = ["entry", "target", "zones", "limits"];
 
 export function ClickerStudio({
   presetId,
@@ -80,66 +79,120 @@ export function ClickerStudio({
       onBack={onBack}
       hotkeys={hotkeys}
       onSavedAsNew={onSavedAsNew}
+      onOpenProcessSettings={onOpenProcessSettings}
+      meta={<ClickerMetaBar editor={editor} />}
     />,
     { active },
   );
 
+  const onTabKeyDown = (ev: KeyboardEvent<HTMLDivElement>) => {
+    const i = TAB_IDS.indexOf(tab);
+    if (i < 0) return;
+    let next = i;
+    if (ev.key === "ArrowRight" || ev.key === "ArrowDown") {
+      next = (i + 1) % TAB_IDS.length;
+    } else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") {
+      next = (i - 1 + TAB_IDS.length) % TAB_IDS.length;
+    } else if (ev.key === "Home") {
+      next = 0;
+    } else if (ev.key === "End") {
+      next = TAB_IDS.length - 1;
+    } else {
+      return;
+    }
+    ev.preventDefault();
+    setTab(TAB_IDS[next]!);
+    const el = document.getElementById(`clicker-tab-${TAB_IDS[next]}`);
+    el?.focus();
+  };
+
+  const paneClass = [
+    "caster-clicker-inspector-pane",
+    tab === "entry" ? "caster-clicker-inspector-pane--entry" : "",
+    tab === "target" || tab === "zones"
+      ? "caster-clicker-inspector-pane--zones"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <div className="caster-page caster-clicker-studio">
       {titleBarPortal}
-      <ClickerMetaBar editor={editor} />
-      <ClickerSessionStats
-        samples={editor.cpsSamples}
-        metrics={editor.metrics}
-        running={editor.running}
-        paused={editor.sessionPaused}
-        limits={{
-          enabled: editor.limitsEnabled,
-          mode: editor.limitMode,
-          maxClicks:
-            editor.maxClicks === "" ? null : Number(editor.maxClicks) || null,
-          maxDurationSec:
-            editor.maxDurationSec === ""
-              ? null
-              : Number(editor.maxDurationSec) || null,
-        }}
-      />
       <div className="caster-clicker-center">
         <div className="caster-settings-pane-inner caster-clicker-settings">
-          <div className="caster-tabs caster-clicker-tabs" role="tablist">
+          <div
+            className="caster-segmented caster-segmented--wide caster-clicker-nav"
+            role="tablist"
+            aria-label={t("clicker.tabs.navAria")}
+            onKeyDown={onTabKeyDown}
+          >
             {tabs.map((item) => (
               <button
                 key={item.id}
+                id={`clicker-tab-${item.id}`}
                 type="button"
                 role="tab"
                 aria-selected={tab === item.id}
-                className={["caster-tab", tab === item.id ? "active" : ""].join(" ")}
+                aria-controls={`clicker-panel-${item.id}`}
+                tabIndex={tab === item.id ? 0 : -1}
+                className={[
+                  "caster-segmented-btn",
+                  tab === item.id ? "active" : "",
+                ].join(" ")}
                 onClick={() => setTab(item.id)}
               >
                 {item.label}
               </button>
             ))}
           </div>
-          <div className="caster-clicker-inspector-pane" role="tabpanel">
-            {tab === "entry" ? (
-              <ClickerEntrySection
-                editor={editor}
-                onOpenProcessSettings={onOpenProcessSettings}
-              />
-            ) : null}
-            {tab === "target" ? (
+          <div className={paneClass}>
+            <div
+              id="clicker-panel-entry"
+              className="caster-clicker-tab-panel"
+              role="tabpanel"
+              aria-labelledby="clicker-tab-entry"
+              hidden={tab !== "entry"}
+              inert={tab !== "entry" ? true : undefined}
+            >
+              <ClickerEntrySection editor={editor} />
+            </div>
+            <div
+              id="clicker-panel-target"
+              className="caster-clicker-tab-panel"
+              role="tabpanel"
+              aria-labelledby="clicker-tab-target"
+              hidden={tab !== "target"}
+              inert={tab !== "target" ? true : undefined}
+            >
               <div className="caster-clicker-zones-split">
                 <ClickerTargetSection editor={editor} />
                 <ClickerTargetPreview editor={editor} />
               </div>
-            ) : null}
-            {tab === "zones" ? (
+            </div>
+            <div
+              id="clicker-panel-zones"
+              className="caster-clicker-tab-panel"
+              role="tabpanel"
+              aria-labelledby="clicker-tab-zones"
+              hidden={tab !== "zones"}
+              inert={tab !== "zones" ? true : undefined}
+            >
               <div className="caster-clicker-zones-split">
                 <ClickerZonesSection editor={editor} />
                 <ClickerZonePreview editor={editor} />
               </div>
-            ) : null}
-            {tab === "limits" ? <ClickerLimitsSection editor={editor} /> : null}
+            </div>
+            <div
+              id="clicker-panel-limits"
+              className="caster-clicker-tab-panel"
+              role="tabpanel"
+              aria-labelledby="clicker-tab-limits"
+              hidden={tab !== "limits"}
+              inert={tab !== "limits" ? true : undefined}
+            >
+              <ClickerLimitsSection editor={editor} />
+            </div>
           </div>
         </div>
       </div>

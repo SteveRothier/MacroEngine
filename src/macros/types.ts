@@ -460,6 +460,89 @@ export function removeAtPath(actions: MacroAction[], path: ActionPath): MacroAct
   return rewriteList(actions, path, (list, idx) => list.filter((_, i) => i !== idx));
 }
 
+/** Deepest / highest-index paths first so sibling indices stay valid. */
+function comparePathsDesc(a: ActionPath, b: ActionPath): number {
+  if (a.length !== b.length) return b.length - a.length;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return (b[i] ?? 0) - (a[i] ?? 0);
+  }
+  return 0;
+}
+
+/** Remove many paths in one pass (caller should push a single undo entry). */
+export function removeManyAtPaths(
+  actions: MacroAction[],
+  paths: ActionPath[],
+): MacroAction[] {
+  if (paths.length === 0) return actions;
+  const sorted = [...paths].sort(comparePathsDesc);
+  let next = actions;
+  for (const p of sorted) {
+    next = removeAtPath(next, p);
+  }
+  return next;
+}
+
+/** Duplicate many paths (high index first); one tree rewrite for batched undo. */
+export function duplicateManyAtPaths(
+  actions: MacroAction[],
+  paths: ActionPath[],
+): { actions: MacroAction[]; lastPath: ActionPath | null } {
+  if (paths.length === 0) return { actions, lastPath: null };
+  const sorted = [...paths].sort(comparePathsDesc);
+  let next = actions;
+  let lastPath: ActionPath | null = null;
+  for (const p of sorted) {
+    const result = duplicateAtPath(next, p);
+    if (!result) continue;
+    next = result.actions;
+    lastPath = result.newPath;
+  }
+  return { actions: next, lastPath };
+}
+
+/**
+ * Move many siblings in one parent list one step. Mixed parents: only paths
+ * sharing the first path's parent are moved.
+ */
+export function moveManyInParent(
+  actions: MacroAction[],
+  paths: ActionPath[],
+  dir: -1 | 1,
+): MacroAction[] | null {
+  if (paths.length === 0) return null;
+  const parent = paths[0]!.slice(0, -1);
+  const indices = [
+    ...new Set(
+      paths
+        .filter(
+          (p) =>
+            p.length === parent.length + 1 &&
+            parent.every((seg, i) => p[i] === seg),
+        )
+        .map((p) => p[p.length - 1]!),
+    ),
+  ].sort((a, b) => a - b);
+  if (indices.length === 0) return null;
+
+  const probePath: ActionPath =
+    parent.length === 0 ? [indices[0]!] : [...parent, indices[0]!];
+
+  const rewritten = rewriteList(actions, probePath, (list) => {
+    const min = indices[0]!;
+    const max = indices[indices.length - 1]!;
+    if (dir === -1 && min === 0) return list;
+    if (dir === 1 && max >= list.length - 1) return list;
+    const selected = new Set(indices);
+    const picked = indices.map((i) => list[i]!);
+    const without = list.filter((_, i) => !selected.has(i));
+    const insertAt = dir === -1 ? min - 1 : min + 1;
+    without.splice(insertAt, 0, ...picked);
+    return without;
+  });
+  return rewritten;
+}
+
 /** Insert `action` at `path` index (shifts following siblings). */
 export function insertAtPath(
   actions: MacroAction[],
@@ -509,6 +592,24 @@ export function pasteAfterAtPath(
     actions: insertAtPath(actions, insertPath, copy),
     newPath: insertPath,
   };
+}
+
+/** Insert remapped clones of `actionsToPaste` immediately after `path` (in order). */
+export function pasteManyAfterAtPath(
+  actions: MacroAction[],
+  path: ActionPath,
+  actionsToPaste: MacroAction[],
+): { actions: MacroAction[]; newPath: ActionPath } | null {
+  if (path.length === 0 || actionsToPaste.length === 0) return null;
+  let next = actions;
+  let lastPath = path;
+  for (const action of actionsToPaste) {
+    const result = pasteAfterAtPath(next, lastPath, action);
+    if (!result) return null;
+    next = result.actions;
+    lastPath = result.newPath;
+  }
+  return { actions: next, newPath: lastPath };
 }
 
 /** Clone action at path and insert the copy immediately after. */

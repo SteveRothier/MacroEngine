@@ -16,12 +16,16 @@ export type AutomationRow = {
   status: AutomationStatus;
   lastRunLabel: string;
   lastRunTooltip?: string;
+  /** Unix ms of latest run (for Accueil lastRun sort). */
+  lastRunAt?: number;
   favorite: boolean;
   locked: boolean;
   dirty: boolean;
   meta?: string;
   /** Library index order within kind+folder. */
   sortOrder?: number;
+  /** True when the item is in the library trash. */
+  trashed?: boolean;
   /** Active script permissions (Accueil badge). */
   permLabels?: string[];
   /** Script marked as library module (not runnable from Accueil). */
@@ -50,16 +54,18 @@ export function statusToPill(
 }
 
 export type DisplayOptions = {
-  sortBy: "order" | "name" | "type" | "status";
+  sortBy: "order" | "name" | "type" | "status" | "lastRun";
   sortDir: "asc" | "desc";
 };
 
-export type AutomationFilter = "all" | "favorites" | "recent";
+export type AutomationFilter = "all" | "favorites" | "recent" | "trash";
 
 /** Shared folder option for Accueil / bulk move (macros + clickers). */
 export type AutomationFolderOption = {
   id: string;
   name: string;
+  sortOrder?: number;
+  parentId?: string | null;
 };
 
 export function folderOptionKey(
@@ -72,6 +78,7 @@ export type FilterCounts = {
   all: number;
   favorites: number;
   recent: number;
+  trash: number;
 };
 
 export const DEFAULT_DISPLAY: DisplayOptions = {

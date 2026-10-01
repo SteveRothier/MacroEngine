@@ -92,6 +92,7 @@ export const scripts = defineCatalog({
       resizeAria: "Redimensionner la console",
       empty:
         "Aucune activité pour l’instant. Lancez le script pour voir les logs ici.",
+      emptyCta: "Exécuter",
       menuAria: "Actions de la console",
       sessionStart: "Session · démarrage",
       cancelRequested: "Annulation demandée (F8)",
@@ -135,7 +136,7 @@ export const scripts = defineCatalog({
     },
     presets: {
       helloParam: {
-        name: "Hello + @param",
+        name: "Hello + @param (démarrage)",
         description: "Découverte des paramètres et de caster.return",
       },
       assertReturn: {
@@ -143,7 +144,7 @@ export const scripts = defineCatalog({
         description: "Assertion, incrément et valeur de retour",
       },
       sleepLog: {
-        name: "Sleep + log",
+        name: "Sleep + log (démarrage)",
         description: "Pause timer (permission Input) puis log",
       },
       httpGet: {
@@ -163,14 +164,19 @@ export const scripts = defineCatalog({
         description: "caster.runMacro (profondeur max 3)",
       },
       clickSleep: {
-        name: "Click + sleep",
+        name: "Click + sleep (démarrage)",
         description: "Clic souris puis pause (permission Input)",
       },
     },
     toast: {
       networkDenied:
         "Erreur : caster.fetch a échoué — le script n’a pas la permission Réseau. Activez-la dans Permissions si c’est voulu.",
-      timeout: "Délai d’exécution dépassé (timeout script).",
+      timeout:
+        "Délai d’exécution dépassé — augmentez le timeout dans Options, ou raccourcissez le script.",
+      processFilterBlocked:
+        "Filtre process : la fenêtre au premier plan n’est pas autorisée. Ajustez le filtre (hérité ou local) ou désactivez-le.",
+      inputPermission:
+        "Permission Input manquante — activez-la dans Permissions pour sleep/click, puis relancez.",
       errorPrefix: "Erreur : {detail}",
       permissionDenied:
         "Permission « {permission} » manquante — activez-la dans le menu Permissions.",
@@ -293,6 +299,7 @@ export const scripts = defineCatalog({
       collapse: "Collapse console",
       resizeAria: "Resize console",
       empty: "No activity yet. Run the script to see logs here.",
+      emptyCta: "Run",
       menuAria: "Console actions",
       sessionStart: "Session · started",
       cancelRequested: "Cancel requested (F8)",
@@ -335,7 +342,7 @@ export const scripts = defineCatalog({
     },
     presets: {
       helloParam: {
-        name: "Hello + @param",
+        name: "Hello + @param (starter)",
         description: "Intro to parameters and caster.return",
       },
       assertReturn: {
@@ -343,7 +350,7 @@ export const scripts = defineCatalog({
         description: "Assertion, increment, and return value",
       },
       sleepLog: {
-        name: "Sleep + log",
+        name: "Sleep + log (starter)",
         description: "Timed pause (Input permission) then log",
       },
       httpGet: {
@@ -363,14 +370,19 @@ export const scripts = defineCatalog({
         description: "caster.runMacro (max depth 3)",
       },
       clickSleep: {
-        name: "Click + sleep",
+        name: "Click + sleep (starter)",
         description: "Mouse click then pause (Input permission)",
       },
     },
     toast: {
       networkDenied:
         "Error: caster.fetch failed — the script does not have Network permission. Enable it under Permissions if intended.",
-      timeout: "Script execution timed out.",
+      timeout:
+        "Script timed out — raise the timeout in Options, or shorten the script.",
+      processFilterBlocked:
+        "Process filter: the foreground window is not allowed. Adjust the filter (inherit or local) or turn it off.",
+      inputPermission:
+        "Input permission missing — enable it under Permissions for sleep/click, then rerun.",
       errorPrefix: "Error: {detail}",
       permissionDenied:
         "Missing “{permission}” permission — enable it in the Permissions menu.",

@@ -53,4 +53,26 @@ describe("undo/redo stack", () => {
     expect(r.past).toEqual([2, 3, 4]);
     expect(r.future).toEqual([]);
   });
+
+  it("treats a bulk edit as a single undo step", () => {
+    // Mirrors MacroEditorView: one updateDoc after removeMany / moveMany / duplicateMany.
+    type Snap = { ids: string[] };
+    let present: Snap = { ids: ["a", "b", "c", "d"] };
+    let past: Snap[] = [];
+    let future: Snap[] = [];
+
+    const commitBulk = (next: Snap) => {
+      past = pushUndo(past, present, 20);
+      future = [];
+      present = next;
+    };
+
+    commitBulk({ ids: ["a", "c"] }); // remove b+d in one batch
+    expect(past).toHaveLength(1);
+    expect(present.ids).toEqual(["a", "c"]);
+
+    const u = undoStep(past, present, future)!;
+    expect(u.present.ids).toEqual(["a", "b", "c", "d"]);
+    expect(u.past).toHaveLength(0);
+  });
 });

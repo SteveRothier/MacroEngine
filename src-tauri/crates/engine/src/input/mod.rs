@@ -18,6 +18,15 @@ use crate::stop_zones::ScreenGeom;
 /// Tagged into `dwExtraInfo` so record hooks can ignore our own injections.
 pub const INJECT_EXTRA_INFO: usize = 0x4D45_0001; // "ME" + tag
 
+/// Visible-window process entry for the process picker (basename + path + icon).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessExeEntry {
+    pub name: String,
+    pub path: String,
+    /// `data:image/png;base64,...` when extraction succeeds.
+    pub icon_data_url: Option<String>,
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MouseButton {
@@ -156,6 +165,18 @@ pub fn list_visible_process_exes() -> Vec<String> {
     #[cfg(windows)]
     {
         win32::list_visible_process_exes()
+    }
+    #[cfg(not(windows))]
+    {
+        Vec::new()
+    }
+}
+
+/// Visible processes with path + shell icon (Windows).
+pub fn list_visible_process_exe_entries() -> Vec<ProcessExeEntry> {
+    #[cfg(windows)]
+    {
+        win32::list_visible_process_exe_entries()
     }
     #[cfg(not(windows))]
     {

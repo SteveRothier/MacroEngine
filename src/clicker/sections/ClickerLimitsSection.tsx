@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { Switch } from "../../ui";
 import { Select, useToast } from "../../ui/shell";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { useT } from "../../i18n";
+import { ClickerInfoTip } from "../ClickerInfoTip";
 import type { ClickerEditor } from "../useClickerEditor";
 import {
   DEFAULT_PIXEL_CONDITION,
@@ -61,6 +63,13 @@ function rgbToHex(r: number, g: number, b: number): string {
   return `#${h(r)}${h(g)}${h(b)}`.toUpperCase();
 }
 
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = Number.parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
 export function ClickerLimitsSection({ editor: e }: Props) {
   const t = useT();
   const toast = useToast();
@@ -72,6 +81,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
   const [sampling, setSampling] = useState(false);
   const [pickingScreen, setPickingScreen] = useState(false);
   const [pickPreview, setPickPreview] = useState<PixelSample | null>(null);
+  const [pixelDetailsOpen, setPixelDetailsOpen] = useState(false);
   const pickingRef = useRef(false);
   const pixel = e.pixelCondition ?? DEFAULT_PIXEL_CONDITION;
   const pixelRef = useRef(pixel);
@@ -111,6 +121,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
         b: sample.b,
       });
       setLiveRgb({ r: sample.r, g: sample.g, b: sample.b });
+      setPixelDetailsOpen(true);
       toast.success(
         t("clicker.limits.pickOk", {
           x: sample.x,
@@ -276,10 +287,19 @@ export function ClickerLimitsSection({ editor: e }: Props) {
 
   const showClicks = choice === "clicks" || choice === "both";
   const showTime = choice === "time" || choice === "both";
-  const refSwatch = `rgb(${pixel.r}, ${pixel.g}, ${pixel.b})`;
   const liveSwatch = liveRgb
     ? `rgb(${liveRgb.r}, ${liveRgb.g}, ${liveRgb.b})`
     : "transparent";
+  const pixelDelta =
+    liveRgb == null
+      ? null
+      : Math.max(
+          Math.abs(liveRgb.r - pixel.r),
+          Math.abs(liveRgb.g - pixel.g),
+          Math.abs(liveRgb.b - pixel.b),
+        );
+  const pixelMatch =
+    pixelDelta == null ? null : pixelDelta <= pixel.tolerance;
   const pickPreviewCss = pickPreview
     ? `rgb(${pickPreview.r}, ${pickPreview.g}, ${pickPreview.b})`
     : "transparent";
@@ -323,10 +343,17 @@ export function ClickerLimitsSection({ editor: e }: Props) {
             document.body,
           )
         : null}
+      <div className="caster-clicker-limits-block">
+        <h3 className="caster-clicker-limits-block-title caster-settings-row-label-with-info">
+          <span>{t("clicker.scenario.limitsTitle")}</span>
+          <ClickerInfoTip text={t("clicker.limits.titlebarProgressHint")} />
+        </h3>
       <div className="caster-settings-row caster-settings-row--stack">
         <div className="caster-settings-row-label">
-          <span>{t("clicker.limits.sessionEnd")}</span>
-          <p>{t("clicker.limits.sessionEndHint")}</p>
+          <span className="caster-settings-row-label-with-info">
+            <span>{t("clicker.limits.sessionEnd")}</span>
+            <ClickerInfoTip text={t("clicker.limits.sessionEndHint")} />
+          </span>
         </div>
         <div className="caster-settings-row-control caster-settings-row-control--full">
           <div
@@ -428,14 +455,17 @@ export function ClickerLimitsSection({ editor: e }: Props) {
 
       <div className="caster-settings-row caster-settings-row--stack">
         <div className="caster-settings-row-label">
-          <span>{t("clicker.limits.chainMacro")}</span>
-          <p>{t("clicker.limits.chainMacroHint")}</p>
+          <span className="caster-settings-row-label-with-info">
+            <span>{t("clicker.limits.chainMacro")}</span>
+            <ClickerInfoTip text={t("clicker.limits.chainMacroHint")} />
+          </span>
         </div>
         <div className="caster-settings-row-control caster-settings-row-control--full">
           <Select
             className="caster-select"
             disabled={e.editDisabled}
             value={e.onCompleteMacro ?? ""}
+            ariaLabel={t("clicker.limits.chainMacroAria")}
             options={[
               { value: "", label: t("clicker.segments.none") },
               ...macros.map((name) => ({ value: name, label: name })),
@@ -444,161 +474,258 @@ export function ClickerLimitsSection({ editor: e }: Props) {
           />
         </div>
       </div>
+      </div>
 
-      <div className="caster-settings-row caster-settings-row--stack">
-        <div className="caster-settings-row-label">
+      <div className="caster-clicker-limits-block">
+        <h3 className="caster-clicker-limits-block-title caster-settings-row-label-with-info">
           <span>{t("clicker.limits.pixelCondition")}</span>
-          <p>{t("clicker.limits.pixelConditionHint")}</p>
-        </div>
-        <div className="caster-settings-row-control caster-settings-row-control--full caster-clicker-pixel-controls">
-          <label className="caster-check">
-            <input
-              type="checkbox"
-              checked={pixel.enabled}
-              disabled={e.editDisabled}
-              onChange={(ev) => patchPixel({ enabled: ev.target.checked })}
-            />
-            {t("clicker.limits.enabled")}
-          </label>
-
-          <div className="caster-clicker-pixel-row">
-            <label className="caster-field caster-clicker-limits-field">
-              <span>X</span>
-              <WheelNumberInput
-                className={NUM}
-                value={pixel.x}
-                disabled={e.editDisabled || !pixel.enabled}
-                onValueChange={(n) => patchPixel({ x: n })}
-              />
-            </label>
-            <label className="caster-field caster-clicker-limits-field">
-              <span>Y</span>
-              <WheelNumberInput
-                className={NUM}
-                value={pixel.y}
-                disabled={e.editDisabled || !pixel.enabled}
-                onValueChange={(n) => patchPixel({ y: n })}
-              />
-            </label>
-            <label className="caster-field caster-clicker-limits-field">
-              <span>{t("clicker.limits.tolerance")}</span>
-              <WheelNumberInput
-                className={NUM}
-                min={0}
-                max={255}
-                value={pixel.tolerance}
-                disabled={e.editDisabled || !pixel.enabled}
-                onValueChange={(n) => patchPixel({ tolerance: n || 0 })}
-              />
-            </label>
-            <button
-              type="button"
-              className="caster-btn caster-btn-ghost caster-btn-sm"
-              disabled={e.editDisabled || sampling || pickingScreen}
-              onClick={() => void pickReference()}
-            >
-              {t("clicker.limits.pickColor")}
-            </button>
-          </div>
-
-          <div className="caster-clicker-pixel-row">
-            <span
-              className="caster-clicker-pixel-swatch"
-              style={{ background: refSwatch }}
-              title={t("clicker.limits.refSwatchTitle", {
-                rgb: `${pixel.r},${pixel.g},${pixel.b}`,
-              })}
-            />
-            <label className="caster-field caster-clicker-limits-field">
-              <span>R</span>
-              <WheelNumberInput
-                className={NUM}
-                min={0}
-                max={255}
-                value={pixel.r}
-                disabled={e.editDisabled || !pixel.enabled}
-                onValueChange={(n) => patchPixel({ r: clampByte(n) })}
-              />
-            </label>
-            <label className="caster-field caster-clicker-limits-field">
-              <span>G</span>
-              <WheelNumberInput
-                className={NUM}
-                min={0}
-                max={255}
-                value={pixel.g}
-                disabled={e.editDisabled || !pixel.enabled}
-                onValueChange={(n) => patchPixel({ g: clampByte(n) })}
-              />
-            </label>
-            <label className="caster-field caster-clicker-limits-field">
-              <span>B</span>
-              <WheelNumberInput
-                className={NUM}
-                min={0}
-                max={255}
-                value={pixel.b}
-                disabled={e.editDisabled || !pixel.enabled}
-                onValueChange={(n) => patchPixel({ b: clampByte(n) })}
-              />
-            </label>
-            <span className="caster-clicker-pixel-live-label">
-              {t("clicker.limits.liveSwatch")}
-            </span>
-            <span
-              className={[
-                "caster-clicker-pixel-swatch",
-                liveRgb ? "" : "is-empty",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              style={{ background: liveSwatch }}
-              title={
-                liveRgb
-                  ? t("clicker.limits.liveSwatchTitle", {
-                      rgb: `${liveRgb.r},${liveRgb.g},${liveRgb.b}`,
-                    })
-                  : t("clicker.limits.liveSwatchEmpty")
-              }
-            />
-            <button
-              type="button"
-              className="caster-btn caster-btn-ghost caster-btn-sm"
-              disabled={e.editDisabled || !pixel.enabled || sampling || pickingScreen}
-              onClick={() => void refreshLive()}
-            >
-              {t("clicker.limits.refreshColor")}
-            </button>
-          </div>
-
-          <div
-            className="caster-segmented"
-            role="group"
-            aria-label={t("clicker.limits.pixelActionAria")}
-          >
-            {(
-              [
-                ["stop", t("clicker.segments.stop")],
-                ["pause", t("clicker.segments.pause")],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
+          <ClickerInfoTip text={t("clicker.limits.pixelConditionHint")} />
+        </h3>
+        <div className="caster-settings-row caster-settings-row--stack">
+          <div className="caster-settings-row-control caster-settings-row-control--full caster-clicker-pixel-controls">
+            <div className="caster-clicker-pixel-summary">
+              <div className="caster-clicker-pixel-panel-head">
+                <div className="caster-clicker-pixel-panel-title">
+                  {t("clicker.limits.pixelSummaryPanel")}
+                </div>
+                <Switch
+                  checked={pixel.enabled}
+                  disabled={e.editDisabled}
+                  label={t("clicker.limits.enabled")}
+                  onChange={(on) => patchPixel({ enabled: on })}
+                />
+              </div>
+              <div
                 className={[
-                  "caster-segmented-btn",
-                  pixel.action === value ? "active" : "",
+                  "caster-clicker-pixel-summary-body",
+                  pixel.enabled ? "" : "is-inactive",
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                disabled={e.editDisabled || !pixel.enabled}
-                onClick={() =>
-                  patchPixel({ action: value as PixelConditionAction })
-                }
               >
-                {label}
-              </button>
-            ))}
+                <div className="caster-clicker-pixel-main">
+                  <button
+                    type="button"
+                    className="caster-btn caster-btn-sm"
+                    disabled={
+                      e.editDisabled ||
+                      !pixel.enabled ||
+                      sampling ||
+                      pickingScreen
+                    }
+                    onClick={() => void pickReference()}
+                  >
+                    {t("clicker.limits.pickColor")}
+                  </button>
+                  <div className="caster-clicker-pixel-status">
+                    <div className="caster-clicker-pixel-swatch-pair">
+                      <span className="caster-clicker-pixel-swatch-slot">
+                        <input
+                          type="color"
+                          className="caster-clicker-pixel-swatch"
+                          value={rgbToHex(pixel.r, pixel.g, pixel.b).toLowerCase()}
+                          disabled={e.editDisabled || !pixel.enabled}
+                          aria-label={t("clicker.limits.refSwatchTitle", {
+                            rgb: `${pixel.r},${pixel.g},${pixel.b}`,
+                          })}
+                          title={t("clicker.limits.refSwatchTitle", {
+                            rgb: `${pixel.r},${pixel.g},${pixel.b}`,
+                          })}
+                          onChange={(ev) => {
+                            const rgb = hexToRgb(ev.target.value);
+                            if (rgb) patchPixel(rgb);
+                          }}
+                        />
+                        <span className="caster-clicker-pixel-swatch-caption">
+                          {t("clicker.limits.pixelGroupRef")}
+                        </span>
+                      </span>
+                      <span className="caster-clicker-pixel-swatch-slot">
+                        <span
+                          className={[
+                            "caster-clicker-pixel-swatch",
+                            liveRgb ? "" : "is-empty",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          style={{ background: liveSwatch }}
+                          title={
+                            liveRgb
+                              ? t("clicker.limits.liveSwatchTitle", {
+                                  rgb: `${liveRgb.r},${liveRgb.g},${liveRgb.b}`,
+                                })
+                              : t("clicker.limits.liveSwatchEmpty")
+                          }
+                        />
+                        <span className="caster-clicker-pixel-swatch-caption">
+                          {t("clicker.limits.pixelGroupLive")}
+                        </span>
+                      </span>
+                    </div>
+                    {pixelMatch != null ? (
+                      <span
+                        className={[
+                          "caster-clicker-pixel-match",
+                          pixelMatch ? "is-match" : "is-mismatch",
+                        ].join(" ")}
+                      >
+                        {pixelMatch
+                          ? t("clicker.limits.pixelMatchOk", {
+                              delta: pixelDelta,
+                            })
+                          : t("clicker.limits.pixelMatchBad", {
+                              delta: pixelDelta,
+                            })}
+                      </span>
+                    ) : null}
+                    <span className="caster-clicker-pixel-coords">
+                      {t("clicker.limits.pixelCoords", {
+                        x: pixel.x,
+                        y: pixel.y,
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="caster-clicker-pixel-action-row">
+                  <span className="caster-clicker-pixel-action-label">
+                    {t("clicker.limits.pixelIfGap")}
+                  </span>
+                  <div
+                    className="caster-segmented"
+                    role="group"
+                    aria-label={t("clicker.limits.pixelActionAria")}
+                  >
+                    {(
+                      [
+                        ["stop", t("clicker.segments.stop")],
+                        ["pause", t("clicker.segments.pause")],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={[
+                          "caster-segmented-btn",
+                          pixel.action === value ? "active" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        disabled={e.editDisabled || !pixel.enabled}
+                        onClick={() =>
+                          patchPixel({ action: value as PixelConditionAction })
+                        }
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <details
+              className="caster-clicker-details caster-clicker-pixel-details"
+              open={pixelDetailsOpen}
+              onToggle={(ev) =>
+                setPixelDetailsOpen(
+                  (ev.currentTarget as HTMLDetailsElement).open,
+                )
+              }
+            >
+              <summary>{t("clicker.limits.pixelManualSettings")}</summary>
+              <div className="caster-clicker-pixel-manual">
+                <div className="caster-clicker-pixel-point-grid">
+                  <label className="caster-field caster-clicker-limits-field">
+                    <span>X</span>
+                    <WheelNumberInput
+                      className={NUM}
+                      value={pixel.x}
+                      disabled={e.editDisabled || !pixel.enabled}
+                      onValueChange={(n) => patchPixel({ x: n })}
+                    />
+                  </label>
+                  <label className="caster-field caster-clicker-limits-field">
+                    <span>Y</span>
+                    <WheelNumberInput
+                      className={NUM}
+                      value={pixel.y}
+                      disabled={e.editDisabled || !pixel.enabled}
+                      onValueChange={(n) => patchPixel({ y: n })}
+                    />
+                  </label>
+                  <label className="caster-field caster-clicker-limits-field">
+                    <span>{t("clicker.limits.tolerance")}</span>
+                    <WheelNumberInput
+                      className={NUM}
+                      min={0}
+                      max={255}
+                      value={pixel.tolerance}
+                      disabled={e.editDisabled || !pixel.enabled}
+                      onValueChange={(n) =>
+                        patchPixel({ tolerance: n || 0 })
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="caster-clicker-pixel-rgb-row">
+                  <div className="caster-clicker-pixel-rgb-grid">
+                    <label className="caster-field caster-clicker-limits-field">
+                      <span>R</span>
+                      <WheelNumberInput
+                        className={NUM}
+                        min={0}
+                        max={255}
+                        value={pixel.r}
+                        disabled={e.editDisabled || !pixel.enabled}
+                        onValueChange={(n) =>
+                          patchPixel({ r: clampByte(n) })
+                        }
+                      />
+                    </label>
+                    <label className="caster-field caster-clicker-limits-field">
+                      <span>G</span>
+                      <WheelNumberInput
+                        className={NUM}
+                        min={0}
+                        max={255}
+                        value={pixel.g}
+                        disabled={e.editDisabled || !pixel.enabled}
+                        onValueChange={(n) =>
+                          patchPixel({ g: clampByte(n) })
+                        }
+                      />
+                    </label>
+                    <label className="caster-field caster-clicker-limits-field">
+                      <span>B</span>
+                      <WheelNumberInput
+                        className={NUM}
+                        min={0}
+                        max={255}
+                        value={pixel.b}
+                        disabled={e.editDisabled || !pixel.enabled}
+                        onValueChange={(n) =>
+                          patchPixel({ b: clampByte(n) })
+                        }
+                      />
+                    </label>
+                  </div>
+                  <button
+                    type="button"
+                    className="caster-btn caster-btn-sm"
+                    disabled={
+                      e.editDisabled ||
+                      !pixel.enabled ||
+                      sampling ||
+                      pickingScreen
+                    }
+                    onClick={() => void refreshLive()}
+                  >
+                    {t("clicker.limits.refreshColor")}
+                  </button>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
       </div>

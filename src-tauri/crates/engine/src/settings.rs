@@ -36,6 +36,17 @@ impl Default for ProcessFilterMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct ProcessFilterPreset {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub mode: ProcessFilterMode,
+    #[serde(default)]
+    pub names: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ProcessFilter {
     #[serde(default)]
     pub enabled: bool,
@@ -253,11 +264,10 @@ pub struct ShellPrefs {
     #[serde(default = "default_true")]
     pub restore_workspace_tabs: bool,
     #[serde(default)]
-    pub minimize_to_tray: bool,
+    #[serde(alias = "minimizeToTray")]
+    pub start_in_tray: bool,
     #[serde(default = "default_true")]
     pub show_session_pill: bool,
-    #[serde(default = "default_true")]
-    pub command_palette_enabled: bool,
     #[serde(default = "default_recent_max")]
     pub recent_list_max: u32,
     #[serde(default = "default_true")]
@@ -284,6 +294,12 @@ pub struct ShellPrefs {
     pub last_macro_id: Option<String>,
     #[serde(default)]
     pub last_script_id: Option<String>,
+    #[serde(default = "default_journal_max_lines")]
+    pub journal_max_lines: u32,
+}
+
+fn default_journal_max_lines() -> u32 {
+    80
 }
 
 impl Default for ShellPrefs {
@@ -291,9 +307,8 @@ impl Default for ShellPrefs {
         Self {
             startup_view: StartupView::Home,
             restore_workspace_tabs: true,
-            minimize_to_tray: false,
+            start_in_tray: false,
             show_session_pill: true,
-            command_palette_enabled: true,
             recent_list_max: 12,
             warn_on_unsaved_quit: true,
             always_on_top: false,
@@ -307,6 +322,7 @@ impl Default for ShellPrefs {
             last_clicker_id: None,
             last_macro_id: None,
             last_script_id: None,
+            journal_max_lines: 80,
         }
     }
 }
@@ -458,6 +474,9 @@ pub struct AppSettings {
     /// Process allow/deny list applied by the clicker engine.
     #[serde(default)]
     pub process_filter: ProcessFilter,
+    /// Named process-filter lists (UI presets).
+    #[serde(default)]
+    pub process_filter_presets: Vec<ProcessFilterPreset>,
     #[serde(default)]
     pub theme: ThemeMode,
     /// Physical display id (`Monitor::name`). `None` = primary.
@@ -469,6 +488,9 @@ pub struct AppSettings {
     pub journal_open: bool,
     #[serde(default)]
     pub close_to_tray: bool,
+    /// When true, the Windows minimize button hides the window to the tray.
+    #[serde(default)]
+    pub minimize_hides_to_tray: bool,
     #[serde(default)]
     pub start_with_windows: bool,
     #[serde(default)]
@@ -496,11 +518,13 @@ impl Default for AppSettings {
             overlay_opacity: 1.0,
             hotkeys: HotkeyBindings::default(),
             process_filter: ProcessFilter::default(),
+            process_filter_presets: Vec::new(),
             theme: ThemeMode::Dark,
             display_id: None,
             sidebar_collapsed: false,
             journal_open: false,
             close_to_tray: false,
+            minimize_hides_to_tray: false,
             start_with_windows: false,
             accueil: AccueilPrefs::default(),
             shell: ShellPrefs::default(),
@@ -636,7 +660,6 @@ mod tests {
         fs::write(&path, serde_json::to_string(&legacy).unwrap()).unwrap();
         let loaded = load_settings(&dir).unwrap();
         assert_eq!(loaded.accueil.default_sort_by, AccueilSortBy::Order);
-        assert!(loaded.shell.command_palette_enabled);
         assert!(loaded.shell.confirm_quit_if_running);
         assert!(loaded.shell.toast_on_finish);
         assert!(loaded.confirmations.purge_trash);

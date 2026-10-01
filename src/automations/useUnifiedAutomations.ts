@@ -65,8 +65,43 @@ function toFolderOptions(folders: LibraryFolder[]): AutomationFolderOption[] {
   for (const f of folders) {
     if (seen.has(f.id)) continue;
     seen.add(f.id);
-    out.push({ id: f.id, name: f.name });
+    out.push({
+      id: f.id,
+      name: f.name,
+      sortOrder: f.sortOrder ?? 0,
+      parentId: f.parentId ?? null,
+    });
   }
+  out.sort(
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) ||
+      a.id.localeCompare(b.id),
+  );
+  return out;
+}
+
+/** Depth-first preorder of folders for Accueil sections (max depth 3). */
+export function flattenFolderTree(
+  folders: AutomationFolderOption[],
+): { folder: AutomationFolderOption; depth: number }[] {
+  const byParent = new Map<string | null, AutomationFolderOption[]>();
+  for (const f of folders) {
+    const key = f.parentId ?? null;
+    const list = byParent.get(key) ?? [];
+    list.push(f);
+    byParent.set(key, list);
+  }
+  const out: { folder: AutomationFolderOption; depth: number }[] = [];
+  function walk(parentId: string | null, depth: number) {
+    if (depth > 2) return;
+    const kids = byParent.get(parentId) ?? [];
+    for (const f of kids) {
+      out.push({ folder: f, depth });
+      walk(f.id, depth + 1);
+    }
+  }
+  walk(null, 0);
   return out;
 }
 
@@ -107,6 +142,8 @@ export function useUnifiedAutomations(options: {
   query?: string;
   filter?: AutomationFilter;
   setQuery?: (q: string) => void;
+  /** Cap for Accueil « Récents » filter (1–50). */
+  recentListMax?: number;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -124,6 +161,14 @@ export function useUnifiedAutomations(options: {
   const query = options.query ?? internalQuery;
   const filter = options.filter ?? "all";
   const setQuery = options.setQuery ?? setInternalQuery;
+  const recentListMax = Math.min(
+    50,
+    Math.max(1, options.recentListMax ?? 12),
+  );
+  const cappedRecentOrder = useMemo(
+    () => recentOrder.slice(0, recentListMax),
+    [recentOrder, recentListMax],
+  );
   const [hotkeys, setHotkeys] = useState<HotkeyBindings | null>(
     () => lastHomeSnapshot?.hotkeys ?? null,
   );
@@ -176,6 +221,13 @@ export function useUnifiedAutomations(options: {
       const runLabels = lastRunLabelMap(qa.recent, t, locale);
       const runTooltips = lastRunTooltipMap(qa.recent, t, locale);
       const runStatuses = lastRunStatusMap(qa.recent);
+      const runAt = new Map<string, number>();
+      for (const r of qa.recent) {
+        const k = rowKey(r.kind, r.id);
+        if (!runAt.has(k) && Number.isFinite(r.at) && r.at > 0) {
+          runAt.set(k, r.at);
+        }
+      }
       const allFolders = [
         ...macroIndex.folders,
         ...clickerIndex.folders,
@@ -194,7 +246,24 @@ export function useUnifiedAutomations(options: {
       const next: AutomationRow[] = [];
 
       for (const it of macroIndex.items) {
-        if (it.trashed) continue;
+        if (it.trashed) {
+          next.push({
+            id: it.id,
+            name: it.name,
+            kind: "macro",
+            triggerLabel: t("automations.trigger.manual"),
+            folderLabel: folderName(allFolders, it.folderId ?? null, t),
+            folderId: it.folderId ?? null,
+            status: "attention",
+            lastRunLabel: empty,
+            favorite: false,
+            locked: it.locked,
+            dirty: false,
+            trashed: true,
+            sortOrder: it.sortOrder ?? 0,
+          });
+          continue;
+        }
         const m = macroMap.get(it.id);
         next.push({
           id: it.id,
@@ -212,9 +281,11 @@ export function useUnifiedAutomations(options: {
           ),
           lastRunLabel: runLabels.get(rowKey("macro", it.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("macro", it.id)),
+          lastRunAt: runAt.get(rowKey("macro", it.id)),
           favorite: favMacros.includes(it.id),
           locked: it.locked,
           dirty: false,
+          trashed: false,
           meta: m
             ? t("automations.row.metaActions", { count: m.actionCount })
             : undefined,
@@ -223,7 +294,24 @@ export function useUnifiedAutomations(options: {
       }
 
       for (const it of clickerIndex.items) {
-        if (it.trashed) continue;
+        if (it.trashed) {
+          next.push({
+            id: it.id,
+            name: it.name,
+            kind: "clicker",
+            triggerLabel: hk ? clickerTriggerLabel(hk) : "F6",
+            folderLabel: folderName(allFolders, it.folderId ?? null, t),
+            folderId: it.folderId ?? null,
+            status: "attention",
+            lastRunLabel: empty,
+            favorite: false,
+            locked: it.locked,
+            dirty: false,
+            trashed: true,
+            sortOrder: it.sortOrder ?? 0,
+          });
+          continue;
+        }
         const c = clickerMap.get(it.id);
         next.push({
           id: it.id,
@@ -239,9 +327,11 @@ export function useUnifiedAutomations(options: {
           ),
           lastRunLabel: runLabels.get(rowKey("clicker", it.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("clicker", it.id)),
+          lastRunAt: runAt.get(rowKey("clicker", it.id)),
           favorite: favClickers.includes(it.id),
           locked: it.locked,
           dirty: false,
+          trashed: false,
           meta: c
             ? t("automations.row.metaCps", { cps: c.cps.toFixed(0) })
             : undefined,
@@ -251,7 +341,27 @@ export function useUnifiedAutomations(options: {
 
       for (const s of scripts) {
         const lib = scriptLibById.get(s.id);
-        if (lib?.trashed) continue;
+        if (lib?.trashed) {
+          next.push({
+            id: s.id,
+            name: s.name,
+            kind: "script",
+            triggerLabel: t("automations.trigger.script"),
+            folderLabel: folderName(allFolders, lib.folderId ?? null, t),
+            folderId: lib.folderId ?? null,
+            status: "attention",
+            lastRunLabel: empty,
+            favorite: false,
+            locked: lib.locked ?? false,
+            dirty: false,
+            trashed: true,
+            isModule: !!s.isModule,
+            scriptLanguage:
+              s.language === "typescript" ? "typescript" : "javascript",
+            sortOrder: lib.sortOrder ?? 0,
+          });
+          continue;
+        }
         const folderId = lib?.folderId ?? null;
         const permLabels = activePermissionLabels(s, t);
         next.push({
@@ -268,9 +378,11 @@ export function useUnifiedAutomations(options: {
           ),
           lastRunLabel: runLabels.get(rowKey("script", s.id)) ?? empty,
           lastRunTooltip: runTooltips.get(rowKey("script", s.id)),
+          lastRunAt: runAt.get(rowKey("script", s.id)),
           favorite: favScripts.includes(s.id),
           locked: lib?.locked ?? false,
           dirty: false,
+          trashed: false,
           isModule: !!s.isModule,
           scriptLanguage:
             s.language === "typescript" ? "typescript" : "javascript",
@@ -346,29 +458,36 @@ export function useUnifiedAutomations(options: {
   ]);
 
   const counts: FilterCounts = useMemo(() => {
-    const recentSet = new Set(recentOrder);
+    const recentSet = new Set(cappedRecentOrder);
+    const active = rowsWithDirty.filter((r) => !r.trashed);
     return {
-      all: rowsWithDirty.length,
-      favorites: rowsWithDirty.filter((r) => r.favorite).length,
-      recent: rowsWithDirty.filter((r) =>
-        recentSet.has(rowKey(r.kind, r.id)),
-      ).length,
+      all: active.length,
+      favorites: active.filter((r) => r.favorite).length,
+      recent: active.filter((r) => recentSet.has(rowKey(r.kind, r.id))).length,
+      trash: rowsWithDirty.filter((r) => r.trashed).length,
     };
-  }, [rowsWithDirty, recentOrder]);
+  }, [rowsWithDirty, cappedRecentOrder]);
 
   const filtered = useMemo(() => {
     let list = rowsWithDirty;
-    if (filter === "favorites") {
-      list = list.filter((r) => r.favorite);
-    } else if (filter === "recent") {
-      const order = new Map(recentOrder.map((key, index) => [key, index]));
-      list = list
-        .filter((r) => order.has(rowKey(r.kind, r.id)))
-        .sort(
-          (a, b) =>
-            (order.get(rowKey(a.kind, a.id)) ?? 0) -
-            (order.get(rowKey(b.kind, b.id)) ?? 0),
+    if (filter === "trash") {
+      list = list.filter((r) => r.trashed);
+    } else {
+      list = list.filter((r) => !r.trashed);
+      if (filter === "favorites") {
+        list = list.filter((r) => r.favorite);
+      } else if (filter === "recent") {
+        const order = new Map(
+          cappedRecentOrder.map((key, index) => [key, index]),
         );
+        list = list
+          .filter((r) => order.has(rowKey(r.kind, r.id)))
+          .sort(
+            (a, b) =>
+              (order.get(rowKey(a.kind, a.id)) ?? 0) -
+              (order.get(rowKey(b.kind, b.id)) ?? 0),
+          );
+      }
     }
     const q = query.trim().toLowerCase();
     if (!q) return list;
@@ -379,7 +498,7 @@ export function useUnifiedAutomations(options: {
         r.folderLabel.toLowerCase().includes(q) ||
         (r.meta?.toLowerCase().includes(q) ?? false),
     );
-  }, [rowsWithDirty, query, filter, recentOrder]);
+  }, [rowsWithDirty, query, filter, cappedRecentOrder]);
 
   return {
     rows: filtered,

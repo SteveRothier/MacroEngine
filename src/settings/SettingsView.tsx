@@ -16,6 +16,10 @@ import {
   type DisplayDto,
   type ProcessFilter,
 } from "../clicker/clickerTypes";
+import {
+  ProcessFilterEditor,
+  type ProcessFilterPreset,
+} from "../process";
 import { useClickerSettingsApi } from "../clicker/useClickerSettings";
 import { Select, useToast } from "../ui/shell";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
@@ -25,14 +29,22 @@ import type { ThemeMode } from "../theme";
 import type { SettingsSection } from "../app/types";
 import {
   mergeAccueilPrefs,
+  mergeAppearancePrefs,
   mergeAutomationPrefs,
+  mergeConfirmationsPrefs,
+  mergeMaintenancePrefs,
   mergeScriptsPrefs,
   mergeShellPrefs,
   type AccueilPrefs,
+  type AccentTheme,
+  type AppearancePrefs,
   type AutomationPrefs,
+  type ConfirmationsPrefs,
+  type MaintenancePrefs,
   type ScriptsPrefs,
   type ShellPrefs,
   type StartupView,
+  type UiDensity,
   type UiLocale,
 } from "./settingsTypes";
 import { useT, localePreferenceOptions } from "../i18n";
@@ -50,8 +62,6 @@ type Props = {
   theme: ThemeMode;
   onThemeChange: (t: ThemeMode) => void;
   onHotkeysChange: (h: HotkeyBindings) => void;
-  advanced: boolean;
-  onAdvancedChange: (v: boolean) => void;
   running?: boolean;
   journalOpen: boolean;
   onJournalOpenChange: (v: boolean) => void;
@@ -59,6 +69,8 @@ type Props = {
   onAutomationPrefsChange?: (prefs: AutomationPrefs) => void;
   onScriptsPrefsChange?: (prefs: ScriptsPrefs) => void;
   onAccueilPrefsChange?: (prefs: AccueilPrefs) => void;
+  onAppearancePrefsChange?: (prefs: AppearancePrefs) => void;
+  onConfirmationsPrefsChange?: (prefs: ConfirmationsPrefs) => void;
 };
 
 function displayOptionLabel(d: DisplayDto, primarySuffix: string): string {
@@ -114,8 +126,6 @@ export function SettingsView({
   theme,
   onThemeChange,
   onHotkeysChange,
-  advanced,
-  onAdvancedChange,
   running = false,
   journalOpen,
   onJournalOpenChange,
@@ -123,6 +133,8 @@ export function SettingsView({
   onAutomationPrefsChange,
   onScriptsPrefsChange,
   onAccueilPrefsChange,
+  onAppearancePrefsChange,
+  onConfirmationsPrefsChange,
 }: Props) {
   const toast = useToast();
   const t = useT();
@@ -134,19 +146,32 @@ export function SettingsView({
   ];
   const { loadSettings, saveBundle } = useClickerSettingsApi();
   const [processFilter, setProcessFilter] = useState<ProcessFilter>(DEFAULT_PROCESS_FILTER);
+  const [processFilterPresets, setProcessFilterPresets] = useState<
+    ProcessFilterPreset[]
+  >([]);
   const [overlayVisible, setOverlayVisible] = useState(false);
   const [overlayOpacity, setOverlayOpacity] = useState(1);
   const [closeToTray, setCloseToTray] = useState(false);
+  const [minimizeHidesToTray, setMinimizeHidesToTray] = useState(false);
   const [startWithWindows, setStartWithWindows] = useState(false);
+  const [purgeOlderDays, setPurgeOlderDays] = useState(30);
+  const [purgeOlderPreview, setPurgeOlderPreview] = useState<number | null>(null);
   const [shell, setShell] = useState<ShellPrefs>(() => mergeShellPrefs());
   const [automation, setAutomation] = useState<AutomationPrefs>(() =>
     mergeAutomationPrefs(),
   );
   const [scripts, setScripts] = useState<ScriptsPrefs>(() => mergeScriptsPrefs());
   const [accueil, setAccueil] = useState<AccueilPrefs>(() => mergeAccueilPrefs());
-  const [liveExes, setLiveExes] = useState<string[]>([]);
+  const [appearance, setAppearance] = useState<AppearancePrefs>(() =>
+    mergeAppearancePrefs(),
+  );
+  const [confirmations, setConfirmations] = useState<ConfirmationsPrefs>(() =>
+    mergeConfirmationsPrefs(),
+  );
+  const [maintenance, setMaintenance] = useState<MaintenancePrefs>(() =>
+    mergeMaintenancePrefs(),
+  );
   const [foregroundExe, setForegroundExe] = useState<string | null>(null);
-  const [processDraft, setProcessDraft] = useState("");
   const [displays, setDisplays] = useState<DisplayDto[]>([]);
   const [displayId, setDisplayId] = useState<string | null>(null);
   const [paths, setPaths] = useState<AppPaths | null>(null);
@@ -161,20 +186,16 @@ export function SettingsView({
       .catch(() => setDisplays([]));
   }, []);
 
-  const refreshLiveExes = useCallback(() => {
-    void invoke<string[]>("list_visible_process_exes")
-      .then(setLiveExes)
-      .catch(() => setLiveExes([]));
-  }, []);
-
   useEffect(() => {
     void loadSettings().then((s) => {
       if (!s) return;
       setProcessFilter(s.processFilter ?? DEFAULT_PROCESS_FILTER);
+      setProcessFilterPresets(s.processFilterPresets ?? []);
       setOverlayVisible(s.overlayVisible);
       setOverlayOpacity(s.overlayOpacity ?? 1);
       setDisplayId(s.displayId ?? null);
       setCloseToTray(!!s.closeToTray);
+      setMinimizeHidesToTray(!!s.minimizeHidesToTray);
       setStartWithWindows(!!s.startWithWindows);
       const sh = mergeShellPrefs(s.shell);
       setShell(sh);
@@ -188,6 +209,13 @@ export function SettingsView({
       const ac = mergeAccueilPrefs(s.accueil);
       setAccueil(ac);
       onAccueilPrefsChange?.(ac);
+      const ap = mergeAppearancePrefs(s.appearance);
+      setAppearance(ap);
+      onAppearancePrefsChange?.(ap);
+      const cf = mergeConfirmationsPrefs(s.confirmations);
+      setConfirmations(cf);
+      onConfirmationsPrefsChange?.(cf);
+      setMaintenance(mergeMaintenancePrefs(s.maintenance));
     });
     refreshDisplays();
     void invoke<AppPaths>("get_paths")
@@ -200,6 +228,8 @@ export function SettingsView({
     onAutomationPrefsChange,
     onScriptsPrefsChange,
     onAccueilPrefsChange,
+    onAppearancePrefsChange,
+    onConfirmationsPrefsChange,
   ]);
 
   useEffect(() => {
@@ -210,7 +240,6 @@ export function SettingsView({
 
   useEffect(() => {
     if (section !== "security") return;
-    refreshLiveExes();
     const tick = () => {
       void invoke<string | null>("get_foreground_exe")
         .then(setForegroundExe)
@@ -219,44 +248,57 @@ export function SettingsView({
     tick();
     const id = window.setInterval(tick, 800);
     return () => window.clearInterval(id);
-  }, [section, refreshLiveExes]);
+  }, [section]);
 
   const persist = useCallback(
     async (partial: {
       processFilter?: ProcessFilter;
+      processFilterPresets?: ProcessFilterPreset[];
       overlayVisible?: boolean;
       overlayOpacity?: number;
       theme?: ThemeMode;
       displayId?: string | null;
-      advancedUi?: boolean;
       journalOpen?: boolean;
       closeToTray?: boolean;
+      minimizeHidesToTray?: boolean;
       startWithWindows?: boolean;
       shell?: ShellPrefs;
       automation?: AutomationPrefs;
       scripts?: ScriptsPrefs;
       accueil?: AccueilPrefs;
+      appearance?: AppearancePrefs;
+      confirmations?: ConfirmationsPrefs;
+      maintenance?: MaintenancePrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
       await saveBundle({
         clicker: current.clicker,
-        advancedUi: partial.advancedUi ?? current.advancedUi,
+        advancedUi: true,
         overlayVisible: partial.overlayVisible ?? current.overlayVisible,
         overlayOpacity: partial.overlayOpacity ?? current.overlayOpacity,
         processFilter: partial.processFilter ?? current.processFilter ?? DEFAULT_PROCESS_FILTER,
+        processFilterPresets:
+          partial.processFilterPresets ??
+          current.processFilterPresets ??
+          processFilterPresets,
         theme: partial.theme ?? current.theme ?? theme,
         displayId: partial.displayId !== undefined ? partial.displayId : current.displayId,
         journalOpen: partial.journalOpen ?? current.journalOpen,
         closeToTray: partial.closeToTray ?? current.closeToTray,
+        minimizeHidesToTray:
+          partial.minimizeHidesToTray ?? current.minimizeHidesToTray,
         startWithWindows: partial.startWithWindows ?? current.startWithWindows,
         shell: partial.shell,
         automation: partial.automation,
         scripts: partial.scripts,
         accueil: partial.accueil,
+        appearance: partial.appearance,
+        confirmations: partial.confirmations,
+        maintenance: partial.maintenance,
       });
     },
-    [loadSettings, saveBundle, theme],
+    [loadSettings, saveBundle, theme, processFilterPresets],
   );
 
   const persistShellPrefs = (patch: Partial<ShellPrefs>) => {
@@ -287,9 +329,24 @@ export function SettingsView({
     void persist({ accueil: next });
   };
 
-  const setAdvanced = (next: boolean) => {
-    onAdvancedChange(next);
-    void persist({ advancedUi: next });
+  const persistAppearancePrefs = (patch: Partial<AppearancePrefs>) => {
+    const next = mergeAppearancePrefs({ ...appearance, ...patch });
+    setAppearance(next);
+    onAppearancePrefsChange?.(next);
+    void persist({ appearance: next });
+  };
+
+  const persistConfirmationsPrefs = (patch: Partial<ConfirmationsPrefs>) => {
+    const next = mergeConfirmationsPrefs({ ...confirmations, ...patch });
+    setConfirmations(next);
+    onConfirmationsPrefsChange?.(next);
+    void persist({ confirmations: next });
+  };
+
+  const persistMaintenancePrefs = (patch: Partial<MaintenancePrefs>) => {
+    const next = mergeMaintenancePrefs({ ...maintenance, ...patch });
+    setMaintenance(next);
+    void persist({ maintenance: next });
   };
 
   const setTheme = (t: ThemeMode) => {
@@ -302,21 +359,28 @@ export function SettingsView({
     void persist({ processFilter: next });
   };
 
+  const persistPresets = (next: ProcessFilterPreset[]) => {
+    setProcessFilterPresets(next);
+    void persist({ processFilterPresets: next });
+  };
+
   const resetClicker = async () => {
-    const ok = await confirmChoice({
-      title: t("settings.data.resetTitle"),
-      message: t("settings.data.resetMessage"),
-      confirmLabel: t("settings.data.reset"),
-      cancelLabel: t("common.cancel"),
-      danger: true,
-    });
-    if (ok !== "confirm") return;
+    if (confirmations.resetClicker) {
+      const ok = await confirmChoice({
+        title: t("settings.data.resetTitle"),
+        message: t("settings.data.resetMessage"),
+        confirmLabel: t("settings.data.reset"),
+        cancelLabel: t("common.cancel"),
+        danger: true,
+      });
+      if (ok !== "confirm") return;
+    }
     try {
       const s = await loadSettings();
       if (!s) return;
       await saveBundle({
         clicker: DEFAULT_CLICKER,
-        advancedUi: s.advancedUi,
+        advancedUi: true,
         overlayVisible: s.overlayVisible,
         processFilter: s.processFilter ?? DEFAULT_PROCESS_FILTER,
         theme: s.theme ?? theme,
@@ -361,6 +425,7 @@ export function SettingsView({
         overlayVisible?: boolean;
         overlayOpacity?: number;
         closeToTray?: boolean;
+        minimizeHidesToTray?: boolean;
         startWithWindows?: boolean;
         theme?: ThemeMode;
         journalOpen?: boolean;
@@ -369,6 +434,7 @@ export function SettingsView({
       setOverlayVisible(!!next.overlayVisible);
       setOverlayOpacity(next.overlayOpacity ?? 1);
       setCloseToTray(!!next.closeToTray);
+      setMinimizeHidesToTray(!!next.minimizeHidesToTray);
       setStartWithWindows(!!next.startWithWindows);
       if (typeof next.journalOpen === "boolean") {
         onJournalOpenChange(next.journalOpen);
@@ -379,18 +445,96 @@ export function SettingsView({
     }
   };
 
-  const purgeTrash = async () => {
+  const exportLibrary = async () => {
+    try {
+      const path = await save({
+        defaultPath: "caster-library.zip",
+        filters: [{ name: "ZIP", extensions: ["zip"] }],
+      });
+      if (!path) return;
+      await invoke("export_library_backup", { path });
+      toast.success(t("settings.data.libraryExportOk"));
+    } catch {
+      toast.error(t("settings.data.libraryExportFail"));
+    }
+  };
+
+  const importLibrary = async () => {
     const ok = await confirmChoice({
-      title: t("settings.data.purgeTitle"),
-      message: t("settings.data.purgeMessage"),
-      confirmLabel: t("settings.data.purge"),
+      title: t("settings.data.libraryImportTitle"),
+      message: t("settings.data.libraryImportMessage"),
+      confirmLabel: t("common.import"),
       cancelLabel: t("common.cancel"),
       danger: true,
     });
     if (ok !== "confirm") return;
     try {
+      const path = await open({
+        multiple: false,
+        filters: [{ name: "ZIP", extensions: ["zip"] }],
+      });
+      if (!path || Array.isArray(path)) return;
+      await invoke("import_library_backup", { path });
+      toast.success(t("settings.data.libraryImportOk"));
+    } catch {
+      toast.error(t("settings.data.libraryImportFail"));
+    }
+  };
+
+  const purgeTrash = async () => {
+    if (confirmations.purgeTrash) {
+      const ok = await confirmChoice({
+        title: t("settings.data.purgeTitle"),
+        message: t("settings.data.purgeMessage"),
+        confirmLabel: t("settings.data.purge"),
+        cancelLabel: t("common.cancel"),
+        danger: true,
+      });
+      if (ok !== "confirm") return;
+    }
+    try {
       const n = await invoke<number>("purge_library_trash_cmd");
       toast.success(n > 0 ? t("settings.data.purgeOk", { n }) : t("settings.data.purgeEmpty"));
+      setPurgeOlderPreview(null);
+    } catch {
+      toast.error(t("settings.data.purgeFail"));
+    }
+  };
+
+  const refreshPurgeOlderPreview = async (days: number) => {
+    try {
+      const n = await invoke<number>("count_library_trash_older_than_cmd", {
+        days,
+      });
+      setPurgeOlderPreview(n);
+    } catch {
+      setPurgeOlderPreview(null);
+    }
+  };
+
+  const purgeTrashOlder = async () => {
+    const days = Math.max(0, Math.floor(purgeOlderDays));
+    if (confirmations.purgeTrash) {
+      const ok = await confirmChoice({
+        title: t("settings.data.purgeOlderTitle"),
+        message: t("settings.data.purgeOlderMessage", {
+          days,
+          n: purgeOlderPreview ?? "…",
+        }),
+        confirmLabel: t("settings.data.purgeOlder"),
+        cancelLabel: t("common.cancel"),
+        danger: true,
+      });
+      if (ok !== "confirm") return;
+    }
+    try {
+      const n = await invoke<number>("purge_library_trash_older_than_cmd", {
+        days,
+      });
+      toast.success(
+        n > 0 ? t("settings.data.purgeOk", { n }) : t("settings.data.purgeEmpty"),
+      );
+      setPurgeOlderPreview(0);
     } catch {
       toast.error(t("settings.data.purgeFail"));
     }
@@ -450,10 +594,10 @@ export function SettingsView({
                     </div>
                     <div className="caster-settings-row-control">
                       <SettingsToggle
-                        checked={shell.minimizeToTray}
+                        checked={shell.startInTray}
                         ariaLabel={t("settings.application.startInTray")}
                         onChange={(checked) =>
-                          persistShellPrefs({ minimizeToTray: checked })
+                          persistShellPrefs({ startInTray: checked })
                         }
                       />
                     </div>
@@ -476,6 +620,22 @@ export function SettingsView({
                   </div>
                   <div className="caster-settings-row">
                     <div className="caster-settings-row-label">
+                      <span>{t("settings.application.minimizeHidesToTray")}</span>
+                      <p>{t("settings.application.minimizeHidesToTrayHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={minimizeHidesToTray}
+                        ariaLabel={t("settings.application.minimizeHidesToTray")}
+                        onChange={(checked) => {
+                          setMinimizeHidesToTray(checked);
+                          void persist({ minimizeHidesToTray: checked });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.journalOnStart")}</span>
                       <p>{t("settings.application.journalOnStartHint")}</p>
                     </div>
@@ -486,6 +646,28 @@ export function SettingsView({
                         onChange={(checked) => {
                           onJournalOpenChange(checked);
                           void persist({ journalOpen: checked });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.journalMaxLines")}</span>
+                      <p>{t("settings.application.journalMaxLinesHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <input
+                        type="number"
+                        className="caster-input caster-input-narrow"
+                        min={40}
+                        max={500}
+                        step={10}
+                        value={shell.journalMaxLines}
+                        aria-label={t("settings.application.journalMaxLines")}
+                        onChange={(e) => {
+                          const n = Number(e.target.value);
+                          if (!Number.isFinite(n)) return;
+                          persistShellPrefs({ journalMaxLines: n });
                         }}
                       />
                     </div>
@@ -572,6 +754,59 @@ export function SettingsView({
                   </div>
                   <div className="caster-settings-row">
                     <div className="caster-settings-row-label">
+                      <span>{t("settings.application.warnOnUnsavedQuit")}</span>
+                      <p>{t("settings.application.warnOnUnsavedQuitHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.warnOnUnsavedQuit}
+                        ariaLabel={t("settings.application.warnOnUnsavedQuit")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ warnOnUnsavedQuit: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.showSessionPill")}</span>
+                      <p>{t("settings.application.showSessionPillHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={shell.showSessionPill}
+                        ariaLabel={t("settings.application.showSessionPill")}
+                        onChange={(checked) =>
+                          persistShellPrefs({ showSessionPill: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.recentListMax")}</span>
+                      <p>{t("settings.application.recentListMaxHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <WheelNumberInput
+                        className="caster-input"
+                        min={1}
+                        max={50}
+                        step={1}
+                        value={shell.recentListMax}
+                        aria-label={t("settings.application.recentListMax")}
+                        onValueChange={(n) => {
+                          persistShellPrefs({
+                            recentListMax: Number.isFinite(n)
+                              ? Math.min(50, Math.max(1, Math.floor(n)))
+                              : 12,
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.goHomeAfterEmergency")}</span>
                       <p>{t("settings.application.goHomeAfterEmergencyHint")}</p>
                     </div>
@@ -643,6 +878,70 @@ export function SettingsView({
                         ariaLabel={t("settings.application.trayRelaunch")}
                         onChange={(checked) =>
                           persistShellPrefs({ trayRelaunchLast: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </SettingsGroup>
+                <SettingsGroup title={t("settings.application.groupLaunch")}>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.confirmLaunchFromHome")}</span>
+                      <p>{t("settings.application.confirmLaunchFromHomeHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={automation.confirmLaunchFromHome}
+                        ariaLabel={t("settings.application.confirmLaunchFromHome")}
+                        onChange={(checked) =>
+                          persistAutomationPrefs({ confirmLaunchFromHome: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.confirmStopSession")}</span>
+                      <p>{t("settings.application.confirmStopSessionHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={automation.confirmStopSession}
+                        ariaLabel={t("settings.application.confirmStopSession")}
+                        onChange={(checked) =>
+                          persistAutomationPrefs({ confirmStopSession: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.autoSaveBeforeRun")}</span>
+                      <p>{t("settings.application.autoSaveBeforeRunHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={automation.autoSaveBeforeRun}
+                        ariaLabel={t("settings.application.autoSaveBeforeRun")}
+                        onChange={(checked) =>
+                          persistAutomationPrefs({ autoSaveBeforeRun: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.runFromRequiresSelection")}</span>
+                      <p>{t("settings.application.runFromRequiresSelectionHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={automation.runFromRequiresSelection}
+                        ariaLabel={t("settings.application.runFromRequiresSelection")}
+                        onChange={(checked) =>
+                          persistAutomationPrefs({
+                            runFromRequiresSelection: checked,
+                          })
                         }
                       />
                     </div>
@@ -747,6 +1046,183 @@ export function SettingsView({
                     </div>
                   </div>
                 </SettingsGroup>
+                <SettingsGroup title={t("settings.application.groupAccueil")}>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.openOnSingleClick")}</span>
+                      <p>{t("settings.application.openOnSingleClickHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={accueil.openOnSingleClick}
+                        ariaLabel={t("settings.application.openOnSingleClick")}
+                        onChange={(checked) =>
+                          persistAccueilPrefs({ openOnSingleClick: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.confirmTrash")}</span>
+                      <p>{t("settings.application.confirmTrashHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={accueil.confirmTrash}
+                        ariaLabel={t("settings.application.confirmTrash")}
+                        onChange={(checked) =>
+                          persistAccueilPrefs({ confirmTrash: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.confirmDeleteFolder")}</span>
+                      <p>{t("settings.application.confirmDeleteFolderHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={accueil.confirmDeleteFolder}
+                        ariaLabel={t("settings.application.confirmDeleteFolder")}
+                        onChange={(checked) =>
+                          persistAccueilPrefs({ confirmDeleteFolder: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.showScriptsInAll")}</span>
+                      <p>{t("settings.application.showScriptsInAllHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={accueil.showScriptsInAll}
+                        ariaLabel={t("settings.application.showScriptsInAll")}
+                        onChange={(checked) =>
+                          persistAccueilPrefs({ showScriptsInAll: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.defaultSortBy")}</span>
+                      <p>{t("settings.application.defaultSortByHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <Select
+                        className="caster-select"
+                        value={accueil.defaultSortBy}
+                        ariaLabel={t("settings.application.defaultSortBy")}
+                        options={[
+                          { value: "order", label: t("automations.columns.order") },
+                          { value: "name", label: t("automations.columns.name") },
+                          { value: "type", label: t("automations.columns.type") },
+                          { value: "status", label: t("automations.columns.status") },
+                          { value: "lastRun", label: t("automations.columns.lastRun") },
+                        ]}
+                        onChange={(v) =>
+                          persistAccueilPrefs({
+                            defaultSortBy: v as AccueilPrefs["defaultSortBy"],
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.defaultSortDir")}</span>
+                      <p>{t("settings.application.defaultSortDirHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <Select
+                        className="caster-select"
+                        value={accueil.defaultSortDir}
+                        ariaLabel={t("settings.application.defaultSortDir")}
+                        options={[
+                          {
+                            value: "asc",
+                            label: t("settings.application.sortDirAsc"),
+                          },
+                          {
+                            value: "desc",
+                            label: t("settings.application.sortDirDesc"),
+                          },
+                        ]}
+                        onChange={(v) =>
+                          persistAccueilPrefs({
+                            defaultSortDir: v as AccueilPrefs["defaultSortDir"],
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </SettingsGroup>
+                <SettingsGroup title={t("settings.application.groupConfirmations")}>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.confirmDeleteAction")}</span>
+                      <p>{t("settings.application.confirmDeleteActionHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={confirmations.deleteAction}
+                        ariaLabel={t("settings.application.confirmDeleteAction")}
+                        onChange={(checked) =>
+                          persistConfirmationsPrefs({ deleteAction: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.confirmCloseDirtyTab")}</span>
+                      <p>{t("settings.application.confirmCloseDirtyTabHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={confirmations.closeDirtyTab}
+                        ariaLabel={t("settings.application.confirmCloseDirtyTab")}
+                        onChange={(checked) =>
+                          persistConfirmationsPrefs({ closeDirtyTab: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.confirmPurgeTrash")}</span>
+                      <p>{t("settings.application.confirmPurgeTrashHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={confirmations.purgeTrash}
+                        ariaLabel={t("settings.application.confirmPurgeTrash")}
+                        onChange={(checked) =>
+                          persistConfirmationsPrefs({ purgeTrash: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.confirmResetClicker")}</span>
+                      <p>{t("settings.application.confirmResetClickerHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={confirmations.resetClicker}
+                        ariaLabel={t("settings.application.confirmResetClicker")}
+                        onChange={(checked) =>
+                          persistConfirmationsPrefs({ resetClicker: checked })
+                        }
+                      />
+                    </div>
+                  </div>
+                </SettingsGroup>
                 <SettingsGroup title={t("settings.application.groupAppearance")}>
                   <div className="caster-settings-row">
                     <div className="caster-settings-row-label">
@@ -803,6 +1279,99 @@ export function SettingsView({
                           .join(" ")}
                         aria-label={t("settings.application.themeLightAria")}
                         onClick={() => setTheme("light")}
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.density")}</span>
+                      <p>{t("settings.application.densityHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <Select
+                        className="caster-select"
+                        value={appearance.density}
+                        ariaLabel={t("settings.application.density")}
+                        options={[
+                          {
+                            value: "comfortable",
+                            label: t("settings.application.densityComfortable"),
+                          },
+                          {
+                            value: "compact",
+                            label: t("settings.application.densityCompact"),
+                          },
+                        ]}
+                        onChange={(v) =>
+                          persistAppearancePrefs({ density: v as UiDensity })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.accent")}</span>
+                      <p>{t("settings.application.accentHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <Select
+                        className="caster-select"
+                        value={appearance.accent}
+                        ariaLabel={t("settings.application.accent")}
+                        options={[
+                          {
+                            value: "default",
+                            label: t("settings.application.accentDefault"),
+                          },
+                          {
+                            value: "blue",
+                            label: t("settings.application.accentBlue"),
+                          },
+                          {
+                            value: "teal",
+                            label: t("settings.application.accentTeal"),
+                          },
+                        ]}
+                        onChange={(v) =>
+                          persistAppearancePrefs({ accent: v as AccentTheme })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.fontScale")}</span>
+                      <p>{t("settings.application.fontScaleHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <Select
+                        className="caster-select"
+                        value={String(appearance.fontScale)}
+                        ariaLabel={t("settings.application.fontScale")}
+                        options={[
+                          { value: "0.9", label: "90 %" },
+                          { value: "1", label: "100 %" },
+                          { value: "1.1", label: "110 %" },
+                          { value: "1.25", label: "125 %" },
+                        ]}
+                        onChange={(v) =>
+                          persistAppearancePrefs({ fontScale: Number(v) })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.application.reduceMotion")}</span>
+                      <p>{t("settings.application.reduceMotionHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <SettingsToggle
+                        checked={appearance.reduceMotion}
+                        ariaLabel={t("settings.application.reduceMotion")}
+                        onChange={(checked) =>
+                          persistAppearancePrefs({ reduceMotion: checked })
+                        }
                       />
                     </div>
                   </div>
@@ -868,34 +1437,6 @@ export function SettingsView({
                 <SettingsGroup title={t("settings.application.groupClicker")}>
                   <div className="caster-settings-row">
                     <div className="caster-settings-row-label">
-                      <span>{t("settings.application.clickerMode")}</span>
-                      <p>{t("settings.application.clickerModeHint")}</p>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <div className="caster-segmented" role="group" aria-label={t("settings.application.clickerModeAria")}>
-                        <button
-                          type="button"
-                          className={["caster-segmented-btn", !advanced ? "active" : ""]
-                            .filter(Boolean)
-                            .join(" ")}
-                          onClick={() => setAdvanced(false)}
-                        >
-                          {t("common.simple")}
-                        </button>
-                        <button
-                          type="button"
-                          className={["caster-segmented-btn", advanced ? "active" : ""]
-                            .filter(Boolean)
-                            .join(" ")}
-                          onClick={() => setAdvanced(true)}
-                        >
-                          {t("common.advanced")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.state")}</span>
                     </div>
                     <div className="caster-settings-row-control">
@@ -951,150 +1492,21 @@ export function SettingsView({
                       <span>{t("settings.security.foreground")}</span>
                     </div>
                     <div className="caster-settings-row-control">
-                      <code className="caster-settings-mono">{foregroundExe ?? t("common.empty")}</code>
-                      <button
-                        type="button"
-                        className="caster-btn caster-btn-ghost"
-                        title={t("settings.security.refreshProcesses")}
-                        onClick={refreshLiveExes}
-                      >
-                        <RefreshCw size={14} aria-hidden />
-                      </button>
+                      <code className="caster-settings-mono">
+                        {foregroundExe ?? t("common.empty")}
+                      </code>
                     </div>
                   </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.security.enableFilter")}</span>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <SettingsToggle
-                        checked={processFilter.enabled}
-                        disabled={running}
-                        ariaLabel={t("settings.security.enableFilter")}
-                        onChange={(checked) =>
-                          persistProcess({
-                            ...processFilter,
-                            enabled: checked,
-                          })
-                        }
-                      />
-                    </div>
+                  <div className="caster-settings-process-editor">
+                    <ProcessFilterEditor
+                      filter={processFilter}
+                      onChange={persistProcess}
+                      disabled={running}
+                      showEnabledToggle
+                      presets={processFilterPresets}
+                      onPresetsChange={persistPresets}
+                    />
                   </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.security.mode")}</span>
-                      <p>{t("settings.security.modeHint")}</p>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <Select
-                        className="caster-select"
-                        value={processFilter.mode}
-                        disabled={running || !processFilter.enabled}
-                        options={[
-                          {
-                            value: "deny",
-                            label: t("settings.security.modeDeny"),
-                          },
-                          {
-                            value: "allow",
-                            label: t("settings.security.modeAllow"),
-                          },
-                        ]}
-                        onChange={(v) =>
-                          persistProcess({
-                            ...processFilter,
-                            mode: v as ProcessFilter["mode"],
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  {liveExes.length > 0 ? (
-                    <div className="caster-settings-row caster-settings-row--stack">
-                      <div className="caster-settings-row-label">
-                        <span>{t("settings.security.addFromVisible")}</span>
-                      </div>
-                      <div className="caster-settings-row-control caster-settings-row-control--full">
-                        <Select
-                          className="caster-select"
-                          value=""
-                          disabled={running || !processFilter.enabled}
-                          options={[
-                            { value: "", label: t("settings.security.choose") },
-                            ...liveExes
-                              .filter((x) => !processFilter.names.includes(x))
-                              .map((x) => ({ value: x, label: x })),
-                          ]}
-                          onChange={(name) => {
-                            if (!name || processFilter.names.includes(name)) return;
-                            persistProcess({
-                              ...processFilter,
-                              names: [...processFilter.names, name],
-                            });
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ) : null}
-                  <div className="caster-settings-row caster-settings-row--stack">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.security.addManual")}</span>
-                    </div>
-                    <div className="caster-settings-row-control caster-settings-row-control--full">
-                      <div className="caster-field-row">
-                        <input
-                          value={processDraft}
-                          disabled={running || !processFilter.enabled}
-                          onChange={(e) => setProcessDraft(e.target.value)}
-                          placeholder="chrome.exe"
-                        />
-                        <button
-                          type="button"
-                          className="caster-btn"
-                          disabled={
-                            running ||
-                            !processFilter.enabled ||
-                            !processDraft.trim()
-                          }
-                          onClick={() => {
-                            const n = processDraft.trim().toLowerCase();
-                            if (!n || processFilter.names.includes(n)) return;
-                            setProcessDraft("");
-                            persistProcess({
-                              ...processFilter,
-                              names: [...processFilter.names, n],
-                            });
-                          }}
-                        >
-                          {t("settings.security.add")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  {processFilter.names.length === 0 ? (
-                    <p className="caster-settings-group-hint">{t("settings.security.noneListed")}</p>
-                  ) : (
-                    <ul className="caster-settings-process-list">
-                      {processFilter.names.map((n) => (
-                        <li key={n}>
-                          <code>{n}</code>
-                          <button
-                            type="button"
-                            className="caster-btn caster-btn-ghost"
-                            disabled={running}
-                            onClick={() =>
-                              persistProcess({
-                                ...processFilter,
-                                names: processFilter.names.filter((x) => x !== n),
-                              })
-                            }
-                          >
-                            {t("settings.security.remove")}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </SettingsGroup>
                 <SettingsGroup title={t("settings.security.displayGroup")}>
                   <div className="caster-settings-row">
@@ -1211,6 +1623,28 @@ export function SettingsView({
                   </div>
                   <div className="caster-settings-row">
                     <div className="caster-settings-row-label">
+                      <span>{t("settings.data.libraryBackup")}</span>
+                      <p>{t("settings.data.libraryBackupHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <button
+                        type="button"
+                        className="caster-btn"
+                        onClick={() => void exportLibrary()}
+                      >
+                        {t("settings.data.libraryExport")}
+                      </button>
+                      <button
+                        type="button"
+                        className="caster-btn caster-btn-ghost"
+                        onClick={() => void importLibrary()}
+                      >
+                        {t("settings.data.libraryImport")}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.data.purgeTrash")}</span>
                       <p>{t("settings.data.purgeTrashHint")}</p>
                     </div>
@@ -1222,6 +1656,65 @@ export function SettingsView({
                       >
                         {t("settings.data.purge")}
                       </button>
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.data.purgeOlder")}</span>
+                      <p>
+                        {t("settings.data.purgeOlderHint")}
+                        {purgeOlderPreview != null
+                          ? ` ${t("settings.data.purgeOlderPreview", {
+                              n: purgeOlderPreview,
+                            })}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="caster-settings-row-control caster-settings-row-control--stack">
+                      <WheelNumberInput
+                        min={0}
+                        max={365}
+                        value={purgeOlderDays}
+                        aria-label={t("settings.data.purgeOlder")}
+                        onValueChange={(n) => {
+                          setPurgeOlderDays(n);
+                          void refreshPurgeOlderPreview(n);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="caster-btn caster-btn-ghost"
+                        onClick={() => void refreshPurgeOlderPreview(purgeOlderDays)}
+                      >
+                        {t("settings.data.purgeOlderCount")}
+                      </button>
+                      <button
+                        type="button"
+                        className="caster-btn caster-btn-danger-ghost"
+                        onClick={() => void purgeTrashOlder()}
+                      >
+                        {t("settings.data.purgeOlder")}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
+                      <span>{t("settings.data.autoPurge")}</span>
+                      <p>{t("settings.data.autoPurgeHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <WheelNumberInput
+                        min={0}
+                        max={365}
+                        value={maintenance.autoPurgeTrashDays}
+                        aria-label={t("settings.data.autoPurge")}
+                        onValueChange={(n) =>
+                          persistMaintenancePrefs({ autoPurgeTrashDays: n })
+                        }
+                      />
+                      <span className="caster-settings-suffix">
+                        {t("settings.data.autoPurgeUnit")}
+                      </span>
                     </div>
                   </div>
                   <div className="caster-settings-row">

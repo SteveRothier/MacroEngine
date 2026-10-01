@@ -7,8 +7,10 @@ import {
   Plus,
   Redo2,
   Search,
+  Trash2,
   Undo2,
   Workflow,
+  X,
 } from "lucide-react";
 import { useT } from "../i18n";
 import { DropdownMenu, Tooltip } from "../ui/shell";
@@ -32,6 +34,8 @@ type Props = {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
+  /** When filter is trash and count > 0, show empty-trash control. */
+  onPurgeTrash?: () => void;
 };
 
 const FILTER_VIEW_DEFS: {
@@ -39,7 +43,8 @@ const FILTER_VIEW_DEFS: {
   labelKey:
     | "automations.filter.all"
     | "automations.filter.favorites"
-    | "automations.filter.recent";
+    | "automations.filter.recent"
+    | "automations.filter.trash";
   countKey: keyof FilterCounts;
 }[] = [
   {
@@ -56,6 +61,11 @@ const FILTER_VIEW_DEFS: {
     value: "recent",
     labelKey: "automations.filter.recent",
     countKey: "recent",
+  },
+  {
+    value: "trash",
+    labelKey: "automations.filter.trash",
+    countKey: "trash",
   },
 ];
 
@@ -76,6 +86,7 @@ export function AutomationsToolbar({
   canRedo = false,
   onUndo,
   onRedo,
+  onPurgeTrash,
 }: Props) {
   const t = useT();
   const localSearchRef = useRef<HTMLInputElement>(null);
@@ -158,9 +169,36 @@ export function AutomationsToolbar({
             placeholder={t("automations.search.placeholder")}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
-            className="caster-search-inline caster-automations-filter-search"
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && query) {
+                e.preventDefault();
+                e.stopPropagation();
+                onQueryChange("");
+              }
+            }}
+            className={[
+              "caster-search-inline",
+              "caster-automations-filter-search",
+              query ? "has-clear" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             aria-label={t("automations.search.aria")}
           />
+          {query ? (
+            <button
+              type="button"
+              className="caster-automations-search-clear"
+              aria-label={t("automations.search.clearSearch")}
+              title={t("automations.search.clearSearch")}
+              onClick={() => {
+                onQueryChange("");
+                searchRef.current?.focus();
+              }}
+            >
+              <X size={12} aria-hidden />
+            </button>
+          ) : null}
         </label>
 
         <div className="caster-automations-filter-bar-end">
@@ -191,6 +229,17 @@ export function AutomationsToolbar({
                 <Redo2 size={14} aria-hidden />
               </button>
             </div>
+          ) : null}
+          {filter === "trash" && counts.trash > 0 && onPurgeTrash ? (
+            <button
+              type="button"
+              className="caster-btn caster-btn-danger-ghost"
+              onClick={onPurgeTrash}
+              title={t("automations.toolbar.purgeTrashTitle")}
+            >
+              <Trash2 size={14} aria-hidden />
+              {t("automations.toolbar.purgeTrash")}
+            </button>
           ) : null}
           <DropdownMenu
             label={t("automations.create.label")}

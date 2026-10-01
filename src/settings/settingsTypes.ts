@@ -2,7 +2,7 @@ import type { UiLocalePref } from "../i18n/locales";
 
 /** Nested app preference groups (mirrored from engine `AppSettings`). */
 
-export type AccueilSortBy = "order" | "name" | "type" | "status";
+export type AccueilSortBy = "order" | "name" | "type" | "status" | "lastRun";
 export type AccueilSortDir = "asc" | "desc";
 export type AccueilFilter = "all" | "favorites" | "recent";
 export type StartupView = "home" | "lastDocument";
@@ -31,16 +31,15 @@ export type AccueilPrefs = {
   /** Script languages hidden from Accueil (`javascript`, `typescript`). */
   hideScriptLanguages: string[];
   syncLibrarySortOnReorder: boolean;
-  doubleClickDelayMs: number;
   dragThresholdPx: number;
 };
 
 export type ShellPrefs = {
   startupView: StartupView;
   restoreWorkspaceTabs: boolean;
-  minimizeToTray: boolean;
+  /** Launch hidden in tray when started with Windows (not minimize-to-tray). */
+  startInTray: boolean;
   showSessionPill: boolean;
-  commandPaletteEnabled: boolean;
   recentListMax: number;
   warnOnUnsavedQuit: boolean;
   alwaysOnTop: boolean;
@@ -54,6 +53,8 @@ export type ShellPrefs = {
   lastClickerId: string | null;
   lastMacroId: string | null;
   lastScriptId: string | null;
+  /** Max retained journal lines (40–500, default 80). */
+  journalMaxLines: number;
 };
 
 export type AutomationPrefs = {
@@ -101,16 +102,14 @@ export const DEFAULT_ACCUEIL_PREFS: AccueilPrefs = {
   showModulesInAll: false,
   hideScriptLanguages: [],
   syncLibrarySortOnReorder: true,
-  doubleClickDelayMs: 300,
   dragThresholdPx: 6,
 };
 
 export const DEFAULT_SHELL_PREFS: ShellPrefs = {
   startupView: "home",
   restoreWorkspaceTabs: true,
-  minimizeToTray: false,
+  startInTray: false,
   showSessionPill: true,
-  commandPaletteEnabled: true,
   recentListMax: 12,
   warnOnUnsavedQuit: true,
   alwaysOnTop: false,
@@ -124,6 +123,7 @@ export const DEFAULT_SHELL_PREFS: ShellPrefs = {
   lastClickerId: null,
   lastMacroId: null,
   lastScriptId: null,
+  journalMaxLines: 80,
 };
 
 export const DEFAULT_AUTOMATION_PREFS: AutomationPrefs = {
@@ -167,14 +167,33 @@ export function mergeAccueilPrefs(
   if ((merged.defaultFilter as string) === "scripts") {
     merged.defaultFilter = "all";
   }
+  // Purged FE field (still may exist in older settings.json / Rust).
+  delete (merged as AccueilPrefs & { doubleClickDelayMs?: number })
+    .doubleClickDelayMs;
   return merged;
 }
 
 export function mergeShellPrefs(partial?: Partial<ShellPrefs> | null): ShellPrefs {
+  const legacy = partial as
+    | (Partial<ShellPrefs> & { minimizeToTray?: boolean })
+    | null
+    | undefined;
   const merged = { ...DEFAULT_SHELL_PREFS, ...partial };
+  if (legacy && legacy.startInTray === undefined && typeof legacy.minimizeToTray === "boolean") {
+    merged.startInTray = legacy.minimizeToTray;
+  }
+  delete (merged as ShellPrefs & { minimizeToTray?: boolean }).minimizeToTray;
   if (partial && "windowBounds" in partial) {
     merged.windowBounds = partial.windowBounds ?? null;
   }
+  const n = Number(merged.journalMaxLines);
+  merged.journalMaxLines = Number.isFinite(n)
+    ? Math.min(500, Math.max(40, Math.round(n)))
+    : DEFAULT_SHELL_PREFS.journalMaxLines;
+  const recent = Number(merged.recentListMax);
+  merged.recentListMax = Number.isFinite(recent)
+    ? Math.min(50, Math.max(1, Math.round(recent)))
+    : DEFAULT_SHELL_PREFS.recentListMax;
   return merged;
 }
 

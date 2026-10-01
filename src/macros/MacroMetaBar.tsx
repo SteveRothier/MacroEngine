@@ -128,11 +128,12 @@ export function MacroMetaBar({
   return (
     <div className="caster-macro-meta">
       <label className="caster-macro-meta-row">
-        <span className="caster-macro-meta-label">{t("macros.toolbar.metaName")}</span>
+        <span className="sr-only">{t("macros.toolbar.metaName")}</span>
         <input
           className="caster-macro-meta-input caster-macro-meta-input--name"
           value={doc.name}
           disabled={locked}
+          aria-label={t("macros.toolbar.metaName")}
           onChange={(e) => onChange({ ...doc, name: e.target.value })}
           onBlur={(e) => onNameCommit?.(e.target.value)}
           onKeyDown={(e) => {

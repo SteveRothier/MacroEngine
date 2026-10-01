@@ -139,15 +139,14 @@ export function ClickerMetaBar({ editor: e }: Props) {
   }, [e.locked]);
 
   return (
-    <div className="caster-macro-meta caster-clicker-meta">
+    <div className="caster-macro-meta">
       <label className="caster-macro-meta-row">
-        <span className="caster-macro-meta-label">
-          {t("clicker.meta.name")}
-        </span>
+        <span className="sr-only">{t("clicker.meta.name")}</span>
         <input
           className="caster-macro-meta-input caster-macro-meta-input--name"
           value={e.presetName}
           disabled={e.editDisabled}
+          aria-label={t("clicker.meta.name")}
           onChange={(ev) => e.setPresetName(ev.target.value)}
           onBlur={(ev) => void e.onRenamePreset(ev.target.value)}
           onKeyDown={(ev) => {

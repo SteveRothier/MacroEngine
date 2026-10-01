@@ -1,5 +1,7 @@
 use std::sync::{Arc, Mutex};
 
+use serde::Serialize;
+
 use crate::state::EngineState;
 
 /// Why a safety zone produced user-visible feedback.
@@ -30,6 +32,22 @@ impl ZoneFeedbackKind {
     }
 }
 
+/// Pixel-condition guard feedback (out of tolerance).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PixelFeedbackKind {
+    Stop,
+    Pause,
+}
+
+impl PixelFeedbackKind {
+    pub fn kind_label(self) -> &'static str {
+        match self {
+            PixelFeedbackKind::Stop => "stop",
+            PixelFeedbackKind::Pause => "pause",
+        }
+    }
+}
+
 /// Events emitted by the engine toward observers (Tauri shell, tests).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EngineEvent {
@@ -56,9 +74,13 @@ pub enum EngineEvent {
     ZoneFeedback {
         kind: ZoneFeedbackKind,
     },
+    PixelFeedback {
+        kind: PixelFeedbackKind,
+    },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub enum LogLevel {
     Debug,
     Info,

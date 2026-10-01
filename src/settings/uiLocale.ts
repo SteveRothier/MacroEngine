@@ -24,6 +24,8 @@ export type ApplicationStringKey =
   | "startInTrayHint"
   | "closeToTray"
   | "closeToTrayHint"
+  | "minimizeHidesToTray"
+  | "minimizeHidesToTrayHint"
   | "journalOnStart"
   | "journalOnStartHint"
   | "startupView"

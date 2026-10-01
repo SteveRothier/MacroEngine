@@ -31,11 +31,13 @@ export type PersistBundle = {
   advancedUi: boolean;
   overlayVisible: boolean;
   processFilter: ProcessFilter;
+  processFilterPresets?: import("../process").ProcessFilterPreset[];
   theme: ThemeMode;
   displayId?: string | null;
   overlayOpacity?: number;
   journalOpen?: boolean;
   closeToTray?: boolean;
+  minimizeHidesToTray?: boolean;
   startWithWindows?: boolean;
   sidebarCollapsed?: boolean;
   accueil?: Partial<AccueilPrefs>;
@@ -55,10 +57,14 @@ function mergeSettings(current: AppSettings, bundle: PersistBundle): AppSettings
     overlayVisible: bundle.overlayVisible,
     overlayOpacity: bundle.overlayOpacity ?? current.overlayOpacity ?? 1,
     processFilter: bundle.processFilter ?? DEFAULT_PROCESS_FILTER,
+    processFilterPresets:
+      bundle.processFilterPresets ?? current.processFilterPresets ?? [],
     theme: bundle.theme,
     displayId: bundle.displayId !== undefined ? bundle.displayId : current.displayId,
     journalOpen: bundle.journalOpen ?? current.journalOpen,
     closeToTray: bundle.closeToTray ?? current.closeToTray,
+    minimizeHidesToTray:
+      bundle.minimizeHidesToTray ?? current.minimizeHidesToTray,
     startWithWindows: bundle.startWithWindows ?? current.startWithWindows,
     sidebarCollapsed: bundle.sidebarCollapsed ?? current.sidebarCollapsed,
     accueil: mergeAccueilPrefs({

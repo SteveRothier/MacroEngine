@@ -2,6 +2,11 @@ import type { ReactNode } from "react";
 import { ArrowLeft, Circle, Pause, Play, Redo2, Square, Undo2 } from "lucide-react";
 import { useT } from "../../i18n";
 import { EditorToolbar } from "../../ui/shell";
+import {
+  ProcessFilterTool,
+  type ProcessFilter,
+  type ProcessFilterScopeMode,
+} from "../../process";
 
 type Props = {
   onBack: () => void;
@@ -25,8 +30,21 @@ type Props = {
   onRedo?: () => void;
   /** Convert this macro to a script (Accueil convert flow). */
   onConvertToScript?: () => void;
+  /** Convert this macro to a clicker preset. */
+  onConvertToClicker?: () => void;
   /** Nom / répétitions / raccourci — fused into this bar. */
   meta?: ReactNode;
+  processFilter: ProcessFilter;
+  processFilterMode: ProcessFilterScopeMode;
+  onProcessFilterModeChange: (mode: ProcessFilterScopeMode) => void;
+  localProcessFilter: ProcessFilter;
+  onLocalProcessFilterChange: (filter: ProcessFilter) => void;
+  onOpenProcessSettings?: () => void;
+  onGlobalProcessFilterChange?: (filter: ProcessFilter) => void;
+  processFilterPresets?: import("../../process").ProcessFilterPreset[];
+  onProcessFilterPresetsChange?: (
+    presets: import("../../process").ProcessFilterPreset[],
+  ) => void;
 };
 
 export function MacroTitleBarTools({
@@ -49,7 +67,17 @@ export function MacroTitleBarTools({
   onUndo,
   onRedo,
   onConvertToScript,
+  onConvertToClicker,
   meta,
+  processFilter,
+  processFilterMode,
+  onProcessFilterModeChange,
+  localProcessFilter,
+  onLocalProcessFilterChange,
+  onOpenProcessSettings,
+  onGlobalProcessFilterChange,
+  processFilterPresets,
+  onProcessFilterPresetsChange,
 }: Props) {
   const t = useT();
   const running = engineState === "running" || engineState === "paused";
@@ -79,10 +107,33 @@ export function MacroTitleBarTools({
               {t("macros.toolbar.convertToScript")}
             </button>
           ) : null}
+          {onConvertToClicker ? (
+            <button
+              type="button"
+              className="caster-titlebar-btn caster-btn caster-btn-ghost"
+              disabled={locked || busy}
+              onClick={onConvertToClicker}
+              title={t("macros.toolbar.convertToClickerTitle")}
+            >
+              {t("macros.toolbar.convertToClicker")}
+            </button>
+          ) : null}
         </>
       }
       end={
         <>
+          <ProcessFilterTool
+            filter={processFilter}
+            mode={processFilterMode}
+            onModeChange={onProcessFilterModeChange}
+            localFilter={localProcessFilter}
+            onLocalFilterChange={onLocalProcessFilterChange}
+            disabled={locked || busy}
+            onOpenSettings={onOpenProcessSettings}
+            onGlobalFilterChange={onGlobalProcessFilterChange}
+            presets={processFilterPresets}
+            onPresetsChange={onProcessFilterPresetsChange}
+          />
           <button
             type="button"
             className="caster-titlebar-btn caster-titlebar-icon-btn"

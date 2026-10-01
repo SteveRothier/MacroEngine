@@ -13,7 +13,7 @@ import {
   drawSelection,
   placeholder as cmPlaceholder,
 } from "@codemirror/view";
-import { EditorState, Compartment, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, EditorSelection, type Extension } from "@codemirror/state";
 import {
   defaultKeymap,
   history,
@@ -54,6 +54,8 @@ export type ScriptSourceEditorHandle = {
   /** Insert text at the current selection (replaces selection). */
   insertText: (text: string) => void;
   focus: () => void;
+  /** 1-based line number. */
+  gotoLine: (line: number) => void;
 };
 
 type Props = {
@@ -290,6 +292,18 @@ export const ScriptSourceEditor = forwardRef<
     },
     focus() {
       viewRef.current?.focus();
+    },
+    gotoLine(line: number) {
+      const view = viewRef.current;
+      if (!view) return;
+      const doc = view.state.doc;
+      const ln = Math.max(1, Math.min(line, doc.lines));
+      const lineObj = doc.line(ln);
+      view.dispatch({
+        selection: EditorSelection.cursor(lineObj.from),
+        effects: EditorView.scrollIntoView(lineObj.from, { y: "center" }),
+      });
+      view.focus();
     },
   }));
 

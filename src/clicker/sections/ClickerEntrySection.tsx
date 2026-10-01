@@ -9,30 +9,19 @@ import type {
   RateUnit,
   TimingMode,
 } from "../clickerTypes";
-import { Select } from "../../ui/shell";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { useT } from "../../i18n";
-import { ClickerProcessFilterRow } from "./ClickerProcessFilterRow";
+import { ClickerInfoTip } from "../ClickerInfoTip";
 
 type Props = {
   editor: ClickerEditor;
-  onOpenProcessSettings?: () => void;
 };
 
-export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props) {
+export function ClickerEntrySection({ editor: e }: Props) {
   const t = useT();
 
   return (
     <div className="caster-clicker-section caster-clicker-entry-split">
-      <ClickerProcessFilterRow
-        filter={e.processFilter}
-        mode={e.presetFilterMode}
-        onModeChange={e.setPresetFilterMode}
-        localFilter={e.localProcessFilter}
-        onLocalFilterChange={e.setLocalProcessFilter}
-        disabled={e.editDisabled}
-        onOpenSettings={onOpenProcessSettings}
-      />
       <div className="caster-clicker-entry-col">
         <h3 className="caster-clicker-entry-col-title">{t("clicker.entry.title")}</h3>
         <div className="caster-settings-row">
@@ -112,16 +101,33 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                 <span>{t("clicker.entry.clickKind")}</span>
               </div>
               <div className="caster-settings-row-control">
-                <Select
-                  className="caster-select"
-                  value={e.clickKind}
-                  disabled={e.editDisabled}
-                  options={[
-                    { value: "single", label: t("clicker.segments.single") },
-                    { value: "double", label: t("clicker.segments.double") },
-                  ]}
-                  onChange={(v) => e.setClickKind(v as ClickKind)}
-                />
+                <div
+                  className="caster-segmented"
+                  role="group"
+                  aria-label={t("clicker.entry.clickKind")}
+                >
+                  {(
+                    [
+                      ["single", t("clicker.segments.single")],
+                      ["double", t("clicker.segments.double")],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={[
+                        "caster-segmented-btn",
+                        e.clickKind === value ? "active" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      disabled={e.editDisabled}
+                      onClick={() => e.setClickKind(value as ClickKind)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </>
@@ -155,24 +161,41 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
 
         <div className="caster-settings-row">
           <div className="caster-settings-row-label">
-            <span>{t("clicker.entry.hotkeyMode")}</span>
+            <span className="caster-settings-row-label-with-info">
+              <span>{t("clicker.entry.hotkeyMode")}</span>
+              <ClickerInfoTip text={t("clicker.entry.triggerHintMeta")} />
+            </span>
           </div>
           <div className="caster-settings-row-control">
-            <Select
-              className="caster-select"
-              value={e.mode}
-              disabled={e.editDisabled}
-              options={[
-                { value: "toggle", label: t("clicker.segments.toggle") },
-                { value: "hold", label: t("clicker.segments.hold") },
-              ]}
-              onChange={(v) => e.setMode(v as ClickMode)}
-            />
+            <div
+              className="caster-segmented"
+              role="group"
+              aria-label={t("clicker.entry.hotkeyMode")}
+            >
+              {(
+                [
+                  ["toggle", t("clicker.segments.toggle")],
+                  ["hold", t("clicker.segments.hold")],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={[
+                    "caster-segmented-btn",
+                    e.mode === value ? "active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  disabled={e.editDisabled}
+                  onClick={() => e.setMode(value as ClickMode)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-        <p className="caster-clicker-hint caster-clicker-entry-trigger-hint">
-          {t("clicker.entry.triggerHintMeta")}
-        </p>
       </div>
 
       <div className="caster-clicker-entry-col">
@@ -219,7 +242,6 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
             <div className="caster-settings-row">
               <div className="caster-settings-row-label">
                 <span>{t("clicker.entry.cadence")}</span>
-                <p>{e.cadenceDisplay}</p>
               </div>
               <div className="caster-settings-row-control caster-settings-row-control--grow">
                 <label className="caster-settings-range">
@@ -232,36 +254,77 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                     disabled={e.editDisabled}
                     onChange={(ev) => e.setCps(Number(ev.target.value))}
                   />
+                  <WheelNumberInput
+                    className="action-cell-input action-cell-num"
+                    min={1}
+                    max={500}
+                    value={Math.round(e.cps)}
+                    disabled={e.editDisabled}
+                    aria-label={t("clicker.entry.cadence")}
+                    onValueChange={(n) => e.setCps(n)}
+                  />
                 </label>
               </div>
             </div>
-            <label className="caster-field">
-              <span>{t("clicker.entry.unit")}</span>
-              <Select
-                className="caster-select"
-                value={e.rateUnit}
-                disabled={e.editDisabled}
-                options={[
-                  {
-                    value: "perSecond",
-                    label: t("clicker.segments.perSecond"),
-                  },
-                  {
-                    value: "perMinute",
-                    label: t("clicker.segments.perMinute"),
-                  },
-                  { value: "perHour", label: t("clicker.segments.perHour") },
-                  { value: "perDay", label: t("clicker.segments.perDay") },
-                ]}
-                onChange={(v) => e.setRateUnit(v as RateUnit)}
-              />
-            </label>
+            <div className="caster-settings-row">
+              <div className="caster-settings-row-label">
+                <span>{t("clicker.entry.unit")}</span>
+              </div>
+              <div className="caster-settings-row-control">
+                <div
+                  className="caster-segmented"
+                  role="group"
+                  aria-label={t("clicker.entry.unit")}
+                >
+                  {(
+                    [
+                      [
+                        "perSecond",
+                        t("clicker.segments.perSecondShort"),
+                        t("clicker.segments.perSecond"),
+                      ],
+                      [
+                        "perMinute",
+                        t("clicker.segments.perMinuteShort"),
+                        t("clicker.segments.perMinute"),
+                      ],
+                      [
+                        "perHour",
+                        t("clicker.segments.perHourShort"),
+                        t("clicker.segments.perHour"),
+                      ],
+                      [
+                        "perDay",
+                        t("clicker.segments.perDayShort"),
+                        t("clicker.segments.perDay"),
+                      ],
+                    ] as const
+                  ).map(([value, short, full]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={[
+                        "caster-segmented-btn",
+                        e.rateUnit === value ? "active" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      disabled={e.editDisabled}
+                      title={full}
+                      aria-label={full}
+                      onClick={() => e.setRateUnit(value as RateUnit)}
+                    >
+                      {short}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </>
         ) : (
           <div className="caster-settings-row">
             <div className="caster-settings-row-label">
               <span>{t("clicker.entry.interval")}</span>
-              <p>{e.cadenceDisplay}</p>
             </div>
             <div className="caster-settings-row-control caster-settings-row-control--grow">
               <label className="caster-settings-range">
@@ -274,6 +337,16 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                   disabled={e.editDisabled}
                   onChange={(ev) => e.setIntervalMs(Number(ev.target.value))}
                 />
+                <WheelNumberInput
+                  className="action-cell-input action-cell-num"
+                  min={1}
+                  max={2000}
+                  value={Math.round(e.intervalMs)}
+                  disabled={e.editDisabled}
+                  aria-label={t("clicker.entry.interval")}
+                  onValueChange={(n) => e.setIntervalMs(n)}
+                />
+                <span>ms</span>
               </label>
             </div>
           </div>
@@ -282,7 +355,6 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
         <div className="caster-settings-row">
           <div className="caster-settings-row-label">
             <span>{t("clicker.entry.randomTiming")}</span>
-            <p>±{e.randomPct}%</p>
           </div>
           <div className="caster-settings-row-control">
             <input
@@ -309,23 +381,31 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                   disabled={e.editDisabled}
                   onChange={(ev) => e.setRandomPct(Number(ev.target.value))}
                 />
-                <span>{e.randomPct}%</span>
+                <WheelNumberInput
+                  className="action-cell-input action-cell-num"
+                  min={0}
+                  max={95}
+                  value={e.randomPct}
+                  disabled={e.editDisabled}
+                  aria-label={t("clicker.entry.percent")}
+                  onValueChange={(n) => e.setRandomPct(n)}
+                />
+                <span>%</span>
               </label>
             </div>
           </div>
         ) : null}
 
-        <div className="caster-settings-row">
-          <div className="caster-settings-row-label">
-            <span>{t("clicker.entry.effectiveCap")}</span>
-          </div>
-          <div className="caster-settings-row-control">
-            <strong>{t("clicker.entry.capValue")}</strong>
-          </div>
-        </div>
-
         <details className="caster-clicker-details">
           <summary>{t("clicker.entry.advancedTiming")}</summary>
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
+              <span>{t("clicker.entry.effectiveCap")}</span>
+            </div>
+            <div className="caster-settings-row-control">
+              <strong>{t("clicker.entry.capValue")}</strong>
+            </div>
+          </div>
           <div className="caster-settings-row">
             <div className="caster-settings-row-label">
               <span>{t("clicker.entry.cpsMin")}</span>
@@ -388,23 +468,73 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
               </div>
             </div>
           </div>
+          <div className="caster-settings-row">
+            <div className="caster-settings-row-label">
+              <span>{t("clicker.entry.dutyMode")}</span>
+            </div>
+            <div className="caster-settings-row-control">
+              <div
+                className="caster-segmented"
+                role="group"
+                aria-label={t("clicker.entry.dutyMode")}
+              >
+                {(
+                  [
+                    ["pulse", t("clicker.segments.pulse")],
+                    ["holdPct", t("clicker.segments.holdPct")],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={[
+                      "caster-segmented-btn",
+                      e.dutyMode === value ? "active" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                    disabled={e.editDisabled}
+                    onClick={() => e.setDutyMode(value as DutyMode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {e.dutyMode === "pulse" ? (
+            <div className="caster-settings-row">
+              <div className="caster-settings-row-label">
+                <span>{t("clicker.entry.duty")}</span>
+              </div>
+              <div className="caster-settings-row-control caster-settings-row-control--grow">
+                <label className="caster-settings-range">
+                  <input
+                    type="range"
+                    min={5}
+                    max={100}
+                    step={5}
+                    value={Math.round(e.duty * 100)}
+                    disabled={e.editDisabled}
+                    onChange={(ev) => e.setDuty(Number(ev.target.value) / 100)}
+                  />
+                  <WheelNumberInput
+                    className="action-cell-input action-cell-num"
+                    min={5}
+                    max={100}
+                    step={5}
+                    value={Math.round(e.duty * 100)}
+                    disabled={e.editDisabled}
+                    aria-label={t("clicker.entry.duty")}
+                    onValueChange={(n) => e.setDuty(n / 100)}
+                  />
+                  <span>%</span>
+                </label>
+              </div>
+            </div>
+          ) : null}
         </details>
-
-        <details className="caster-clicker-details">
-          <summary>{t("clicker.entry.dutyAdvanced")}</summary>
-          <label className="caster-field">
-            <span>{t("clicker.entry.dutyMode")}</span>
-            <Select
-              className="caster-select"
-              value={e.dutyMode}
-              disabled={e.editDisabled}
-              options={[
-                { value: "pulse", label: t("clicker.segments.pulse") },
-                { value: "holdPct", label: t("clicker.segments.holdPct") },
-              ]}
-              onChange={(v) => e.setDutyMode(v as DutyMode)}
-            />
-          </label>
+        {e.dutyMode === "holdPct" ? (
           <div className="caster-settings-row">
             <div className="caster-settings-row-label">
               <span>{t("clicker.entry.duty")}</span>
@@ -420,11 +550,21 @@ export function ClickerEntrySection({ editor: e, onOpenProcessSettings }: Props)
                   disabled={e.editDisabled}
                   onChange={(ev) => e.setDuty(Number(ev.target.value) / 100)}
                 />
-                <span>{Math.round(e.duty * 100)}%</span>
+                <WheelNumberInput
+                  className="action-cell-input action-cell-num"
+                  min={5}
+                  max={100}
+                  step={5}
+                  value={Math.round(e.duty * 100)}
+                  disabled={e.editDisabled}
+                  aria-label={t("clicker.entry.duty")}
+                  onValueChange={(n) => e.setDuty(n / 100)}
+                />
+                <span>%</span>
               </label>
             </div>
           </div>
-        </details>
+        ) : null}
       </div>
     </div>
   );

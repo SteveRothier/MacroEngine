@@ -20,13 +20,13 @@ import {
   type ColorScheme,
 } from "../theme";
 import {
-  SCRIPT_SNIPPET_CLICK,
-  SCRIPT_SNIPPET_GET,
-  SCRIPT_SNIPPET_INCLUDE,
-  SCRIPT_SNIPPET_KEY,
-  SCRIPT_SNIPPET_PARAM,
-  SCRIPT_SNIPPET_RUN_PROCESS,
-  SCRIPT_SNIPPET_SET,
+  scriptSnippetClick,
+  scriptSnippetGet,
+  scriptSnippetInclude,
+  scriptSnippetKey,
+  scriptSnippetParam,
+  scriptSnippetRunProcess,
+  scriptSnippetSet,
   apiInsertSnippet,
   type ApiInsertName,
 } from "./snippets";
@@ -67,6 +67,13 @@ import { parseParamDefs } from "./parseParams";
 import type { ScriptDoc, ScriptLanguage } from "./types";
 export { newScriptId } from "./newScriptId";
 import type { EngineStatus, MacroValue } from "../macros/types";
+import {
+  DEFAULT_PROCESS_FILTER,
+  type ProcessFilter,
+  type ProcessFilterPreset,
+  type ProcessFilterScopeMode,
+  withLocalEnabled,
+} from "../process";
 import {
   mergeScriptsPrefs,
   type ScriptsPrefs,
@@ -110,6 +117,12 @@ function normalizeDoc(doc: ScriptDoc): ScriptDoc {
     allowInput: doc.allowInput ?? false,
     allowProcess: doc.allowProcess ?? false,
     paramValues: doc.paramValues ?? {},
+    processFilter: doc.processFilter ?? "inherit",
+    localProcessFilter: doc.localProcessFilter ?? {
+      enabled: false,
+      mode: "deny",
+      names: [],
+    },
   };
 }
 
@@ -134,7 +147,7 @@ export function ScriptEditorView({
   onBack,
   onDirtyChange,
   onLabelChange,
-  onOpenSettings: _onOpenSettings,
+  onOpenSettings,
   onOpenMacro,
   scriptsPrefs: scriptsPrefsProp,
   active = true,
@@ -159,6 +172,12 @@ export function ScriptEditorView({
   const [stepMode, setStepMode] = useState(false);
   const [stepPausedMethod, setStepPausedMethod] = useState<string | null>(null);
   const [runTimeline, setRunTimeline] = useState<ConsoleLine[]>([]);
+  const [globalProcessFilter, setGlobalProcessFilter] = useState<ProcessFilter>(
+    DEFAULT_PROCESS_FILTER,
+  );
+  const [processFilterPresets, setProcessFilterPresets] = useState<
+    ProcessFilterPreset[]
+  >([]);
   const consoleIdRef = useRef(0);
   const runTimelineIdRef = useRef(0);
   const lintTimerRef = useRef<number | null>(null);
@@ -460,6 +479,48 @@ export function ScriptEditorView({
     return () => window.removeEventListener("keydown", onKey);
   }, [active, flushAutosave]);
 
+  useEffect(() => {
+    void invoke<{
+      processFilter?: ProcessFilter;
+      processFilterPresets?: ProcessFilterPreset[];
+    }>("get_settings")
+      .then((s) => {
+        setGlobalProcessFilter(s.processFilter ?? DEFAULT_PROCESS_FILTER);
+        setProcessFilterPresets(s.processFilterPresets ?? []);
+      })
+      .catch(() => {
+        setGlobalProcessFilter(DEFAULT_PROCESS_FILTER);
+        setProcessFilterPresets([]);
+      });
+  }, [scriptId, active]);
+
+  const persistGlobalProcessFilter = useCallback(async (next: ProcessFilter) => {
+    setGlobalProcessFilter(next);
+    try {
+      const current = await invoke<Record<string, unknown>>("get_settings");
+      await invoke("save_app_settings", {
+        settings: { ...current, processFilter: next },
+      });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persistProcessFilterPresets = useCallback(
+    async (next: ProcessFilterPreset[]) => {
+      setProcessFilterPresets(next);
+      try {
+        const current = await invoke<Record<string, unknown>>("get_settings");
+        await invoke("save_app_settings", {
+          settings: { ...current, processFilterPresets: next },
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
+
   function patch(partial: Partial<ScriptDoc>) {
     if (locked) return;
     setDraft((prev) => {
@@ -736,6 +797,35 @@ export function ScriptEditorView({
         const doc = draftRef.current;
         if (doc) void persistNow(doc);
       }}
+      processFilter={globalProcessFilter}
+      processFilterMode={draft?.processFilter ?? "inherit"}
+      onProcessFilterModeChange={(mode: ProcessFilterScopeMode) => {
+        const cur = draftRef.current;
+        patch({
+          processFilter: mode,
+          ...(mode === "local"
+            ? {
+                localProcessFilter: withLocalEnabled(
+                  cur?.localProcessFilter ?? DEFAULT_PROCESS_FILTER,
+                ),
+              }
+            : {}),
+        });
+      }}
+      localProcessFilter={
+        draft?.localProcessFilter ?? DEFAULT_PROCESS_FILTER
+      }
+      onLocalProcessFilterChange={(localProcessFilter) =>
+        patch({ localProcessFilter })
+      }
+      onGlobalProcessFilterChange={(next) => {
+        void persistGlobalProcessFilter(next);
+      }}
+      onOpenProcessSettings={onOpenSettings}
+      processFilterPresets={processFilterPresets}
+      onProcessFilterPresetsChange={(next) => {
+        void persistProcessFilterPresets(next);
+      }}
     />,
     { active },
   );
@@ -790,7 +880,39 @@ export function ScriptEditorView({
             diagnostics={diagnostics}
             readOnly={locked}
           />
+          {diagnostics.length > 0 ? (
+            <div className="caster-script-diag-list" role="list">
+              {diagnostics.slice(0, 8).map((d, i) => {
+                const line =
+                  draft.source.slice(0, d.from).split(/\r?\n/).length || 1;
+                return (
+                  <button
+                    key={`diag-${i}-${d.from}`}
+                    type="button"
+                    role="listitem"
+                    className={`caster-script-diag-item is-${d.severity ?? "error"}`}
+                    onClick={() => sourceEditorRef.current?.gotoLine(line)}
+                  >
+                    L{line}: {d.message}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <div className="caster-script-snippets">
+            {presets.slice(0, 3).map((p) => (
+              <button
+                key={`quick-${p.id}`}
+                type="button"
+                className="caster-btn caster-btn-ghost caster-script-snippets-btn"
+                disabled={locked}
+                title={p.description}
+                onClick={() => void applyPreset(p)}
+              >
+                <FileCode2 size={14} aria-hidden />
+                {p.name}
+              </button>
+            ))}
             <DropdownMenu
               label={t("scripts.toolbar.examples")}
               ariaLabel={t("scripts.toolbar.examples")}
@@ -826,7 +948,7 @@ export function ScriptEditorView({
                         label: t("scripts.toolbar.snipGet"),
                         icon: <Code2 size={14} />,
                         onSelect: () =>
-                          insertSnippet(SCRIPT_SNIPPET_GET, {
+                          insertSnippet(scriptSnippetGet(locale), {
                             allowNetwork: true,
                           }),
                       },
@@ -834,20 +956,20 @@ export function ScriptEditorView({
                         id: "snip-set",
                         label: t("scripts.toolbar.snipSet"),
                         icon: <Code2 size={14} />,
-                        onSelect: () => insertSnippet(SCRIPT_SNIPPET_SET),
+                        onSelect: () => insertSnippet(scriptSnippetSet(locale)),
                       },
                       {
                         id: "snip-param",
                         label: t("scripts.toolbar.snipParam"),
                         icon: <Code2 size={14} />,
-                        onSelect: () => insertSnippet(SCRIPT_SNIPPET_PARAM),
+                        onSelect: () => insertSnippet(scriptSnippetParam(locale)),
                       },
                       {
                         id: "snip-click",
                         label: t("scripts.toolbar.snipClick"),
                         icon: <Code2 size={14} />,
                         onSelect: () =>
-                          insertSnippet(SCRIPT_SNIPPET_CLICK, {
+                          insertSnippet(scriptSnippetClick(locale), {
                             allowInput: true,
                           }),
                       },
@@ -856,7 +978,7 @@ export function ScriptEditorView({
                         label: t("scripts.toolbar.snipKey"),
                         icon: <Code2 size={14} />,
                         onSelect: () =>
-                          insertSnippet(SCRIPT_SNIPPET_KEY, {
+                          insertSnippet(scriptSnippetKey(locale), {
                             allowInput: true,
                           }),
                       },
@@ -864,14 +986,15 @@ export function ScriptEditorView({
                         id: "snip-include",
                         label: t("scripts.toolbar.snipInclude"),
                         icon: <Code2 size={14} />,
-                        onSelect: () => insertSnippet(SCRIPT_SNIPPET_INCLUDE),
+                        onSelect: () =>
+                          insertSnippet(scriptSnippetInclude(locale)),
                       },
                       {
                         id: "snip-process",
                         label: t("scripts.toolbar.snipProcess"),
                         icon: <Code2 size={14} />,
                         onSelect: () =>
-                          insertSnippet(SCRIPT_SNIPPET_RUN_PROCESS, {
+                          insertSnippet(scriptSnippetRunProcess(locale), {
                             allowProcess: true,
                           }),
                       },
@@ -891,6 +1014,11 @@ export function ScriptEditorView({
                         "include",
                         "runScript",
                         "click",
+                        "keyTap",
+                        "moveTo",
+                        "runProcess",
+                        "clipboardRead",
+                        "clipboardWrite",
                       ] as ApiInsertName[]
                     ).map((name) => ({
                       id: `api-${name}`,
@@ -910,6 +1038,9 @@ export function ScriptEditorView({
           scriptId={scriptId}
           lines={consoleLines}
           onClear={() => setConsoleLines([])}
+          onEmptyRun={() => void onRun()}
+          emptyRunDisabled={running || locked || !!draft?.isModule}
+          onJumpToLine={(line) => sourceEditorRef.current?.gotoLine(line)}
         />
         <ScriptRunTimeline
           lines={runTimeline}

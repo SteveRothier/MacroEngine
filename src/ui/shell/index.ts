@@ -33,7 +33,7 @@ export { DataTable, type Column } from "./DataTable";
 export { StatusPill, type StatusKind } from "./StatusPill";
 export { InspectorPanel, InspectorSection } from "./InspectorPanel";
 export { SummaryBar } from "./SummaryBar";
-export { CommandPalette, DisplayPopover, type CommandItem } from "./CommandPalette";
+export { DisplayPopover } from "./DisplayPopover";
 export {
   ActionPickerMenu,
   type ActionPickerEntry,

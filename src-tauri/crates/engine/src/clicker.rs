@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 use crate::cancel::CancellationToken;
-use crate::event_bus::{EngineEvent, EventBus, LogLevel, ZoneFeedbackKind};
+use crate::event_bus::{EngineEvent, EventBus, LogLevel, PixelFeedbackKind, ZoneFeedbackKind};
 use crate::input::{InputError, MouseButton, MouseInjector, Point};
 use crate::metrics::MetricsCollector;
 use crate::pause::PauseGate;
@@ -754,19 +754,30 @@ impl ClickerSession {
                                     if let Some(bus) = bus {
                                         bus.publish(EngineEvent::Log {
                                             level: LogLevel::Warn,
-                                            message: "pixel condition stop".into(),
+                                            message: "Condition pixel — session arrêtée (hors tolérance)"
+                                                .into(),
+                                        });
+                                        bus.publish(EngineEvent::PixelFeedback {
+                                            kind: PixelFeedbackKind::Stop,
                                         });
                                     }
                                     break;
                                 }
                                 PixelConditionAction::Pause => {
                                     if let Some(gate) = pause {
+                                        let already = gate.is_paused();
                                         gate.pause();
-                                        if let Some(bus) = bus {
-                                            bus.publish(EngineEvent::Log {
-                                                level: LogLevel::Info,
-                                                message: "pixel condition pause".into(),
-                                            });
+                                        if !already {
+                                            if let Some(bus) = bus {
+                                                bus.publish(EngineEvent::Log {
+                                                    level: LogLevel::Info,
+                                                    message: "Condition pixel — session en pause (hors tolérance)"
+                                                        .into(),
+                                                });
+                                                bus.publish(EngineEvent::PixelFeedback {
+                                                    kind: PixelFeedbackKind::Pause,
+                                                });
+                                            }
                                         }
                                     }
                                 }

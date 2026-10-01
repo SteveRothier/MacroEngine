@@ -274,11 +274,9 @@ export function ActionPickerMenu({
                       onMouseEnter={() => setActiveIdx(idx)}
                       onClick={() => pick(row.item)}
                     >
-                      {row.item.icon ? (
-                        <span className="caster-menu-item-icon" aria-hidden>
-                          {row.item.icon}
-                        </span>
-                      ) : null}
+                      <span className="caster-menu-item-icon" aria-hidden>
+                        {row.item.icon ?? null}
+                      </span>
                       <span className="caster-action-picker-item-text">
                         <span className="caster-menu-item-label">
                           {row.item.label}

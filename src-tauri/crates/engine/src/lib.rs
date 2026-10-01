@@ -16,6 +16,7 @@ pub mod event_bus;
 pub mod hotkeys;
 pub mod input;
 pub mod json_path;
+pub mod library_backup;
 pub mod library_index;
 pub mod macro_library;
 pub mod macro_vm;
@@ -57,20 +58,23 @@ pub use convert::{
     convert_library_item, convert_library_item_lang, ConvertError, ConvertMode, ConvertReport,
     ConvertResult,
 };
+pub use library_backup::{export_library_zip, import_library_zip, LibraryBackupError};
 pub use library_index::{
     assert_not_locked, create_library_folder, delete_library_folder, enrich_macro_summaries,
     get_library_index, is_locked, list_library_items, list_library_items_from_index, load_index,
-    move_library_item, prepare_library_index, purge_library_trash, remove_library_entry,
-    rename_library_entry_key, rename_library_folder, restore_library_item, set_library_item_locked,
-    trash_library_item, LibraryFolder, LibraryIndex, LibraryIndexDto, LibraryIndexError,
-    LibraryItemDto, LibraryKind, ListLibraryQuery,
+    move_library_item, prepare_library_index, purge_library_trash,
+    count_library_trash_older_than, purge_library_trash_older_than, remove_library_entry,
+    rename_library_entry_key,
+    rename_library_folder, reorder_library_folders, restore_library_item, set_library_folder_parent,
+    set_library_item_locked, trash_library_item, LibraryFolder, LibraryIndex, LibraryIndexDto,
+    LibraryIndexError, LibraryItemDto, LibraryKind, ListLibraryQuery,
 };
 pub use env::MacroEnv;
-pub use event_bus::{EngineEvent, EventBus, LogLevel, ZoneFeedbackKind};
+pub use event_bus::{EngineEvent, EventBus, LogLevel, PixelFeedbackKind, ZoneFeedbackKind};
 pub use hotkeys::{default_bindings, HotkeyBindings, HotkeyCallbacks, HotkeyHook};
 pub use input::{
-    default_injector, list_visible_process_exes, InputError, MouseButton, MouseInjector, Point,
-    RecordingInjector,
+    default_injector, list_visible_process_exe_entries, list_visible_process_exes, InputError,
+    MouseButton, MouseInjector, Point, ProcessExeEntry, RecordingInjector,
 };
 #[cfg(windows)]
 pub use input::SendInputInjector;
@@ -106,8 +110,8 @@ pub use settings::{
     clamp_overlay_opacity, load_settings, normalize_app_settings, save_settings, settings_path,
     AccentTheme, AccueilFilter, AccueilPrefs, AccueilSortBy, AccueilSortDir, AppearancePrefs,
     AppSettings, AutomationPrefs, ConfirmationsPrefs, MaintenancePrefs, ProcessFilter,
-    ProcessFilterMode, ScriptsPrefs, SettingsError, ShellPrefs, StartupView, ThemeMode, UiDensity,
-    UiLocale, WindowBounds,
+    ProcessFilterMode, ProcessFilterPreset, ScriptsPrefs, SettingsError, ShellPrefs, StartupView,
+    ThemeMode, UiDensity, UiLocale, WindowBounds,
 };
 pub use state::{EngineError, EngineState, StateTransitionError};
 pub use stop_zones::{

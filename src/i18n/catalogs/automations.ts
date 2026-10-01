@@ -8,9 +8,11 @@ export const automations = defineCatalog({
       all: "Tous",
       favorites: "Favoris",
       recent: "Récentes",
+      trash: "Corbeille",
       tipAll: "Toutes les automations",
       tipFavorites: "Favoris uniquement",
       tipRecent: "Dernières exécutions",
+      tipTrash: "Éléments mis à la corbeille",
     },
     folder: {
       selectTrigger: "Dossier",
@@ -28,6 +30,9 @@ export const automations = defineCatalog({
       renameFiltered: "Renommer le dossier filtré",
       rename: "Renommer",
       delete: "Supprimer le dossier",
+      createChild: "Nouveau sous-dossier",
+      moveToRoot: "Remonter à la racine",
+      moveInto: "Déplacer dans « {name} »",
       sectionMenuAria: "Actions du dossier {name}",
       itemCount: "{count} éléments",
       itemCountOne: "1 élément",
@@ -60,8 +65,8 @@ export const automations = defineCatalog({
       name: "Nom",
       type: "Type",
       trigger: "Déclencheur",
-      folderMeta: "Dossier / Meta",
-      lastRun: "Dernière exécution",
+      folderMeta: "Dossier",
+      lastRun: "Dernière exé",
       status: "État",
     },
     sections: {
@@ -82,6 +87,9 @@ export const automations = defineCatalog({
       noRecentTitle: "Aucune exécution récente",
       noRecentLead:
         "Lancez une macro, un clicker ou un script pour la voir apparaître ici.",
+      noTrashTitle: "Corbeille vide",
+      noTrashLead:
+        "Rien à restaurer. Les éléments mis à la corbeille apparaissent ici ; utilisez Vider pour les supprimer définitivement.",
       newClicker: "Nouveau clicker",
       newScript: "Nouveau script",
       newMacro: "Nouvelle macro",
@@ -107,6 +115,7 @@ export const automations = defineCatalog({
         moveTo: "Déplacer vers",
         noFolder: "Sans dossier",
         reveal: "Afficher dans l’explorateur",
+        goToFolder: "Aller au dossier",
         convertTo: "Convertir en",
         trash: "Mettre à la corbeille",
         delete: "Supprimer",
@@ -140,6 +149,7 @@ export const automations = defineCatalog({
       noFolderClickers: "Sans dossier (clickers)",
       noFolderScripts: "Sans dossier (scripts)",
       trash: "Corbeille",
+      restore: "Restaurer",
     },
     confirm: {
       launchTitle: "Lancer",
@@ -177,6 +187,8 @@ export const automations = defineCatalog({
       scriptModuleBlocked:
         "Ce script est un module bibliothèque — utilisez caster.include, pas Exécuter.",
       trashed: "Mis à la corbeille",
+      restored: "Restauré",
+      restoreFail: "Restauration impossible",
       deleted: "Suppression effectuée",
       deleteFail: "Échec de la suppression",
       undo: "Annuler",
@@ -231,6 +243,7 @@ export const automations = defineCatalog({
       running: "En cours",
       permAccess: "{count} accès",
       permTooltip: "Ce script utilise : {list}",
+      recentBadge: "Récent",
       lastRunTooltip: "Dernière exécution · {label}",
       neverRun: "Jamais exécuté",
       playTip: "Lancer",
@@ -249,6 +262,7 @@ export const automations = defineCatalog({
       sortName: "Nom",
       sortType: "Type",
       sortStatus: "Statut",
+      sortLastRun: "Dernière exé",
     },
     relative: {
       empty: "—",
@@ -277,6 +291,8 @@ export const automations = defineCatalog({
       undoTitle: "Annuler (Ctrl+Z)",
       redo: "Rétablir",
       redoTitle: "Rétablir (Ctrl+Y)",
+      purgeTrash: "Vider",
+      purgeTrashTitle: "Vider la corbeille définitivement",
     },
     convert: {
       kind: {
@@ -317,6 +333,45 @@ export const automations = defineCatalog({
       kept: "Conservé : {list}",
       dropped: "Non converti : {list}",
       openAfter: "Ouvrir",
+      tokens: {
+        scriptRunWrap: "enveloppe script.run",
+        runMacroWrap: "enveloppe runMacro",
+        points: "points",
+        stopZones: "zones d’arrêt",
+        pixelCondition: "condition pixel",
+        jitter: "jitter / aléatoire",
+        dutyCycle: "cycle de service",
+        holdMode: "mode maintien",
+        keyboardInput: "entrée clavier",
+        onCompleteMacro: "macro de fin",
+        keyboard: "clavier",
+        controlIf: "condition si",
+        controlWhile: "boucle tant que",
+        scriptRun: "script.run",
+        orphanDelay: "délai orphelin",
+        mixedClicks: "mélange curseur / fixe",
+        scriptBody: "corps du script",
+      },
+      warnings: {
+        clickerLimited:
+          "Les fonctions clicker au-delà des clics fixes + délai ne sont pas converties",
+        macroWrapsScript:
+          "La macro enveloppe le script d’origine via script.run",
+        scriptRunMacroPerm:
+          "Le script appelle caster.runMacro ; activez la permission contrôle macro",
+        generatedClicks: "{clicks} clic(s) généré(s) à ~{ms} ms",
+        intermediateMacro: "La macro intermédiaire « {name} » a aussi été créée",
+        clickerPreset:
+          "Preset clicker : {count} clic(s) @ ~{cps} CPS ({ms} ms)",
+        pointSequence:
+          "Preset clicker : séquence de {points} point(s) ({clicks} clic(s))",
+        pointsToClicks:
+          "{count} point(s) clicker convertis en séquence clic+délai",
+        macroActionsSkipped:
+          "Certaines actions de la macro ont été ignorées à la conversion clicker",
+        scriptClickerStub:
+          "Stub clicker : le corps du script ne peut pas être transcrit en clics",
+      },
     },
   },
   en: {
@@ -325,9 +380,11 @@ export const automations = defineCatalog({
       all: "All",
       favorites: "Favorites",
       recent: "Recent",
+      trash: "Trash",
       tipAll: "All automations",
       tipFavorites: "Favorites only",
       tipRecent: "Recent runs",
+      tipTrash: "Items in the trash",
     },
     folder: {
       selectTrigger: "Folder",
@@ -345,6 +402,9 @@ export const automations = defineCatalog({
       renameFiltered: "Rename filtered folder",
       rename: "Rename",
       delete: "Delete folder",
+      createChild: "New subfolder",
+      moveToRoot: "Move to root",
+      moveInto: "Move into “{name}”",
       sectionMenuAria: "Folder actions for {name}",
       itemCount: "{count} items",
       itemCountOne: "1 item",
@@ -377,7 +437,7 @@ export const automations = defineCatalog({
       name: "Name",
       type: "Type",
       trigger: "Trigger",
-      folderMeta: "Folder / Meta",
+      folderMeta: "Folder",
       lastRun: "Last run",
       status: "Status",
     },
@@ -397,6 +457,9 @@ export const automations = defineCatalog({
       seeAll: "See all automations",
       noRecentTitle: "No recent runs",
       noRecentLead: "Run a macro, clicker, or script to see it here.",
+      noTrashTitle: "Trash is empty",
+      noTrashLead:
+        "Nothing to restore. Trashed items appear here; use Empty to delete them permanently.",
       newClicker: "New clicker",
       newScript: "New script",
       newMacro: "New macro",
@@ -421,6 +484,7 @@ export const automations = defineCatalog({
         moveTo: "Move to",
         noFolder: "No folder",
         reveal: "Show in Explorer",
+        goToFolder: "Go to folder",
         convertTo: "Convert to",
         trash: "Move to trash",
         delete: "Delete",
@@ -454,6 +518,7 @@ export const automations = defineCatalog({
       noFolderClickers: "No folder (clickers)",
       noFolderScripts: "No folder (scripts)",
       trash: "Trash",
+      restore: "Restore",
     },
     confirm: {
       launchTitle: "Run",
@@ -491,6 +556,8 @@ export const automations = defineCatalog({
       scriptModuleBlocked:
         "This script is a library module — use caster.include, not Run.",
       trashed: "Moved to trash",
+      restored: "Restored",
+      restoreFail: "Unable to restore",
       deleted: "Deleted",
       deleteFail: "Delete failed",
       undo: "Undo",
@@ -545,6 +612,7 @@ export const automations = defineCatalog({
       running: "Running",
       permAccess: "{count} access",
       permTooltip: "This script uses: {list}",
+      recentBadge: "Recent",
       lastRunTooltip: "Last run · {label}",
       neverRun: "Never run",
       playTip: "Run",
@@ -563,6 +631,7 @@ export const automations = defineCatalog({
       sortName: "Name",
       sortType: "Type",
       sortStatus: "Status",
+      sortLastRun: "Last run",
     },
     relative: {
       empty: "—",
@@ -591,6 +660,8 @@ export const automations = defineCatalog({
       undoTitle: "Undo (Ctrl+Z)",
       redo: "Redo",
       redoTitle: "Redo (Ctrl+Y)",
+      purgeTrash: "Empty",
+      purgeTrashTitle: "Permanently empty trash",
     },
     convert: {
       kind: {
@@ -631,6 +702,44 @@ export const automations = defineCatalog({
       kept: "Kept: {list}",
       dropped: "Not converted: {list}",
       openAfter: "Open",
+      tokens: {
+        scriptRunWrap: "script.run wrap",
+        runMacroWrap: "runMacro wrap",
+        points: "points",
+        stopZones: "stop zones",
+        pixelCondition: "pixel condition",
+        jitter: "jitter / random",
+        dutyCycle: "duty cycle",
+        holdMode: "hold mode",
+        keyboardInput: "keyboard input",
+        onCompleteMacro: "on-complete macro",
+        keyboard: "keyboard",
+        controlIf: "if condition",
+        controlWhile: "while loop",
+        scriptRun: "script.run",
+        orphanDelay: "orphan delay",
+        mixedClicks: "mixed cursor/fixed clicks",
+        scriptBody: "script body",
+      },
+      warnings: {
+        clickerLimited:
+          "Clicker features beyond fixed clicks+delay are not converted",
+        macroWrapsScript: "Macro wraps the original script via script.run",
+        scriptRunMacroPerm:
+          "Script calls caster.runMacro; enable macro control permission",
+        generatedClicks: "Generated {clicks} click(s) at ~{ms} ms",
+        intermediateMacro: "Intermediate macro “{name}” was also created",
+        clickerPreset:
+          "Clicker preset: {count} click(s) @ ~{cps} CPS ({ms} ms)",
+        pointSequence:
+          "Clicker preset: {points} point sequence ({clicks} click(s))",
+        pointsToClicks:
+          "Converted {count} clicker point(s) to click+delay sequence",
+        macroActionsSkipped:
+          "Some macro actions were skipped during clicker conversion",
+        scriptClickerStub:
+          "Clicker stub: script body cannot be transcribed to clicks",
+      },
     },
   },
 });

@@ -11,11 +11,25 @@ export function humanizeScriptError(raw: string, t: TFunction): string {
   if (s === "module_not_runnable" || /module_not_runnable/i.test(s)) {
     return t("scripts.module.runBlocked");
   }
-  if (s === "script_timeout" || /script_timeout/i.test(s)) {
+  if (s === "script_timeout" || /script_timeout|timed?\s*out|timeout/i.test(s)) {
     return t("scripts.toast.timeout");
   }
   if (/engine already|already active|clicker is active|record is active/i.test(s)) {
     return t("scripts.toast.engineBusy");
+  }
+  if (
+    /process[_ ]?filter|filtre process|not in allow|blocked by process|exe not allowed/i.test(
+      s,
+    )
+  ) {
+    return t("scripts.toast.processFilterBlocked");
+  }
+  if (
+    /input (permission|denied)|allowInput|permission.*input|Input.*manquante/i.test(
+      s,
+    )
+  ) {
+    return t("scripts.toast.inputPermission");
   }
 
   const assertMatch = s.match(/assertion failed(?::\s*(.*))?/i);

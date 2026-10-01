@@ -2,12 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   adjustPathAfterRemove,
   duplicateAtPath,
+  duplicateManyAtPaths,
   flattenTree,
   getAtPath,
   insertAtPath,
   isAncestorPath,
   moveAtPath,
+  moveManyInParent,
   pasteAfterAtPath,
+  pasteManyAfterAtPath,
+  removeManyAtPaths,
   type MacroAction,
 } from "./types";
 
@@ -76,6 +80,21 @@ describe("pasteAfterAtPath", () => {
     expect(result!.actions[1]!.id).not.toBe("clip");
     expect(result!.actions[1]!.type).toBe("mouse.click");
     expect(result!.actions[2]!.id).toBe("b");
+  });
+});
+
+describe("pasteManyAfterAtPath", () => {
+  it("pastes several actions in order", () => {
+    const actions = [click("a")];
+    const result = pasteManyAfterAtPath(actions, [0], [
+      delay("d1", 10),
+      delay("d2", 20),
+    ]);
+    expect(result).not.toBeNull();
+    expect(result!.actions).toHaveLength(3);
+    expect(result!.newPath).toEqual([2]);
+    expect(result!.actions[1]!.type).toBe("delay");
+    expect(result!.actions[2]!.type).toBe("delay");
   });
 });
 
@@ -158,5 +177,27 @@ describe("control.while tree", () => {
       expect(parent.body[1]!.id).not.toBe("b0");
       expect(parent.body[2]!.id).toBe("b1");
     }
+  });
+});
+
+describe("batch remove / duplicate / move", () => {
+  it("removes many paths in one rewrite", () => {
+    const actions = [click("a"), click("b"), click("c"), click("d")];
+    const next = removeManyAtPaths(actions, [[1], [3]]);
+    expect(next.map((a) => a.id)).toEqual(["a", "c"]);
+  });
+
+  it("duplicates many and keeps distinct ids", () => {
+    const actions = [click("a"), click("b"), click("c")];
+    const result = duplicateManyAtPaths(actions, [[0], [2]]);
+    expect(result.actions).toHaveLength(5);
+    const ids = result.actions.map((a) => a.id);
+    expect(new Set(ids).size).toBe(5);
+  });
+
+  it("moves many siblings one step down", () => {
+    const actions = [click("a"), click("b"), click("c"), click("d")];
+    const next = moveManyInParent(actions, [[0], [1]], 1);
+    expect(next?.map((a) => a.id)).toEqual(["c", "a", "b", "d"]);
   });
 });

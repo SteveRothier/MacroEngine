@@ -1,3 +1,5 @@
+import type { ProcessFilter, ProcessFilterScopeMode } from "../process";
+
 /** Script language (JavaScript or TypeScript). */
 export type ScriptLanguage = "javascript" | "typescript";
 
@@ -14,6 +16,8 @@ export type ScriptDoc = {
   allowInput?: boolean;
   allowProcess?: boolean;
   paramValues?: Record<string, boolean | number | string>;
+  processFilter?: ProcessFilterScopeMode;
+  localProcessFilter?: ProcessFilter;
 };
 
 /** Accueil / list metadata without source. */

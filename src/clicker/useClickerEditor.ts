@@ -33,6 +33,7 @@ import {
   type ZoneSelection,
   screenGeomFromDisplay,
 } from "./clickerTypes";
+import { withLocalEnabled } from "../process";
 import { useClickerSettingsApi } from "./useClickerSettings";
 import { useToast } from "../ui/shell";
 import {
@@ -108,7 +109,6 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const [metrics, setMetrics] = useState<ClickerMetrics | null>(null);
   const [foregroundExe, setForegroundExe] = useState<string | null>(null);
   const [overlayVisible, setOverlayVisible] = useState(false);
-  const [advancedUi, setAdvancedUi] = useState(false);
   const [targetFixed, setTargetFixed] = useState(false);
   const [targetX, setTargetX] = useState(0);
   const [targetY, setTargetY] = useState(0);
@@ -160,6 +160,9 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const [processFilter, setProcessFilter] = useState<ProcessFilter>(
     DEFAULT_PROCESS_FILTER,
   );
+  const [processFilterPresets, setProcessFilterPresets] = useState<
+    import("../process").ProcessFilterPreset[]
+  >([]);
   const [presetFilterMode, setPresetFilterMode] =
     useState<ClickerProcessFilterMode>("inherit");
   const [localProcessFilter, setLocalProcessFilter] = useState<ProcessFilter>(
@@ -179,6 +182,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   const triggerRef = useRef<ClickerTrigger>(MANUAL_TRIGGER);
   const autosaveTimerRef = useRef<number | null>(null);
   const capturingPointsRef = useRef(false);
+  const targetFixedRef = useRef(false);
+  const pointsEnabledRef = useRef(false);
   const buildConfigRef = useRef<() => ClickerConfigPayload>(() => {
     throw new Error("buildConfig not ready");
   });
@@ -198,6 +203,12 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   useEffect(() => {
     capturingPointsRef.current = capturingPoints;
   }, [capturingPoints]);
+  useEffect(() => {
+    targetFixedRef.current = targetFixed;
+  }, [targetFixed]);
+  useEffect(() => {
+    pointsEnabledRef.current = pointsEnabled;
+  }, [pointsEnabled]);
 
   const syncHistFlags = useCallback(() => {
     setCanUndo(pastRef.current.length > 0);
@@ -398,19 +409,20 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     ) => {
       await saveBundle({
         clicker: buildConfig(),
-        advancedUi,
+        advancedUi: true,
         overlayVisible: nextOverlay,
         processFilter: nextFilter,
+        processFilterPresets,
         theme: nextTheme,
         displayId: nextDisplayId,
       });
     },
     [
       activeDisplayId,
-      advancedUi,
       buildConfig,
       overlayVisible,
       processFilter,
+      processFilterPresets,
       saveBundle,
       theme,
     ],
@@ -645,8 +657,15 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         "stop_clicker_point_capture",
       );
       if (captured.length > 0) {
-        setPoints((prev) => [...prev, ...captured]);
-        setPointsEnabled(true);
+        // Fixed-mode pick: first click becomes the single target.
+        if (targetFixedRef.current && !pointsEnabledRef.current) {
+          const pt = captured[0];
+          setTargetX(pt.x);
+          setTargetY(pt.y);
+        } else {
+          setPoints((prev) => [...prev, ...captured]);
+          setPointsEnabled(true);
+        }
       }
       return captured;
     } catch {
@@ -688,6 +707,16 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
           setCapturedCount(s.count);
           setLiveCapturePoints(s.points ?? []);
           if (!s.active) {
+            stopped = true;
+            void finishPointCapture().catch(() => {});
+            return;
+          }
+          // Fixed-mode pick: accept the first click and stop (no multi-point UI).
+          if (
+            targetFixedRef.current &&
+            !pointsEnabledRef.current &&
+            s.count >= 1
+          ) {
             stopped = true;
             void finishPointCapture().catch(() => {});
           }
@@ -786,6 +815,40 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       setZoneSelection((cur) =>
         cur?.kind === "custom" && cur.id === id ? null : cur,
       );
+    },
+    [pushHistory],
+  );
+
+  const removeCustomZones = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      if (ids.length === 1) {
+        removeCustomZone(ids[0]!);
+        return;
+      }
+      const idSet = new Set(ids);
+      pushHistory("clicker.history.zoneDeleted");
+      setZoneModel((m) => ({
+        ...m,
+        customZones: m.customZones.filter((z) => !idSet.has(z.id)),
+      }));
+      setZoneSelection((cur) =>
+        cur?.kind === "custom" && idSet.has(cur.id) ? null : cur,
+      );
+    },
+    [pushHistory, removeCustomZone],
+  );
+
+  const bringCustomZonesFront = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return;
+      const idSet = new Set(ids);
+      pushHistory("clicker.history.zoneReordered");
+      setZoneModel((m) => {
+        const moving = m.customZones.filter((z) => idSet.has(z.id));
+        const rest = m.customZones.filter((z) => !idSet.has(z.id));
+        return { ...m, customZones: [...rest, ...moving] };
+      });
     },
     [pushHistory],
   );
@@ -1001,8 +1064,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         const s = await loadSettings();
         if (s) {
           setOverlayVisible(s.overlayVisible);
-          setAdvancedUi(s.advancedUi);
           setProcessFilter(s.processFilter ?? DEFAULT_PROCESS_FILTER);
+          setProcessFilterPresets(s.processFilterPresets ?? []);
           setActiveDisplayId(s.displayId ?? null);
         }
       } catch {
@@ -1329,8 +1392,30 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     liveCapturePoints,
     onTogglePointCapture,
     processFilter,
+    setGlobalProcessFilter: (next: ProcessFilter) => {
+      setProcessFilter(next);
+      void persistUi(overlayVisible, next);
+    },
+    processFilterPresets,
+    setProcessFilterPresets: (next: import("../process").ProcessFilterPreset[]) => {
+      setProcessFilterPresets(next);
+      void saveBundle({
+        clicker: buildConfig(),
+        advancedUi: true,
+        overlayVisible,
+        processFilter,
+        processFilterPresets: next,
+        theme,
+        displayId: activeDisplayId,
+      });
+    },
     presetFilterMode,
-    setPresetFilterMode,
+    setPresetFilterMode: (mode: import("../process").ProcessFilterScopeMode) => {
+      setPresetFilterMode(mode);
+      if (mode === "local") {
+        setLocalProcessFilter((cur) => withLocalEnabled(cur));
+      }
+    },
     localProcessFilter,
     setLocalProcessFilter,
     drawing,
@@ -1359,6 +1444,8 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     addCustomZone,
     updateCustomZone,
     removeCustomZone,
+    removeCustomZones,
+    bringCustomZonesFront,
     duplicateCustomZone,
     moveCustomZoneOrder,
     onSavePreset,

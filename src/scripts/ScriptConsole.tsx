@@ -27,7 +27,23 @@ type Props = {
   scriptId: string;
   lines: ConsoleLine[];
   onClear: () => void;
+  /** Short empty-state CTA (e.g. run script). */
+  onEmptyRun?: () => void;
+  emptyRunDisabled?: boolean;
+  /** Jump editor to 1-based line when a console line embeds a line number. */
+  onJumpToLine?: (line: number) => void;
 };
+
+/** Parse first 1-based line number from common error formats. */
+export function parseConsoleLineNumber(text: string): number | null {
+  const m =
+    text.match(/\b(?:line|ligne)\s*[:=]?\s*(\d+)\b/i) ||
+    text.match(/:(\d+)(?::\d+)?\b/) ||
+    text.match(/\((\d+)(?:,\d+)?\)/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 function storageKey(scriptId: string, suffix: string) {
   return `caster.script.${suffix}.${scriptId}`;
@@ -78,7 +94,14 @@ export function formatConsoleTime(
   });
 }
 
-export function ScriptConsole({ scriptId, lines, onClear }: Props) {
+export function ScriptConsole({
+  scriptId,
+  lines,
+  onClear,
+  onEmptyRun,
+  emptyRunDisabled,
+  onJumpToLine,
+}: Props) {
   const t = useT();
   const [collapsed, setCollapsed] = useState(() => readCollapsed(scriptId));
   const [height, setHeight] = useState(() => readHeight(scriptId));
@@ -223,19 +246,53 @@ export function ScriptConsole({ scriptId, lines, onClear }: Props) {
             aria-live="polite"
           >
             {lines.length === 0 ? (
-              <p className="caster-script-console-empty">
-                {t("scripts.console.empty")}
-              </p>
+              <div className="caster-script-console-empty">
+                <p>{t("scripts.console.empty")}</p>
+                {onEmptyRun ? (
+                  <button
+                    type="button"
+                    className="caster-btn caster-btn-ghost"
+                    disabled={emptyRunDisabled}
+                    onClick={onEmptyRun}
+                  >
+                    {t("scripts.console.emptyCta")}
+                  </button>
+                ) : null}
+              </div>
             ) : (
-              lines.map((line) => (
+              lines.map((line) => {
+                const jumpLine = onJumpToLine
+                  ? parseConsoleLineNumber(line.text)
+                  : null;
+                return (
                 <div
                   key={line.id}
-                  className={`caster-script-console-line is-${line.level}`}
+                  className={`caster-script-console-line is-${line.level}${
+                    jumpLine != null ? " is-jumpable" : ""
+                  }`}
+                  role={jumpLine != null ? "button" : undefined}
+                  tabIndex={jumpLine != null ? 0 : undefined}
+                  onClick={
+                    jumpLine != null
+                      ? () => onJumpToLine?.(jumpLine)
+                      : undefined
+                  }
+                  onKeyDown={
+                    jumpLine != null
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onJumpToLine?.(jumpLine);
+                          }
+                        }
+                      : undefined
+                  }
                 >
                   <span className="caster-script-console-time">{line.time}</span>
                   <span className="caster-script-console-msg">{line.text}</span>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         ) : null}

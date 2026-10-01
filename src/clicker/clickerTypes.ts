@@ -23,23 +23,9 @@ export function normalizeExeName(s: string): string {
   return base.toLowerCase();
 }
 
-/** Whether the global process filter allows execution for the foreground exe. */
-export function processFilterAllows(
-  filter: ProcessFilter,
-  foregroundExe: string | null | undefined,
-): boolean {
-  if (!filter.enabled) return true;
-  const listed = filter.names.map(normalizeExeName).filter((n) => n.length > 0);
-  if (listed.length === 0) {
-    return filter.mode === "deny";
-  }
-  const exe = foregroundExe ? normalizeExeName(foregroundExe) : "";
-  if (!exe) {
-    return filter.mode === "deny";
-  }
-  const hit = listed.includes(exe);
-  return filter.mode === "allow" ? hit : !hit;
-}
+export {
+  processFilterAllows,
+} from "../process/types";
 
 export type MouseButton = "left" | "right" | "middle";
 export type ClickMode = "hold" | "toggle";
@@ -229,11 +215,14 @@ export type AppSettings = {
   overlayVisible: boolean;
   overlayOpacity?: number;
   processFilter?: ProcessFilter;
+  processFilterPresets?: import("../process").ProcessFilterPreset[];
   theme?: ThemeMode;
   displayId?: string | null;
   sidebarCollapsed?: boolean;
   journalOpen?: boolean;
   closeToTray?: boolean;
+  /** Minimize button hides to tray (distinct from closeToTray / startInTray). */
+  minimizeHidesToTray?: boolean;
   startWithWindows?: boolean;
   accueil?: import("../settings/settingsTypes").AccueilPrefs;
   shell?: import("../settings/settingsTypes").ShellPrefs;

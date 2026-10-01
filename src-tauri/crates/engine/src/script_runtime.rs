@@ -17,6 +17,7 @@ use crate::input::{MouseButton, MouseInjector, Point};
 use crate::script_library::{resolve_script, ScriptLanguage};
 use crate::script_transpile::prepare_script_source;
 use crate::schema::MacroValue;
+use crate::settings::ProcessFilter;
 use std::collections::{HashMap, HashSet};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -107,6 +108,8 @@ pub struct ScriptOptions {
     pub dry_run: bool,
     /// Optional step-through gate (script session debug).
     pub step_gate: Option<Arc<ScriptStepGate>>,
+    /// Effective process filter (already resolved inherit/off/local).
+    pub process_filter: Option<Arc<Mutex<ProcessFilter>>>,
 }
 
 impl Default for ScriptOptions {
@@ -127,6 +130,7 @@ impl Default for ScriptOptions {
             include_stack: None,
             dry_run: false,
             step_gate: None,
+            process_filter: None,
         }
     }
 }
@@ -282,6 +286,7 @@ pub fn merge_child_script_opts(base: &ScriptOptions, doc: &crate::script_library
     child.allow_process |= doc.allow_process;
     child.language = doc.language;
     child.call_depth = depth + 1;
+    child.process_filter = doc.effective_process_filter(base.process_filter.clone());
     child
 }
 
@@ -421,6 +426,7 @@ pub fn run_script_with_options(
     let data_dir = opts.script_data_dir();
     let config_dir = opts.config_dir.clone();
     let injector = opts.injector.clone();
+    let process_filter = opts.process_filter.clone();
     let run_macro = opts.run_macro.clone();
     let _include_stack = opts
         .include_stack
@@ -695,6 +701,8 @@ pub fn run_script_with_options(
     };
 
     let step_opts_sleep = step_opts.clone();
+    let pf_sleep = process_filter.clone();
+    let inj_sleep = injector.clone();
     let sleep_fn = unsafe {
         NativeFunction::from_closure(move |_this, args, _ctx| {
             if !allow_input {
@@ -705,6 +713,7 @@ pub fn run_script_with_options(
             let cancel = unsafe { &*(cancel_ptr as *const CancellationToken) };
             let bus = unsafe { &*(bus_ptr as *const EventBus) };
             maybe_step(&step_opts_sleep, bus, cancel, "caster.sleep").map_err(step_js_err)?;
+            wait_while_process_blocked(inj_sleep.as_ref(), pf_sleep.as_ref(), cancel)?;
             let ms = args
                 .first()
                 .and_then(|v| v.as_number())
@@ -724,6 +733,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let pf_click = process_filter.clone();
     let inj_click = injector.clone();
     let step_opts_click = step_opts.clone();
     let click_fn = unsafe {
@@ -735,8 +745,7 @@ pub fn run_script_with_options(
                 dry_run_skip(bus, "caster.click");
                 return Ok(JsValue::undefined());
             }
-            require_input(allow_input, "caster.click")?;
-            let inj = require_injector(inj_click.as_ref())?;
+            let inj = gate_input(allow_input, "caster.click", &inj_click, &pf_click, cancel)?;
             let (button, x, y) = parse_mouse_opts(args.first(), ctx)?;
             maybe_move_xy(inj, x, y)?;
             inj.click(button).map_err(input_js_err)?;
@@ -744,6 +753,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let pf_move = process_filter.clone();
     let inj_move = injector.clone();
     let step_opts_move = step_opts.clone();
     let move_to_fn = unsafe {
@@ -755,8 +765,7 @@ pub fn run_script_with_options(
                 dry_run_skip(bus, "caster.moveTo");
                 return Ok(JsValue::undefined());
             }
-            require_input(allow_input, "caster.moveTo")?;
-            let inj = require_injector(inj_move.as_ref())?;
+            let inj = gate_input(allow_input, "caster.moveTo", &inj_move, &pf_move, cancel)?;
             let x = args
                 .first()
                 .and_then(|v| v.as_number())
@@ -774,6 +783,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let pf_down = process_filter.clone();
     let inj_down = injector.clone();
     let step_opts_mdown = step_opts.clone();
     let mouse_down_fn = unsafe {
@@ -785,8 +795,7 @@ pub fn run_script_with_options(
                 dry_run_skip(bus, "caster.mouseDown");
                 return Ok(JsValue::undefined());
             }
-            require_input(allow_input, "caster.mouseDown")?;
-            let inj = require_injector(inj_down.as_ref())?;
+            let inj = gate_input(allow_input, "caster.mouseDown", &inj_down, &pf_down, cancel)?;
             let (button, x, y) = parse_mouse_opts(args.first(), ctx)?;
             maybe_move_xy(inj, x, y)?;
             inj.mouse_down(button).map_err(input_js_err)?;
@@ -794,6 +803,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let pf_up = process_filter.clone();
     let inj_up = injector.clone();
     let step_opts_mup = step_opts.clone();
     let mouse_up_fn = unsafe {
@@ -805,8 +815,7 @@ pub fn run_script_with_options(
                 dry_run_skip(bus, "caster.mouseUp");
                 return Ok(JsValue::undefined());
             }
-            require_input(allow_input, "caster.mouseUp")?;
-            let inj = require_injector(inj_up.as_ref())?;
+            let inj = gate_input(allow_input, "caster.mouseUp", &inj_up, &pf_up, cancel)?;
             let (button, x, y) = parse_mouse_opts(args.first(), ctx)?;
             maybe_move_xy(inj, x, y)?;
             inj.mouse_up(button).map_err(input_js_err)?;
@@ -814,6 +823,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let pf_wheel = process_filter.clone();
     let inj_wheel = injector.clone();
     let step_opts_wheel = step_opts.clone();
     let wheel_fn = unsafe {
@@ -825,8 +835,7 @@ pub fn run_script_with_options(
                 dry_run_skip(bus, "caster.wheel");
                 return Ok(JsValue::undefined());
             }
-            require_input(allow_input, "caster.wheel")?;
-            let inj = require_injector(inj_wheel.as_ref())?;
+            let inj = gate_input(allow_input, "caster.wheel", &inj_wheel, &pf_wheel, cancel)?;
             let delta = args
                 .first()
                 .and_then(|v| v.as_number())
@@ -840,6 +849,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let pf_ktap = process_filter.clone();
     let inj_ktap = injector.clone();
     let step_opts_ktap = step_opts.clone();
     let key_tap_fn = unsafe {
@@ -851,8 +861,7 @@ pub fn run_script_with_options(
                 dry_run_skip(bus, "caster.keyTap");
                 return Ok(JsValue::undefined());
             }
-            require_input(allow_input, "caster.keyTap")?;
-            let inj = require_injector(inj_ktap.as_ref())?;
+            let inj = gate_input(allow_input, "caster.keyTap", &inj_ktap, &pf_ktap, cancel)?;
             let key = args
                 .first()
                 .and_then(|v| v.as_string())
@@ -867,6 +876,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let pf_kdown = process_filter.clone();
     let inj_kdown = injector.clone();
     let step_opts_kdown = step_opts.clone();
     let key_down_fn = unsafe {
@@ -878,8 +888,7 @@ pub fn run_script_with_options(
                 dry_run_skip(bus, "caster.keyDown");
                 return Ok(JsValue::undefined());
             }
-            require_input(allow_input, "caster.keyDown")?;
-            let inj = require_injector(inj_kdown.as_ref())?;
+            let inj = gate_input(allow_input, "caster.keyDown", &inj_kdown, &pf_kdown, cancel)?;
             let key = args
                 .first()
                 .and_then(|v| v.as_string())
@@ -894,6 +903,7 @@ pub fn run_script_with_options(
         })
     };
 
+    let pf_kup = process_filter.clone();
     let inj_kup = injector.clone();
     let step_opts_kup = step_opts.clone();
     let key_up_fn = unsafe {
@@ -905,8 +915,7 @@ pub fn run_script_with_options(
                 dry_run_skip(bus, "caster.keyUp");
                 return Ok(JsValue::undefined());
             }
-            require_input(allow_input, "caster.keyUp")?;
-            let inj = require_injector(inj_kup.as_ref())?;
+            let inj = gate_input(allow_input, "caster.keyUp", &inj_kup, &pf_kup, cancel)?;
             let key = args
                 .first()
                 .and_then(|v| v.as_string())
@@ -1354,6 +1363,51 @@ fn require_injector(
     })
 }
 
+fn wait_while_process_blocked(
+    injector: Option<&Arc<dyn MouseInjector>>,
+    process_filter: Option<&Arc<Mutex<ProcessFilter>>>,
+    cancel: &CancellationToken,
+) -> Result<(), boa_engine::JsError> {
+    let Some(shared) = process_filter else {
+        return Ok(());
+    };
+    let Some(inj) = injector else {
+        return Ok(());
+    };
+    loop {
+        if cancel.is_cancelled() {
+            return Err(boa_engine::JsNativeError::error()
+                .with_message("cancelled")
+                .into());
+        }
+        let allowed = {
+            let Ok(filter) = shared.lock() else {
+                return Ok(());
+            };
+            if !filter.enabled {
+                return Ok(());
+            }
+            filter.allows(inj.foreground_exe().as_deref())
+        };
+        if allowed {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(40));
+    }
+}
+
+fn gate_input<'a>(
+    allow: bool,
+    name: &str,
+    injector: &'a Option<Arc<dyn MouseInjector>>,
+    process_filter: &Option<Arc<Mutex<ProcessFilter>>>,
+    cancel: &CancellationToken,
+) -> Result<&'a dyn MouseInjector, boa_engine::JsError> {
+    require_input(allow, name)?;
+    wait_while_process_blocked(injector.as_ref(), process_filter.as_ref(), cancel)?;
+    require_injector(injector.as_ref())
+}
+
 fn input_js_err(e: crate::input::InputError) -> boa_engine::JsError {
     boa_engine::JsNativeError::error()
         .with_message(e.to_string())
@@ -1620,6 +1674,8 @@ mod tests {
             allow_input: false,
             allow_process,
             param_values: Default::default(),
+            process_filter: Default::default(),
+            local_process_filter: Default::default(),
         }
     }
 

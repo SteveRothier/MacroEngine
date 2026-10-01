@@ -1603,6 +1603,8 @@ impl AppState {
                 include_stack: None,
                 dry_run,
                 step_gate: step_gate.clone(),
+                process_filter: doc
+                    .effective_process_filter(Some(app.process_filter_handle())),
             };
             if opts.allow_macro_control {
                 let inj = Arc::clone(&injector);
@@ -2289,6 +2291,8 @@ mod tests {
             allow_input: false,
             allow_process: false,
             param_values: HashMap::new(),
+            process_filter: Default::default(),
+            local_process_filter: Default::default(),
         };
         save_script(&dir, &doc).unwrap();
 
