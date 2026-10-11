@@ -1,7 +1,7 @@
 export const TAB_LAYOUT = {
   MIN_W: 36,
   /** Soft ceiling for layout math / animations — keep in sync with --caster-tab-max-w. */
-  MAX_W: 220,
+  MAX_W: 160,
   STRIP_GAP_PX: 4,
   /** Min width of `.caster-doc-tabbar-drag-fill` (CSS flex-grows to fill leftover strip). */
   DRAG_FILL_W: 24,
@@ -18,6 +18,12 @@ export function clampTabWidth(width: number, tokens?: TabStripTokens): number {
   return Math.min(t.maxW, Math.max(t.minW, width));
 }
 
+/**
+ * Equal tab width for the current strip: fills available scroll width up to
+ * maxW, keeps a drag-fill reserve, and floors at minW (strip may then scroll).
+ *
+ * Strip children: N tabs + add button + drag-fill → N+1 gaps.
+ */
 export function computeTargetTabWidth(
   scrollEl: HTMLElement,
   addBtnEl: HTMLElement | null,
@@ -29,7 +35,9 @@ export function computeTargetTabWidth(
   if (tabCount <= 0) {
     return t.maxW;
   }
-  const gapTotal = tabCount * TAB_LAYOUT.STRIP_GAP_PX;
-  const available = scrollEl.clientWidth - addW - TAB_LAYOUT.DRAG_FILL_W - gapTotal;
+  // Gaps between tabs, before add, and before drag-fill.
+  const gapTotal = (tabCount + 1) * TAB_LAYOUT.STRIP_GAP_PX;
+  const available =
+    scrollEl.clientWidth - addW - TAB_LAYOUT.DRAG_FILL_W - gapTotal;
   return clampTabWidth(Math.floor(available / tabCount), t);
 }

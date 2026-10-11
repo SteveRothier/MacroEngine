@@ -76,7 +76,7 @@ export function recentStatusLabel(
   }
 }
 
-/** Compact Accueil cell: relative · duration · status (when known). */
+/** Compact Accueil cell: relative · duration (non-ok status when known). */
 export function formatLastRunSummary(
   entry: RecentEntry,
   t: TFunction,
@@ -88,11 +88,13 @@ export function formatLastRunSummary(
     const d = formatDuration(entry.durationMs, t, locale);
     if (d) parts.push(d);
   }
-  if (entry.status) parts.push(recentStatusLabel(entry.status, t));
+  if (entry.status && entry.status !== "ok") {
+    parts.push(recentStatusLabel(entry.status, t));
+  }
   return parts.join(" · ");
 }
 
-/** Tooltip: statut · durée · relative. */
+/** Tooltip: durée · relative (non-ok status when known). */
 export function formatLastRunTooltip(
   entry: RecentEntry,
   t: TFunction,
@@ -100,7 +102,9 @@ export function formatLastRunTooltip(
   locale: AppLocale = "fr",
 ): string {
   const parts: string[] = [];
-  if (entry.status) parts.push(recentStatusLabel(entry.status, t));
+  if (entry.status && entry.status !== "ok") {
+    parts.push(recentStatusLabel(entry.status, t));
+  }
   if (entry.durationMs != null && entry.durationMs >= 0) {
     const d = formatDuration(entry.durationMs, t, locale);
     if (d) parts.push(d);

@@ -1,4 +1,11 @@
-import { ArrowLeft, MoreHorizontal, Play, Square } from "lucide-react";
+import {
+  ArrowLeft,
+  Lock,
+  LockOpen,
+  MoreHorizontal,
+  Play,
+  Square,
+} from "lucide-react";
 import { useT, type TFunction } from "../i18n";
 import {
   DEFAULT_PROCESS_FILTER,
@@ -7,7 +14,13 @@ import {
   type ProcessFilterPreset,
   type ProcessFilterScopeMode,
 } from "../process";
-import { DropdownMenu, EditorToolbar, Select, Tooltip } from "../ui/shell";
+import {
+  DropdownMenu,
+  EditorToolbar,
+  Select,
+  Tooltip,
+} from "../ui/shell";
+import type { DropdownEntry } from "../ui/shell";
 import {
   ScriptPermissionsMenu,
   type ScriptPermissions,
@@ -27,6 +40,7 @@ type Props = {
   permissions: ScriptPermissions;
   onPermissionsChange: (partial: Partial<ScriptPermissions>) => void;
   locked?: boolean;
+  onLockChange?: (locked: boolean) => void;
   loading?: boolean;
   dryRun?: boolean;
   onDryRunChange?: (dryRun: boolean) => void;
@@ -77,6 +91,7 @@ export function ScriptTitleBarTools({
   permissions,
   onPermissionsChange,
   locked = false,
+  onLockChange,
   loading = false,
   dryRun = false,
   onDryRunChange,
@@ -155,14 +170,6 @@ export function ScriptTitleBarTools({
               if (e.key === "Enter") e.currentTarget.blur();
             }}
           />
-          {locked ? (
-            <span
-              className="caster-clicker-lock"
-              title={t("scripts.toolbar.lockedTitle")}
-            >
-              {t("scripts.toolbar.locked")}
-            </span>
-          ) : null}
           {onConvertToMacro ? (
             <button
               type="button"
@@ -193,9 +200,27 @@ export function ScriptTitleBarTools({
             label={t("scripts.toolbar.options")}
             ariaLabel={t("scripts.toolbar.optionsAria")}
             align="start"
-            disabled={editDisabled && running}
+            disabled={running && editDisabled}
             triggerClassName="caster-titlebar-btn caster-btn caster-btn-ghost"
             items={[
+              ...(onLockChange
+                ? ([
+                    {
+                      id: "lock-toggle",
+                      label: locked
+                        ? t("scripts.toolbar.unlockTitle")
+                        : t("scripts.toolbar.lockTitle"),
+                      icon: locked ? (
+                        <LockOpen size={14} />
+                      ) : (
+                        <Lock size={14} />
+                      ),
+                      disabled: loading,
+                      onSelect: () => onLockChange(!locked),
+                    },
+                    { id: "sep-lock", label: "", separator: true },
+                  ] satisfies DropdownEntry[])
+                : []),
               {
                 id: "module",
                 label: isModule
@@ -275,7 +300,7 @@ export function ScriptTitleBarTools({
               onModeChange={onProcessFilterModeChange}
               localFilter={localProcessFilter}
               onLocalFilterChange={onLocalProcessFilterChange}
-              disabled={editDisabled || running}
+              disabled={locked}
               onOpenSettings={onOpenProcessSettings}
               onGlobalFilterChange={onGlobalProcessFilterChange}
               presets={processFilterPresets}

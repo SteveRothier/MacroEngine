@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -14,6 +15,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   ChevronDown,
   Code2,
+  Copy,
   Folder,
   FolderPlus,
   Lock,
@@ -60,7 +62,6 @@ import { AutomationsToolbar } from "./AutomationsToolbar";
 import { buildAutomationRowMenuItems } from "./automationRowMenuItems";
 import { automationRowMenuIcons } from "./automationRowMenuIcons";
 import { highlightQuery } from "./highlightQuery";
-import { loadRecent } from "../app/recent";
 import {
   commonConvertTargets,
   convertBatchSummaryMessage,
@@ -82,14 +83,15 @@ import {
   favoriteTooltip,
   kindTooltip,
   metaTooltip,
+  rowInfoLabel,
   rowSubtitle,
-  statusTooltip,
+  showTriggerLabel,
 } from "./rowLabels";
 import {
   COLLAPSED_SECTIONS_KEY,
   folderOptionKey,
-  statusToPill,
   type AutomationFilter,
+  type AutomationKindFilter,
   type AutomationFolderOption,
   type AutomationRow,
   type DisplayOptions,
@@ -116,9 +118,11 @@ type Props = {
   query: string;
   onQueryChange: (q: string) => void;
   filter: AutomationFilter;
+  kindFilter?: AutomationKindFilter;
   display: DisplayOptions;
   onDisplayChange: (d: DisplayOptions) => void;
   onFilterChange?: (f: AutomationFilter) => void;
+  onKindFilterChange?: (k: AutomationKindFilter) => void;
   onRefresh?: () => void;
   /** Sync open document tabs when Accueil renames a resource. */
   onResourceRenamed?: (
@@ -208,9 +212,11 @@ export function AutomationsTable({
   query,
   onQueryChange,
   filter,
+  kindFilter = "all",
   display,
   onDisplayChange,
   onFilterChange,
+  onKindFilterChange,
   onRefresh,
   onResourceRenamed,
   runningScriptName = null,
@@ -226,7 +232,6 @@ export function AutomationsTable({
 }: Props) {
   const t = useT();
   const { locale } = useLocale();
-  const empty = t("common.empty");
   const accueilPrefs = mergeAccueilPrefs(accueilPrefsProp);
   const automationPrefs = mergeAutomationPrefs(automationPrefsProp);
   const confirmationsPrefs = mergeConfirmationsPrefs(confirmationsPrefsProp);
@@ -245,7 +250,9 @@ export function AutomationsTable({
     refreshKey,
     query,
     filter,
+    kindFilter,
     recentListMax,
+    active,
   });
   const afterUndoRef = useRef(async () => {
     await refresh({ silent: true });
@@ -274,6 +281,9 @@ export function AutomationsTable({
     [accueilUndo, t, toast],
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  /** Dock bulk UI can lag a frame so row checkmarks paint first. */
+  const deferredSelected = useDeferredValue(selected);
+
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     () =>
@@ -298,6 +308,38 @@ export function AutomationsTable({
     if (key) setFocusFolderKey(null);
     onFocusKeyChange?.(key);
   };
+
+  useEffect(() => {
+    if (!active || (selected.size === 0 && !focusFolderKey)) return;
+    function onPointerDown(e: PointerEvent) {
+      if (e.button !== 0) return;
+      const el = e.target;
+      if (!(el instanceof Element)) return;
+      const onChrome =
+        el.closest(".caster-automations-selection-dock") ||
+        el.closest(".caster-context-menu") ||
+        el.closest(".caster-menu-popover") ||
+        el.closest(".caster-menu-submenu") ||
+        el.closest(".caster-confirm") ||
+        el.closest(".caster-modal") ||
+        el.closest("[role='dialog']");
+      if (onChrome) return;
+
+      const onRow = el.closest(".caster-auto-row");
+      const onFolder = el.closest(".caster-auto-folder-section");
+
+      if (!onRow && selected.size > 0) {
+        setSelected(new Set());
+      }
+      // Folder focus outline: clear on any click outside that folder header.
+      if (focusFolderKey && !onFolder) {
+        setFocusFolderKey(null);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () =>
+      document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [active, selected.size, focusFolderKey]);
   const ctxMenu = useContextMenuState();
   const [ctxRow, setCtxRow] = useState<AutomationRow | null>(null);
   const emptyCtx = useContextMenuState();
@@ -388,6 +430,10 @@ export function AutomationsTable({
   const commitAccueilDrop = useCallback(
     async (intent: AccueilDropIntent) => {
       const { row } = intent;
+      if (row.locked) {
+        toast.info(t("automations.toast.unlockBeforeMove"));
+        return;
+      }
       try {
         if (intent.type === "move-folder") {
           const folder =
@@ -794,6 +840,7 @@ export function AutomationsTable({
       const items = sorted.filter(
         (r) => r.folderId != null && r.folderId === f.id,
       );
+      if (items.length === 0) continue;
       out.push({
         id: `folder:${key}`,
         name: f.name,
@@ -805,14 +852,16 @@ export function AutomationsTable({
     }
 
     const unfiled = sorted.filter((r) => r.folderId == null);
-    out.push({
-      id: "unfiled",
-      name: null,
-      folder: null,
-      kind: "flat",
-      items: unfiled,
-      depth: 0,
-    });
+    if (unfiled.length > 0) {
+      out.push({
+        id: "unfiled",
+        name: null,
+        folder: null,
+        kind: "flat",
+        items: unfiled,
+        depth: 0,
+      });
+    }
     return out;
   }, [sorted, filter, orderedFolders]);
 
@@ -820,13 +869,9 @@ export function AutomationsTable({
     return sorted.filter((r) => selected.has(rowKey(r)));
   }, [sorted, selected]);
 
-  const recentIdSet = useMemo(() => {
-    try {
-      return new Set(loadRecent().map((e) => `${e.kind}:${e.id}`));
-    } catch {
-      return new Set<string>();
-    }
-  }, [sorted]);
+  const dockSelectedRows = useMemo(() => {
+    return sorted.filter((r) => deferredSelected.has(rowKey(r)));
+  }, [sorted, deferredSelected]);
 
   const virtualizeRows = sorted.length > 80;
 
@@ -843,6 +888,35 @@ export function AutomationsTable({
               onClick={() => onQueryChange("")}
             >
               {t("automations.empty.clearSearch")}
+            </button>
+          }
+        />
+      );
+    }
+    if (kindFilter !== "all") {
+      const kindTitle =
+        kindFilter === "macro"
+          ? t("automations.empty.noKindMacroTitle")
+          : kindFilter === "clicker"
+            ? t("automations.empty.noKindClickerTitle")
+            : t("automations.empty.noKindScriptTitle");
+      const kindLead =
+        kindFilter === "macro"
+          ? t("automations.empty.noKindMacroLead")
+          : kindFilter === "clicker"
+            ? t("automations.empty.noKindClickerLead")
+            : t("automations.empty.noKindScriptLead");
+      return (
+        <EmptyState
+          title={kindTitle}
+          lead={kindLead}
+          actions={
+            <button
+              type="button"
+              className="caster-btn caster-btn-ghost"
+              onClick={() => onKindFilterChange?.("all")}
+            >
+              {t("automations.empty.clearKindFilter")}
             </button>
           }
         />
@@ -932,10 +1006,12 @@ export function AutomationsTable({
     );
   }, [
     filter,
+    kindFilter,
     onCreateClicker,
     onCreateMacro,
     onCreateScript,
     onFilterChange,
+    onKindFilterChange,
     onQueryChange,
     query,
     t,
@@ -969,20 +1045,25 @@ export function AutomationsTable({
 
   async function onDeleteSelected() {
     if (selectedRows.length === 0) return;
+    const targets = selectedRows.filter((r) => !r.locked && !r.trashed);
+    if (targets.length === 0) {
+      toast.info(t("automations.toast.unlockBeforeTrash"));
+      return;
+    }
     const ok = await confirmAction({
       title: t("automations.confirm.trashTitle"),
       message:
-        selectedRows.length === 1
-          ? t("automations.confirm.trashMany", { count: selectedRows.length })
+        targets.length === 1
+          ? t("automations.confirm.trashMany", { count: targets.length })
           : t("automations.confirm.trashManyOther", {
-              count: selectedRows.length,
+              count: targets.length,
             }),
       confirmLabel: t("automations.confirm.trashConfirm"),
       danger: true,
     });
     if (!ok) return;
     try {
-      for (const r of selectedRows) {
+      for (const r of targets) {
         await deleteRow(r);
         accueilUndo.push({
           type: "trash-item",
@@ -1177,8 +1258,13 @@ export function AutomationsTable({
     folderId: string | null,
     kind: "macro" | "clicker" | "script",
   ) {
-    const targets = selectedRows.filter((r) => r.kind === kind);
-    if (targets.length === 0) return;
+    const kindRows = selectedRows.filter((r) => r.kind === kind);
+    if (kindRows.length === 0) return;
+    const targets = kindRows.filter((r) => !r.locked);
+    if (targets.length === 0) {
+      toast.info(t("automations.toast.unlockBeforeMove"));
+      return;
+    }
     try {
       for (const r of targets) {
         await invoke("move_library_item_cmd", {
@@ -1211,14 +1297,15 @@ export function AutomationsTable({
   }
 
   function onOpenSelected() {
-    const first = selectedRows[0];
-    if (!first) return;
-    onNavigate({
-      name: "automation",
-      id: first.id,
-      kind: first.kind,
-      label: first.name,
-    });
+    if (selectedRows.length === 0) return;
+    for (const r of selectedRows) {
+      onNavigate({
+        name: "automation",
+        id: r.id,
+        kind: r.kind,
+        label: r.name,
+      });
+    }
   }
 
   function applyRangeSelect(fromKey: string, toKey: string) {
@@ -1249,6 +1336,10 @@ export function AutomationsTable({
   }
 
   async function onDeleteOne(r: AutomationRow) {
+    if (r.locked) {
+      toast.info(t("automations.toast.unlockBeforeTrash"));
+      return;
+    }
     if (!accueilPrefs.confirmTrash) {
       try {
         await deleteRow(r);
@@ -1322,6 +1413,10 @@ export function AutomationsTable({
     r: AutomationRow,
     toKind: AutomationRow["kind"],
   ) {
+    if (r.locked) {
+      toast.info(t("automations.toast.unlockBeforeConvert"));
+      return;
+    }
     // Let the row menu finish closing before opening confirm — avoids list flash.
     queueMicrotask(() => {
       void (async () => {
@@ -1460,49 +1555,50 @@ export function AutomationsTable({
     }
   }
 
-  async function onDuplicateOne(r: AutomationRow) {
+  async function duplicateRow(
+    r: AutomationRow,
+    opts?: { navigate?: boolean },
+  ): Promise<{ ok: true; name: string } | { ok: false; reason: "locked" | "error"; message?: string }> {
     if (r.locked) {
-      toast.info(t("automations.toast.unlockBeforeDuplicate"));
-      return;
+      return { ok: false, reason: "locked" };
     }
     try {
       if (r.kind === "macro") {
         const doc = await invoke<{ name: string }>("duplicate_saved_macro", {
           name: r.id,
         });
-        await refresh();
-        onRefresh?.();
-        toast.success(t("automations.toast.macroDuplicated", { name: doc.name }));
-        onNavigate({
-          name: "automation",
-          id: doc.name,
-          kind: "macro",
-          label: doc.name,
-        });
-      } else if (r.kind === "clicker") {
+        if (opts?.navigate !== false) {
+          onNavigate({
+            name: "automation",
+            id: doc.name,
+            kind: "macro",
+            label: doc.name,
+          });
+        }
+        return { ok: true, name: doc.name };
+      }
+      if (r.kind === "clicker") {
         const preset = await invoke<{ name: string }>("duplicate_clicker_preset", {
           name: r.id,
         });
-        await refresh();
-        onRefresh?.();
-        toast.success(t("automations.toast.presetDuplicated", { name: preset.name }));
-        onNavigate({
-          name: "automation",
-          id: preset.name,
-          kind: "clicker",
-          label: preset.name,
-        });
-      } else {
-        const src = await invoke<ScriptDoc>("load_script_cmd", { id: r.id });
-        const copy: ScriptDoc = {
-          ...src,
-          id: newScriptId(),
-          name: t("automations.toast.scriptCopySuffix", { name: src.name }),
-        };
-        await invoke("save_script_cmd", { doc: copy });
-        await refresh();
-        onRefresh?.();
-        toast.success(t("automations.toast.scriptDuplicated", { name: copy.name }));
+        if (opts?.navigate !== false) {
+          onNavigate({
+            name: "automation",
+            id: preset.name,
+            kind: "clicker",
+            label: preset.name,
+          });
+        }
+        return { ok: true, name: preset.name };
+      }
+      const src = await invoke<ScriptDoc>("load_script_cmd", { id: r.id });
+      const copy: ScriptDoc = {
+        ...src,
+        id: newScriptId(),
+        name: t("automations.toast.scriptCopySuffix", { name: src.name }),
+      };
+      await invoke("save_script_cmd", { doc: copy });
+      if (opts?.navigate !== false) {
         onNavigate({
           name: "automation",
           id: copy.id,
@@ -1510,9 +1606,74 @@ export function AutomationsTable({
           label: copy.name,
         });
       }
-      setMenuKey(null);
+      return { ok: true, name: copy.name };
     } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.duplicateFail")));
+      return {
+        ok: false,
+        reason: "error",
+        message: errMessage(e, t("automations.toast.duplicateFail")),
+      };
+    }
+  }
+
+  async function onDuplicateOne(r: AutomationRow) {
+    const result = await duplicateRow(r, { navigate: true });
+    if (!result.ok) {
+      if (result.reason === "locked") {
+        toast.info(t("automations.toast.unlockBeforeDuplicate"));
+      } else {
+        toast.error(result.message ?? t("automations.toast.duplicateFail"));
+      }
+      return;
+    }
+    await refresh();
+    onRefresh?.();
+    if (r.kind === "macro") {
+      toast.success(t("automations.toast.macroDuplicated", { name: result.name }));
+    } else if (r.kind === "clicker") {
+      toast.success(t("automations.toast.presetDuplicated", { name: result.name }));
+    } else {
+      toast.success(t("automations.toast.scriptDuplicated", { name: result.name }));
+    }
+    setMenuKey(null);
+  }
+
+  async function onDuplicateSelected() {
+    const targets = selectedRows.filter((r) => !r.trashed);
+    if (targets.length === 0) return;
+    let ok = 0;
+    let locked = 0;
+    let failed = 0;
+    let lastName: string | null = null;
+    for (const r of targets) {
+      const result = await duplicateRow(r, { navigate: false });
+      if (result.ok) {
+        ok += 1;
+        lastName = result.name;
+      } else if (result.reason === "locked") {
+        locked += 1;
+      } else {
+        failed += 1;
+      }
+    }
+    await refresh();
+    onRefresh?.();
+    setSelected(new Set());
+    if (ok === 1 && lastName && locked === 0 && failed === 0) {
+      toast.success(t("automations.toast.duplicatedOne", { name: lastName }));
+    } else if (ok > 0 && locked === 0 && failed === 0) {
+      toast.success(t("automations.toast.duplicatedMany", { count: ok }));
+    } else if (ok > 0) {
+      toast.success(
+        t("automations.toast.duplicatedPartial", {
+          count: ok,
+          skipped: locked + failed,
+        }),
+      );
+    } else if (locked > 0 && failed === 0) {
+      toast.info(t("automations.toast.unlockBeforeDuplicate"));
+    } else {
+      toast.error(t("automations.toast.duplicateFail"));
     }
   }
 
@@ -1603,9 +1764,14 @@ export function AutomationsTable({
 
   function onRowKeyDown(e: ReactKeyboardEvent, r: AutomationRow) {
     const key = rowKey(r);
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.key === "Enter") {
       e.preventDefault();
       openRow(r);
+      return;
+    }
+    if (e.key === " ") {
+      e.preventDefault();
+      toggleSelect(key, { multi: true });
       return;
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -1649,6 +1815,10 @@ export function AutomationsTable({
         if (selected.size > 0) {
           e.preventDefault();
           setSelected(new Set());
+        }
+        if (focusFolderKey) {
+          e.preventDefault();
+          setFocusFolderKey(null);
         }
         if (createOpen) setCreateOpen(false);
         return;
@@ -1790,7 +1960,8 @@ export function AutomationsTable({
   const moveFolders = useMemo(() => {
     const movable = selectedRows.filter(
       (r) =>
-        r.kind === "macro" || r.kind === "clicker" || r.kind === "script",
+        !r.locked &&
+        (r.kind === "macro" || r.kind === "clicker" || r.kind === "script"),
     );
     if (movable.length === 0) return [];
     const commonFolderId = (() => {
@@ -1804,12 +1975,14 @@ export function AutomationsTable({
 
   const selectionHasFiled = useMemo(
     () => ({
-      macro: selectedRows.some((r) => r.kind === "macro" && r.folderId != null),
+      macro: selectedRows.some(
+        (r) => r.kind === "macro" && !r.locked && r.folderId != null,
+      ),
       clicker: selectedRows.some(
-        (r) => r.kind === "clicker" && r.folderId != null,
+        (r) => r.kind === "clicker" && !r.locked && r.folderId != null,
       ),
       script: selectedRows.some(
-        (r) => r.kind === "script" && r.folderId != null,
+        (r) => r.kind === "script" && !r.locked && r.folderId != null,
       ),
     }),
     [selectedRows],
@@ -1907,6 +2080,9 @@ export function AutomationsTable({
   const lockTargets = selectedRows;
   const canLock = lockTargets.some((r) => !r.locked);
   const canUnlock = lockTargets.some((r) => r.locked);
+  const canTrashSelected = dockSelectedRows.some(
+    (r) => !r.trashed && !r.locked,
+  );
 
   return (
     <div
@@ -1930,6 +2106,8 @@ export function AutomationsTable({
         onQueryChange={onQueryChange}
         filter={filter}
         onFilterChange={(f) => onFilterChange?.(f)}
+        kindFilter={kindFilter}
+        onKindFilterChange={(k) => onKindFilterChange?.(k)}
         counts={counts}
         onCreateMacro={onCreateMacro}
         onCreateClicker={onCreateClicker}
@@ -1959,40 +2137,18 @@ export function AutomationsTable({
       >
         {sorted.length > 0 ? (
           <div
-            className="caster-automations-list"
+            className={[
+              "caster-automations-list",
+              selected.size > 0 ? "is-selecting" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             role="list"
             aria-busy={loading || undefined}
           >
             <div className="caster-auto-colhead">
               <span className="caster-auto-colhead-check" aria-hidden />
               <div className="caster-auto-colhead-identity">
-                <button
-                  type="button"
-                  role="columnheader"
-                  className={[
-                    "caster-auto-colhead-label",
-                    "caster-auto-colhead-order",
-                    display.sortBy === "order" ? "is-active" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-sort={ariaSortFor("order")}
-                  title={t("automations.columns.orderTitle")}
-                  onClick={() => setSortBy("order")}
-                >
-                  {t("automations.columns.order")}
-                  {display.sortBy === "order" ? (
-                    <ChevronDown
-                      size={12}
-                      aria-hidden
-                      className={
-                        display.sortDir === "desc"
-                          ? "caster-auto-colhead-sort-icon is-desc"
-                          : "caster-auto-colhead-sort-icon"
-                      }
-                    />
-                  ) : null}
-                </button>
                 <span className="caster-auto-colhead-kind" aria-hidden />
                 <button
                   type="button"
@@ -2000,15 +2156,32 @@ export function AutomationsTable({
                   className={[
                     "caster-auto-colhead-label",
                     "caster-auto-colhead-name",
-                    display.sortBy === "name" ? "is-active" : "",
+                    display.sortBy === "name" || display.sortBy === "order"
+                      ? "is-active"
+                      : "",
                   ]
                     .filter(Boolean)
                     .join(" ")}
-                  aria-sort={ariaSortFor("name")}
-                  onClick={() => setSortBy("name")}
+                  aria-sort={
+                    display.sortBy === "name" || display.sortBy === "order"
+                      ? ariaSortFor(display.sortBy)
+                      : "none"
+                  }
+                  title={t("automations.columns.orderTitle")}
+                  onClick={() => {
+                    if (display.sortBy === "name") {
+                      setSortBy("order");
+                    } else if (display.sortBy === "order") {
+                      setSortBy("name");
+                    } else {
+                      setSortBy("name");
+                    }
+                  }}
                 >
-                  {t("automations.columns.name")}
-                  {display.sortBy === "name" ? (
+                  {display.sortBy === "order"
+                    ? t("automations.columns.order")
+                    : t("automations.columns.name")}
+                  {display.sortBy === "name" || display.sortBy === "order" ? (
                     <ChevronDown
                       size={12}
                       aria-hidden
@@ -2021,38 +2194,12 @@ export function AutomationsTable({
                   ) : null}
                 </button>
               </div>
-              <button
-                type="button"
-                role="columnheader"
-                className={[
-                  "caster-auto-colhead-label",
-                  "caster-auto-colhead-type",
-                  display.sortBy === "type" ? "is-active" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                aria-sort={ariaSortFor("type")}
-                onClick={() => setSortBy("type")}
-              >
-                {t("automations.columns.type")}
-                {display.sortBy === "type" ? (
-                  <ChevronDown
-                    size={12}
-                    aria-hidden
-                    className={
-                      display.sortDir === "desc"
-                        ? "caster-auto-colhead-sort-icon is-desc"
-                        : "caster-auto-colhead-sort-icon"
-                    }
-                  />
-                ) : null}
-              </button>
               <div className="caster-auto-row-props caster-auto-colhead-props">
-                <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--trigger">
-                  {t("automations.columns.trigger")}
+                <span className="caster-auto-colhead-label caster-auto-colhead-label--static caster-auto-row-prop caster-auto-row-prop--info">
+                  {t("automations.columns.info")}
                 </span>
-                <span className="caster-auto-colhead-label caster-auto-row-prop caster-auto-row-prop--secondary">
-                  {t("automations.columns.folderMeta")}
+                <span className="caster-auto-colhead-label caster-auto-colhead-label--static caster-auto-row-prop caster-auto-row-prop--trigger">
+                  {t("automations.columns.trigger")}
                 </span>
                 <button
                   type="button"
@@ -2070,33 +2217,6 @@ export function AutomationsTable({
                 >
                   {t("automations.columns.lastRun")}
                   {display.sortBy === "lastRun" ? (
-                    <ChevronDown
-                      size={12}
-                      aria-hidden
-                      className={
-                        display.sortDir === "desc"
-                          ? "caster-auto-colhead-sort-icon is-desc"
-                          : "caster-auto-colhead-sort-icon"
-                      }
-                    />
-                  ) : null}
-                </button>
-                <button
-                  type="button"
-                  role="columnheader"
-                  className={[
-                    "caster-auto-colhead-label",
-                    "caster-auto-row-prop",
-                    "caster-auto-row-prop--status",
-                    display.sortBy === "status" ? "is-active" : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  aria-sort={ariaSortFor("status")}
-                  onClick={() => setSortBy("status")}
-                >
-                  {t("automations.columns.status")}
-                  {display.sortBy === "status" ? (
                     <ChevronDown
                       size={12}
                       aria-hidden
@@ -2308,22 +2428,27 @@ export function AutomationsTable({
                     : section.items.map((r) => {
                         const key = rowKey(r);
                         const isSelected = selected.has(key);
-                        const pill = statusToPill(r.status, t);
                         const rowRunning =
                           liveSession != null &&
                           liveSession.kind === r.kind &&
                           liveSession.name === r.name;
                         const permCount = r.permLabels?.length ?? 0;
-                        const propSecondary =
-                          r.kind === "script"
-                            ? (r.meta ?? null)
-                            : r.folderLabel !== empty
-                              ? r.folderLabel
-                              : (r.meta ?? null);
+                        const showTrigger =
+                          rowRunning || showTriggerLabel(r, t);
                         const propLastRun =
-                          r.lastRunLabel !== empty ? r.lastRunLabel : null;
-                        const subtitle = rowSubtitle(r, t, {
+                          r.lastRunLabel !== t("common.empty")
+                            ? r.lastRunLabel
+                            : null;
+                        const infoLabel = rowInfoLabel(r, t);
+                        const subtitleWide = rowSubtitle(r, t, {
                           running: rowRunning,
+                          includeFolder: filter !== "all",
+                          mode: "wide",
+                        });
+                        const subtitleNarrow = rowSubtitle(r, t, {
+                          running: rowRunning,
+                          includeFolder: filter !== "all",
+                          mode: "narrow",
                         });
                           const dropBefore =
                           dropEdge?.key === key && dropEdge.edge === "before";
@@ -2350,6 +2475,25 @@ export function AutomationsTable({
                             ]
                               .filter(Boolean)
                               .join(" ")}
+                              onPointerDown={(e) => {
+                              if (
+                                e.button !== 0 ||
+                                !(e.shiftKey || e.ctrlKey || e.metaKey)
+                              ) {
+                                return;
+                              }
+                              if (
+                                suppressClickAfterDragRef.current ||
+                                dragRow ||
+                                folderDragArmedRef.current
+                              ) {
+                                return;
+                              }
+                              // Shift / Ctrl / Cmd+clic : coche (additif), sans ouvrir.
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleSelect(key, { multi: true });
+                            }}
                             onClick={(e) => {
                               if (suppressClickAfterDragRef.current) {
                                 suppressClickAfterDragRef.current = false;
@@ -2358,10 +2502,17 @@ export function AutomationsTable({
                                 return;
                               }
                               if (dragRow || folderDragArmedRef.current) return;
-                              setFocusKey(key);
-                              if (accueilPrefs.openOnSingleClick) {
-                                openRow(r);
+                              if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                                // Déjà géré en pointerdown.
+                                e.preventDefault();
+                                return;
                               }
+                              setFocusKey(key);
+                              // Clic gauche : ouvrir (et sortir de la sélection si besoin).
+                              if (selected.size > 0) {
+                                setSelected(new Set());
+                              }
+                              openRow(r);
                             }}
                             onDoubleClick={(e) => {
                               if (suppressClickAfterDragRef.current) return;
@@ -2381,26 +2532,35 @@ export function AutomationsTable({
                           >
                             <label
                               className="caster-auto-row-check"
-                              onClick={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => {
+                                if (e.button !== 0) return;
+                                // Sélection immédiate (avant mouseup / click).
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleSelect(key, {
+                                  multi: true,
+                                  range: e.shiftKey,
+                                });
+                              }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
+                              onDoubleClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                              }}
                             >
                               <input
                                 type="checkbox"
                                 checked={isSelected}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  e.preventDefault();
-                                  toggleSelect(key, {
-                                    multi: true,
-                                    range: e.shiftKey,
-                                  });
-                                }}
+                                tabIndex={-1}
                                 onChange={() => {
-                                  /* controlled via onClick */
+                                  /* controlled via pointerdown */
                                 }}
                                 aria-label={t("automations.row.selectAria", { name: r.name })}
                               />
                             </label>
-                            <span className="caster-auto-row-order" aria-hidden />
                             <div
                               className="caster-auto-row-identity"
                               onPointerDown={(e) => onRowPointerDown(r, e)}
@@ -2418,90 +2578,79 @@ export function AutomationsTable({
                                     {query.trim()
                                       ? highlightQuery(r.name, query)
                                       : r.name}
-                                    {recentIdSet.has(`${r.kind}:${r.id}`) &&
-                                    filter !== "recent" ? (
-                                      <span className="caster-auto-row-recent-inline">
-                                        {" "}
-                                        · {t("automations.row.recentBadge")}
-                                      </span>
-                                    ) : null}
                                   </span>
                                 </TruncatedTooltip>
-                                {subtitle ? (
-                                  <TruncatedTooltip content={subtitle}>
+                                {subtitleWide ? (
+                                  <TruncatedTooltip content={subtitleWide}>
                                     <span
                                       className={[
                                         "caster-auto-row-sub",
+                                        "caster-auto-row-sub--wide",
                                         rowRunning ? "is-running" : "",
                                       ]
                                         .filter(Boolean)
                                         .join(" ")}
                                     >
-                                      {subtitle}
+                                      {subtitleWide}
+                                    </span>
+                                  </TruncatedTooltip>
+                                ) : null}
+                                {subtitleNarrow ? (
+                                  <TruncatedTooltip content={subtitleNarrow}>
+                                    <span
+                                      className={[
+                                        "caster-auto-row-sub",
+                                        "caster-auto-row-sub--narrow",
+                                        rowRunning ? "is-running" : "",
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" ")}
+                                    >
+                                      {subtitleNarrow}
                                     </span>
                                   </TruncatedTooltip>
                                 ) : null}
                               </div>
                             </div>
-                            <span
-                              className={`caster-auto-type-badge caster-auto-type-badge--${r.kind}`}
-                            >
-                              {kindLabel(r.kind, t)}
-                            </span>
                             <div className="caster-auto-row-props">
+                              {infoLabel ? (
+                                <TruncatedTooltip content={infoLabel}>
+                                  <span className="caster-auto-row-prop caster-auto-row-prop--info">
+                                    {infoLabel}
+                                  </span>
+                                </TruncatedTooltip>
+                              ) : (
+                                <span
+                                  className="caster-auto-row-prop caster-auto-row-prop--info"
+                                  aria-hidden
+                                />
+                              )}
                               {rowRunning ? (
                                 <span className="caster-auto-row-prop caster-auto-row-prop--trigger is-running">
-                                  <Play size={11} aria-hidden />
                                   {t("common.running")}
                                 </span>
-                              ) : r.kind === "script" &&
-                                scriptsPrefs.showPermBadgesOnHome &&
-                                permCount > 0 ? (
-                                <Tooltip
-                                  content={t("automations.row.permTooltip", {
-                                    list: (r.permLabels ?? []).join(", "),
-                                  })}
+                              ) : showTrigger ? (
+                                <TruncatedTooltip
+                                  content={
+                                    r.kind === "script" &&
+                                    scriptsPrefs.showPermBadgesOnHome &&
+                                    permCount > 0
+                                      ? t("automations.row.permTooltip", {
+                                          list: (r.permLabels ?? []).join(", "),
+                                        })
+                                      : metaTooltip(r, t)
+                                  }
                                 >
-                                  <span
-                                    className="caster-auto-row-prop caster-auto-row-prop--trigger"
-                                    tabIndex={0}
-                                  >
-                                    <span className="caster-auto-row-perm-badge">
-                                      {t("automations.row.permAccess", { count: permCount })}
-                                    </span>
-                                  </span>
-                                </Tooltip>
-                              ) : (
-                                <TruncatedTooltip content={metaTooltip(r, t)}>
-                                  <span className="caster-auto-row-prop caster-auto-row-prop--trigger">
-                                    <Play size={11} aria-hidden />
+                                  <span className="caster-auto-row-prop caster-auto-row-prop--trigger is-hotkey">
                                     {r.triggerLabel}
                                   </span>
                                 </TruncatedTooltip>
-                              )}
-                              <TruncatedTooltip
-                                content={propSecondary ?? metaTooltip(r, t)}
-                              >
+                              ) : (
                                 <span
-                                  className={[
-                                    "caster-auto-row-prop",
-                                    "caster-auto-row-prop--secondary",
-                                  ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                >
-                                  {propSecondary ? (
-                                    <>
-                                      {r.kind === "script" ? (
-                                        <Code2 size={11} aria-hidden />
-                                      ) : (
-                                        <Folder size={11} aria-hidden />
-                                      )}
-                                      {propSecondary}
-                                    </>
-                                  ) : null}
-                                </span>
-                              </TruncatedTooltip>
+                                  className="caster-auto-row-prop caster-auto-row-prop--trigger"
+                                  aria-hidden
+                                />
+                              )}
                               <Tooltip
                                 content={
                                   r.lastRunTooltip && propLastRun
@@ -2514,23 +2663,7 @@ export function AutomationsTable({
                                 }
                               >
                                 <span className="caster-auto-row-prop caster-auto-row-prop--run">
-                                  {propLastRun ?? empty}
-                                </span>
-                              </Tooltip>
-                              <Tooltip content={statusTooltip(r.status, t)}>
-                                <span
-                                  className={[
-                                    "caster-auto-row-prop",
-                                    "caster-auto-row-prop--status",
-                                    `is-${pill.kind}`,
-                                  ].join(" ")}
-                                  tabIndex={0}
-                                >
-                                  <span
-                                    className="caster-auto-status-dot"
-                                    aria-hidden
-                                  />
-                                  {pill.label}
+                                  {propLastRun ?? ""}
                                 </span>
                               </Tooltip>
                             </div>
@@ -2584,6 +2717,34 @@ export function AutomationsTable({
                                     aria-hidden
                                     fill={r.favorite ? "currentColor" : "none"}
                                   />
+                                </button>
+                              </Tooltip>
+                              <Tooltip
+                                content={
+                                  r.locked
+                                    ? t("automations.menu.row.unlock")
+                                    : t("automations.menu.row.lock")
+                                }
+                              >
+                                <button
+                                  type="button"
+                                  className={[
+                                    "caster-auto-row-lock-btn",
+                                    r.locked ? "is-on" : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                  aria-pressed={r.locked}
+                                  aria-label={
+                                    r.locked
+                                      ? t("automations.menu.row.unlock")
+                                      : t("automations.menu.row.lock")
+                                  }
+                                  onClick={() =>
+                                    void setRowLocked(r, !r.locked)
+                                  }
+                                >
+                                  <Lock size={14} aria-hidden />
                                 </button>
                               </Tooltip>
                               <AutomationRowMenu
@@ -2640,16 +2801,20 @@ export function AutomationsTable({
         ) : null}
       </div>
 
-      {selected.size > 0 ? (
+      {deferredSelected.size > 0 ? (
         <div
           className="caster-automations-selection-dock"
           role="toolbar"
           aria-label={t("automations.selection.aria")}
         >
           <span className="caster-automations-selection-count">
-            {selected.size === 1
-              ? t("automations.selection.countOne", { count: selected.size })
-              : t("automations.selection.countMany", { count: selected.size })}
+            {deferredSelected.size === 1
+              ? t("automations.selection.countOne", {
+                  count: deferredSelected.size,
+                })
+              : t("automations.selection.countMany", {
+                  count: deferredSelected.size,
+                })}
           </span>
           <div className="caster-automations-selection-actions">
             <button
@@ -2657,128 +2822,34 @@ export function AutomationsTable({
               className="caster-btn caster-btn-ghost"
               onClick={onOpenSelected}
             >
-              {t("common.open")}
+              {deferredSelected.size > 1
+                ? t("automations.selection.openAll", {
+                    count: deferredSelected.size,
+                  })
+                : t("common.open")}
             </button>
             <button
               type="button"
               className="caster-btn caster-btn-primary"
               onClick={onLaunchSelected}
             >
-              {t("automations.selection.launch")}
+              {dockSelectedRows[0]
+                ? t("automations.selection.launchNamed", {
+                    name: dockSelectedRows[0].name,
+                  })
+                : t("automations.selection.launch")}
             </button>
-            <button
-              type="button"
-              className="caster-btn caster-btn-ghost"
-              onClick={() => void onFavoriteSelected()}
-            >
-              {t("automations.selection.favorite")}
-            </button>
-            {canLock ? (
+            {filter !== "trash" && dockSelectedRows.some((r) => !r.trashed) ? (
               <button
                 type="button"
                 className="caster-btn caster-btn-ghost"
-                onClick={() => void onLockSelected(true)}
+                onClick={() => void onDuplicateSelected()}
               >
-                <Lock size={14} aria-hidden />
-                {t("automations.selection.lock")}
+                <Copy size={14} aria-hidden />
+                {t("automations.selection.duplicate")}
               </button>
             ) : null}
-            {canUnlock ? (
-              <button
-                type="button"
-                className="caster-btn caster-btn-ghost"
-                onClick={() => void onLockSelected(false)}
-              >
-                <LockOpen size={14} aria-hidden />
-                {t("automations.selection.unlock")}
-              </button>
-            ) : null}
-            {moveFolders.length > 0 ||
-            selectionHasFiled.macro ||
-            selectionHasFiled.clicker ||
-            selectionHasFiled.script ? (
-              <DropdownMenu
-                label={t("automations.selection.folder")}
-                ariaLabel={t("automations.selection.folderAria")}
-                align="end"
-                triggerClassName="caster-btn caster-btn-ghost"
-                items={[
-                  ...(selectionHasFiled.macro
-                    ? [
-                        {
-                          id: "root-macro",
-                          label: t("automations.selection.noFolderMacros"),
-                          icon: <Folder size={14} />,
-                          onSelect: () => void onMoveSelected(null, "macro"),
-                        },
-                      ]
-                    : []),
-                  ...(selectionHasFiled.clicker
-                    ? [
-                        {
-                          id: "root-clicker",
-                          label: t("automations.selection.noFolderClickers"),
-                          icon: <Folder size={14} />,
-                          onSelect: () => void onMoveSelected(null, "clicker"),
-                        },
-                      ]
-                    : []),
-                  ...(selectionHasFiled.script
-                    ? [
-                        {
-                          id: "root-script",
-                          label: t("automations.selection.noFolderScripts"),
-                          icon: <Folder size={14} />,
-                          onSelect: () => void onMoveSelected(null, "script"),
-                        },
-                      ]
-                    : []),
-                  ...moveFolders.map((f) => ({
-                    id: folderOptionKey(f),
-                    label: f.name,
-                    icon: <Folder size={14} />,
-                    onSelect: () => {
-                      const kinds = new Set<"macro" | "clicker" | "script">();
-                      for (const r of selectedRows) {
-                        if (
-                          r.kind === "macro" ||
-                          r.kind === "clicker" ||
-                          r.kind === "script"
-                        ) {
-                          kinds.add(r.kind);
-                        }
-                      }
-                      for (const kind of kinds) {
-                        void onMoveSelected(f.id, kind);
-                      }
-                    },
-                  })),
-                ]}
-              >
-                <Folder size={14} aria-hidden />
-                {t("automations.selection.folder")}
-                <ChevronDown size={14} aria-hidden />
-              </DropdownMenu>
-            ) : null}
-            {batchConvertTargets.length > 0 ? (
-              <DropdownMenu
-                label={t("automations.convert.batch")}
-                ariaLabel={t("automations.convert.batch")}
-                align="end"
-                triggerClassName="caster-btn caster-btn-ghost"
-                items={batchConvertTargets.map((to) => ({
-                  id: `batch-convert-${to}`,
-                  label: t(`automations.convert.kind.${to}`),
-                  icon: <RefreshCw size={14} />,
-                  onSelect: () => scheduleConvertBatch(to),
-                }))}
-              >
-                <RefreshCw size={14} aria-hidden />
-                {t("automations.convert.batch")}
-                <ChevronDown size={14} aria-hidden />
-              </DropdownMenu>
-            ) : null}
-            {filter === "trash" || selectedRows.every((r) => r.trashed) ? (
+            {filter === "trash" || dockSelectedRows.every((r) => r.trashed) ? (
               <button
                 type="button"
                 className="caster-btn caster-btn-primary"
@@ -2786,7 +2857,7 @@ export function AutomationsTable({
               >
                 {t("automations.selection.restore")}
               </button>
-            ) : (
+            ) : canTrashSelected ? (
               <button
                 type="button"
                 className="caster-btn caster-btn-danger-ghost"
@@ -2794,7 +2865,132 @@ export function AutomationsTable({
               >
                 {t("automations.selection.trash")}
               </button>
-            )}
+            ) : null}
+            <DropdownMenu
+              label={t("automations.selection.more")}
+              ariaLabel={t("automations.selection.moreAria")}
+              align="end"
+              triggerClassName="caster-btn caster-btn-ghost"
+              items={[
+                {
+                  id: "favorite",
+                  label: t("automations.selection.favorite"),
+                  icon: <Star size={14} />,
+                  onSelect: () => void onFavoriteSelected(),
+                },
+                ...(canLock
+                  ? [
+                      {
+                        id: "lock",
+                        label: t("automations.selection.lock"),
+                        icon: <Lock size={14} />,
+                        onSelect: () => void onLockSelected(true),
+                      },
+                    ]
+                  : []),
+                ...(canUnlock
+                  ? [
+                      {
+                        id: "unlock",
+                        label: t("automations.selection.unlock"),
+                        icon: <LockOpen size={14} />,
+                        onSelect: () => void onLockSelected(false),
+                      },
+                    ]
+                  : []),
+                ...(moveFolders.length > 0 ||
+                selectionHasFiled.macro ||
+                selectionHasFiled.clicker ||
+                selectionHasFiled.script
+                  ? [
+                      {
+                        id: "sep-folder",
+                        label: "",
+                        separator: true as const,
+                      },
+                      ...(selectionHasFiled.macro
+                        ? [
+                            {
+                              id: "root-macro",
+                              label: t("automations.selection.noFolderMacros"),
+                              icon: <Folder size={14} />,
+                              onSelect: () =>
+                                void onMoveSelected(null, "macro"),
+                            },
+                          ]
+                        : []),
+                      ...(selectionHasFiled.clicker
+                        ? [
+                            {
+                              id: "root-clicker",
+                              label: t(
+                                "automations.selection.noFolderClickers",
+                              ),
+                              icon: <Folder size={14} />,
+                              onSelect: () =>
+                                void onMoveSelected(null, "clicker"),
+                            },
+                          ]
+                        : []),
+                      ...(selectionHasFiled.script
+                        ? [
+                            {
+                              id: "root-script",
+                              label: t(
+                                "automations.selection.noFolderScripts",
+                              ),
+                              icon: <Folder size={14} />,
+                              onSelect: () =>
+                                void onMoveSelected(null, "script"),
+                            },
+                          ]
+                        : []),
+                      ...moveFolders.map((f) => ({
+                        id: folderOptionKey(f),
+                        label: t("automations.selection.moveToFolder", {
+                          name: f.name,
+                        }),
+                        icon: <Folder size={14} />,
+                        onSelect: () => {
+                          const kinds = new Set<
+                            "macro" | "clicker" | "script"
+                          >();
+                          for (const r of selectedRows) {
+                            if (
+                              r.kind === "macro" ||
+                              r.kind === "clicker" ||
+                              r.kind === "script"
+                            ) {
+                              kinds.add(r.kind);
+                            }
+                          }
+                          for (const kind of kinds) {
+                            void onMoveSelected(f.id, kind);
+                          }
+                        },
+                      })),
+                    ]
+                  : []),
+                ...(batchConvertTargets.length > 0
+                  ? [
+                      {
+                        id: "sep-convert",
+                        label: "",
+                        separator: true as const,
+                      },
+                      ...batchConvertTargets.map((to) => ({
+                        id: `batch-convert-${to}`,
+                        label: t(`automations.convert.kind.${to}`),
+                        icon: <RefreshCw size={14} />,
+                        onSelect: () => scheduleConvertBatch(to),
+                      })),
+                    ]
+                  : []),
+              ]}
+            >
+              <MoreHorizontal size={14} aria-hidden />
+              {t("automations.selection.more")}
+            </DropdownMenu>
             <button
               type="button"
               className="caster-btn caster-btn-ghost"

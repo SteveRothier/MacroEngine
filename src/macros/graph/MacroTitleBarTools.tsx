@@ -1,7 +1,23 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, Circle, Pause, Play, Redo2, Square, Undo2 } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Circle,
+  Copy,
+  Download,
+  Lock,
+  LockOpen,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Redo2,
+  Square,
+  Undo2,
+  Upload,
+} from "lucide-react";
 import { useT } from "../../i18n";
-import { EditorToolbar } from "../../ui/shell";
+import { DropdownMenu, EditorToolbar } from "../../ui/shell";
+import type { DropdownEntry } from "../../ui/shell";
 import {
   ProcessFilterTool,
   type ProcessFilter,
@@ -11,6 +27,10 @@ import {
 type Props = {
   onBack: () => void;
   locked: boolean;
+  onLockChange?: (locked: boolean) => void;
+  onDuplicate?: () => void;
+  onImport?: () => void;
+  onExport?: () => void;
   loading?: boolean;
   engineState: string;
   recording: boolean;
@@ -28,10 +48,6 @@ type Props = {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
-  /** Convert this macro to a script (Accueil convert flow). */
-  onConvertToScript?: () => void;
-  /** Convert this macro to a clicker preset. */
-  onConvertToClicker?: () => void;
   /** Nom / répétitions / raccourci — fused into this bar. */
   meta?: ReactNode;
   processFilter: ProcessFilter;
@@ -50,6 +66,10 @@ type Props = {
 export function MacroTitleBarTools({
   onBack,
   locked,
+  onLockChange,
+  onDuplicate,
+  onImport,
+  onExport,
   loading = false,
   engineState,
   recording,
@@ -66,8 +86,6 @@ export function MacroTitleBarTools({
   canRedo = false,
   onUndo,
   onRedo,
-  onConvertToScript,
-  onConvertToClicker,
   meta,
   processFilter,
   processFilterMode,
@@ -82,6 +100,46 @@ export function MacroTitleBarTools({
   const t = useT();
   const running = engineState === "running" || engineState === "paused";
   const busy = running || recording || loading;
+  const mutateDisabled = locked || loading || busy;
+
+  const moreItems: DropdownEntry[] = [
+    ...(onLockChange
+      ? ([
+          {
+            id: "lock-toggle",
+            label: locked
+              ? t("macros.toolbar.unlockTitle")
+              : t("macros.toolbar.lockTitle"),
+            icon: locked ? <LockOpen size={14} /> : <Lock size={14} />,
+            disabled: loading,
+            onSelect: () => onLockChange(!locked),
+          },
+          { id: "sep-lock", label: "", separator: true },
+        ] satisfies DropdownEntry[])
+      : []),
+    {
+      id: "duplicate",
+      label: t("macros.menu.ctx.duplicate"),
+      icon: <Copy size={14} />,
+      disabled: mutateDisabled || !onDuplicate,
+      onSelect: () => onDuplicate?.(),
+    },
+    { id: "sep-io", label: "", separator: true },
+    {
+      id: "import",
+      label: t("macros.menu.more.import"),
+      icon: <Upload size={14} />,
+      disabled: mutateDisabled || !onImport,
+      onSelect: () => onImport?.(),
+    },
+    {
+      id: "export",
+      label: t("macros.menu.more.export"),
+      icon: <Download size={14} />,
+      disabled: loading || busy || !onExport,
+      onSelect: () => onExport?.(),
+    },
+  ];
 
   return (
     <EditorToolbar
@@ -96,28 +154,6 @@ export function MacroTitleBarTools({
             <ArrowLeft size={14} aria-hidden />
           </button>
           {meta}
-          {onConvertToScript ? (
-            <button
-              type="button"
-              className="caster-titlebar-btn caster-btn caster-btn-ghost"
-              disabled={locked || busy}
-              onClick={onConvertToScript}
-              title={t("macros.toolbar.convertToScriptTitle")}
-            >
-              {t("macros.toolbar.convertToScript")}
-            </button>
-          ) : null}
-          {onConvertToClicker ? (
-            <button
-              type="button"
-              className="caster-titlebar-btn caster-btn caster-btn-ghost"
-              disabled={locked || busy}
-              onClick={onConvertToClicker}
-              title={t("macros.toolbar.convertToClickerTitle")}
-            >
-              {t("macros.toolbar.convertToClicker")}
-            </button>
-          ) : null}
         </>
       }
       end={
@@ -128,7 +164,7 @@ export function MacroTitleBarTools({
             onModeChange={onProcessFilterModeChange}
             localFilter={localProcessFilter}
             onLocalFilterChange={onLocalProcessFilterChange}
-            disabled={locked || busy}
+            disabled={locked}
             onOpenSettings={onOpenProcessSettings}
             onGlobalFilterChange={onGlobalProcessFilterChange}
             presets={processFilterPresets}
@@ -164,87 +200,104 @@ export function MacroTitleBarTools({
           {!recording ? (
             <button
               type="button"
-              className="caster-titlebar-btn caster-btn caster-btn-ghost"
+              className="caster-titlebar-btn caster-titlebar-icon-btn"
               disabled={locked || busy}
               onClick={onStartRecord}
               title={t("macros.toolbar.captureTitle")}
+              aria-label={t("macros.toolbar.capture")}
             >
               <Circle size={14} aria-hidden />
-              {t("macros.toolbar.capture")}
             </button>
           ) : (
             <>
               {recordPaused ? (
                 <button
                   type="button"
-                  className="caster-titlebar-btn caster-btn caster-btn-ghost"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
                   onClick={onResumeRecord}
                   title={t("macros.toolbar.resumeCaptureTitle")}
+                  aria-label={t("macros.toolbar.resumeCapture")}
                 >
                   <Play size={14} aria-hidden />
-                  {t("macros.toolbar.resumeCapture")}
                 </button>
               ) : (
                 <button
                   type="button"
-                  className="caster-titlebar-btn caster-btn caster-btn-ghost"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
                   onClick={onPauseRecord}
                   title={t("macros.toolbar.pauseCaptureTitle")}
+                  aria-label={t("macros.toolbar.pauseCapture")}
                 >
                   <Pause size={14} aria-hidden />
-                  {t("macros.toolbar.pauseCapture")}
                 </button>
               )}
               <button
                 type="button"
-                className="caster-titlebar-btn caster-btn"
+                className="caster-titlebar-btn caster-titlebar-icon-btn"
                 onClick={onStopRecord}
                 title={t("macros.toolbar.stopCaptureTitle")}
+                aria-label={t("macros.toolbar.stopCapture")}
               >
                 <Square size={14} aria-hidden />
-                {t("macros.toolbar.stopCapture")}
               </button>
             </>
           )}
-          {onPlayFrom ? (
+          <div className="caster-titlebar-test-split is-split">
             <button
               type="button"
-              className="caster-titlebar-btn caster-btn caster-btn-ghost"
-              disabled={locked || busy}
-              onClick={onPlayFrom}
-              title={t("macros.toolbar.playFromTitle")}
+              className="caster-titlebar-btn caster-titlebar-icon-btn caster-titlebar-test-split-main"
+              disabled={busy}
+              onClick={onPlay}
+              title={t("macros.toolbar.testTitle")}
+              aria-label={t("macros.toolbar.test")}
             >
               <Play size={14} aria-hidden />
-              {t("macros.toolbar.playFrom")}
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="caster-titlebar-btn caster-btn caster-btn-primary"
-            disabled={locked || busy}
-            onClick={onPlay}
-            title={t("macros.toolbar.testTitle")}
-          >
-            <Play size={14} aria-hidden />
-            {t("macros.toolbar.test")}
-          </button>
+            <DropdownMenu
+              label={t("macros.toolbar.playFrom")}
+              ariaLabel={t("macros.toolbar.playFromTitle")}
+              align="end"
+              disabled={busy || !onPlayFrom}
+              triggerClassName="caster-titlebar-btn caster-titlebar-icon-btn caster-titlebar-test-split-chevron"
+              items={
+                onPlayFrom
+                  ? [
+                      {
+                        id: "play-from",
+                        label: t("macros.toolbar.playFrom"),
+                        shortcut: t("macros.toolbar.playFromShortcut"),
+                        icon: <Play size={14} />,
+                        onSelect: onPlayFrom,
+                      },
+                    ]
+                  : []
+              }
+            >
+              <ChevronDown size={12} aria-hidden />
+            </DropdownMenu>
+          </div>
           {onStop ? (
             <button
               type="button"
-              className="caster-titlebar-btn caster-btn caster-btn-danger-ghost"
+              className="caster-titlebar-btn caster-titlebar-icon-btn caster-titlebar-icon-btn-danger"
               disabled={!running || loading}
               onClick={onStop}
               title={t("macros.toolbar.stopTitle")}
+              aria-label={t("macros.toolbar.stop")}
             >
               <Square size={14} aria-hidden />
-              {t("macros.toolbar.stop")}
             </button>
           ) : null}
-          {locked ? (
-            <span className="caster-clicker-lock" title={t("macros.toolbar.lockedTitle")}>
-              {t("macros.toolbar.locked")}
-            </span>
-          ) : null}
+          <DropdownMenu
+            label={t("macros.toolbar.moreActions")}
+            ariaLabel={t("macros.toolbar.moreActions")}
+            align="end"
+            disabled={loading}
+            triggerClassName="caster-titlebar-btn caster-titlebar-icon-btn"
+            items={moreItems}
+          >
+            <MoreHorizontal size={16} aria-hidden />
+          </DropdownMenu>
         </>
       }
     />

@@ -28,8 +28,8 @@ export const settings = defineCatalog({
       densityComfortable: "Confortable",
       densityCompact: "Compacte",
       accent: "Accent",
-      accentHint: "Teinte d’accentuation.",
-      accentDefault: "Défaut",
+      accentHint: "Teinte d’accentuation. Neutre = gris/blanc.",
+      accentDefault: "Neutre",
       accentBlue: "Bleu",
       accentTeal: "Sarcelle",
       fontScale: "Taille du texte",
@@ -45,7 +45,8 @@ export const settings = defineCatalog({
       confirmResetClicker: "Confirmer la réinitialisation du clicker",
       confirmResetClickerHint: "Demande confirmation avant de restaurer les défauts clicker.",
       openOnSingleClick: "Ouvrir au simple clic",
-      openOnSingleClickHint: "Un clic ouvre l’automation (sinon double-clic).",
+      openOnSingleClickHint:
+        "Un clic gauche ouvre toujours l’automation (Shift/Ctrl pour sélectionner).",
       confirmTrash: "Confirmer la mise à la corbeille",
       confirmTrashHint: "Demande confirmation avant de mettre à la corbeille.",
       confirmDeleteFolder: "Confirmer la suppression de dossier",
@@ -95,8 +96,6 @@ export const settings = defineCatalog({
       warnOnUnsavedQuit: "Confirmer avant quitter si onglets modifiés",
       warnOnUnsavedQuitHint:
         "Demande confirmation s’il reste des documents non enregistrés.",
-      showSessionPill: "Pastille de session",
-      showSessionPillHint: "Affiche l’état du moteur dans la barre de titre.",
       recentListMax: "Nombre de récents",
       recentListMaxHint: "Taille max de la liste Accueil « Récents » (1–50).",
       goHomeAfterEmergency: "Accueil après arrêt d’urgence",
@@ -133,7 +132,7 @@ export const settings = defineCatalog({
       languageHint: "S’applique à toute l’interface.",
       hud: "Indicateur flottant (HUD)",
       hudHint:
-        "Affiche l’état au-dessus des autres fenêtres (pas les zones Clicker).",
+        "Pastille au-dessus des autres fenêtres. Visible aussi automatiquement pendant une session clicker (Running / Pause) ; clic pour ramener Caster.",
       hudOpacity: "Opacité du HUD",
       clickerMode: "Mode interface",
       clickerModeHint:
@@ -273,8 +272,8 @@ export const settings = defineCatalog({
       densityComfortable: "Comfortable",
       densityCompact: "Compact",
       accent: "Accent",
-      accentHint: "Accent color tint.",
-      accentDefault: "Default",
+      accentHint: "Accent color tint. Neutral = gray/white.",
+      accentDefault: "Neutral",
       accentBlue: "Blue",
       accentTeal: "Teal",
       fontScale: "Text size",
@@ -290,7 +289,8 @@ export const settings = defineCatalog({
       confirmResetClicker: "Confirm clicker reset",
       confirmResetClickerHint: "Ask before restoring clicker defaults.",
       openOnSingleClick: "Open on single click",
-      openOnSingleClickHint: "One click opens the automation (otherwise double-click).",
+      openOnSingleClickHint:
+        "A left click always opens the automation (Shift/Ctrl to select).",
       confirmTrash: "Confirm move to trash",
       confirmTrashHint: "Ask before moving items to trash.",
       confirmDeleteFolder: "Confirm folder deletion",
@@ -338,8 +338,6 @@ export const settings = defineCatalog({
       confirmQuitHint: "Ask before quitting when the engine is still running.",
       warnOnUnsavedQuit: "Confirm quit with unsaved tabs",
       warnOnUnsavedQuitHint: "Ask if any documents still have unsaved changes.",
-      showSessionPill: "Session status pill",
-      showSessionPillHint: "Show engine status in the title bar.",
       recentListMax: "Recent list size",
       recentListMaxHint: "Max items in the Home “Recent” list (1–50).",
       goHomeAfterEmergency: "Home after emergency stop",
@@ -371,7 +369,8 @@ export const settings = defineCatalog({
       language: "Language",
       languageHint: "Applies to the whole UI.",
       hud: "Floating status (HUD)",
-      hudHint: "Show status above other windows (not Clicker zones).",
+      hudHint:
+        "Pill above other windows. Also auto-shown during a clicker session (Running / Paused); click to focus Caster.",
       hudOpacity: "HUD opacity",
       clickerMode: "Interface mode",
       clickerModeHint:

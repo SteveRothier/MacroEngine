@@ -130,4 +130,28 @@ describe("buildAutomationRowMenuItems", () => {
       "convert-script",
     ]);
   });
+
+  it("omits mutating actions when locked", () => {
+    const items = buildAutomationRowMenuItems(
+      baseRow({ kind: "macro", id: "M", name: "M", locked: true, status: "locked" }),
+      t,
+      {
+        onOpen: vi.fn(),
+        onLaunch: vi.fn(),
+        onRename: vi.fn(),
+        onDuplicate: vi.fn(),
+        onDelete: vi.fn(),
+        onMoveToFolder: vi.fn(),
+        onConvertTo: vi.fn(),
+        onUnlock: vi.fn(),
+        moveFolders: [{ id: "albion", name: "Albion" }],
+      },
+    );
+    expect(items.map((i) => i.id)).toEqual([
+      "open",
+      "launch",
+      "sep-mid",
+      "unlock",
+    ]);
+  });
 });

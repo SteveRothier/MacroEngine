@@ -769,21 +769,6 @@ export function SettingsView({
                   </div>
                   <div className="caster-settings-row">
                     <div className="caster-settings-row-label">
-                      <span>{t("settings.application.showSessionPill")}</span>
-                      <p>{t("settings.application.showSessionPillHint")}</p>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <SettingsToggle
-                        checked={shell.showSessionPill}
-                        ariaLabel={t("settings.application.showSessionPill")}
-                        onChange={(checked) =>
-                          persistShellPrefs({ showSessionPill: checked })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.recentListMax")}</span>
                       <p>{t("settings.application.recentListMaxHint")}</p>
                     </div>

@@ -14,18 +14,42 @@ import "./App.css";
 import "./ui/shell/tokens.css";
 import "./ui/shell/shell.css";
 
-type ClickerMetrics = {
+function OverlayView() {
+  const prefs = mergeShellPrefs();
+  return (
+    <LocaleProvider preference={prefs.uiLocale}>
+      <OverlayInner />
+    </LocaleProvider>
+  );
+}
+
+type OverlayMetrics = {
   measuredCps: number;
+  clicksEmitted: number;
+  elapsedMs: number;
 };
 
-function OverlayView() {
+function formatOverlayClock(ms: number) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${String(r).padStart(2, "0")}`;
+}
+
+function OverlayInner() {
+  const t = useT();
   const [status, setStatus] = useState<EngineStatus>({
     state: "idle",
     cancelled: false,
     message: null,
   });
-  const [cps, setCps] = useState(0);
+  const [metrics, setMetrics] = useState<OverlayMetrics>({
+    measuredCps: 0,
+    clicksEmitted: 0,
+    elapsedMs: 0,
+  });
   const [opacity, setOpacity] = useState(1);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     void invoke<{ overlayOpacity?: number }>("get_settings")
@@ -47,10 +71,14 @@ function OverlayView() {
     const tick = async () => {
       try {
         const s = await invoke<EngineStatus>("get_engine_state");
-        const m = await invoke<ClickerMetrics>("get_clicker_metrics");
+        const m = await invoke<OverlayMetrics>("get_clicker_metrics");
         if (!alive) return;
         setStatus(s);
-        setCps(m.measuredCps);
+        setMetrics({
+          measuredCps: m.measuredCps,
+          clicksEmitted: m.clicksEmitted,
+          elapsedMs: m.elapsedMs,
+        });
       } catch {
         /* ignore */
       }
@@ -63,10 +91,117 @@ function OverlayView() {
     };
   }, []);
 
+  const paused = status.state === "paused";
+  const active =
+    (status.state === "running" || paused) && status.sessionKind === "clicker";
+  const stateLabel = paused
+    ? t("labels.paused")
+    : active
+      ? t("common.running")
+      : t("common.inactive");
+
+  const runControl = async (cmd: "pause_clicker" | "resume_clicker" | "request_cancel") => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const next = await invoke<EngineStatus>(cmd);
+      setStatus(next);
+    } catch {
+      /* ignore */
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
-    <div className="overlay caster-root" data-tauri-drag-region style={{ opacity }}>
-      <strong>{status.sessionKind ?? status.state}</strong>
-      <span>{cps.toFixed(1)} CPS</span>
+    <div
+      className={[
+        "overlay",
+        "caster-root",
+        active ? "overlay--session" : "",
+        paused ? "overlay--paused" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={{ opacity }}
+      role="group"
+      aria-label={t("clicker.overlay.focusAria")}
+    >
+      <button
+        type="button"
+        className="overlay-main"
+        title={t("clicker.overlay.focusHint")}
+        aria-label={t("clicker.overlay.focusAria")}
+        onClick={() => {
+          void invoke("focus_main_window").catch(() => undefined);
+        }}
+      >
+        <span
+          className={[
+            "overlay-state",
+            paused ? "is-paused" : active ? "is-running" : "is-idle",
+          ].join(" ")}
+        >
+          {stateLabel}
+        </span>
+        {active ? (
+          <span className="overlay-metrics">
+            {t("clicker.overlay.clicks", { n: metrics.clicksEmitted })}
+            <span className="overlay-sep" aria-hidden>
+              ·
+            </span>
+            {formatOverlayClock(metrics.elapsedMs)}
+            <span className="overlay-sep" aria-hidden>
+              ·
+            </span>
+            {t("clicker.overlay.cps", {
+              cps: metrics.measuredCps.toFixed(1),
+            })}
+          </span>
+        ) : (
+          <span className="overlay-metrics overlay-metrics--idle">
+            {t("clicker.overlay.idleHint")}
+          </span>
+        )}
+      </button>
+      {active ? (
+        <div className="overlay-actions" role="group" aria-label={t("clicker.overlay.controlsAria")}>
+          <button
+            type="button"
+            className="overlay-btn"
+            disabled={busy}
+            title={
+              paused
+                ? t("clicker.overlay.resume")
+                : t("clicker.overlay.pause")
+            }
+            aria-label={
+              paused
+                ? t("clicker.overlay.resume")
+                : t("clicker.overlay.pause")
+            }
+            onClick={(e) => {
+              e.stopPropagation();
+              void runControl(paused ? "resume_clicker" : "pause_clicker");
+            }}
+          >
+            {paused ? t("clicker.overlay.resumeShort") : t("clicker.overlay.pauseShort")}
+          </button>
+          <button
+            type="button"
+            className="overlay-btn overlay-btn--stop"
+            disabled={busy}
+            title={t("clicker.overlay.stop")}
+            aria-label={t("clicker.overlay.stop")}
+            onClick={(e) => {
+              e.stopPropagation();
+              void runControl("request_cancel");
+            }}
+          >
+            {t("clicker.overlay.stopShort")}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

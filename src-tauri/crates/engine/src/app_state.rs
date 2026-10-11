@@ -345,13 +345,6 @@ impl AppState {
     pub fn set_hotkey_bindings(&self, bindings: HotkeyBindings) {
         *self.bindings.lock().expect("bindings lock") = bindings;
         update_live_bindings(bindings);
-        self.bus.publish(EngineEvent::Log {
-            level: LogLevel::Info,
-            message: format!(
-                "hotkeys updated action=0x{:X} macro=0x{:X} pause=0x{:X} emergency=0x{:X}",
-                bindings.action_vk, bindings.macro_vk, bindings.pause_vk, bindings.emergency_vk
-            ),
-        });
     }
 
     pub fn is_recording(&self) -> bool {
@@ -1714,17 +1707,6 @@ impl AppState {
                 let _ = rebuild.rebuild_clicker_triggers();
             })
             .map_err(|e| e.to_string())?;
-        self.bus.publish(EngineEvent::Log {
-            level: LogLevel::Info,
-            message: format!(
-                "hotkeys armed action=0x{:X} macro=0x{:X} script=0x{:X} pause=0x{:X} emergency=0x{:X}",
-                bindings.action_vk,
-                bindings.macro_vk,
-                bindings.script_vk,
-                bindings.pause_vk,
-                bindings.emergency_vk
-            ),
-        });
         Ok(())
     }
 

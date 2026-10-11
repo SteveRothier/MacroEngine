@@ -747,6 +747,27 @@ export function ScriptEditorView({
       }}
       onPermissionsChange={(partial) => patch(partial)}
       locked={locked}
+      onLockChange={(nextLocked) => {
+        void (async () => {
+          try {
+            await invoke("set_library_item_locked_cmd", {
+              kind: "script",
+              id: scriptId,
+              locked: nextLocked,
+            });
+            setLocked(nextLocked);
+            toast.success(
+              nextLocked
+                ? t("automations.toast.locked")
+                : t("automations.toast.unlocked"),
+            );
+          } catch (e) {
+            toast.error(
+              typeof e === "string" ? e : t("automations.toast.lockFail"),
+            );
+          }
+        })();
+      }}
       loading={loading || !draft}
       dryRun={dryRun}
       onDryRunChange={setDryRun}
@@ -1039,7 +1060,7 @@ export function ScriptEditorView({
           lines={consoleLines}
           onClear={() => setConsoleLines([])}
           onEmptyRun={() => void onRun()}
-          emptyRunDisabled={running || locked || !!draft?.isModule}
+          emptyRunDisabled={running || !!draft?.isModule}
           onJumpToLine={(line) => sourceEditorRef.current?.gotoLine(line)}
         />
         <ScriptRunTimeline

@@ -19,7 +19,7 @@ describe("last-run formatting", () => {
     expect(formatDuration(65_000, t)).toBe("1 min 5 s");
   });
 
-  it("builds summary and tooltip with status + duration", () => {
+  it("builds summary and tooltip with duration; omits OK status", () => {
     const entry: RecentEntry = {
       kind: "macro",
       id: "Demo",
@@ -28,10 +28,26 @@ describe("last-run formatting", () => {
       durationMs: 1500,
     };
     expect(formatLastRunSummary(entry, t, now)).toBe(
-      "il y a 2 min · 1,5 s · OK",
+      "il y a 2 min · 1,5 s",
     );
     expect(formatLastRunTooltip(entry, t, now)).toBe(
-      "OK · 1,5 s · il y a 2 min",
+      "1,5 s · il y a 2 min",
+    );
+  });
+
+  it("keeps non-ok status in summary and tooltip", () => {
+    const entry: RecentEntry = {
+      kind: "macro",
+      id: "Fail",
+      at: now - 120_000,
+      status: "error",
+      durationMs: 800,
+    };
+    expect(formatLastRunSummary(entry, t, now)).toBe(
+      "il y a 2 min · 800 ms · Erreur",
+    );
+    expect(formatLastRunTooltip(entry, t, now)).toBe(
+      "Erreur · 800 ms · il y a 2 min",
     );
   });
 });

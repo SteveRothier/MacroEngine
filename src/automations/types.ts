@@ -60,6 +60,9 @@ export type DisplayOptions = {
 
 export type AutomationFilter = "all" | "favorites" | "recent" | "trash";
 
+/** Accueil secondary filter: restrict by library kind. */
+export type AutomationKindFilter = "all" | "macro" | "clicker" | "script";
+
 /** Shared folder option for Accueil / bulk move (macros + clickers). */
 export type AutomationFolderOption = {
   id: string;
@@ -79,6 +82,9 @@ export type FilterCounts = {
   favorites: number;
   recent: number;
   trash: number;
+  macro: number;
+  clicker: number;
+  script: number;
 };
 
 export const DEFAULT_DISPLAY: DisplayOptions = {

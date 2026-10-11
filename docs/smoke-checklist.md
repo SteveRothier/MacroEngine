@@ -16,6 +16,7 @@ Vérifications manuelles rapides après une build ou un gros changement.
 
 ## Clicker
 
+- [ ] Titlebar `⋯` : Verrouiller / Déverrouiller en tête du menu (plus de cadenas standalone)
 - [ ] Overlay zones : activer « Afficher » → bandes visibles sur l’écran cible
 - [ ] Dessiner zone sécurité et zone clic (`begin_zone_overlay_draw`)
 - [ ] Zone pause / arrêt / démarrer : curseur dans zone → comportement attendu
@@ -35,15 +36,19 @@ Vérifications manuelles rapides après une build ou un gros changement.
 - [ ] Zones : clic dehors (hors carte) désélectionne coins / bords / custom
 - [ ] Condition pixel : Activée on/off (hauteur stable) ; pastilles Réf/Live ; InfoTip i ; Arrêt/Pause
 - [ ] Condition pixel runtime : hors tolérance → toast + journal (arrêt ou pause)
+- [ ] Overlay statut session : pastille visible en Running/Pause (clics · durée · CPS) ; Pause/Reprendre + Stop ; clic zone texte → focus app ; réglages manuels pixel restent fermés au seul toggle Activée
 - [ ] Écran retiré : titlebar indique l’écran actif manquant ; fallback primaire
 
 ## Macros
 
+- [ ] Titlebar `⋯` : Verrouiller / Déverrouiller, Dupliquer, Importer / Exporter (plus de cadenas standalone)
+- [ ] Liste : scrollbar collée au bord droit, du sous la barre d’outils jusqu’en bas ; pas de pastille / icône de type (colonne Action suffit)
+- [ ] `+ Ajouter` : menu écarté du bouton ; lignes compactes ; pas de hints techniques (`mouse.click`)
 - [ ] Capture : démarrer, pause/reprise, souris seule ou clavier seul
 - [ ] Post-traitement : délais courts fusionnés après stop
 - [ ] Séquence : réordonner racine et branches `then`/`else`, éditer un délai en cellules
 - [ ] Éditeur **liste** : multi-sélection (Shift/Ctrl), barre bulk (monter/descendre/**dupliquer**/supprimer) ; undo groupé ; plus de vue graphe
-- [ ] Convertir macro → script **ou clicker** depuis la barre d’outils
+- [ ] Convertir macro → script **ou clicker** depuis Accueil (plus depuis la titlebar)
 - [ ] Convertir macro multi-points → preset clicker (séquence de points)
 - [ ] Convert soft-fail : macro avec clics + non-clics → clicker créé + warnings `dropped` (pas d’échec total)
 - [ ] Coller multi : copier plusieurs actions → coller après (clipboard interne)
@@ -55,6 +60,7 @@ Vérifications manuelles rapides après une build ou un gros changement.
 ## Scripts
 
 - [ ] Ouvrir un script depuis la bibliothèque / Accueil
+- [ ] Titlebar `⋯` : Verrouiller / Déverrouiller en tête (avec module / dry-run / step) ; plus de cadenas standalone
 - [ ] **Run** session autonome ; **Stop** / F8
 - [ ] Dry-run : toggle titlebar → badge visible, pas d’effet host, lignes `dry-run skipped` en console
 - [ ] **Pas à pas** : pause avant effets de bord → Continuer
@@ -66,10 +72,27 @@ Vérifications manuelles rapides après une build ou un gros changement.
 
 ## Accueil
 
+- [ ] Colonnes large : Nom · Infos (meta) · Déclencheur · Dernière exé · trail — props à largeur fixe (pas d’espace mort au milieu) ; pas de colonne État / Dossier / Type / `#`
+- [ ] Layout étroit (< ~720px liste) : Infos / hotkey / lastRun dans le subtitle ; colonnes props masquées
+- [ ] Liste : hairlines discrètes, hover lisible, en-têtes un cran plus contrastés, dossiers légèrement teintés
+- [ ] Vue Tous large : subtitle = dossier seulement hors Tous ; Favoris/Récentes : dossier sous le nom
+- [ ] Ligne Manuel : colonne déclencheur vide ; F6 / hotkey visible
+- [ ] Déclencheur non remplacé par perms ; filtre Types en menu déroulant
+- [ ] Dossiers vides masqués ; empty kind dédié (« Aucun clicker ») + clear filtre
+- [ ] Dock bulk : Ouvrir (tous si multi) · Lancer « nom » (premier) · Dupliquer · Corbeille + menu Plus (favori/verrou/dossier/convert)
+- [ ] Pref « Ouvrir au simple clic » on : 1 clic ouvre ; off : double-clic ; avec sélection : clic = clear (+ open si pref on)
+- [ ] Shift+clic / Ctrl+clic ligne = checkmark additif ; double-clic sur checkbox n’ouvre pas ; Esc ou clic dehors désélectionne
+- [ ] Clavier : Entrée ouvre ; Espace coche/décoche
+- [ ] Dernière exé : libellés relatifs se rafraîchissent (~45 s) sans reload
+- [ ] Tri : en-tête Nom↔Ordre lisible ; Infos / Déclencheur non cliquables
+- [ ] Checkmarks : invisibles au repos ; hover/focus ; toutes visibles en mode sélection
+- [ ] Cadenas trail : style ghost comme play/★/⋯ ; toggle verrouillage
+- [ ] Verrouillé : menu sans rename/dupliquer/corbeille/déplacer/convert ; DnD inert ; Delete/dock corbeille bloqués (toast) ; éditeur lecture seule
+- [ ] Densité compacte : lignes Accueil plus basses (`appearance.density`)
+- [ ] Filtre type Macro / Clicker / Script + bulk Dupliquer
 - [ ] Réordonner les dossiers (DnD sur en-têtes de section)
 - [ ] Dossiers imbriqués : créer un sous-dossier, indent/collapse, plafond 3 niveaux
 - [ ] Recherche : matches surlignés ; « Aller au dossier » expand + scroll
-- [ ] Badge « Récent » visible hors filtre Récents (scripts inclus)
 - [ ] Liste longue (> ~80 lignes) : scroll fluide (content-visibility)
 
 ## Données

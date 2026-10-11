@@ -6,13 +6,14 @@ import {
   type HotkeyBindings,
 } from "../macros/types";
 import type { LibraryFolder, LibraryIndexDto } from "../library/types";
-import type { QuickAccess, RecentRunStatus } from "../quickAccess";
+import type { QuickAccess, RecentEntry, RecentRunStatus } from "../quickAccess";
 import type { ScriptSummary } from "../scripts/types";
 import { activePermissionLabels } from "../scripts/ScriptPermissionsMenu";
 import { useLocale, useT, type TFunction } from "../i18n";
 import type {
   AutomationFilter,
   AutomationFolderOption,
+  AutomationKindFilter,
   AutomationRow,
   AutomationStatus,
   FilterCounts,
@@ -141,9 +142,12 @@ export function useUnifiedAutomations(options: {
   refreshKey?: number;
   query?: string;
   filter?: AutomationFilter;
+  kindFilter?: AutomationKindFilter;
   setQuery?: (q: string) => void;
   /** Cap for Accueil « Récents » filter (1–50). */
   recentListMax?: number;
+  /** When true, refresh relative lastRun labels on a timer. */
+  active?: boolean;
 }) {
   const t = useT();
   const { locale } = useLocale();
@@ -160,6 +164,7 @@ export function useUnifiedAutomations(options: {
   const [internalQuery, setInternalQuery] = useState("");
   const query = options.query ?? internalQuery;
   const filter = options.filter ?? "all";
+  const kindFilter = options.kindFilter ?? "all";
   const setQuery = options.setQuery ?? setInternalQuery;
   const recentListMax = Math.min(
     50,
@@ -174,6 +179,7 @@ export function useUnifiedAutomations(options: {
   );
   const hasLoadedRef = useRef(lastHomeSnapshot != null);
   const homeLoadGenRef = useRef(0);
+  const recentEntriesRef = useRef<RecentEntry[]>([]);
   const refresh = useCallback(async (opts?: { silent?: boolean; retried?: boolean }) => {
     const silent = opts?.silent === true || hasLoadedRef.current;
     if (!silent) setLoading(true);
@@ -218,6 +224,7 @@ export function useUnifiedAutomations(options: {
       const favScripts = qa.favorites.scripts ?? [];
       const nextRecent = qa.recent.map((r) => rowKey(r.kind, r.id));
       setRecentOrder(nextRecent);
+      recentEntriesRef.current = qa.recent;
       const runLabels = lastRunLabelMap(qa.recent, t, locale);
       const runTooltips = lastRunTooltipMap(qa.recent, t, locale);
       const runStatuses = lastRunStatusMap(qa.recent);
@@ -435,6 +442,32 @@ export function useUnifiedAutomations(options: {
     void refresh({ silent: hasLoadedRef.current });
   }, [refresh, options.refreshKey]);
 
+  // Refresh relative lastRun labels while Accueil is visible (~45s).
+  useEffect(() => {
+    if (!options.active) return;
+    const tick = () => {
+      const entries = recentEntriesRef.current;
+      if (entries.length === 0) return;
+      const runLabels = lastRunLabelMap(entries, t, locale);
+      const runTooltips = lastRunTooltipMap(entries, t, locale);
+      setRows((prev) => {
+        let changed = false;
+        const next = prev.map((r) => {
+          const k = rowKey(r.kind, r.id);
+          const label = runLabels.get(k);
+          if (!label) return r;
+          const tip = runTooltips.get(k);
+          if (r.lastRunLabel === label && r.lastRunTooltip === tip) return r;
+          changed = true;
+          return { ...r, lastRunLabel: label, lastRunTooltip: tip };
+        });
+        return changed ? next : prev;
+      });
+    };
+    const id = window.setInterval(tick, 45_000);
+    return () => window.clearInterval(id);
+  }, [options.active, t, locale]);
+
   // Overlay dirty flags locally — do not refetch home IPC on every tab dirty flip.
   const rowsWithDirty = useMemo(() => {
     const dm = options.dirtyMacroId ?? null;
@@ -465,6 +498,9 @@ export function useUnifiedAutomations(options: {
       favorites: active.filter((r) => r.favorite).length,
       recent: active.filter((r) => recentSet.has(rowKey(r.kind, r.id))).length,
       trash: rowsWithDirty.filter((r) => r.trashed).length,
+      macro: active.filter((r) => r.kind === "macro").length,
+      clicker: active.filter((r) => r.kind === "clicker").length,
+      script: active.filter((r) => r.kind === "script").length,
     };
   }, [rowsWithDirty, cappedRecentOrder]);
 
@@ -489,6 +525,9 @@ export function useUnifiedAutomations(options: {
           );
       }
     }
+    if (kindFilter !== "all") {
+      list = list.filter((r) => r.kind === kindFilter);
+    }
     const q = query.trim().toLowerCase();
     if (!q) return list;
     return list.filter(
@@ -498,7 +537,7 @@ export function useUnifiedAutomations(options: {
         r.folderLabel.toLowerCase().includes(q) ||
         (r.meta?.toLowerCase().includes(q) ?? false),
     );
-  }, [rowsWithDirty, query, filter, cappedRecentOrder]);
+  }, [rowsWithDirty, query, filter, kindFilter, cappedRecentOrder]);
 
   return {
     rows: filtered,

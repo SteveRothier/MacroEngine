@@ -22,6 +22,7 @@ export {
 } from "./DropdownMenu";
 export { EmptyState } from "./EmptyState";
 export { EditorToolbar } from "./EditorToolbar";
+export { LibraryLockButton } from "./LibraryLockButton";
 export { usePointerReorder, type PointerReorderHandlers } from "./usePointerReorder";
 export { AppShell } from "./AppShell";
 export { AppNavTabs } from "./AppNavTabs";

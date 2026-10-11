@@ -207,6 +207,8 @@ export function useAccueilDnd({
   const onRowPointerDown = useCallback(
     (row: AutomationRow, e: ReactPointerEvent) => {
       if (e.button !== 0) return;
+      // Locked rows are read-only: no reorder / folder move via DnD.
+      if (row.locked) return;
       // Always reset any leftover gesture so the 2nd+ DnD can start.
       clearDrag();
       const pointerId = e.pointerId;

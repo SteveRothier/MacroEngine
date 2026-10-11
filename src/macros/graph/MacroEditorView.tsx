@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { confirmAction } from "../../ui";
-import { ActionPickerMenu, useToast } from "../../ui/shell";
+import { useToast } from "../../ui/shell";
 import { ActionList } from "../ActionList";
 import { buildActionAddMenu, makeAction } from "../actionFactory";
 import { MacroMetaBar } from "../MacroMetaBar";
@@ -35,7 +36,6 @@ import {
   type ConfirmationsPrefs,
 } from "../../settings/settingsTypes";
 import { useT, type TFunction } from "../../i18n";
-import { runLibraryConvert } from "../../automations/convertLibraryItem";
 import {
   DEFAULT_PROCESS_FILTER,
   type ProcessFilter,
@@ -62,10 +62,11 @@ type Props = {
   onDirtyChange?: (id: string, dirty: boolean) => void;
   /** Called after a successful library rename (id changed). */
   onRenamed?: (from: string, to: string) => void;
+  /** Open another macro (duplicate / import). */
+  onOpenMacro?: (macroId: string, label?: string) => void;
   engineState: string;
   onStatus: (s: EngineStatus) => void;
   onOpenScript?: (scriptId: string, label?: string) => void;
-  onOpenClicker?: (clickerId: string, label?: string) => void;
   /** Open global process filter settings (Sécurité). */
   onOpenProcessSettings?: () => void;
   /** When false (keep-mounted but hidden), ignore global shortcuts / titlebar. */
@@ -73,6 +74,17 @@ type Props = {
   automationPrefs?: AutomationPrefs;
   confirmationsPrefs?: ConfirmationsPrefs;
 };
+
+async function uniqueMacroId(base: string): Promise<string> {
+  const existing = await invoke<string[]>("list_saved_macros");
+  const taken = new Set(existing);
+  if (!taken.has(base)) return base;
+  for (let i = 2; i < 1000; i++) {
+    const candidate = `${base} ${i}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+  throw new Error("name collision");
+}
 
 function saveErrorMessage(e: unknown, t: TFunction): string {
   if (typeof e === "string") return e;
@@ -97,10 +109,10 @@ export function MacroEditorView({
   onBack,
   onDirtyChange,
   onRenamed,
+  onOpenMacro,
   onStatus,
   engineState,
   onOpenScript,
-  onOpenClicker,
   onOpenProcessSettings,
   active = true,
   automationPrefs: automationPrefsProp,
@@ -546,9 +558,9 @@ export function MacroEditorView({
   );
 
   const onPlay = useCallback(async () => {
-    if (locked || recording) return;
+    if (recording) return;
     try {
-      if (automationPrefs.autoSaveBeforeRun) {
+      if (automationPrefs.autoSaveBeforeRun && !lockedRef.current) {
         await flushAutosave();
       }
       const st = await invoke<EngineStatus>("launch_saved_macro", {
@@ -562,7 +574,6 @@ export function MacroEditorView({
   }, [
     automationPrefs.autoSaveBeforeRun,
     flushAutosave,
-    locked,
     onStatus,
     recording,
     t,
@@ -587,7 +598,7 @@ export function MacroEditorView({
 
   const onRunFrom = useCallback(
     async (path: ActionPath) => {
-      if (locked || recording || editorLocked) return;
+      if (recording) return;
       if (!path.length) {
         if (automationPrefs.runFromRequiresSelection) {
           toast.error(t("macros.toast.selectStepToTest"));
@@ -595,7 +606,7 @@ export function MacroEditorView({
         return;
       }
       try {
-        if (automationPrefs.autoSaveBeforeRun) {
+        if (automationPrefs.autoSaveBeforeRun && !lockedRef.current) {
           await flushAutosave();
         }
         const st = await invoke<EngineStatus>("launch_saved_macro", {
@@ -616,9 +627,7 @@ export function MacroEditorView({
     [
       automationPrefs.autoSaveBeforeRun,
       automationPrefs.runFromRequiresSelection,
-      editorLocked,
       flushAutosave,
-      locked,
       onStatus,
       recording,
       t,
@@ -629,7 +638,7 @@ export function MacroEditorView({
   useEffect(() => {
     if (!active) return;
     function onKey(e: KeyboardEvent) {
-      if (lockedRef.current || recording || editorLocked) return;
+      if (recording) return;
       if (!(e.ctrlKey || e.metaKey) || !e.shiftKey) return;
       if (e.key !== "Enter" && e.code !== "Enter") return;
       const el = e.target as HTMLElement | null;
@@ -651,7 +660,7 @@ export function MacroEditorView({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, editorLocked, onRunFrom, recording, t, toast]);
+  }, [active, onRunFrom, recording, t, toast]);
 
   const onStartRecord = useCallback(async () => {
     if (locked || recording) return;
@@ -914,11 +923,105 @@ export function MacroEditorView({
 
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
+  const restoreEngineMacro = useCallback(async () => {
+    await invoke<MacroDocument>("load_saved_macro", {
+      name: macroIdRef.current,
+    });
+  }, []);
+
+  const onDuplicateMacro = useCallback(async () => {
+    if (lockedRef.current || recording) return;
+    try {
+      await flushAutosave();
+      const copy = await invoke<MacroDocument>("duplicate_saved_macro", {
+        name: macroIdRef.current,
+      });
+      await restoreEngineMacro();
+      toast.success(
+        t("automations.toast.macroDuplicated", { name: copy.name }),
+      );
+      onOpenMacro?.(copy.name, copy.name);
+    } catch (e) {
+      toast.error(errMessage(e, t("macros.toast.saveFailed")));
+    }
+  }, [flushAutosave, onOpenMacro, recording, restoreEngineMacro, t, toast]);
+
+  const onExportMacro = useCallback(async () => {
+    if (recording) return;
+    try {
+      if (!lockedRef.current) {
+        await flushAutosave();
+      }
+      await restoreEngineMacro();
+      const path = await save({
+        filters: [
+          { name: t("macros.library.dialogFilter"), extensions: ["json"] },
+        ],
+        defaultPath: `${macroIdRef.current.replace(/\s+/g, "-").toLowerCase()}.json`,
+      });
+      if (!path) return;
+      await invoke("export_macro_path", { path });
+      toast.success(t("macros.toast.exported"));
+    } catch (e) {
+      toast.error(errMessage(e, t("macros.toast.exportFailed")));
+    }
+  }, [flushAutosave, recording, restoreEngineMacro, t, toast]);
+
+  const onImportMacro = useCallback(async () => {
+    if (lockedRef.current || recording) return;
+    try {
+      await flushAutosave();
+      const path = await open({
+        multiple: false,
+        filters: [
+          { name: t("macros.library.dialogFilter"), extensions: ["json"] },
+        ],
+      });
+      if (!path || Array.isArray(path)) return;
+      const imported = await invoke<MacroDocument>("import_macro_path", {
+        path,
+      });
+      const base = (imported.name || "macro").trim() || "macro";
+      const id = await uniqueMacroId(base);
+      const toSave: MacroDocument = { ...imported, name: id };
+      await invoke("save_saved_macro", { id, doc: toSave });
+      await restoreEngineMacro();
+      toast.success(t("macros.toast.imported", { name: id }));
+      onOpenMacro?.(id, id);
+    } catch (e) {
+      toast.error(errMessage(e, t("macros.toast.importFailed")));
+    }
+  }, [flushAutosave, onOpenMacro, recording, restoreEngineMacro, t, toast]);
+
   const titleBarPortal = useTitleBarSlot(
     doc.name || macroId,
     <MacroTitleBarTools
       onBack={onBack}
       locked={locked}
+      onLockChange={(nextLocked) => {
+        void (async () => {
+          try {
+            await invoke("set_library_item_locked_cmd", {
+              kind: "macro",
+              id: macroId,
+              locked: nextLocked,
+            });
+            setLocked(nextLocked);
+            toast.success(
+              nextLocked
+                ? t("automations.toast.locked")
+                : t("automations.toast.unlocked"),
+            );
+          } catch (e) {
+            toast.error(
+              typeof e === "string" ? e : t("automations.toast.lockFail"),
+            );
+          }
+        })();
+      }}
+      onDuplicate={() => void onDuplicateMacro()}
+      onImport={() => void onImportMacro()}
+      onExport={() => void onExportMacro()}
       loading={loading}
       engineState={engineState}
       recording={recording}
@@ -927,7 +1030,7 @@ export function MacroEditorView({
       onPlay={() => void onPlay()}
       onStop={() => void onStopSession()}
       onPlayFrom={
-        selectedPath && !editorLocked
+        selectedPath && !recording
           ? () => void onRunFrom(selectedPath)
           : undefined
       }
@@ -967,62 +1070,6 @@ export function MacroEditorView({
       onProcessFilterPresetsChange={(next) => {
         void persistProcessFilterPresets(next);
       }}
-      onConvertToScript={
-        editorLocked
-          ? undefined
-          : () => {
-              void (async () => {
-                const outcome = await runLibraryConvert({
-                  fromKind: "macro",
-                  id: macroId,
-                  toKind: "script",
-                  name: doc.name || macroId,
-                  t,
-                });
-                if (!outcome) return;
-                toast.success(
-                  t("automations.convert.success", {
-                    name: outcome.result.newName,
-                    kind: t(`automations.convert.kind.${outcome.result.toKind}`),
-                  }),
-                );
-                if (outcome.openAfter && onOpenScript) {
-                  onOpenScript(
-                    outcome.result.newId,
-                    outcome.result.newName,
-                  );
-                }
-              })();
-            }
-      }
-      onConvertToClicker={
-        editorLocked
-          ? undefined
-          : () => {
-              void (async () => {
-                const outcome = await runLibraryConvert({
-                  fromKind: "macro",
-                  id: macroId,
-                  toKind: "clicker",
-                  name: doc.name || macroId,
-                  t,
-                });
-                if (!outcome) return;
-                toast.success(
-                  t("automations.convert.success", {
-                    name: outcome.result.newName,
-                    kind: t(`automations.convert.kind.${outcome.result.toKind}`),
-                  }),
-                );
-                if (outcome.openAfter && onOpenClicker) {
-                  onOpenClicker(
-                    outcome.result.newId,
-                    outcome.result.newName,
-                  );
-                }
-              })();
-            }
-      }
       meta={
         <MacroMetaBar
           doc={doc}
@@ -1045,17 +1092,19 @@ export function MacroEditorView({
       {titleBarPortal}
       <div className="caster-editor-layout">
         <div className="caster-seq-panel">
-          <div className="caster-seq-toolbar">
-            <ActionPickerMenu
-              label={t("macros.toolbar.add")}
-              disabled={editorLocked || !hydrated}
-              items={buildActionAddMenu(addAction, t)}
-              open={addMenuOpen}
-              onOpenChange={setAddMenuOpen}
-            />
-          </div>
           <div
             className="caster-seq-scroll"
+            onClick={(e) => {
+              const el = e.target as HTMLElement;
+              if (
+                el.closest(
+                  ".action-list-item, .action-list-bulk, .action-list-empty, .action-list-shell, .caster-action-picker-root, .caster-dropdown-menu-root, .caster-menu-popover, .caster-context-menu, button, a, input, select, textarea, label, [role='button']",
+                )
+              ) {
+                return;
+              }
+              setSelectedPath(null);
+            }}
             onContextMenu={
               editorLocked
                 ? undefined
@@ -1094,7 +1143,9 @@ export function MacroEditorView({
                 onDuplicateMany={onDuplicateMany}
                 onMove={onMove}
                 onMoveMany={onMoveMany}
-                onRunFrom={editorLocked ? undefined : (path) => void onRunFrom(path)}
+                onRunFrom={
+                  recording ? undefined : (path) => void onRunFrom(path)
+                }
                 onInsertBefore={onInsertBefore}
                 onInsertAfter={onInsertAfter}
                 onPasteAfter={onPasteAfter}
@@ -1103,6 +1154,11 @@ export function MacroEditorView({
                   editorLocked ? undefined : () => setAddMenuOpen(true)
                 }
                 onEmptyAdd={editorLocked ? undefined : () => addAction("mouse.click")}
+                addMenuItems={
+                  editorLocked ? undefined : buildActionAddMenu(addAction, t)
+                }
+                addMenuOpen={addMenuOpen}
+                onAddMenuOpenChange={setAddMenuOpen}
                 onStartRecord={
                   editorLocked || recording
                     ? undefined

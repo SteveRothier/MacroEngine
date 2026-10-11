@@ -193,15 +193,17 @@ export function buildAutomationRowMenuItems(
     });
   }
 
-  items.push(
-    { id: "sep-del", label: "", separator: true },
-    {
-      id: "delete",
-      label: t("automations.menu.row.trash"),
-      icon: actions.icons?.delete,
-      danger: true,
-      onSelect: actions.onDelete,
-    },
-  );
+  if (!row.locked) {
+    items.push(
+      { id: "sep-del", label: "", separator: true },
+      {
+        id: "delete",
+        label: t("automations.menu.row.trash"),
+        icon: actions.icons?.delete,
+        danger: true,
+        onSelect: actions.onDelete,
+      },
+    );
+  }
   return items;
 }

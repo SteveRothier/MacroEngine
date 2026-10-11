@@ -8,6 +8,8 @@ import {
   Download,
   FilePlus2,
   LayoutTemplate,
+  Lock,
+  LockOpen,
   Monitor,
   MoreHorizontal,
   Pause,
@@ -17,7 +19,12 @@ import {
   Undo2,
   Upload,
 } from "lucide-react";
-import { DisplayPopover, DropdownMenu, EditorToolbar, useToast } from "../ui/shell";
+import {
+  DisplayPopover,
+  DropdownMenu,
+  EditorToolbar,
+  useToast,
+} from "../ui/shell";
 import type { DropdownEntry } from "../ui/shell";
 import { promptAction } from "../ui";
 import {
@@ -79,7 +86,8 @@ export function ClickerTitleBarTools({
     editor.activeDisplayId != null &&
     editor.displays.length > 0 &&
     !editor.displays.some((d) => d.id === editor.activeDisplayId);
-  const displayDisabled = editor.editDisabled || editor.running;
+  const displayDisabled = editor.running;
+  const mutateDisabled = editor.editDisabled;
 
   const saveAsNew = async () => {
     const raw = await promptAction({
@@ -223,11 +231,54 @@ export function ClickerTitleBarTools({
     };
   });
 
+  const toggleLock = () => {
+    void (async () => {
+      const id = editor.selectedPreset;
+      if (!id) return;
+      const nextLocked = !editor.locked;
+      try {
+        await invoke("set_library_item_locked_cmd", {
+          kind: "clicker",
+          id,
+          locked: nextLocked,
+        });
+        editor.setLocked(nextLocked);
+        toast.success(
+          nextLocked
+            ? t("automations.toast.locked")
+            : t("automations.toast.unlocked"),
+        );
+      } catch (e) {
+        toast.error(
+          typeof e === "string" ? e : t("automations.toast.lockFail"),
+        );
+      }
+    })();
+  };
+
   const moreItems: DropdownEntry[] = [
+    ...(editor.selectedPreset
+      ? ([
+          {
+            id: "lock-toggle",
+            label: editor.locked
+              ? t("clicker.toolbar.unlockTitle")
+              : t("clicker.toolbar.lockTitle"),
+            icon: editor.locked ? (
+              <LockOpen size={14} />
+            ) : (
+              <Lock size={14} />
+            ),
+            onSelect: toggleLock,
+          },
+          { id: "sep-lock", label: "", separator: true },
+        ] satisfies DropdownEntry[])
+      : []),
     {
       id: "save-now",
       label: t("clicker.toolbar.saveNow"),
       icon: <Save size={14} />,
+      disabled: mutateDisabled,
       onSelect: () => {
         void editor.onSavePreset().then(
           () => toast.success(t("clicker.toasts.presetSaved")),
@@ -247,12 +298,14 @@ export function ClickerTitleBarTools({
       id: "save-as-new",
       label: t("clicker.toolbar.saveAsNew"),
       icon: <FilePlus2 size={14} />,
+      disabled: mutateDisabled,
       onSelect: () => void saveAsNew(),
     },
     {
       id: "templates",
       label: t("clicker.toolbar.templates"),
       icon: <LayoutTemplate size={14} />,
+      disabled: mutateDisabled,
       submenu: templateItems,
     },
     { id: "sep-io", label: "", separator: true },
@@ -260,6 +313,7 @@ export function ClickerTitleBarTools({
       id: "import",
       label: t("clicker.toolbar.import"),
       icon: <Upload size={14} />,
+      disabled: mutateDisabled,
       onSelect: () => {
         void editor.onImportPreset().then((id) => {
           if (id) onSavedAsNew?.(id);
@@ -315,14 +369,6 @@ export function ClickerTitleBarTools({
             <ArrowLeft size={14} aria-hidden />
           </button>
           {meta}
-          {editor.locked ? (
-            <span
-              className="caster-clicker-lock"
-              title={t("clicker.toolbar.lockedTitle")}
-            >
-              {t("clicker.toolbar.locked")}
-            </span>
-          ) : null}
         </>
       }
       end={
@@ -415,7 +461,7 @@ export function ClickerTitleBarTools({
             onModeChange={editor.setPresetFilterMode}
             localFilter={editor.localProcessFilter}
             onLocalFilterChange={editor.setLocalProcessFilter}
-            disabled={editor.editDisabled || editor.running}
+            disabled={editor.locked}
             onOpenSettings={onOpenProcessSettings}
             onGlobalFilterChange={editor.setGlobalProcessFilter}
             presets={editor.processFilterPresets}
@@ -530,7 +576,7 @@ export function ClickerTitleBarTools({
             label={t("clicker.toolbar.moreActions")}
             ariaLabel={t("clicker.toolbar.moreActions")}
             align="end"
-            disabled={editor.running || editor.editDisabled}
+            disabled={editor.running}
             triggerClassName="caster-titlebar-btn caster-btn caster-btn-ghost"
             items={moreItems}
           >

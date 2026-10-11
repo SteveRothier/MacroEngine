@@ -39,7 +39,6 @@ export type ShellPrefs = {
   restoreWorkspaceTabs: boolean;
   /** Launch hidden in tray when started with Windows (not minimize-to-tray). */
   startInTray: boolean;
-  showSessionPill: boolean;
   recentListMax: number;
   warnOnUnsavedQuit: boolean;
   alwaysOnTop: boolean;
@@ -95,7 +94,7 @@ export const DEFAULT_ACCUEIL_PREFS: AccueilPrefs = {
   defaultSortDir: "asc",
   defaultFilter: "all",
   rememberCollapsedSections: true,
-  openOnSingleClick: false,
+  openOnSingleClick: true,
   confirmTrash: true,
   confirmDeleteFolder: true,
   showScriptsInAll: true,
@@ -109,7 +108,6 @@ export const DEFAULT_SHELL_PREFS: ShellPrefs = {
   startupView: "home",
   restoreWorkspaceTabs: true,
   startInTray: false,
-  showSessionPill: true,
   recentListMax: 12,
   warnOnUnsavedQuit: true,
   alwaysOnTop: false,

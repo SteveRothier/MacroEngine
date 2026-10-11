@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Code2,
   FolderPlus,
+  LayoutGrid,
   MousePointer2,
   Plus,
   Redo2,
@@ -14,7 +15,11 @@ import {
 } from "lucide-react";
 import { useT } from "../i18n";
 import { DropdownMenu, Tooltip } from "../ui/shell";
-import type { AutomationFilter, FilterCounts } from "./types";
+import type {
+  AutomationFilter,
+  AutomationKindFilter,
+  FilterCounts,
+} from "./types";
 import { filterPillTooltip } from "./rowLabels";
 
 type Props = {
@@ -22,6 +27,8 @@ type Props = {
   onQueryChange: (q: string) => void;
   filter: AutomationFilter;
   onFilterChange: (f: AutomationFilter) => void;
+  kindFilter: AutomationKindFilter;
+  onKindFilterChange: (k: AutomationKindFilter) => void;
   counts: FilterCounts;
   onCreateMacro: () => void;
   onCreateClicker: () => void;
@@ -69,11 +76,49 @@ const FILTER_VIEW_DEFS: {
   },
 ];
 
+const KIND_FILTER_DEFS: {
+  value: AutomationKindFilter;
+  labelKey:
+    | "automations.filter.kindAll"
+    | "automations.filter.kindMacro"
+    | "automations.filter.kindClicker"
+    | "automations.filter.kindScript";
+  countKey: keyof FilterCounts | null;
+  icon: "all" | "macro" | "clicker" | "script";
+}[] = [
+  {
+    value: "all",
+    labelKey: "automations.filter.kindAll",
+    countKey: null,
+    icon: "all",
+  },
+  {
+    value: "macro",
+    labelKey: "automations.filter.kindMacro",
+    countKey: "macro",
+    icon: "macro",
+  },
+  {
+    value: "clicker",
+    labelKey: "automations.filter.kindClicker",
+    countKey: "clicker",
+    icon: "clicker",
+  },
+  {
+    value: "script",
+    labelKey: "automations.filter.kindScript",
+    countKey: "script",
+    icon: "script",
+  },
+];
+
 export function AutomationsToolbar({
   query,
   onQueryChange,
   filter,
   onFilterChange,
+  kindFilter,
+  onKindFilterChange,
   counts,
   onCreateMacro,
   onCreateClicker,
@@ -91,6 +136,10 @@ export function AutomationsToolbar({
   const t = useT();
   const localSearchRef = useRef<HTMLInputElement>(null);
   const searchRef = searchInputRef ?? localSearchRef;
+
+  const kindFilterDef =
+    KIND_FILTER_DEFS.find((d) => d.value === kindFilter) ?? KIND_FILTER_DEFS[0]!;
+  const kindFilterLabel = t(kindFilterDef.labelKey);
 
   const createItems = [
     {
@@ -156,6 +205,44 @@ export function AutomationsToolbar({
             </Tooltip>
           ))}
         </div>
+
+        <DropdownMenu
+          label={kindFilterLabel}
+          ariaLabel={t("automations.filter.kindAria")}
+          align="start"
+          triggerClassName={[
+            "caster-btn",
+            "caster-btn-ghost",
+            "caster-automations-kind-menu-btn",
+            kindFilter !== "all" ? "is-filtered" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          items={KIND_FILTER_DEFS.map(({ value, labelKey, countKey, icon }) => {
+            const Icon =
+              icon === "macro"
+                ? Workflow
+                : icon === "clicker"
+                  ? MousePointer2
+                  : icon === "script"
+                    ? Code2
+                    : LayoutGrid;
+            const countSuffix =
+              countKey != null ? ` · ${counts[countKey]}` : "";
+            return {
+              id: value,
+              label: `${t(labelKey)}${countSuffix}`,
+              icon: <Icon size={14} />,
+              onSelect: () => onKindFilterChange(value),
+            };
+          })}
+        >
+          <LayoutGrid size={14} aria-hidden />
+          <span className="caster-automations-kind-menu-label">
+            {kindFilterLabel}
+          </span>
+          <ChevronDown size={14} aria-hidden />
+        </DropdownMenu>
 
         <label className="caster-automations-search">
           <Search

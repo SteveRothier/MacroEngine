@@ -34,7 +34,6 @@ import {
   WindowTitleBar,
   type BarContextAction,
   type DocumentTabItem,
-  type StatusKind,
   type TabContextAction,
 } from "../ui/shell";
 import { TitleBarProvider, useTitleBarContext } from "../ui/shell/TitleBarContext";
@@ -48,8 +47,7 @@ import {
   ScriptLanguageHost,
 } from "../ui";
 import { applyTheme, normalizeTheme, readStoredTheme, type ThemeMode } from "../theme";
-import { stateLabel, sessionLabel } from "../ui/labels";
-import { LocaleProvider, useLocale, useT } from "../i18n";
+import { LocaleProvider, useT } from "../i18n";
 import { loadLastStudio, pushRecent, saveLastStudio } from "./recent";
 import type { SettingsSection } from "./types";
 import type { AppSettings } from "../clicker/clickerTypes";
@@ -167,16 +165,16 @@ function playFinishBeep() {
 export function MainApp() {
   const [uiLocalePref, setUiLocalePref] = useState(() => mergeShellPrefs().uiLocale);
   return (
-    <TitleBarProvider>
-      <LocaleProvider
-        preference={uiLocalePref}
-        onPreferenceChange={setUiLocalePref}
-      >
+    <LocaleProvider
+      preference={uiLocalePref}
+      onPreferenceChange={setUiLocalePref}
+    >
+      <TitleBarProvider>
         <ToastProvider>
           <MainAppInner onUiLocalePrefChange={setUiLocalePref} />
         </ToastProvider>
-      </LocaleProvider>
-    </TitleBarProvider>
+      </TitleBarProvider>
+    </LocaleProvider>
   );
 }
 
@@ -187,7 +185,6 @@ function MainAppInner({
 }) {
   const toast = useToast();
   const t = useT();
-  const { locale } = useLocale();
   const titleBarCtx = useTitleBarContext();
   const automationsPage = useAutomationsPageState();
   const [shellPrefs, setShellPrefs] = useState<ShellPrefs>(() => mergeShellPrefs());
@@ -395,42 +392,6 @@ function MainAppInner({
     setJournalOpen(true);
     void persistShell({ journalOpen: true });
   }, [automationPrefs.focusFollowsRun, persistShell]);
-
-  const onEmergencyStop = useCallback(async () => {
-    if (automationPrefs.confirmStopSession) {
-      const ok = await confirmAction({
-        title: t("shell.stopConfirmTitle"),
-        message: t("shell.stopConfirmMessage"),
-        confirmLabel: t("shell.stopConfirm"),
-        danger: true,
-      });
-      if (!ok) return;
-    }
-    void invoke<EngineStatus>("emergency_stop")
-      .then((s) => {
-        setStatus(s);
-        toast.info(t("shell.sessionStopped"));
-        if (shellPrefs.goHomeAfterEmergency) {
-          setWorkspace((ws) => selectHome(ws));
-        }
-      })
-      .catch(() =>
-        void invoke<EngineStatus>("request_cancel")
-          .then((s) => {
-            setStatus(s);
-            toast.info(t("shell.cancelRequested"));
-            if (shellPrefs.goHomeAfterEmergency) {
-              setWorkspace((ws) => selectHome(ws));
-            }
-          })
-          .catch((e) => toast.error(launchErr(e, t("shell.cannotStop")))),
-      );
-  }, [
-    automationPrefs.confirmStopSession,
-    shellPrefs.goHomeAfterEmergency,
-    t,
-    toast,
-  ]);
 
   const openDoc = useCallback(
     (kind: DocTabKind, resourceId: string, label?: string) => {
@@ -829,20 +790,6 @@ function MainAppInner({
     return () => window.removeEventListener("keydown", onKey);
   }, [onCreateMacro, onTabClose, workspace]);
 
-  const sessionPill = useMemo((): { kind: StatusKind; label: string } | null => {
-    if (!running && status.state === "idle") return null;
-    const kind: StatusKind =
-      status.state === "running"
-        ? "running"
-        : status.state === "paused"
-          ? "paused"
-          : "healthy";
-    return {
-      kind,
-      label: sessionLabel(locale, status) ?? stateLabel(locale, status.state),
-    };
-  }, [locale, running, status]);
-
   const documentTabs = useMemo((): DocumentTabItem[] => {
     return [
       { id: HOME_TAB_ID, label: t("shell.navHome"), kind: "home", closable: false },
@@ -901,9 +848,11 @@ function MainAppInner({
         query={automationsPage.query}
         onQueryChange={automationsPage.setQuery}
         filter={automationsPage.filter}
+        kindFilter={automationsPage.kindFilter}
         display={automationsPage.display}
         onDisplayChange={automationsPage.setDisplay}
         onFilterChange={automationsPage.setFilter}
+        onKindFilterChange={automationsPage.setKindFilter}
         onRefresh={bumpRefresh}
         onResourceRenamed={(kind, fromId, toId, label) => {
           const tabId = docTabId(kind, fromId);
@@ -983,10 +932,10 @@ function MainAppInner({
                 setWorkspace((ws) => renameDocTab(ws, tab.id, to, to));
                 bumpRefresh();
               }}
+              onOpenMacro={(id, label) => openDoc("macro", id, label ?? id)}
               engineState={status.state}
               onStatus={setStatus}
               onOpenScript={(id, label) => openDoc("script", id, label ?? id)}
-              onOpenClicker={(id, label) => openDoc("clicker", id, label ?? id)}
               onOpenProcessSettings={() => goSettings("security")}
             />
           );
@@ -1106,9 +1055,6 @@ function MainAppInner({
               });
             }}
             journalOpen={journalOpen}
-            sessionStatus={shellPrefs.showSessionPill ? sessionPill : null}
-            showStop={running}
-            onStop={onEmergencyStop}
           />
         }
       >

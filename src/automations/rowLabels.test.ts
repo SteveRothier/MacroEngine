@@ -5,7 +5,9 @@ import {
   filterPillTooltip,
   kindTooltip,
   metaTooltip,
+  rowInfoLabel,
   rowSubtitle,
+  showTriggerLabel,
   sortByLabel,
   statusTooltip,
 } from "./rowLabels";
@@ -42,8 +44,39 @@ describe("rowLabels", () => {
     expect(metaTooltip({ ...baseRow, folderLabel: "—" }, t)).toBe("F6 · hier");
   });
 
-  it("rowSubtitle prefers meta and folder over type", () => {
-    expect(rowSubtitle(baseRow, t)).toBe("28 actions · Albion");
+  it("rowInfoLabel is meta (+ script perms)", () => {
+    expect(rowInfoLabel(baseRow, t)).toBe("28 actions");
+    expect(
+      rowInfoLabel(
+        {
+          ...baseRow,
+          kind: "script",
+          meta: "TypeScript",
+          permLabels: ["réseau"],
+        },
+        t,
+      ),
+    ).toBe("TypeScript · 1 accès");
+    expect(rowInfoLabel({ ...baseRow, meta: undefined }, t)).toBeNull();
+  });
+
+  it("rowSubtitle wide: folder only when includeFolder", () => {
+    expect(rowSubtitle(baseRow, t, { mode: "wide" })).toBeNull();
+    expect(
+      rowSubtitle(baseRow, t, { mode: "wide", includeFolder: true }),
+    ).toBe("Albion");
+    expect(rowSubtitle(baseRow, t, { mode: "wide", running: true })).toBe(
+      "En cours",
+    );
+  });
+
+  it("rowSubtitle narrow: meta · folder · trigger · lastRun", () => {
+    expect(rowSubtitle(baseRow, t, { mode: "narrow" })).toBe(
+      "28 actions · F6 · hier",
+    );
+    expect(
+      rowSubtitle(baseRow, t, { mode: "narrow", includeFolder: true }),
+    ).toBe("28 actions · Albion · F6 · hier");
     expect(
       rowSubtitle(
         {
@@ -51,8 +84,11 @@ describe("rowLabels", () => {
           kind: "clicker",
           meta: "117 CPS",
           folderLabel: "—",
+          lastRunLabel: "—",
+          triggerLabel: "Manuel",
         },
         t,
+        { mode: "narrow" },
       ),
     ).toBe("117 CPS");
     expect(
@@ -60,14 +96,30 @@ describe("rowLabels", () => {
         {
           ...baseRow,
           kind: "script",
-          meta: undefined,
-          folderLabel: "—",
+          meta: "TypeScript",
+          folderLabel: "Outils",
+          lastRunLabel: "—",
+          triggerLabel: "Manuel",
           permLabels: ["réseau"],
         },
         t,
+        { mode: "narrow", includeFolder: true },
       ),
-    ).toBe("1 accès");
-    expect(rowSubtitle(baseRow, t, { running: true })).toBe("En cours");
+    ).toBe("TypeScript · 1 accès · Outils");
+    expect(
+      rowSubtitle(
+        { ...baseRow, meta: undefined, triggerLabel: "Manuel" },
+        t,
+        { mode: "narrow" },
+      ),
+    ).toBe("hier");
+  });
+
+  it("showTriggerLabel hides Manuel", () => {
+    expect(showTriggerLabel(baseRow, t)).toBe(true);
+    expect(
+      showTriggerLabel({ ...baseRow, triggerLabel: "Manuel" }, t),
+    ).toBe(false);
   });
 
   it("status and favorite tooltips", () => {

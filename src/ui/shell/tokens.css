@@ -26,9 +26,10 @@
   --caster-text-secondary: #a1a1a1;
   --caster-text-muted: #666666;
 
-  /* Charter M3.20 / mockup */
-  --caster-accent: #2f6fed;
-  --caster-accent-soft: rgba(47, 111, 237, 0.15);
+  /* Default accent = neutral gray/white (blue/teal via data-accent) */
+  --caster-accent: #e8e8ea;
+  --caster-accent-soft: rgba(232, 232, 234, 0.12);
+  --caster-accent-contrast: #0c0c0c;
   --caster-focus-ring: 0 0 0 2px color-mix(in srgb, var(--caster-accent) 45%, transparent);
 
   --caster-dur-fast: 120ms;
@@ -56,8 +57,9 @@
   --caster-node-delay: #a855f7;
   --caster-node-system: #6b7280;
 
-  --caster-type-macro: #3b82f6;
-  --caster-type-macro-bg: rgba(59, 130, 246, 0.14);
+  --caster-type-macro: #c4c4c8;
+  --caster-type-macro-bg: rgba(196, 196, 200, 0.12);
+  --caster-type-script: #b0b0b4;
   --caster-type-clicker: #22c55e;
   --caster-type-clicker-bg: rgba(34, 197, 94, 0.14);
 
@@ -72,7 +74,7 @@
   --caster-tab-h: 30px;
   --caster-tab-min-w: 72px;
   --caster-tab-abs-min-w: 36px;
-  --caster-tab-max-w: 220px;
+  --caster-tab-max-w: 160px;
   --caster-tab-compact-w: 56px;
   --caster-editor-toolbar-h: 36px;
   --caster-inspector-w: 360px;
@@ -104,7 +106,12 @@
   --caster-text-secondary: #52525b;
   --caster-text-muted: #a1a1aa;
   --caster-shadow-float: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --caster-accent-soft: rgba(47, 111, 237, 0.12);
+  --caster-accent: #3f3f46;
+  --caster-accent-soft: rgba(63, 63, 70, 0.12);
+  --caster-accent-contrast: #fafafa;
+  --caster-type-macro: #52525b;
+  --caster-type-macro-bg: rgba(82, 82, 91, 0.12);
+  --caster-type-script: #71717a;
   --caster-scrollbar-track: var(--caster-bg-canvas);
   --caster-scrollbar-thumb: var(--caster-border-strong);
   --caster-scrollbar-thumb-hover: var(--caster-text-muted);

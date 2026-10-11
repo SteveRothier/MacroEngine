@@ -43,6 +43,8 @@ export const scripts = defineCatalog({
         "Module bibliothèque — non exécutable directement (caster.include).",
       locked: "Verrouillé",
       lockedTitle: "Script verrouillé — lecture seule",
+      lockTitle: "Verrouiller",
+      unlockTitle: "Déverrouiller",
       dryRun: "Dry-run",
       dryRunTip:
         "Ignore click / touches / moveTo / runProcess (journalisés). fetch, fichiers et presse-papiers s’exécutent encore.",
@@ -251,6 +253,8 @@ export const scripts = defineCatalog({
         "Library module — not runnable directly (use caster.include).",
       locked: "Locked",
       lockedTitle: "Script locked — read only",
+      lockTitle: "Lock",
+      unlockTitle: "Unlock",
       dryRun: "Dry-run",
       dryRunTip:
         "Skip click / keys / moveTo / runProcess (logged). fetch, files, and clipboard still run.",

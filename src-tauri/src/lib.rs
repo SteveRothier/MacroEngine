@@ -50,6 +50,10 @@ struct ZoneDrawWatch(Mutex<Option<Instant>>);
 /// When true, frontend must not show main after paint (autostart + start_in_tray).
 struct BootStayHidden(Mutex<bool>);
 
+/// Keep in sync with `app.windows[main].minWidth` / `minHeight` in tauri.conf.json.
+const MAIN_MIN_W: u32 = 720;
+const MAIN_MIN_H: u32 = 540;
+
 struct UiPrefs {
     advanced_ui: bool,
     overlay_visible: bool,
@@ -622,6 +626,7 @@ fn move_library_item_cmd(
     before_id: Option<String>,
 ) -> Result<(), String> {
     let kind = LibraryKind::parse(&kind).map_err(|e| e.to_string())?;
+    assert_not_locked(&dir.0, kind, &id).map_err(|e| e.to_string())?;
     move_library_item(&dir.0, kind, id, folder_id, before_id).map_err(|e| e.to_string())
 }
 
@@ -636,6 +641,7 @@ fn convert_library_item_cmd(
 ) -> Result<ConvertResult, String> {
     let from = LibraryKind::parse(&from_kind).map_err(|e| e.to_string())?;
     let to = LibraryKind::parse(&to_kind).map_err(|e| e.to_string())?;
+    assert_not_locked(&dir.0, from, &id).map_err(|e| e.to_string())?;
     let mode = match mode.as_str() {
         "transpile" => ConvertMode::Transpile,
         _ => ConvertMode::Wrap,
@@ -967,7 +973,13 @@ fn set_active_clicker_preset(
 #[tauri::command]
 fn set_overlay_visible(app: AppHandle, prefs: State<'_, Mutex<UiPrefs>>, visible: bool) -> Result<(), String> {
     prefs.lock().map_err(|e| e.to_string())?.overlay_visible = visible;
-    set_overlay_visible_inner(&app, visible)
+    // Prefs alone do not hide during an active clicker session (session HUD).
+    refresh_status_overlay(&app)
+}
+
+#[tauri::command]
+fn focus_main_window(app: AppHandle) {
+    show_main_window(&app);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1256,7 +1268,7 @@ fn window_bounds_sane(b: &WindowBounds) -> bool {
     if b.x <= -10_000 || b.y <= -10_000 {
         return false;
     }
-    if b.width < 200 || b.height < 200 {
+    if b.width < MAIN_MIN_W || b.height < MAIN_MIN_H {
         return false;
     }
     // Guard against absurd sizes from bad saves.
@@ -1281,8 +1293,8 @@ fn apply_main_window_shell(
             if window_bounds_sane(b) {
                 let _ = main.set_position(tauri::PhysicalPosition::new(b.x, b.y));
                 let _ = main.set_size(tauri::PhysicalSize::new(
-                    b.width.max(400),
-                    b.height.max(300),
+                    b.width.max(MAIN_MIN_W),
+                    b.height.max(MAIN_MIN_H),
                 ));
             } else {
                 log::warn!(
@@ -1514,7 +1526,7 @@ fn apply_loaded_settings(
         apply_display(engine, &display);
     }
     apply_overlay_opacity(app, settings.overlay_opacity);
-    set_overlay_visible_inner(app, settings.overlay_visible)?;
+    refresh_status_overlay(app)?;
     persist(app, engine);
     if settings.shell.ui_locale != prev_locale {
         refresh_tray_for_locale(app, engine, settings.shell.ui_locale);
@@ -2152,7 +2164,7 @@ fn ensure_overlay_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     }
     let win = WebviewWindowBuilder::new(app, "overlay", WebviewUrl::App("index.html".into()))
         .title("Caster Overlay")
-        .inner_size(240.0, 72.0)
+        .inner_size(340.0, 56.0)
         .decorations(false)
         .always_on_top(true)
         .skip_taskbar(true)
@@ -2211,6 +2223,28 @@ fn ensure_zones_window(app: &AppHandle) -> Result<WebviewWindow, String> {
     Ok(win)
 }
 
+fn clicker_session_hud_active(engine: &AppState) -> bool {
+    let (kind, _) = engine.session_kind_and_name();
+    kind == Some("clicker")
+        && matches!(
+            engine.state(),
+            EngineState::Running | EngineState::Paused
+        )
+}
+
+/// Show the status HUD when prefs request it, or automatically during a
+/// clicker Running/Paused session. Clickable so the pill can focus main.
+fn refresh_status_overlay(app: &AppHandle) -> Result<(), String> {
+    let prefs_on = app
+        .try_state::<Mutex<UiPrefs>>()
+        .and_then(|p| p.lock().ok().map(|g| g.overlay_visible))
+        .unwrap_or(false);
+    let session_on = app
+        .try_state::<AppState>()
+        .is_some_and(|e| clicker_session_hud_active(e.inner()));
+    set_overlay_visible_inner(app, prefs_on || session_on)
+}
+
 fn set_overlay_visible_inner(app: &AppHandle, visible: bool) -> Result<(), String> {
     let win = ensure_overlay_window(app)?;
     if visible {
@@ -2221,7 +2255,8 @@ fn set_overlay_visible_inner(app: &AppHandle, visible: bool) -> Result<(), Strin
             let _ = place_status_overlay(app, &d);
         }
         win.show().map_err(|e| e.to_string())?;
-        let _ = win.set_ignore_cursor_events(true);
+        // Interactive: click focuses the main window (see OverlayView).
+        let _ = win.set_ignore_cursor_events(false);
         let opacity = app
             .try_state::<Mutex<UiPrefs>>()
             .and_then(|p| p.lock().ok().map(|g| g.overlay_opacity))
@@ -2311,7 +2346,7 @@ fn place_status_overlay(app: &AppHandle, display: &DisplayDto) -> Result<(), Str
     const INSET: i32 = 16;
     let size = win
         .outer_size()
-        .unwrap_or(tauri::PhysicalSize::new(240, 72));
+        .unwrap_or(tauri::PhysicalSize::new(340, 56));
     let x = display.x + display.width - size.width as i32 - INSET;
     let y = display.y + INSET;
     win.set_position(tauri::PhysicalPosition::new(x, y))
@@ -2688,6 +2723,9 @@ fn wire_engine_events(handle: AppHandle, engine: &AppState) {
                     ..payload
                 };
                 let _ = emit_handle.emit("engine://status", payload);
+                if let Err(e) = refresh_status_overlay(&emit_handle) {
+                    log::warn!("status overlay refresh failed: {e}");
+                }
             }
             EngineEvent::Log { message, level } => {
                 match level {
@@ -2897,19 +2935,11 @@ pub fn run() {
                 log::error!("hotkeys unavailable: {e}");
             }
 
-            // Sanitize secondary windows from tauri.conf (alwaysOnTop / click-through).
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                let _ = overlay.set_ignore_cursor_events(true);
-                if settings.overlay_visible {
-                    if let Ok(d) =
-                        resolve_display(app.handle(), engine.display_id().as_deref())
-                    {
-                        let _ = place_status_overlay(app.handle(), &d);
-                    }
-                    apply_overlay_opacity(app.handle(), settings.overlay_opacity);
-                    if let Err(e) = set_overlay_visible_inner(app.handle(), true) {
-                        log::warn!("overlay show at boot failed: {e}");
-                    }
+            // Status HUD: clickable pill (session auto-show + prefs).
+            if app.get_webview_window("overlay").is_some() {
+                apply_overlay_opacity(app.handle(), settings.overlay_opacity);
+                if let Err(e) = refresh_status_overlay(app.handle()) {
+                    log::warn!("overlay refresh at boot failed: {e}");
                 }
             }
             if let Some(picker) = app.get_webview_window("picker") {
@@ -3075,12 +3105,10 @@ pub fn run() {
                         }
                         "overlay" => {
                             if let Some(prefs) = app.try_state::<Mutex<UiPrefs>>() {
-                                let mut visible = false;
                                 if let Ok(mut p) = prefs.lock() {
                                     p.overlay_visible = !p.overlay_visible;
-                                    visible = p.overlay_visible;
                                 }
-                                let _ = set_overlay_visible_inner(app, visible);
+                                let _ = refresh_status_overlay(app);
                                 persist(app, &engine);
                             }
                         }
@@ -3196,6 +3224,7 @@ pub fn run() {
             launch_saved_macro,
             set_active_clicker_preset,
             set_overlay_visible,
+            focus_main_window,
             get_macro,
             set_macro,
             clear_macro,

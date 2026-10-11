@@ -10,7 +10,6 @@ import {
   type TabContextAction,
 } from "./DocumentTabBar";
 import { ContextMenu } from "./ContextMenu";
-import { StatusPill, type StatusKind } from "./StatusPill";
 
 type Props = {
   tabs: DocumentTabItem[];
@@ -35,9 +34,6 @@ type Props = {
   onSettingsClick?: () => void;
   onJournalClick?: () => void;
   journalOpen?: boolean;
-  sessionStatus?: { kind: StatusKind; label: string } | null;
-  showStop?: boolean;
-  onStop?: () => void;
 };
 
 export function WindowTitleBar({
@@ -58,9 +54,6 @@ export function WindowTitleBar({
   onSettingsClick,
   onJournalClick,
   journalOpen,
-  sessionStatus,
-  showStop,
-  onStop,
 }: Props) {
   const t = useT();
   const [dragMenu, setDragMenu] = useState<{ x: number; y: number } | null>(null);
@@ -131,27 +124,6 @@ export function WindowTitleBar({
           >
             <ScrollText size={14} aria-hidden />
           </button>
-        ) : null}
-        {sessionStatus || (showStop && onStop) ? (
-          <div className="caster-titlebar-session-slot">
-            <div className="caster-titlebar-session-pill">
-              {sessionStatus ? (
-                <StatusPill kind={sessionStatus.kind} label={sessionStatus.label} />
-              ) : null}
-            </div>
-            <div className="caster-titlebar-session-stop">
-              {showStop && onStop ? (
-                <button
-                  type="button"
-                  className="caster-titlebar-btn caster-btn caster-btn-danger-ghost"
-                  onClick={onStop}
-                  title={t("shell.stopSession")}
-                >
-                  {t("shell.stop")}
-                </button>
-              ) : null}
-            </div>
-          </div>
         ) : null}
         <WindowControls className="caster-titlebar-controls" />
       </div>

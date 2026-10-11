@@ -31,6 +31,7 @@ import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { Tooltip } from "./Tooltip";
 import { useDocumentTabReorder } from "./useDocumentTabReorder";
 import { useTabStripLayoutAnimation } from "./useTabStripLayoutAnimation";
+import { computeTargetTabWidth } from "./tabLayout";
 import { HOME_TAB_ID } from "../../app/workspaces";
 import { CasterLogo } from "./CasterLogo";
 
@@ -526,13 +527,32 @@ export function DocumentTabBar({
     }
   }, [activeTabId]);
 
+  const syncTabStripWidth = useCallback(() => {
+    const scroll = scrollRef.current;
+    if (!scroll || dragUi.isDragging) return;
+    const width = computeTargetTabWidth(
+      scroll,
+      addBtnRef.current,
+      scrollTabIds.length,
+    );
+    scroll.style.setProperty("--caster-tab-w", `${width}px`);
+  }, [dragUi.isDragging, scrollTabIds.length]);
+
+  // Must run before layout-animation measure so targets use the new equal width.
+  useLayoutEffect(() => {
+    syncTabStripWidth();
+  }, [syncTabStripWidth, displayTabs]);
+
   const { isLayoutAnimatingRef } = useTabStripLayoutAnimation({
     tabIds: scrollTabIds,
     tabElsRef,
     scrollRef,
     addBtnRef,
     enabled: !dragUi.isDragging,
-    onAnimationEnd: scrollActiveTabIntoView,
+    onAnimationEnd: () => {
+      syncTabStripWidth();
+      scrollActiveTabIntoView();
+    },
   });
 
   const setTabRef = useCallback((id: string, el: HTMLDivElement | null) => {
@@ -544,6 +564,17 @@ export function DocumentTabBar({
     if (isLayoutAnimatingRef.current) return;
     scrollActiveTabIntoView();
   }, [activeTabId, displayTabs, scrollActiveTabIntoView, isLayoutAnimatingRef]);
+
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    const ro = new ResizeObserver(() => {
+      if (isLayoutAnimatingRef.current) return;
+      syncTabStripWidth();
+    });
+    ro.observe(scroll);
+    return () => ro.disconnect();
+  }, [syncTabStripWidth, isLayoutAnimatingRef]);
 
   useEffect(() => {
     const ro = new ResizeObserver((entries) => {

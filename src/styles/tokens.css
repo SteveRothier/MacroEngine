@@ -24,13 +24,14 @@
   --text-muted: var(--muted);
   --text-faint: #8b93a0;
 
-  --accent: #2f6fed;
-  --accent-hover: #1f5ad4;
-  --accent-soft: rgba(42, 106, 239, 0.12);
-  --accent-text: #1a4fc4;
-  --accent-border: rgba(42, 106, 239, 0.4);
+  --accent: #3f3f46;
+  --accent-hover: #27272a;
+  --accent-soft: rgba(63, 63, 70, 0.12);
+  --accent-text: #3f3f46;
+  --accent-on: #fafafa;
+  --accent-border: rgba(63, 63, 70, 0.4);
   --accent-tint: var(--accent-soft);
-  --accent-tint-strong: rgba(42, 106, 239, 0.18);
+  --accent-tint-strong: rgba(63, 63, 70, 0.18);
   --accent-live: #0fbf7a;
   --accent-live-hover: #0aa86b;
   --accent-live-soft: rgba(15, 191, 122, 0.14);
@@ -152,12 +153,13 @@ html[data-window="zones"] #root {
   --text-muted: var(--muted);
   --text-faint: #555e70;
 
-  --accent: #2f6fed;
-  --accent-hover: #4a84f0;
-  --accent-soft: rgba(47, 111, 237, 0.16);
-  --accent-text: #9bb8ff;
-  --accent-border: rgba(47, 111, 237, 0.45);
-  --accent-tint-strong: rgba(47, 111, 237, 0.24);
+  --accent: #e8e8ea;
+  --accent-hover: #f4f4f5;
+  --accent-soft: rgba(232, 232, 234, 0.12);
+  --accent-text: #e8e8ea;
+  --accent-on: #0c0c0c;
+  --accent-border: rgba(232, 232, 234, 0.45);
+  --accent-tint-strong: rgba(232, 232, 234, 0.24);
   --accent-live: #2ee6a6;
   --accent-live-hover: #4aefb5;
   --accent-live-soft: rgba(46, 230, 166, 0.14);

@@ -22,7 +22,7 @@ export function metaTooltip(row: AutomationRow, t: TFunction): string {
   const parts = [
     row.triggerLabel,
     row.folderLabel !== empty ? row.folderLabel : null,
-    row.lastRunLabel,
+    row.lastRunLabel !== empty ? row.lastRunLabel : null,
   ].filter(Boolean);
   return parts.join(" · ");
 }
@@ -83,30 +83,73 @@ export function filterPillTooltip(
   }
 }
 
-/** Secondary line under the name (Linear-style) — never repeats the type badge. */
+/** True when the trigger column should show a label (hide plain Manuel). */
+export function showTriggerLabel(row: AutomationRow, t: TFunction): boolean {
+  const manual = t("automations.trigger.manual");
+  return Boolean(row.triggerLabel && row.triggerLabel !== manual);
+}
+
+/** Wide-layout Infos column: meta (+ script perm count). */
+export function rowInfoLabel(row: AutomationRow, t: TFunction): string | null {
+  const parts: string[] = [];
+  if (row.meta?.trim()) parts.push(row.meta.trim());
+  if (row.kind === "script") {
+    const n = row.permLabels?.length ?? 0;
+    if (n > 0) parts.push(t("automations.row.permAccess", { count: n }));
+  }
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+export type RowSubtitleMode = "wide" | "narrow";
+
+/**
+ * Secondary line under the name.
+ * - wide: folder only when includeFolder (Infos / hotkey / lastRun are columns)
+ * - narrow: meta · folder? · trigger? · lastRun? (columns collapsed)
+ */
 export function rowSubtitle(
   row: AutomationRow,
   t: TFunction,
-  opts?: { running?: boolean },
+  opts?: {
+    running?: boolean;
+    includeFolder?: boolean;
+    mode?: RowSubtitleMode;
+  },
 ): string | null {
   if (opts?.running) return t("common.running");
   const empty = t("common.empty");
-  if (row.kind === "script") {
-    const n = row.permLabels?.length ?? 0;
-    if (n > 0) return t("automations.row.permAccess", { count: n });
-    if (row.lastRunLabel !== empty) return row.lastRunLabel;
+  const mode = opts?.mode ?? "narrow";
+
+  if (mode === "wide") {
+    if (
+      opts?.includeFolder &&
+      row.folderLabel &&
+      row.folderLabel !== empty
+    ) {
+      return row.folderLabel;
+    }
     return null;
   }
+
   const parts: string[] = [];
-  if (row.meta?.trim()) parts.push(row.meta.trim());
-  if (row.folderLabel && row.folderLabel !== empty) parts.push(row.folderLabel);
-  if (parts.length > 0) return parts.join(" · ");
-  if (row.lastRunLabel !== empty) return row.lastRunLabel;
+  const info = rowInfoLabel(row, t);
+  if (info) parts.push(info);
+
   if (
-    row.triggerLabel &&
-    row.triggerLabel !== t("automations.trigger.manual")
+    opts?.includeFolder &&
+    row.folderLabel &&
+    row.folderLabel !== empty
   ) {
-    return row.triggerLabel;
+    parts.push(row.folderLabel);
   }
-  return null;
+
+  if (showTriggerLabel(row, t) && row.triggerLabel) {
+    parts.push(row.triggerLabel);
+  }
+
+  if (row.lastRunLabel && row.lastRunLabel !== empty) {
+    parts.push(row.lastRunLabel);
+  }
+
+  return parts.length > 0 ? parts.join(" · ") : null;
 }

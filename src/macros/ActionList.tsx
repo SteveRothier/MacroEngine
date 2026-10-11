@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { confirmAction } from "../ui";
 import {
+  ActionPickerMenu,
   ContextMenu,
   findMenuItem,
   useContextMenuState,
@@ -50,7 +51,6 @@ import {
 import {
   actionDetail,
   actionTitleInList,
-  actionTone,
   branchLabel,
   dragGestureEndIndex,
 } from "./actionLabels";
@@ -88,6 +88,9 @@ type Props = {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  addMenuItems?: ActionPickerEntry[];
+  addMenuOpen?: boolean;
+  onAddMenuOpenChange?: (open: boolean) => void;
   branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
 };
@@ -162,7 +165,6 @@ type DragSession = {
 type DragGhost = {
   title: string;
   indexLabel: string;
-  tone: string;
   x: number;
   y: number;
   width: number;
@@ -364,6 +366,9 @@ export function ActionList({
   onRedo,
   canUndo = false,
   canRedo = false,
+  addMenuItems,
+  addMenuOpen,
+  onAddMenuOpenChange,
   branchAddMenuItems,
   onOpenScript,
 }: Props) {
@@ -539,6 +544,38 @@ export function ActionList({
 
   const ctxRowItems: MenuItemDef[] = useMemo(() => {
     if (!ctxPath) return [];
+    const interactItems: MenuItemDef[] = [
+      {
+        id: "run-from",
+        label: t("macros.menu.ctx.runFrom"),
+        shortcut: t("macros.toolbar.playFromShortcut"),
+        icon: <Play size={14} />,
+        disabled: !onRunFrom,
+        onSelect: () => onRunFrom?.(ctxPath),
+      },
+      {
+        id: "copy",
+        label: t("macros.menu.ctx.copy"),
+        icon: <Copy size={14} />,
+        onSelect: () => copyPath(ctxPath),
+      },
+      { id: "sep-sel", label: "", separator: true },
+      {
+        id: "select",
+        label: t("macros.menu.ctx.select"),
+        icon: <MousePointerClick size={14} />,
+        onSelect: () => onSelect(ctxPath),
+      },
+      {
+        id: "clear-selection",
+        label: t("macros.menu.ctx.deselect"),
+        icon: <CircleDot size={14} />,
+        disabled: !onClearSelection || !selectedPath,
+        onSelect: () => onClearSelection?.(),
+      },
+    ];
+    if (readOnly) return interactItems;
+
     const siblings = siblingList(actions, ctxPath);
     const idx = ctxPath[ctxPath.length - 1] ?? 0;
     const canUp = idx > 0;
@@ -582,20 +619,8 @@ export function ActionList({
       );
     }
     return [
-      {
-        id: "run-from",
-        label: t("macros.menu.ctx.runFrom"),
-        shortcut: t("macros.toolbar.playFromShortcut"),
-        icon: <Play size={14} />,
-        disabled: !onRunFrom,
-        onSelect: () => onRunFrom?.(ctxPath),
-      },
-      {
-        id: "copy",
-        label: t("macros.menu.ctx.copy"),
-        icon: <Copy size={14} />,
-        onSelect: () => copyPath(ctxPath),
-      },
+      interactItems[0]!,
+      interactItems[1]!,
       {
         id: "cut",
         label: t("macros.menu.ctx.cut"),
@@ -651,20 +676,9 @@ export function ActionList({
         disabled: !onRedo || !canRedo,
         onSelect: () => onRedo?.(),
       },
-      { id: "sep-sel", label: "", separator: true },
-      {
-        id: "select",
-        label: t("macros.menu.ctx.select"),
-        icon: <MousePointerClick size={14} />,
-        onSelect: () => onSelect(ctxPath),
-      },
-      {
-        id: "clear-selection",
-        label: t("macros.menu.ctx.deselect"),
-        icon: <CircleDot size={14} />,
-        disabled: !onClearSelection || !selectedPath,
-        onSelect: () => onClearSelection?.(),
-      },
+      interactItems[2]!,
+      interactItems[3]!,
+      interactItems[4]!,
       {
         id: "delete",
         label: t("macros.menu.ctx.delete"),
@@ -690,6 +704,7 @@ export function ActionList({
     onRunFrom,
     onSelect,
     onUndo,
+    readOnly,
     selectedPath,
     clipboardTick,
     t,
@@ -958,7 +973,6 @@ export function ActionList({
           setGhost({
             title: actionTitleInList(siblings, siblingIdx, t),
             indexLabel: padIndex(siblingIdx + 1),
-            tone: actionTone(row.action.type),
             x: ev.clientX,
             y: ev.clientY,
             width: rect.width,
@@ -1026,9 +1040,24 @@ export function ActionList({
   const dragFromPath =
     dragFrom != null ? (rows[dragFrom]?.path ?? null) : null;
 
+  const clearSelectionIfBackground = (target: EventTarget | null) => {
+    if (!onClearSelection || !selectedPath) return;
+    const el = target instanceof HTMLElement ? target : null;
+    if (!el) return;
+    if (
+      el.closest(
+        ".action-list-item, .action-list-bulk, .action-list-empty, .caster-action-picker-root, .caster-dropdown-menu-root, .caster-menu-popover, .caster-context-menu, button, a, input, select, textarea, label, [role='button'], [role='menuitem'], [role='option']",
+      )
+    ) {
+      return;
+    }
+    onClearSelection();
+  };
+
   return (
     <div
       className="action-list-shell"
+      onClick={(e) => clearSelectionIfBackground(e.target)}
       onContextMenu={
         !readOnly && !locked
           ? (e) => {
@@ -1062,7 +1091,6 @@ export function ActionList({
       >
         {rows.length > 0 ? (
           <li className="action-list-head" aria-hidden>
-            <span />
             <span>#</span>
             <span>{t("macros.menu.list.headAction")}</span>
             <span>{t("macros.menu.list.headParams")}</span>
@@ -1142,7 +1170,7 @@ export function ActionList({
                 selectRow(row.path, e);
               }}
               onContextMenu={
-                !readOnly && !locked
+                !disabled
                   ? (e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -1152,10 +1180,6 @@ export function ActionList({
                   : undefined
               }
             >
-              <span
-                className={`action-dot ${actionTone(row.action.type)}`}
-                aria-hidden
-              />
               <span className="idx">
                 {isBranchHead(row) && row.branchLabel ? (
                   <em className="branch-tag">
@@ -1228,6 +1252,18 @@ export function ActionList({
                 </button>
               ) : null}
             </div>
+          </li>
+        ) : null}
+        {addMenuItems && !readOnly && rows.length > 0 ? (
+          <li className="action-list-add-row">
+            <ActionPickerMenu
+              label={t("macros.toolbar.add")}
+              disabled={locked}
+              items={addMenuItems}
+              open={addMenuOpen}
+              onOpenChange={onAddMenuOpenChange}
+              triggerClassName="caster-btn caster-btn-primary caster-action-list-add-btn"
+            />
           </li>
         ) : null}
       </ul>
@@ -1351,7 +1387,6 @@ export function ActionList({
               }}
               aria-hidden
             >
-              <span className={`action-dot ${ghost.tone}`} />
               <span className="idx">{ghost.indexLabel}</span>
               <strong className="act-type">{ghost.title}</strong>
             </div>,

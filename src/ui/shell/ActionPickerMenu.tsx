@@ -42,7 +42,7 @@ function isGroup(entry: ActionPickerEntry): entry is ActionPickerGroup {
   return "items" in entry;
 }
 
-const MENU_GAP = 6;
+const MENU_GAP = 10;
 const MENU_PAD = 8;
 
 function placeMenu(
@@ -281,11 +281,6 @@ export function ActionPickerMenu({
                         <span className="caster-menu-item-label">
                           {row.item.label}
                         </span>
-                        {row.item.hint ? (
-                          <span className="caster-action-picker-item-hint">
-                            {row.item.hint}
-                          </span>
-                        ) : null}
                       </span>
                     </button>
                   </div>

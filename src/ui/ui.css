@@ -73,7 +73,7 @@ select:disabled {
 .ui-list-row.is-selected,
 .ui-nav-pill.is-selected {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-on, #fff);
 }
 
 .ui-list-row.is-selected .hint,

@@ -609,7 +609,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     async (id: string) => {
       const running =
         status.state === "running" || status.state === "paused";
-      if (!id || running || locked) return;
+      if (!id || running) return;
       try {
         const display = await invoke<DisplayDto>("set_active_display", {
           displayId: id,
@@ -621,7 +621,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         /* ignore */
       }
     },
-    [locked, persistUi, status.state],
+    [persistUi, status.state],
   );
 
   const onStart = useCallback(async () => {
@@ -1426,6 +1426,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
     setTrigger,
     dirty,
     locked,
+    setLocked,
     canUndo,
     canRedo,
     buildConfig,

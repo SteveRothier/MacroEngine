@@ -23,7 +23,7 @@ describe("tabLayout", () => {
     } as HTMLElement;
     const addBtn = { offsetWidth: 36 } as HTMLElement;
     const target = computeTargetTabWidth(scroll, addBtn, 4);
-    const gaps = 4 * TAB_LAYOUT.STRIP_GAP_PX;
+    const gaps = (4 + 1) * TAB_LAYOUT.STRIP_GAP_PX;
     const chrome = 36 + TAB_LAYOUT.DRAG_FILL_W;
     expect(target).toBe(
       Math.max(TAB_LAYOUT.MIN_W, Math.floor((200 - chrome - gaps) / 4)),

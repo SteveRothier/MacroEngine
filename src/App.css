@@ -133,7 +133,7 @@ input[type="number"] {
 }
 
 /* Shell / caster chrome — excluded from global button styles below */
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.ui-segment):not(.action-row):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip) {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.ui-segment):not(.action-row):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-auto-row-lock-btn):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):not(.overlay):not(.overlay-main):not(.overlay-btn) {
   appearance: none;
   border: 1px solid var(--border-soft);
   background: var(--surface);
@@ -156,7 +156,7 @@ button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):no
     color var(--dur-fast) var(--ease-out);
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.ui-segment):not(.action-row):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):not(.ghost):not(.danger):not(.tiny):not(.active):not(.primary):not(.live):not(.zone-handle):hover:not(:disabled) {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.ui-segment):not(.action-row):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-auto-row-lock-btn):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):not(.overlay):not(.overlay-main):not(.overlay-btn):not(.ghost):not(.danger):not(.tiny):not(.active):not(.primary):not(.live):not(.zone-handle):hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: var(--border);
 }
@@ -164,7 +164,7 @@ button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):no
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-on, #fff);
   box-shadow: none;
   font-weight: 600;
   padding: 0 0.85rem;
@@ -173,7 +173,7 @@ button.primary {
 button.primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-  color: #fff;
+  color: var(--accent-on, #fff);
 }
 
 button.live {
@@ -194,16 +194,16 @@ button.live:hover:not(:disabled) {
   color: #0b0c0f;
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):active:not(:disabled):not(.zone-handle) {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-auto-row-lock-btn):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):not(.overlay):not(.overlay-main):not(.overlay-btn):active:not(:disabled):not(.zone-handle) {
   background: var(--surface-alt);
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):focus-visible {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-auto-row-lock-btn):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):not(.overlay):not(.overlay-main):not(.overlay-btn):focus-visible {
   outline: 2px solid var(--accent-border);
   outline-offset: 2px;
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):disabled {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-auto-colhead-label):not(.caster-automations-section-label):not(.caster-filter-pill):not(.caster-auto-row-play-btn):not(.caster-auto-row-menu-btn):not(.caster-automation-fav):not(.caster-auto-row-lock-btn):not(.caster-select-trigger):not(.caster-auto-folder-section-toggle):not(.caster-toast-dismiss):not(.caster-toast-action):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):not(.overlay):not(.overlay-main):not(.overlay-btn):disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -233,7 +233,7 @@ button.ghost:hover:not(:disabled) {
   border-color: var(--border);
 }
 
-button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip).active {
+button:not(.win-btn):not(.titlebar-nav-item):not(.app-mark):not(.tb-icon-btn):not(.engine-dot):not(.icon-ghost):not(.caster-btn):not(.caster-sidebar-item):not(.caster-sidebar-toggle):not(.caster-sidebar-recent-item):not(.caster-titlebar-tab):not(.caster-titlebar-btn):not(.caster-doc-tab-main):not(.caster-doc-tab-close):not(.caster-doc-tab-add-btn):not(.caster-search-trigger):not(.caster-settings-rail-item):not(.caster-segmented-btn):not(.caster-theme-swatch):not(.caster-macro-hotkey-btn):not(.action-select-cell):not(.action-cell-btn):not(.caster-menu-item):not(.caster-tab):not(.ui-switch):not(.caster-process-filter-panel-live-item):not(.caster-process-filter-panel-refresh):not(.caster-process-filter-panel-chip-remove):not(.caster-process-filter-presets-btn):not(.caster-process-filter-presets-row-remove):not(.caster-clicker-info-tip):not(.overlay):not(.overlay-main):not(.overlay-btn).active {
   border-color: var(--accent-border);
   background: var(--accent-soft);
   color: var(--accent-text);
@@ -259,19 +259,122 @@ button.tiny {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.55rem 0.85rem;
-  background: rgba(244, 245, 247, 0.94);
+  gap: 0.45rem;
+  padding: 0.35rem 0.45rem 0.35rem 0.55rem;
+  margin: 0;
+  background: color-mix(in srgb, var(--surface-raised) 92%, transparent);
   color: var(--text);
-  font: 600 0.9rem var(--font);
+  font: 600 0.82rem var(--font);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-sizing: border-box;
 }
 
-.overlay span {
-  font-weight: 500;
+.overlay-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.2rem 0.25rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.overlay-main:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+
+.overlay-state {
+  flex-shrink: 0;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.overlay-state.is-running {
   color: var(--ok-text);
+}
+
+.overlay-state.is-paused {
+  color: var(--warn-text, #b45309);
+}
+
+.overlay-state.is-idle {
+  color: var(--muted);
+}
+
+.overlay-metrics {
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.overlay-metrics--idle {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.overlay-sep {
+  margin: 0 0.35rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.overlay-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.overlay-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  height: 1.65rem;
+  min-width: 1.65rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: 600 0.72rem var(--font);
+  cursor: pointer;
+}
+
+.overlay-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+}
+
+.overlay-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.overlay-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.overlay-btn--stop {
+  color: var(--danger-text, #b91c1c);
+  border-color: color-mix(in srgb, var(--danger-text, #b91c1c) 35%, var(--border));
+}
+
+.overlay--paused {
+  border-color: color-mix(in srgb, var(--warn-text, #b45309) 35%, var(--border));
 }
 
 .pick-overlay {
@@ -639,7 +742,7 @@ html[data-window="picker"] {
 
 .action-list li.selected {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-on, #fff);
 }
 
 .action-list li.selected .idx,
@@ -1320,7 +1423,7 @@ html[data-window="picker"] {
 
 .macro-library-item.is-active {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-on, #fff);
 }
 
 .macro-library-item .preset-fav {

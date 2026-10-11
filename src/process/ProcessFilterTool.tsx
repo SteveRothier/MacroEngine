@@ -261,7 +261,6 @@ export function ProcessFilterTool({
         ]
           .filter(Boolean)
           .join(" ")}
-        disabled={disabled}
         title={title}
         aria-label={t("common.process.toolAria", {
           mode: modeLabel,

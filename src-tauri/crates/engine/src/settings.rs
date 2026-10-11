@@ -188,7 +188,7 @@ pub struct AccueilPrefs {
     pub default_filter: AccueilFilter,
     #[serde(default = "default_true")]
     pub remember_collapsed_sections: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub open_on_single_click: bool,
     #[serde(default = "default_true")]
     pub confirm_trash: bool,
@@ -217,7 +217,7 @@ impl Default for AccueilPrefs {
             default_sort_dir: AccueilSortDir::Asc,
             default_filter: AccueilFilter::All,
             remember_collapsed_sections: true,
-            open_on_single_click: false,
+            open_on_single_click: true,
             confirm_trash: true,
             confirm_delete_folder: true,
             show_scripts_in_all: true,

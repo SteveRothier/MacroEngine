@@ -628,11 +628,14 @@ export function ClickerTargetSection({ editor: e }: Props) {
               className="caster-btn caster-btn-ghost"
               disabled={e.editDisabled}
               onClick={() => {
+                const nextIndex = e.points.length;
                 e.setPoints((prev) => [
                   ...prev,
                   { x: 0, y: 0, clicks: 1, radius: 0, pauseAfterMs: 0 },
                 ]);
-                e.setSelectedPointIndex(e.points.length);
+                multiAnchorRef.current = nextIndex;
+                setMultiIndices(new Set([nextIndex]));
+                e.setSelectedPointIndex(nextIndex);
               }}
             >
               {t("clicker.target.addPoint")}
