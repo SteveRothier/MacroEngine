@@ -72,6 +72,8 @@ pub struct AppState {
     macros_config_dir: Arc<Mutex<Option<std::path::PathBuf>>>,
     /// Last loaded / saved clicker preset name (for Accueil récents).
     active_clicker_preset: Arc<Mutex<Option<String>>>,
+    /// Preset id to start after the current macro worker finishes (clicker.start).
+    pending_clicker_after_macro: Arc<Mutex<Option<String>>>,
     /// Script currently running as an autonomous session.
     active_script_name: Arc<Mutex<Option<String>>>,
     /// Active step-through gate for script session debugging.
@@ -129,6 +131,7 @@ impl AppState {
             record_replace: Arc::new(AtomicBool::new(false)),
             macros_config_dir: Arc::new(Mutex::new(None)),
             active_clicker_preset: Arc::new(Mutex::new(None)),
+            pending_clicker_after_macro: Arc::new(Mutex::new(None)),
             active_script_name: Arc::new(Mutex::new(None)),
             script_step_gate: Arc::new(Mutex::new(None)),
             macro_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
@@ -613,19 +616,48 @@ impl AppState {
         let macro_name = doc.name.clone();
         let recent_name = macro_name.clone();
 
+        *self
+            .pending_clicker_after_macro
+            .lock()
+            .expect("pending clicker") = None;
+        let pending = Arc::clone(&self.pending_clicker_after_macro);
+        let cancel_for_cb = cancel.clone();
+        let start_clicker: crate::macro_vm::StartClickerCallback =
+            Arc::new(move |preset_id: &str| {
+                *pending.lock().expect("pending clicker") = Some(preset_id.to_string());
+                cancel_for_cb.cancel();
+                Ok(())
+            });
+
         let handle = std::thread::spawn(move || {
             let started = Instant::now();
-            let vm = MacroVm::with_injector(injector);
+            let vm = MacroVm::with_injector_and_clicker(injector, Some(start_clicker));
             let from = from_path.as_deref();
-            let status = match vm.run_from_path(
+            let result = vm.run_from_path(
                 &doc,
                 &cancel,
                 &pause,
                 &bus,
                 Some(process_filter),
                 from,
-            ) {
-                Ok(trace) => {
+            );
+            let handoff = app
+                .pending_clicker_after_macro
+                .lock()
+                .expect("pending clicker")
+                .take();
+            let status = match (&result, &handoff) {
+                (_, Some(_)) => {
+                    bus.publish(EngineEvent::Log {
+                        level: LogLevel::Info,
+                        message: format!(
+                            "Fin « {} » · enchaînement clicker",
+                            macro_name
+                        ),
+                    });
+                    crate::quick_access::RecentRunStatus::Ok
+                }
+                (Ok(trace), None) => {
                     bus.publish(EngineEvent::Log {
                         level: LogLevel::Info,
                         message: format!(
@@ -636,7 +668,7 @@ impl AppState {
                     });
                     crate::quick_access::RecentRunStatus::Ok
                 }
-                Err(e) => {
+                (Err(e), None) => {
                     bus.publish(EngineEvent::Log {
                         level: LogLevel::Warn,
                         message: format!("Arrêt « {macro_name} » · {e}"),
@@ -654,6 +686,9 @@ impl AppState {
                 started.elapsed().as_millis() as u64,
             );
             let _ = app.finish_run();
+            if let Some(preset_id) = handoff {
+                app.chain_clicker_after_macro(&preset_id);
+            }
         });
         *self.worker.lock().expect("worker lock") = Some(handle);
         self.note_recent_macro(&recent_name);
@@ -775,6 +810,45 @@ impl AppState {
             EngineState::Running => self.pause_clicker(),
             EngineState::Paused => self.resume_clicker(),
             _ => Err("clicker not active".into()),
+        }
+    }
+
+    /// After a macro `clicker.start` action, load + start a clicker preset.
+    fn chain_clicker_after_macro(&self, preset_id: &str) {
+        use crate::clicker_presets::load_preset;
+        let Some(dir) = self.macros_config_dir() else {
+            self.bus.publish(EngineEvent::Log {
+                level: LogLevel::Warn,
+                message: format!(
+                    "enchaînement macro → clicker « {preset_id} » ignoré (pas de dossier)"
+                ),
+            });
+            return;
+        };
+        let preset = match load_preset(&dir, preset_id) {
+            Ok(p) => p,
+            Err(e) => {
+                self.bus.publish(EngineEvent::Log {
+                    level: LogLevel::Warn,
+                    message: format!(
+                        "enchaînement macro → clicker « {preset_id} » échoué: {e}"
+                    ),
+                });
+                return;
+            }
+        };
+        self.bus.publish(EngineEvent::Log {
+            level: LogLevel::Info,
+            message: format!("Enchaînement macro → clicker « {preset_id} »"),
+        });
+        let _ = self.worker.lock().expect("worker lock").take();
+        self.set_active_clicker_preset(Some(preset.name.clone()));
+        let _lifecycle = self.lifecycle.lock().expect("lifecycle");
+        if let Err(e) = self.start_clicker_inner(preset.config) {
+            self.bus.publish(EngineEvent::Log {
+                level: LogLevel::Warn,
+                message: format!("échec démarrage clicker enchaîné: {e}"),
+            });
         }
     }
 
@@ -2020,6 +2094,8 @@ mod tests {
             repeat_count: 1,
             process_filter: MacroProcessFilterMode::default(),
             local_process_filter: ProcessFilter::default(),
+            allow_network: false,
+            allow_process: false,
             actions: vec![
                 ActionNode::Delay {
                     id: "d0".into(),
@@ -2056,6 +2132,8 @@ mod tests {
             repeat_count: 1,
             process_filter: MacroProcessFilterMode::default(),
             local_process_filter: ProcessFilter::default(),
+            allow_network: false,
+            allow_process: false,
             actions: vec![
                 ActionNode::Delay {
                     id: "d0".into(),
@@ -2104,6 +2182,8 @@ mod tests {
             repeat_count: 1,
             process_filter: MacroProcessFilterMode::default(),
             local_process_filter: ProcessFilter::default(),
+            allow_network: false,
+            allow_process: false,
             actions: vec![ActionNode::Delay {
                 id: "d0".into(),
                 ms: 500,

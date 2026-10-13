@@ -34,6 +34,8 @@ type Props = {
   items: ActionPickerEntry[];
   /** Extra class on the trigger button */
   triggerClassName?: string;
+  /** Icon-only (or custom) trigger; `label` stays the accessible name */
+  triggerContent?: ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
@@ -103,6 +105,7 @@ export function ActionPickerMenu({
   disabled,
   items,
   triggerClassName,
+  triggerContent,
   open: openProp,
   onOpenChange,
 }: Props) {
@@ -310,12 +313,18 @@ export function ActionPickerMenu({
           "caster-btn caster-btn-ghost caster-action-picker-trigger"
         }
         disabled={disabled}
+        aria-label={triggerContent != null ? triggerLabel : undefined}
+        title={triggerContent != null ? triggerLabel : undefined}
         aria-expanded={open}
         aria-haspopup="menu"
         aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen(!open)}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
       >
-        {triggerLabel}
+        {triggerContent ?? triggerLabel}
       </button>
       {panel}
     </div>

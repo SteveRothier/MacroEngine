@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileCode2 } from "lucide-react";
-import { pickScreenPointDetailed } from "../pick";
 import { Segmented } from "../ui";
-import { ActionPickerMenu, DropdownMenu, Select, Tooltip, useToast } from "../ui/shell";
-import type { ActionPickerEntry, DropdownEntry } from "../ui/shell";
+import { DropdownMenu, Select, Tooltip } from "../ui/shell";
+import type { DropdownEntry } from "../ui/shell";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
-import type { CompareOp, KeyMods, MacroAction, MacroValue, Operand } from "./types";
+import type { KeyMods, MacroAction } from "./types";
+import { parseLit } from "./conditionOps";
 import type { ScriptDoc } from "../scripts/types";
 import { ScriptParamsFields } from "../scripts/ScriptParamsFields";
 import { activePermissionLabels } from "../scripts/ScriptPermissionsMenu";
@@ -33,51 +33,12 @@ const HTTP_METHOD_OPTS = [
   { value: "DELETE", label: "DELETE" },
 ];
 
-function operandModeOpts(t: TFunction) {
-  return [
-    { value: "var", label: t("macros.params.operandVar") },
-    { value: "lit", label: t("macros.params.operandLit") },
-  ];
-}
-
-const COMPARE_OP_OPTS = [
-  { value: "eq", label: "=" },
-  { value: "ne", label: "≠" },
-  { value: "gt", label: ">" },
-  { value: "lt", label: "<" },
-  { value: "gte", label: "≥" },
-  { value: "lte", label: "≤" },
-];
-
 type Props = {
   action: MacroAction | null;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
 };
-
-function isVarOperand(o: Operand): o is { var: string } {
-  return typeof o === "object" && o !== null && "var" in o;
-}
-
-function operandMode(o: Operand): "var" | "lit" {
-  return isVarOperand(o) ? "var" : "lit";
-}
-
-function litString(o: Operand): string {
-  if (isVarOperand(o)) return "";
-  if (typeof o === "string") return o;
-  return String(o);
-}
-
-function parseLit(raw: string): MacroValue {
-  if (raw === "true") return true;
-  if (raw === "false") return false;
-  const n = Number(raw);
-  if (raw.trim() !== "" && !Number.isNaN(n)) return n;
-  return raw;
-}
 
 function modsOf(action: { mods?: KeyMods }): KeyMods {
   return {
@@ -92,8 +53,6 @@ type PointFieldsProps = {
   y: number | null | undefined;
   optional?: boolean;
   disabled?: boolean;
-  picking: boolean;
-  setPicking: (v: boolean) => void;
   onChangeXY: (x: number | null, y: number | null) => void;
   hint?: ReactNode;
 };
@@ -103,31 +62,12 @@ function PointFields({
   y,
   optional = false,
   disabled,
-  picking,
-  setPicking,
   onChangeXY,
   hint,
 }: PointFieldsProps) {
   const t = useT();
-  const toast = useToast();
   const mode: "cursor" | "position" =
     optional && x == null && y == null ? "cursor" : "position";
-
-  async function onPick() {
-    setPicking(true);
-    try {
-      const result = await pickScreenPointDetailed();
-      if (!result.ok) {
-        if (result.reason === "timeout" || result.reason === "error") {
-          toast.info(t("macros.params.pickCancelled"));
-        }
-        return;
-      }
-      onChangeXY(result.point.x, result.point.y);
-    } finally {
-      setPicking(false);
-    }
-  }
 
   if (optional) {
     return (
@@ -137,7 +77,7 @@ function PointFields({
           <Segmented
             ariaLabel={t("macros.params.positionModeAria")}
             value={mode}
-            disabled={disabled || picking}
+            disabled={disabled}
             options={[
               { value: "cursor", label: t("macros.params.cursor") },
               { value: "position", label: t("macros.params.position") },
@@ -162,7 +102,7 @@ function PointFields({
             <label className="caster-field">
               <span>{t("macros.params.coordX")}</span>
               <WheelNumberInput
-                disabled={disabled || picking}
+                disabled={disabled}
                 value={x ?? ""}
                 onValueChange={(n) => onChangeXY(n, y ?? null)}
                 onEmptyChange={() => onChangeXY(null, y ?? null)}
@@ -171,26 +111,17 @@ function PointFields({
             <label className="caster-field">
               <span>{t("macros.params.coordY")}</span>
               <WheelNumberInput
-                disabled={disabled || picking}
+                disabled={disabled}
                 value={y ?? ""}
                 onValueChange={(n) => onChangeXY(x ?? null, n)}
                 onEmptyChange={() => onChangeXY(x ?? null, null)}
               />
             </label>
-            <div
-              className="caster-field props-point-actions"
-              style={{ gridColumn: "1 / -1" }}
-            >
-              <button
-                type="button"
-                disabled={disabled || picking}
-                onClick={() => void onPick()}
-              >
-                {picking
-                  ? t("macros.params.pickOverlay")
-                  : t("macros.params.pickScreen")}
-              </button>
-            </div>
+            {hint ? (
+              <p className="hint" style={{ gridColumn: "1 / -1" }}>
+                {hint}
+              </p>
+            ) : null}
           </>
         )}
       </>
@@ -202,7 +133,7 @@ function PointFields({
       <label className="caster-field">
         <span>{t("macros.params.coordX")}</span>
         <WheelNumberInput
-          disabled={disabled || picking}
+          disabled={disabled}
           value={x ?? ""}
           onValueChange={(n) => onChangeXY(n, y ?? 0)}
         />
@@ -210,21 +141,16 @@ function PointFields({
       <label className="caster-field">
         <span>{t("macros.params.coordY")}</span>
         <WheelNumberInput
-          disabled={disabled || picking}
+          disabled={disabled}
           value={y ?? ""}
           onValueChange={(n) => onChangeXY(x ?? 0, n)}
         />
       </label>
-      <div className="caster-field props-point-actions" style={{ gridColumn: "1 / -1" }}>
-        <button
-          type="button"
-          disabled={disabled || picking}
-          onClick={() => void onPick()}
-        >
-          {picking ? t("macros.params.pickOverlay") : t("macros.params.pickScreen")}
-        </button>
-        {hint ? <p className="hint">{hint}</p> : null}
-      </div>
+      {hint ? (
+        <p className="hint" style={{ gridColumn: "1 / -1" }}>
+          {hint}
+        </p>
+      ) : null}
     </>
   );
 }
@@ -233,11 +159,9 @@ export function ActionProps({
   action,
   disabled,
   onChange,
-  branchAddMenuItems,
   onOpenScript,
 }: Props) {
   const t = useT();
-  const [picking, setPicking] = useState(false);
 
   if (!action) {
     return null;
@@ -251,7 +175,7 @@ export function ActionProps({
           <Select
             className="caster-select"
             value={action.button ?? "left"}
-            disabled={disabled || picking}
+            disabled={disabled}
             options={mouseButtonOpts(t)}
             onChange={(v) =>
               onChange({
@@ -266,8 +190,6 @@ export function ActionProps({
           y={action.y}
           optional
           disabled={disabled}
-          picking={picking}
-          setPicking={setPicking}
           onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
           hint={t("macros.params.clickAtCursorHint")}
         />
@@ -282,8 +204,6 @@ export function ActionProps({
           x={action.x}
           y={action.y}
           disabled={disabled}
-          picking={picking}
-          setPicking={setPicking}
           onChangeXY={(nx, ny) =>
             onChange({
               ...action,
@@ -305,7 +225,7 @@ export function ActionProps({
           <Select
             className="caster-select"
             value={action.button ?? "left"}
-            disabled={disabled || picking}
+            disabled={disabled}
             options={mouseButtonOpts(t)}
             onChange={(v) =>
               onChange({
@@ -320,8 +240,6 @@ export function ActionProps({
           y={action.y}
           optional
           disabled={disabled}
-          picking={picking}
-          setPicking={setPicking}
           onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
         />
         <p className="hint" style={{ gridColumn: "1 / -1" }}>
@@ -339,7 +257,7 @@ export function ActionProps({
         <label className="caster-field">
           <span>{t("macros.params.wheelDelta")}</span>
           <WheelNumberInput
-            disabled={disabled || picking}
+            disabled={disabled}
             value={action.delta}
             onValueChange={(n) => onChange({ ...action, delta: n })}
           />
@@ -349,8 +267,6 @@ export function ActionProps({
           y={action.y}
           optional
           disabled={disabled}
-          picking={picking}
-          setPicking={setPicking}
           onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
         />
       </div>
@@ -582,6 +498,34 @@ export function ActionProps({
     );
   }
 
+  if (action.type === "macro.run") {
+    return (
+      <LibraryIdPickerProps
+        kind="macro"
+        label={t("macros.params.macroId")}
+        tip={t("macros.params.macroRunTip")}
+        value={action.macroId}
+        disabled={disabled}
+        emptyLabel={t("macros.library.scriptSourceChoose")}
+        onChange={(macroId) => onChange({ ...action, macroId })}
+      />
+    );
+  }
+
+  if (action.type === "clicker.start") {
+    return (
+      <LibraryIdPickerProps
+        kind="clicker"
+        label={t("macros.params.clickerPresetId")}
+        tip={t("macros.params.clickerStartTip")}
+        value={action.presetId}
+        disabled={disabled}
+        emptyLabel={t("macros.library.scriptSourceChoose")}
+        onChange={(presetId) => onChange({ ...action, presetId })}
+      />
+    );
+  }
+
   if (
     action.type === "key.tap" ||
     action.type === "key.down" ||
@@ -732,269 +676,6 @@ export function ActionProps({
     );
   }
 
-  if (action.type === "control.if") {
-    const left = action.condition.left;
-    const right = action.condition.right;
-    return (
-      <div className="props-grid">
-        <label className="caster-field">
-          <span>{t("macros.params.ifLeft")}</span>
-          <Select
-            className="caster-select"
-            disabled={disabled}
-            value={operandMode(left)}
-            options={operandModeOpts(t)}
-            onChange={(v) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  left: v === "var" ? { var: "n" } : 0,
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>
-            {operandMode(left) === "var"
-              ? t("macros.params.operandVarShort")
-              : t("macros.params.varValue")}
-          </span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={isVarOperand(left) ? left.var : litString(left)}
-            onChange={(e) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  left:
-                    operandMode(left) === "var"
-                      ? { var: e.target.value }
-                      : parseLit(e.target.value),
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.ifOperator")}</span>
-          <Select
-            className="caster-select"
-            disabled={disabled}
-            value={action.condition.op}
-            options={COMPARE_OP_OPTS}
-            onChange={(op) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  op: op as CompareOp,
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.ifRight")}</span>
-          <Select
-            className="caster-select"
-            disabled={disabled}
-            value={operandMode(right)}
-            options={operandModeOpts(t)}
-            onChange={(v) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  right: v === "var" ? { var: "n" } : 0,
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>
-            {operandMode(right) === "var"
-              ? t("macros.params.operandVarShort")
-              : t("macros.params.varValue")}
-          </span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={isVarOperand(right) ? right.var : litString(right)}
-            onChange={(e) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  right:
-                    operandMode(right) === "var"
-                      ? { var: e.target.value }
-                      : parseLit(e.target.value),
-                },
-              })
-            }
-          />
-        </label>
-        <div className="actions wrap">
-          {branchAddMenuItems ? (
-            <>
-              <ActionPickerMenu
-                label={t("macros.params.addThen")}
-                disabled={disabled}
-                items={branchAddMenuItems("then")}
-              />
-              <ActionPickerMenu
-                label={t("macros.params.addElse")}
-                disabled={disabled}
-                items={branchAddMenuItems("else")}
-              />
-            </>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
-  if (action.type === "control.while") {
-    const left = action.condition.left;
-    const right = action.condition.right;
-    return (
-      <div className="props-grid">
-        <label className="caster-field">
-          <span>{t("macros.params.ifLeft")}</span>
-          <Select
-            className="caster-select"
-            disabled={disabled}
-            value={operandMode(left)}
-            options={operandModeOpts(t)}
-            onChange={(v) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  left: v === "var" ? { var: "n" } : 0,
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>
-            {operandMode(left) === "var"
-              ? t("macros.params.operandVarShort")
-              : t("macros.params.varValue")}
-          </span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={isVarOperand(left) ? left.var : litString(left)}
-            onChange={(e) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  left:
-                    operandMode(left) === "var"
-                      ? { var: e.target.value }
-                      : parseLit(e.target.value),
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.ifOperator")}</span>
-          <Select
-            className="caster-select"
-            disabled={disabled}
-            value={action.condition.op}
-            options={COMPARE_OP_OPTS}
-            onChange={(op) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  op: op as CompareOp,
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.ifRight")}</span>
-          <Select
-            className="caster-select"
-            disabled={disabled}
-            value={operandMode(right)}
-            options={operandModeOpts(t)}
-            onChange={(v) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  right: v === "var" ? { var: "n" } : 0,
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>
-            {operandMode(right) === "var"
-              ? t("macros.params.operandVarShort")
-              : t("macros.params.varValue")}
-          </span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={isVarOperand(right) ? right.var : litString(right)}
-            onChange={(e) =>
-              onChange({
-                ...action,
-                condition: {
-                  ...action.condition,
-                  right:
-                    operandMode(right) === "var"
-                      ? { var: e.target.value }
-                      : parseLit(e.target.value),
-                },
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.maxIterations")}</span>
-          <WheelNumberInput
-            disabled={disabled}
-            min={1}
-            value={action.maxIterations ?? 10000}
-            onValueChange={(n) => {
-              onChange({
-                ...action,
-                maxIterations: Number.isFinite(n)
-                  ? Math.max(1, Math.floor(n))
-                  : 10000,
-              });
-            }}
-          />
-        </label>
-        <div className="actions wrap">
-          {branchAddMenuItems ? (
-            <ActionPickerMenu
-              label={t("macros.params.addBody")}
-              disabled={disabled}
-              items={branchAddMenuItems("body")}
-            />
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
   if (action.type !== "process.run") {
     return null;
   }
@@ -1024,6 +705,75 @@ export function ActionProps({
           }
         />
       </label>
+    </div>
+  );
+}
+
+function LibraryIdPickerProps({
+  kind,
+  label,
+  tip,
+  value,
+  disabled,
+  emptyLabel,
+  onChange,
+}: {
+  kind: "macro" | "clicker";
+  label: string;
+  tip: string;
+  value: string;
+  disabled?: boolean;
+  emptyLabel: string;
+  onChange: (id: string) => void;
+}) {
+  const [items, setItems] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void invoke<{ items: { id: string; name: string }[] }>(
+      "get_library_index_cmd",
+      { kind },
+    )
+      .then((dto) => {
+        if (!cancelled) {
+          setItems(
+            (dto.items ?? [])
+              .filter((i) => i.id)
+              .map((i) => ({ id: i.id, name: i.name || i.id })),
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [kind]);
+
+  const opts = [
+    { value: "", label: emptyLabel },
+    ...items.map((i) => ({ value: i.id, label: i.name })),
+  ];
+
+  return (
+    <div className="props-grid">
+      <label className="caster-field" style={{ gridColumn: "1 / -1" }}>
+        <span>{label}</span>
+        <Select
+          className="caster-select"
+          disabled={disabled}
+          value={value}
+          options={opts}
+          onChange={onChange}
+        />
+      </label>
+      <p
+        className="caster-control-flow-branch-count"
+        style={{ gridColumn: "1 / -1", margin: 0 }}
+      >
+        {tip}
+      </p>
     </div>
   );
 }
