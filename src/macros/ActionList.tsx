@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -19,6 +20,7 @@ import {
   ListPlus,
   MousePointer2,
   MousePointerClick,
+  ChevronDown,
   Play,
   Plus,
   Redo2,
@@ -37,6 +39,7 @@ import {
   type MenuItemDef,
 } from "../ui/shell";
 import { useT, type TFunction } from "../i18n";
+import { buildActionAddMenu } from "./actionFactory";
 import { ActionParamCells } from "./ActionParamCells";
 import {
   flattenTree,
@@ -51,9 +54,15 @@ import {
 import {
   actionDetail,
   actionTitleInList,
+  actionTone,
   branchLabel,
   dragGestureEndIndex,
 } from "./actionLabels";
+import {
+  pathHasPrefix,
+  parsePathKey,
+  remapCollapsedAfterReorder,
+} from "./collapseRemap";
 import { actionOffsetMs, formatActionOffset } from "./sequenceUtils";
 
 type Props = {
@@ -80,6 +89,11 @@ type Props = {
   onAddKind?: (kind: MacroAction["type"]) => void;
   onOpenAddMenu?: () => void;
   onChangeAction?: (path: ActionPath, action: MacroAction) => void;
+  onAddToBranch?: (
+    path: ActionPath,
+    branch: "then" | "else" | "body",
+    kind: MacroAction["type"],
+  ) => void;
   onEmptyAdd?: () => void;
   onStartRecord?: () => void;
   onApplyPreset?: (name: string) => void;
@@ -91,7 +105,6 @@ type Props = {
   addMenuItems?: ActionPickerEntry[];
   addMenuOpen?: boolean;
   onAddMenuOpenChange?: (open: boolean) => void;
-  branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
 };
 
@@ -149,9 +162,13 @@ function kindInsertItems(
   ];
 }
 
+type BranchKey = "then" | "else" | "body";
+
 type DropEdge = {
   index: number;
   edge: "before" | "after";
+  /** Nest into this branch of rows[index] (control.if / while). */
+  intoBranch?: BranchKey;
 };
 
 type DragSession = {
@@ -173,12 +190,129 @@ type DragGhost = {
   offsetY: number;
 };
 
-function isBranchHead(row: FlatRow): boolean {
-  return row.branchLabel != null && row.path[row.path.length - 1] === 0;
-}
-
 function padIndex(n: number): string {
   return String(n).padStart(2, "0");
+}
+
+type BranchSlotItem = {
+  kind: "branch-slot";
+  key: string;
+  parentPath: ActionPath;
+  branch: BranchKey;
+  depth: number;
+  count: number;
+};
+
+type ActionDisplayItem = {
+  kind: "action";
+  row: FlatRow;
+  flatIndex: number;
+};
+
+type DisplayItem = ActionDisplayItem | BranchSlotItem;
+
+/** True if `path` is strictly under a collapsed control.if / while. */
+function isDescendantOfCollapsed(
+  path: ActionPath,
+  collapsed: Set<string>,
+): boolean {
+  if (collapsed.size === 0) return false;
+  for (const key of collapsed) {
+    const prefix = parsePathKey(key);
+    if (!prefix) continue;
+    if (path.length > prefix.length && pathHasPrefix(path, prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function findLastUnderPrefix(rows: FlatRow[], prefix: ActionPath): number {
+  let last = -1;
+  for (let i = 0; i < rows.length; i++) {
+    if (pathHasPrefix(rows[i]!.path, prefix)) last = i;
+  }
+  return last;
+}
+
+function makeSlot(
+  parentPath: ActionPath,
+  branch: BranchKey,
+  depth: number,
+  count: number,
+): BranchSlotItem {
+  return {
+    kind: "branch-slot",
+    key: `${pathKey(parentPath)}:${branch}`,
+    parentPath,
+    branch,
+    depth,
+    count,
+  };
+}
+
+/**
+ * Always show Boucle / Alors / Sinon + at the bottom of each branch.
+ * Drag indices stay on FlatRow only — slots are display-only (but droppable).
+ */
+function buildDisplayItems(
+  _actions: MacroAction[],
+  rows: FlatRow[],
+): DisplayItem[] {
+  const after = new Map<number, BranchSlotItem[]>();
+
+  const pushAfter = (flatIndex: number, slot: BranchSlotItem) => {
+    const list = after.get(flatIndex) ?? [];
+    list.push(slot);
+    after.set(flatIndex, list);
+  };
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]!;
+    const depth = row.depth + 1;
+
+    if (row.action.type === "control.if") {
+      const thenLen = row.action.then?.length ?? 0;
+      const elseLen = row.action.else?.length ?? 0;
+      const lastThen =
+        thenLen > 0 ? findLastUnderPrefix(rows, [...row.path, 0]) : -1;
+      const lastElse =
+        elseLen > 0 ? findLastUnderPrefix(rows, [...row.path, 1]) : -1;
+
+      // Then footer: after last then action, or right after Si if empty.
+      pushAfter(
+        lastThen >= 0 ? lastThen : i,
+        makeSlot(row.path, "then", depth, thenLen),
+      );
+
+      // Else footer: after last else action; if empty, after then footer anchor.
+      if (lastElse >= 0) {
+        pushAfter(lastElse, makeSlot(row.path, "else", depth, elseLen));
+      } else {
+        pushAfter(
+          lastThen >= 0 ? lastThen : i,
+          makeSlot(row.path, "else", depth, 0),
+        );
+      }
+    } else if (row.action.type === "control.while") {
+      const bodyLen = row.action.body?.length ?? 0;
+      const lastBody =
+        bodyLen > 0 ? findLastUnderPrefix(rows, [...row.path, 0]) : -1;
+      pushAfter(
+        lastBody >= 0 ? lastBody : i,
+        makeSlot(row.path, "body", depth, bodyLen),
+      );
+    }
+  }
+
+  const items: DisplayItem[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    items.push({ kind: "action", row: rows[i]!, flatIndex: i });
+    for (const slot of after.get(i) ?? []) {
+      items.push(slot);
+    }
+  }
+  return items;
 }
 
 function parentPath(path: ActionPath): ActionPath {
@@ -200,6 +334,10 @@ function siblingList(actions: MacroAction[], path: ActionPath): MacroAction[] {
   return actions;
 }
 
+function branchKeyToIndex(branch: BranchKey): 0 | 1 {
+  return branch === "else" ? 1 : 0;
+}
+
 function dropToReorderPaths(
   rows: FlatRow[],
   fromIndex: number,
@@ -209,17 +347,29 @@ function dropToReorderPaths(
   const dropRow = rows[drop.index];
   const dropPath = dropRow?.path;
   if (!fromPath || !dropPath) return null;
+  if (pathsEqual(fromPath, dropPath)) return null;
   if (isAncestorPath(fromPath, dropPath)) return null;
 
-  // Nest into then/body when dropping after if/while from another list.
-  if (
-    (dropRow.action.type === "control.if" ||
-      dropRow.action.type === "control.while") &&
-    drop.edge === "after" &&
-    !pathsEqual(fromPath, dropPath) &&
-    !pathsEqual(parentPath(fromPath), parentPath(dropPath))
-  ) {
-    const intoBranch: ActionPath = [...dropPath, 0, 0];
+  const isControl =
+    dropRow.action.type === "control.if" ||
+    dropRow.action.type === "control.while";
+
+  // Explicit branch target (empty slot) or drop-after on if/while → nest.
+  if (isControl && (drop.intoBranch != null || drop.edge === "after")) {
+    const branch: BranchKey =
+      drop.intoBranch ??
+      (dropRow.action.type === "control.while" ? "body" : "then");
+    if (dropRow.action.type === "control.while" && branch === "else") {
+      return null;
+    }
+    if (dropRow.action.type === "control.if" && branch === "body") {
+      return null;
+    }
+    const intoBranch: ActionPath = [
+      ...dropPath,
+      branchKeyToIndex(branch),
+      0,
+    ];
     if (isAncestorPath(fromPath, intoBranch)) return null;
     return { fromPath, toPath: intoBranch };
   }
@@ -257,6 +407,35 @@ function hitTestListDrop(
   if (!fromPath) return null;
 
   const el = document.elementFromPoint(x, y);
+
+  // Empty branch slot (+ then/else/body) → nest into that branch.
+  if (el instanceof Element) {
+    const slot = el.closest(
+      ".action-list-branch-slot[data-branch-parent][data-branch-key]",
+    ) as HTMLElement | null;
+    if (slot) {
+      const parentKey = slot.getAttribute("data-branch-parent");
+      const branchRaw = slot.getAttribute("data-branch-key");
+      const branch: BranchKey | null =
+        branchRaw === "then" || branchRaw === "else" || branchRaw === "body"
+          ? branchRaw
+          : null;
+      if (parentKey != null && branch) {
+        const parentFlat = rows.findIndex((r) => pathKey(r.path) === parentKey);
+        if (parentFlat >= 0 && parentFlat !== fromIndex) {
+          const hitPath = rows[parentFlat]?.path;
+          if (hitPath && !isAncestorPath(fromPath, hitPath)) {
+            return {
+              index: parentFlat,
+              edge: "after",
+              intoBranch: branch,
+            };
+          }
+        }
+      }
+    }
+  }
+
   let row =
     el instanceof Element
       ? (el.closest(".action-list-item[data-list-index]") as HTMLElement | null)
@@ -358,6 +537,7 @@ export function ActionList({
   onAddKind,
   onOpenAddMenu,
   onChangeAction,
+  onAddToBranch,
   onEmptyAdd,
   onStartRecord,
   onApplyPreset,
@@ -369,11 +549,14 @@ export function ActionList({
   addMenuItems,
   addMenuOpen,
   onAddMenuOpenChange,
-  branchAddMenuItems,
   onOpenScript,
 }: Props) {
   const t = useT();
   const rows: FlatRow[] = flattenTree(actions);
+  const displayItems = useMemo(
+    () => buildDisplayItems(actions, rows),
+    [actions, rows],
+  );
   const locked = disabled || readOnly;
   const reducedMotion = usePrefersReducedMotion();
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -381,10 +564,29 @@ export function ActionList({
   const [ghost, setGhost] = useState<DragGhost | null>(null);
   const [clipboardTick, setClipboardTick] = useState(0);
   const [multiKeys, setMultiKeys] = useState<Set<string>>(() => new Set());
+  const [collapsedControls, setCollapsedControls] = useState<Set<string>>(
+    () => new Set(),
+  );
   const multiAnchorRef = useRef<string | null>(null);
+
+  const toggleControlCollapse = (controlPath: ActionPath) => {
+    const key = pathKey(controlPath);
+    setCollapsedControls((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   const rowCtx = useContextMenuState();
   const emptyCtx = useContextMenuState();
+  const branchCtx = useContextMenuState();
   const [ctxPath, setCtxPath] = useState<ActionPath | null>(null);
+  const [ctxBranch, setCtxBranch] = useState<{
+    parentPath: ActionPath;
+    branch: BranchKey;
+    count: number;
+  } | null>(null);
   const sessionRef = useRef<DragSession | null>(null);
   const dropEdgeRef = useRef<DropEdge | null>(null);
   const rowsRef = useRef(rows);
@@ -574,7 +776,25 @@ export function ActionList({
         onSelect: () => onClearSelection?.(),
       },
     ];
-    if (readOnly) return interactItems;
+    const ctxActionEarly = getAtPath(actions, ctxPath);
+    const isControlFlowEarly =
+      ctxActionEarly?.type === "control.if" ||
+      ctxActionEarly?.type === "control.while";
+    if (readOnly) {
+      if (!isControlFlowEarly) return interactItems;
+      const blockCollapsed = collapsedControls.has(pathKey(ctxPath));
+      return [
+        ...interactItems,
+        {
+          id: "fold-block",
+          label: blockCollapsed
+            ? t("macros.params.expandBlock")
+            : t("macros.params.collapseBlock"),
+          icon: <ChevronDown size={14} />,
+          onSelect: () => toggleControlCollapse(ctxPath),
+        },
+      ];
+    }
 
     const siblings = siblingList(actions, ctxPath);
     const idx = ctxPath[ctxPath.length - 1] ?? 0;
@@ -618,7 +838,12 @@ export function ActionList({
         },
       );
     }
-    return [
+    const ctxAction = getAtPath(actions, ctxPath);
+    const isControlFlow =
+      ctxAction?.type === "control.if" || ctxAction?.type === "control.while";
+    const blockCollapsed = collapsedControls.has(pathKey(ctxPath));
+
+    const items: MenuItemDef[] = [
       interactItems[0]!,
       interactItems[1]!,
       {
@@ -662,6 +887,67 @@ export function ActionList({
         disabled: !canInsert && !onOpenAddMenu,
         submenu: addSub,
       },
+    ];
+
+    if (isControlFlow) {
+      if (onAddToBranch && ctxAction) {
+        const branches: Array<"then" | "else" | "body"> =
+          ctxAction.type === "control.while"
+            ? ["body"]
+            : ["then", "else"];
+        const intoSubs: MenuItemDef[] = branches.map((branch) => {
+          const addEntries = buildActionAddMenu(
+            (kind) => onAddToBranch(ctxPath, branch, kind),
+            t,
+          );
+          const addSub: MenuItemDef[] = [];
+          for (const entry of addEntries) {
+            if ("items" in entry) {
+              addSub.push({
+                id: `into-${branch}-${entry.id}`,
+                label: entry.label,
+                submenu: entry.items.map((item) => ({
+                  id: `into-${branch}-${item.id}`,
+                  label: item.label,
+                  icon: item.icon,
+                  onSelect: item.onSelect,
+                })),
+              });
+            } else {
+              addSub.push({
+                id: `into-${branch}-${entry.id}`,
+                label: entry.label,
+                icon: entry.icon,
+                onSelect: entry.onSelect,
+              });
+            }
+          }
+          return {
+            id: `into-${branch}`,
+            label: branchLabel(branch, t),
+            icon: <GitBranch size={14} />,
+            disabled: addSub.length === 0,
+            submenu: addSub.length > 0 ? addSub : undefined,
+          };
+        });
+        items.push({
+          id: "add-into-branch",
+          label: t("macros.params.addIntoBranch"),
+          icon: <Plus size={14} />,
+          submenu: intoSubs,
+        });
+      }
+      items.push({
+        id: "fold-block",
+        label: blockCollapsed
+          ? t("macros.params.expandBlock")
+          : t("macros.params.collapseBlock"),
+        icon: <ChevronDown size={14} />,
+        onSelect: () => toggleControlCollapse(ctxPath),
+      });
+    }
+
+    items.push(
       {
         id: "undo",
         label: t("macros.toolbar.undo"),
@@ -686,12 +972,15 @@ export function ActionList({
         danger: true,
         onSelect: () => onRemove(ctxPath),
       },
-    ];
+    );
+    return items;
   }, [
     actions,
     canRedo,
     canUndo,
+    collapsedControls,
     ctxPath,
+    onAddToBranch,
     onClearSelection,
     onDuplicate,
     onInsertAfter,
@@ -707,6 +996,94 @@ export function ActionList({
     readOnly,
     selectedPath,
     clipboardTick,
+    t,
+  ]);
+
+  const branchCtxItems: MenuItemDef[] = useMemo(() => {
+    if (!ctxBranch) return [];
+    const { parentPath, branch, count } = ctxBranch;
+    const parentKey = pathKey(parentPath);
+    const blockCollapsed = collapsedControls.has(parentKey);
+    const addEntries = onAddToBranch
+      ? buildActionAddMenu(
+          (kind) => onAddToBranch(parentPath, branch, kind),
+          t,
+        )
+      : [];
+    const addSub: MenuItemDef[] = [];
+    for (const entry of addEntries) {
+      if ("items" in entry) {
+        addSub.push({
+          id: `branch-add-${entry.id}`,
+          label: entry.label,
+          submenu: entry.items.map((item) => ({
+            id: `branch-add-${item.id}`,
+            label: item.label,
+            icon: item.icon,
+            onSelect: item.onSelect,
+          })),
+        });
+      } else {
+        addSub.push({
+          id: `branch-add-${entry.id}`,
+          label: entry.label,
+          icon: entry.icon,
+          onSelect: entry.onSelect,
+        });
+      }
+    }
+
+    const items: MenuItemDef[] = [
+      {
+        id: "branch-add",
+        label: t("macros.params.addToBranch"),
+        icon: <Plus size={14} />,
+        disabled: readOnly || locked || !onAddToBranch || addSub.length === 0,
+        submenu: addSub.length > 0 ? addSub : undefined,
+      },
+      {
+        id: "branch-fold",
+        label: blockCollapsed
+          ? t("macros.params.expandBlock")
+          : t("macros.params.collapseBlock"),
+        icon: <ChevronDown size={14} />,
+        onSelect: () => toggleControlCollapse(parentPath),
+      },
+    ];
+
+    if (!readOnly && !locked && count > 0 && onChangeAction) {
+      items.push(
+        { id: "sep-clear", label: "", separator: true },
+        {
+          id: "branch-clear",
+          label: t("macros.params.clearBranch"),
+          icon: <Trash2 size={14} />,
+          danger: true,
+          onSelect: () => {
+            const parent = getAtPath(actions, parentPath);
+            if (!parent) return;
+            if (parent.type === "control.if") {
+              onChangeAction(parentPath, {
+                ...parent,
+                then: branch === "then" ? [] : parent.then,
+                else: branch === "else" ? [] : parent.else,
+              });
+            } else if (parent.type === "control.while" && branch === "body") {
+              onChangeAction(parentPath, { ...parent, body: [] });
+            }
+          },
+        },
+      );
+    }
+    return items;
+  }, [
+    actions,
+    collapsedControls,
+    ctxBranch,
+    locked,
+    onAddToBranch,
+    onChangeAction,
+    readOnly,
     t,
   ]);
 
@@ -829,6 +1206,43 @@ export function ActionList({
         rows.find((r) => multiKeys.has(pathKey(r.path)))?.path ??
         null;
       if (!primary) return;
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const visible = rows.filter(
+          (r) => !isDescendantOfCollapsed(r.path, collapsedControls),
+        );
+        if (visible.length === 0) return;
+        const curKey = pathKey(primary);
+        let idx = visible.findIndex((r) => pathKey(r.path) === curKey);
+        if (idx < 0) idx = 0;
+        const nextIdx =
+          e.key === "ArrowDown"
+            ? Math.min(visible.length - 1, idx + 1)
+            : Math.max(0, idx - 1);
+        const nextPath = visible[nextIdx]!.path;
+        selectRow(nextPath, { shiftKey: e.shiftKey });
+        const el = listRef.current?.querySelector(
+          `[data-list-path="${CSS.escape(pathKey(nextPath))}"]`,
+        );
+        if (el instanceof HTMLElement) {
+          el.scrollIntoView({ block: "nearest" });
+        }
+        return;
+      }
+
+      if (e.key === "Enter") {
+        const action = getAtPath(actions, primary);
+        if (
+          action?.type === "control.if" ||
+          action?.type === "control.while"
+        ) {
+          e.preventDefault();
+          toggleControlCollapse(primary);
+        }
+        return;
+      }
+
       if (mod && (e.key === "c" || e.key === "C")) {
         e.preventDefault();
         copySelectedPaths();
@@ -867,6 +1281,7 @@ export function ActionList({
     return () => window.removeEventListener("keydown", onKey);
   }, [
     actions,
+    collapsedControls,
     confirmDeleteAction,
     locked,
     multiKeys,
@@ -937,7 +1352,7 @@ export function ActionList({
     if (target.closest(".row-ops")) return;
     if (
       target.closest(
-        "input, select, textarea, button, label.action-cell-mod, .action-cell-btn",
+        "input, select, textarea, button, label.action-cell-mod, .action-cell-btn, .caster-condition-field, .caster-select, .act-params",
       )
     ) {
       return;
@@ -1028,6 +1443,9 @@ export function ActionList({
         return;
       }
       if (!reducedMotion) pendingFlipRef.current = captureRowRects();
+      setCollapsedControls((prev) =>
+        remapCollapsedAfterReorder(prev, paths.fromPath, paths.toPath),
+      );
       clearDrag();
       onReorderRef.current(paths.fromPath, paths.toPath);
     };
@@ -1098,10 +1516,97 @@ export function ActionList({
             <span />
           </li>
         ) : null}
-        {rows.map((row, flatIndex) => {
+        {displayItems.map((item) => {
+          if (item.kind === "branch-slot") {
+            if (
+              collapsedControls.has(pathKey(item.parentPath)) ||
+              isDescendantOfCollapsed(item.parentPath, collapsedControls)
+            ) {
+              return null;
+            }
+            const branchClass =
+              item.branch === "else" ? "branch-else" : "branch-then";
+            const label = branchLabel(item.branch, t);
+            const addAria = t("macros.params.addToBranchNamed", {
+              branch: label,
+            });
+            const parentFlat = rows.findIndex((r) =>
+              pathsEqual(r.path, item.parentPath),
+            );
+            const slotDropTarget =
+              dragFromPath != null &&
+              parentFlat >= 0 &&
+              dropEdge != null &&
+              dropEdge.index === parentFlat &&
+              dropEdge.edge === "after" &&
+              dropEdge.intoBranch === item.branch &&
+              !isAncestorPath(dragFromPath, item.parentPath);
+            return (
+              <li
+                key={item.key}
+                className={[
+                  "action-list-item",
+                  "action-list-branch-slot",
+                  "nested",
+                  branchClass,
+                  slotDropTarget ? "is-drop-target" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                style={{ ["--nest-depth" as string]: item.depth }}
+                data-branch-parent={pathKey(item.parentPath)}
+                data-branch-key={item.branch}
+                onContextMenu={
+                  !disabled
+                    ? (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setCtxBranch({
+                          parentPath: item.parentPath,
+                          branch: item.branch,
+                          count: item.count,
+                        });
+                        branchCtx.openFromEvent(e);
+                      }
+                    : undefined
+                }
+              >
+                <span className="idx">
+                  <em className="branch-tag">{label}</em>
+                  {onAddToBranch && !readOnly ? (
+                    <ActionPickerMenu
+                      label={addAria}
+                      disabled={locked}
+                      items={buildActionAddMenu(
+                        (kind) =>
+                          onAddToBranch(item.parentPath, item.branch, kind),
+                        t,
+                      )}
+                      triggerContent={<Plus size={14} aria-hidden />}
+                      triggerClassName="caster-btn caster-btn-ghost action-list-branch-slot-add"
+                    />
+                  ) : null}
+                </span>
+                <span className="lbl" />
+                <div className="act-params" />
+                <span className="act-offset" />
+                <span />
+              </li>
+            );
+          }
+
+          const { row, flatIndex } = item;
           const abs = actionOffsetMs(actions, row.path);
           const displayOffset = formatActionOffset(actions, row.path, prevAbs);
           prevAbs = abs;
+          if (isDescendantOfCollapsed(row.path, collapsedControls)) {
+            return null;
+          }
+          const isControlFlow =
+            row.action.type === "control.if" ||
+            row.action.type === "control.while";
+          const controlCollapsed =
+            isControlFlow && collapsedControls.has(pathKey(row.path));
           const canDropHere =
             dragFromPath != null &&
             !pathsEqual(dragFromPath, row.path) &&
@@ -1115,7 +1620,8 @@ export function ActionList({
             canDropHere &&
             dropEdge &&
             dropEdge.index === flatIndex &&
-            dropEdge.edge === "after";
+            dropEdge.edge === "after" &&
+            dropEdge.intoBranch == null;
 
           const siblings = siblingList(actions, row.path);
           const siblingIdx = row.path[row.path.length - 1]!;
@@ -1128,111 +1634,129 @@ export function ActionList({
             return dragEnd != null;
           })();
 
+          const tone = actionTone(row.action.type);
+
           return (
-            <li
-              key={pathKey(row.path)}
-              className={[
-                "action-list-item",
-                "has-hover-reveal",
-                pathsEqual(selectedPath, row.path) ||
-                multiKeys.has(pathKey(row.path))
-                  ? "selected"
-                  : "",
-                pathsEqual(activePath, row.path) ? "active" : "",
-                row.depth > 0 ? "nested" : "",
-                row.branchLabel === "then" || row.branchLabel === "body"
-                  ? "branch-then"
-                  : "",
-                row.branchLabel === "else" ? "branch-else" : "",
-                dragFrom === flatIndex ? "is-drag-source" : "",
-                dropBefore ? "drop-before" : "",
-                dropAfter ? "drop-after" : "",
-                inDragPath ? "is-drag-gesture" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              style={{ ["--nest-depth" as string]: row.depth }}
-              data-list-index={flatIndex}
-              data-list-path={pathKey(row.path)}
-              onPointerDown={
-                !locked ? (ev) => onRowPointerDown(flatIndex, ev) : undefined
-              }
-              onClick={(e) => {
-                const t = e.target as HTMLElement;
-                if (t.closest(".row-ops")) return;
-                if (
-                  t.closest(
-                    "input, select, textarea, button, label.action-cell-mod, .action-cell-btn",
-                  )
-                ) {
-                  return;
+            <Fragment key={pathKey(row.path)}>
+              <li
+                className={[
+                  "action-list-item",
+                  "has-hover-reveal",
+                  pathsEqual(selectedPath, row.path) ||
+                  multiKeys.has(pathKey(row.path))
+                    ? "selected"
+                    : "",
+                  pathsEqual(activePath, row.path) ? "active" : "",
+                  row.depth > 0 ? "nested" : "",
+                  row.branchLabel === "then" || row.branchLabel === "body"
+                    ? "branch-then"
+                    : "",
+                  row.branchLabel === "else" ? "branch-else" : "",
+                  isControlFlow ? "action-list-control-row" : "",
+                  controlCollapsed ? "is-collapsed" : "",
+                  dragFrom === flatIndex ? "is-drag-source" : "",
+                  dropBefore ? "drop-before" : "",
+                  dropAfter ? "drop-after" : "",
+                  inDragPath ? "is-drag-gesture" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                style={{ ["--nest-depth" as string]: row.depth }}
+                data-list-index={flatIndex}
+                data-list-path={pathKey(row.path)}
+                data-tone={tone}
+                onPointerDown={
+                  !locked ? (ev) => onRowPointerDown(flatIndex, ev) : undefined
                 }
-                selectRow(row.path, e);
-              }}
-              onContextMenu={
-                !disabled
-                  ? (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setCtxPath(row.path);
-                      rowCtx.openFromEvent(e);
+                onClick={(e) => {
+                  if (suppressClickRef.current) {
+                    suppressClickRef.current = false;
+                    return;
+                  }
+                  const el = e.target as HTMLElement;
+                  if (el.closest(".row-ops")) return;
+                  if (
+                    el.closest(
+                      "input, select, textarea, button, label.action-cell-mod, .action-cell-btn, .caster-condition-field, .caster-condition-swatch",
+                    )
+                  ) {
+                    return;
+                  }
+                  if (isControlFlow) {
+                    toggleControlCollapse(row.path);
+                  }
+                  selectRow(row.path, e);
+                }}
+                onContextMenu={
+                  !disabled
+                    ? (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setCtxPath(row.path);
+                        rowCtx.openFromEvent(e);
+                      }
+                    : undefined
+                }
+                {...(isControlFlow
+                  ? {
+                      "aria-expanded": !controlCollapsed,
                     }
-                  : undefined
-              }
-            >
-              <span className="idx">
-                {isBranchHead(row) && row.branchLabel ? (
-                  <em className="branch-tag">
-                    {branchLabel(row.branchLabel, t)}
-                  </em>
-                ) : (
-                  padIndex(row.path[row.path.length - 1]! + 1)
-                )}
-              </span>
-              <span className="lbl">
-                <strong className="act-type">
-                  {actionTitleInList(siblings, siblingIdx, t)}
-                </strong>
-              </span>
-              <div className="act-params">
-                {onChangeAction && !readOnly ? (
-                  <ActionParamCells
-                    action={row.action}
-                    disabled={locked}
-                    onChange={(a) => {
-                      onSelect(row.path);
-                      onChangeAction(row.path, a);
-                    }}
-                    branchAddMenuItems={branchAddMenuItems}
-                    onOpenScript={onOpenScript}
-                  />
-                ) : (
-                  <span className="action-cell-summary">
-                    {actionDetail(row.action, t)}
-                  </span>
-                )}
-              </div>
-              <span className="act-offset">{displayOffset}</span>
-              {!readOnly ? (
-                <div className="row-ops hover-reveal">
-                  <button
-                    type="button"
-                    className="icon-ghost danger-text"
-                    disabled={locked}
-                    title={t("macros.menu.list.deleteTitle")}
-                    aria-label={t("macros.menu.list.deleteTitle")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onRemove(row.path);
-                    }}
-                  >
-                    ×
-                  </button>
+                  : {})}
+              >
+                <span className="idx">
+                  {padIndex(siblingIdx + 1)}
+                </span>
+                <span className="lbl">
+                  <strong className="act-type">
+                    {actionTitleInList(siblings, siblingIdx, t)}
+                  </strong>
+                </span>
+                <div className="act-params">
+                  {onChangeAction && !readOnly ? (
+                    <ActionParamCells
+                      action={row.action}
+                      disabled={locked}
+                      onChange={(a) => {
+                        onSelect(row.path);
+                        onChangeAction(row.path, a);
+                      }}
+                      onActivate={() => onSelect(row.path)}
+                      onOpenScript={onOpenScript}
+                    />
+                  ) : (
+                    <span className="action-cell-summary">
+                      {actionDetail(row.action, t)}
+                    </span>
+                  )}
                 </div>
-              ) : (
-                <span />
-              )}
-            </li>
+                <span className="act-offset">{displayOffset}</span>
+                {!readOnly ? (
+                  <div className="row-ops hover-reveal">
+                    <button
+                      type="button"
+                      className="icon-ghost danger-text"
+                      disabled={locked}
+                      title={t("macros.menu.list.deleteTitle")}
+                      aria-label={t("macros.menu.list.deleteTitle")}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRemove(row.path);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : (
+                  <span />
+                )}
+                {isControlFlow ? (
+                  <span
+                    className="action-list-control-fold-hit"
+                    aria-hidden
+                  />
+                ) : null}
+              </li>
+            </Fragment>
           );
         })}
         {rows.length === 0 ? (
@@ -1267,6 +1791,10 @@ export function ActionList({
           </li>
         ) : null}
       </ul>
+
+      {!readOnly && rows.length > 0 ? (
+        <p className="action-list-kbd-hint">{t("macros.menu.list.kbdHint")}</p>
+      ) : null}
 
       {!readOnly && !locked && multiKeys.size > 1 ? (
         <div className="action-list-bulk" role="toolbar" aria-label={t("macros.bulk.aria")}>
@@ -1374,6 +1902,18 @@ export function ActionList({
           findMenuItem(emptyMenuItems, id)?.onSelect?.();
         }}
         ariaLabel={t("macros.menu.list.emptyCtxAria")}
+      />
+
+      <ContextMenu
+        open={branchCtx.open}
+        x={branchCtx.x}
+        y={branchCtx.y}
+        items={branchCtxItems}
+        onClose={branchCtx.close}
+        onSelect={(id) => {
+          findMenuItem(branchCtxItems, id)?.onSelect?.();
+        }}
+        ariaLabel={t("macros.menu.list.branchCtxAria")}
       />
 
       {ghost && typeof document !== "undefined"

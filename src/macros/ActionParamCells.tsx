@@ -1,10 +1,19 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT, type TFunction } from "../i18n";
-import { Select, type ActionPickerEntry } from "../ui/shell";
+import { Select } from "../ui/shell";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
 import { ActionProps } from "./ActionProps";
-import { actionDetail } from "./actionLabels";
+import { ConditionEditor } from "./ConditionEditor";
+import { ConditionInlineFields } from "./ConditionInlineFields";
+import { ControlFlowAdvancedProps } from "./ControlFlowAdvancedProps";
+import { actionDetail, actionTitle, isComplexAction } from "./actionLabels";
+import {
+  CONDITION_FAMILY_OPTS,
+  conditionFamily,
+  setConditionFamily,
+  type ConditionFamily,
+} from "./conditionOps";
 import type { KeyMods, MacroAction } from "./types";
 
 function mouseButtonOpts(t: TFunction) {
@@ -26,20 +35,9 @@ type Props = {
   action: MacroAction;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
+  onActivate?: () => void;
 };
-
-export function isComplexAction(type: MacroAction["type"]): boolean {
-  return (
-    type === "control.if" ||
-    type === "control.while" ||
-    type === "http.request" ||
-    type === "json.path" ||
-    type === "script.run" ||
-    type === "process.run"
-  );
-}
 
 function modsOf(action: { mods?: KeyMods }): KeyMods {
   return {
@@ -109,7 +107,6 @@ function ComplexPopover({
   action,
   disabled,
   onChange,
-  branchAddMenuItems,
   onOpenScript,
   onClose,
   anchor,
@@ -117,7 +114,6 @@ function ComplexPopover({
   action: MacroAction;
   disabled?: boolean;
   onChange: (action: MacroAction) => void;
-  branchAddMenuItems?: (branch: "then" | "else" | "body") => ActionPickerEntry[];
   onOpenScript?: (scriptId: string, label?: string) => void;
   onClose: () => void;
   anchor: DOMRect;
@@ -125,8 +121,9 @@ function ComplexPopover({
   const t = useT();
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
-  const top = Math.min(anchor.bottom + 6, window.innerHeight - 260);
-  const left = Math.min(Math.max(8, anchor.left), window.innerWidth - 368);
+  const title = actionTitle(action.type, t);
+  const top = Math.min(anchor.bottom + 6, window.innerHeight - 120);
+  const left = Math.min(Math.max(8, anchor.left), window.innerWidth - 416);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -138,6 +135,10 @@ function ComplexPopover({
     function onPointer(e: PointerEvent) {
       const target = e.target as Node | null;
       if (panelRef.current?.contains(target)) return;
+      const el = target instanceof Element ? target : target?.parentElement;
+      if (el?.closest(".caster-action-picker, .caster-action-picker-root")) {
+        return;
+      }
       onClose();
     }
     window.addEventListener("keydown", onKey, true);
@@ -157,19 +158,30 @@ function ComplexPopover({
       style={{ top, left }}
     >
       <div className="caster-action-props-pop-head">
-        <strong id={titleId}>{t("macros.params.panelTitle")}</strong>
-        <button type="button" className="action-cell-btn" onClick={onClose}>
+        <strong id={titleId}>{title}</strong>
+        <button
+          type="button"
+          className="caster-action-props-pop-close"
+          onClick={onClose}
+        >
           {t("shell.closeConfirm")}
         </button>
       </div>
       <div className="caster-action-props-pop-body">
-        <ActionProps
-          action={action}
-          disabled={disabled}
-          onChange={onChange}
-          branchAddMenuItems={branchAddMenuItems}
-          onOpenScript={onOpenScript}
-        />
+        {action.type === "control.while" ? (
+          <ControlFlowAdvancedProps
+            action={action}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        ) : (
+          <ActionProps
+            action={action}
+            disabled={disabled}
+            onChange={onChange}
+            onOpenScript={onOpenScript}
+          />
+        )}
       </div>
     </div>,
     document.body,
@@ -180,13 +192,86 @@ export function ActionParamCells({
   action,
   disabled,
   onChange,
-  branchAddMenuItems,
   onOpenScript,
+  onActivate,
 }: Props) {
   const t = useT();
   const [popOpen, setPopOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
+
+  if (action.type === "control.if" || action.type === "control.while") {
+    const family = conditionFamily(action.condition);
+    const familyOpts = CONDITION_FAMILY_OPTS.map((o) => ({
+      value: o.value,
+      label: t(o.labelKey),
+    }));
+    const showEllipsis = action.type === "control.while";
+    return (
+      <div className="action-cell-edit action-cell-edit--condition">
+        <Select
+          className="action-cell-select caster-condition-family"
+          disabled={disabled}
+          value={family}
+          ariaLabel={t("macros.params.conditionMode")}
+          options={familyOpts}
+          onChange={(v) =>
+            onChange({
+              ...action,
+              condition: setConditionFamily(
+                action.condition,
+                v as ConditionFamily,
+              ),
+            })
+          }
+        />
+        {family === "compare" ? (
+          <ConditionEditor
+            condition={action.condition}
+            disabled={disabled}
+            onChange={(condition) => onChange({ ...action, condition })}
+          />
+        ) : (
+          <ConditionInlineFields
+            condition={action.condition}
+            disabled={disabled}
+            onChange={(condition) => onChange({ ...action, condition })}
+          />
+        )}
+        {showEllipsis ? (
+          <>
+            <button
+              ref={triggerRef}
+              type="button"
+              className="action-cell-btn"
+              disabled={disabled}
+              title={t("macros.params.edit")}
+              aria-expanded={popOpen}
+              onClick={(e) => {
+                e.stopPropagation();
+                onActivate?.();
+                const rect = triggerRef.current?.getBoundingClientRect() ?? null;
+                setAnchor(rect);
+                setPopOpen((v) => !v);
+              }}
+            >
+              …
+            </button>
+            {popOpen && anchor ? (
+              <ComplexPopover
+                action={action}
+                disabled={disabled}
+                onChange={onChange}
+                onOpenScript={onOpenScript}
+                anchor={anchor}
+                onClose={() => setPopOpen(false)}
+              />
+            ) : null}
+          </>
+        ) : null}
+      </div>
+    );
+  }
 
   if (isComplexAction(action.type)) {
     return (
@@ -203,6 +288,7 @@ export function ActionParamCells({
           aria-expanded={popOpen}
           onClick={(e) => {
             e.stopPropagation();
+            onActivate?.();
             const rect = triggerRef.current?.getBoundingClientRect() ?? null;
             setAnchor(rect);
             setPopOpen((v) => !v);
@@ -215,7 +301,6 @@ export function ActionParamCells({
             action={action}
             disabled={disabled}
             onChange={onChange}
-            branchAddMenuItems={branchAddMenuItems}
             onOpenScript={onOpenScript}
             anchor={anchor}
             onClose={() => setPopOpen(false)}

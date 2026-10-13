@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { tStatic } from "../i18n";
 import {
   actionTitleInList,
+  actionTone,
   dragGestureEndIndex,
 } from "./actionLabels";
 import type { MacroAction } from "./types";
@@ -40,5 +41,26 @@ describe("drag gesture labels", () => {
   it("ignores click without moves", () => {
     const list = [down("a"), up("b")];
     expect(dragGestureEndIndex(list, 0)).toBeNull();
+  });
+});
+
+describe("actionTone", () => {
+  it("maps input and control families", () => {
+    expect(actionTone("mouse.click")).toBe("mouse");
+    expect(actionTone("key.tap")).toBe("key");
+    expect(actionTone("control.if")).toBe("logic");
+    expect(actionTone("control.while")).toBe("logic");
+    expect(actionTone("delay")).toBe("wait");
+  });
+
+  it("maps data / system / script", () => {
+    expect(actionTone("var.set")).toBe("data");
+    expect(actionTone("clipboard.set")).toBe("data");
+    expect(actionTone("macro.run")).toBe("system");
+    expect(actionTone("clicker.start")).toBe("system");
+    expect(actionTone("http.request")).toBe("system");
+    expect(actionTone("json.path")).toBe("system");
+    expect(actionTone("process.run")).toBe("system");
+    expect(actionTone("script.run")).toBe("run");
   });
 });

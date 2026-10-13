@@ -16,11 +16,48 @@ export type MacroValue = boolean | number | string;
 
 export type Operand = { var: string } | MacroValue;
 
-export type CompareOp = "eq" | "ne" | "gt" | "lt" | "gte" | "lte";
+export type CompareOp =
+  | "eq"
+  | "ne"
+  | "gt"
+  | "lt"
+  | "gte"
+  | "lte"
+  | "contains"
+  | "startsWith"
+  | "endsWith"
+  | "empty";
+
+export type KeyMods = {
+  ctrl?: boolean;
+  alt?: boolean;
+  shift?: boolean;
+};
+
+/** Extra fields for predicate-based conditions (coords, color, mods, …). */
+export type ConditionParams = {
+  x?: number;
+  y?: number;
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  color?: string;
+  tolerance?: number;
+  key?: string;
+  mods?: KeyMods;
+  exe?: string;
+  name?: string;
+  button?: "left" | "right" | "middle";
+  unit?: "hour" | "minute" | "weekday" | "day" | "month" | "year";
+  op?: CompareOp;
+  value?: number | string;
+};
 
 export type Condition = {
   predicate?: string;
   value?: string;
+  params?: ConditionParams | null;
   left: Operand;
   op: CompareOp;
   right: Operand;
@@ -31,12 +68,6 @@ export type ProcessFilter = {
   enabled: boolean;
   mode: ProcessFilterMode;
   names: string[];
-};
-
-export type KeyMods = {
-  ctrl?: boolean;
-  alt?: boolean;
-  shift?: boolean;
 };
 
 export function formatKeyChord(key: string, mods?: KeyMods | null): string {
@@ -203,6 +234,8 @@ export type MacroAction =
       params?: Record<string, MacroValue>;
       resultVar?: string | null;
     }
+  | { id: string; type: "macro.run"; macroId: string }
+  | { id: string; type: "clicker.start"; presetId: string }
   | { id: string; type: "key.tap"; key: string; mods?: KeyMods }
   | { id: string; type: "key.down"; key: string; mods?: KeyMods }
   | { id: string; type: "key.up"; key: string; mods?: KeyMods }
@@ -240,6 +273,10 @@ export type MacroDocument = {
   repeatCount: number;
   processFilter?: "inherit" | "off" | "local";
   localProcessFilter?: ProcessFilter;
+  /** When false, `http.request` is blocked at runtime. */
+  allowNetwork?: boolean;
+  /** When false, `process.run` is blocked at runtime. */
+  allowProcess?: boolean;
   actions: MacroAction[];
 };
 

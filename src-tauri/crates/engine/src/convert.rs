@@ -150,28 +150,43 @@ fn operand_js(op: &Operand) -> String {
     }
 }
 
-fn compare_op_js(op: CompareOp) -> &'static str {
+fn compare_op_js(op: CompareOp) -> Option<&'static str> {
     match op {
-        CompareOp::Eq => "===",
-        CompareOp::Ne => "!==",
-        CompareOp::Gt => ">",
-        CompareOp::Lt => "<",
-        CompareOp::Gte => ">=",
-        CompareOp::Lte => "<=",
+        CompareOp::Eq => Some("==="),
+        CompareOp::Ne => Some("!=="),
+        CompareOp::Gt => Some(">"),
+        CompareOp::Lt => Some("<"),
+        CompareOp::Gte => Some(">="),
+        CompareOp::Lte => Some("<="),
+        CompareOp::Contains | CompareOp::StartsWith | CompareOp::EndsWith | CompareOp::Empty => {
+            None
+        }
     }
 }
 
-/// Classic left/op/right → JS expression. `None` when predicate-based (process.*) or unsupported.
+/// Classic left/op/right → JS expression. `None` when predicate-based or unsupported.
 fn condition_js(cond: &Condition) -> Option<String> {
     if cond.predicate.is_some() {
         return None;
     }
-    Some(format!(
-        "{} {} {}",
-        operand_js(&cond.left),
-        compare_op_js(cond.op),
-        operand_js(&cond.right)
-    ))
+    let left = operand_js(&cond.left);
+    let right = operand_js(&cond.right);
+    match cond.op {
+        CompareOp::Contains => Some(format!(
+            "String({left}).includes(String({right}))"
+        )),
+        CompareOp::StartsWith => Some(format!(
+            "String({left}).startsWith(String({right}))"
+        )),
+        CompareOp::EndsWith => Some(format!(
+            "String({left}).endsWith(String({right}))"
+        )),
+        CompareOp::Empty => Some(format!("String({left}).trim() === ''")),
+        other => {
+            let op = compare_op_js(other)?;
+            Some(format!("{left} {op} {right}"))
+        }
+    }
 }
 
 fn action_blocks_transpile(a: &ActionNode) -> Option<&'static str> {
@@ -263,7 +278,9 @@ fn action_tree_needs_macro_control(a: &ActionNode) -> bool {
     match a {
         ActionNode::ScriptRun {
             script_id: Some(_), ..
-        } => true,
+        }
+        | ActionNode::MacroRun { .. }
+        | ActionNode::ClickerStart { .. } => true,
         ActionNode::ControlIf {
             then, else_branch, ..
         } => then.iter().any(action_tree_needs_macro_control)
@@ -382,6 +399,19 @@ fn transpile_action(a: &ActionNode, out: &mut String, report: &mut ConvertReport
                 }
                 report.kept.push("script.run:inline".into());
             }
+        }
+        ActionNode::MacroRun { macro_id, .. } => {
+            out.push_str(&format!(
+                "caster.runMacro({});\n",
+                js_string_literal(macro_id)
+            ));
+            report.kept.push(format!("macro.run:{macro_id}"));
+        }
+        ActionNode::ClickerStart { preset_id, .. } => {
+            report.dropped.push(format!("clicker.start:{preset_id}"));
+            report.warnings.push(
+                "clicker.start cannot be represented in a script (macro→clicker handoff)".into(),
+            );
         }
         ActionNode::ProcessRun {
             command,
@@ -982,12 +1012,13 @@ fn action_drop_label(action: &ActionNode) -> &'static str {
         ActionNode::ControlIf { .. } => "control.if",
         ActionNode::ControlWhile { .. } => "control.while",
         ActionNode::ScriptRun { .. } => "script.run",
+        ActionNode::MacroRun { .. } => "macro.run",
+        ActionNode::ClickerStart { .. } => "clicker.start",
         ActionNode::ProcessRun { .. } => "process.run",
         ActionNode::MouseClick { .. } => "mouse.click",
         ActionNode::HttpRequest { .. } => "http",
         ActionNode::ClipboardSet { .. } | ActionNode::ClipboardGet { .. } => "clipboard",
         ActionNode::VarSet { .. } | ActionNode::JsonPath { .. } => "variables",
-        _ => "unsupported",
     }
 }
 
@@ -1343,6 +1374,7 @@ mod tests {
             condition: Condition {
                 predicate: None,
                 value: None,
+                params: None,
                 left: Operand::Var {
                     var: "ready".into(),
                 },

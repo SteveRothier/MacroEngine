@@ -63,15 +63,28 @@ pub fn actions_from_path(actions: &[ActionNode], path: &[usize]) -> Result<Vec<A
     Ok(list.to_vec())
 }
 
+/// Callback to hand off from a running macro to a clicker preset (AppState).
+pub type StartClickerCallback =
+    Arc<dyn Fn(&str) -> Result<(), ActionError> + Send + Sync>;
+
 /// Executes parsed macros via ActionRegistry (real injection when configured).
 pub struct MacroVm {
     registry: ActionRegistry,
     injector: Arc<dyn MouseInjector>,
+    start_clicker: Option<StartClickerCallback>,
 }
 
 impl MacroVm {
     /// Production VM with the given injector.
     pub fn with_injector(injector: Arc<dyn MouseInjector>) -> Self {
+        Self::with_injector_and_clicker(injector, None)
+    }
+
+    /// Production VM with optional clicker handoff callback.
+    pub fn with_injector_and_clicker(
+        injector: Arc<dyn MouseInjector>,
+        start_clicker: Option<StartClickerCallback>,
+    ) -> Self {
         let mut registry = ActionRegistry::new();
         registry.register(
             "mouse.click",
@@ -125,7 +138,11 @@ impl MacroVm {
             }),
         );
         registry.register("noop", Arc::new(NoopHandler));
-        Self { registry, injector }
+        Self {
+            registry,
+            injector,
+            start_clicker,
+        }
     }
 
     /// Test-friendly defaults (recording injector, no OS clicks).
@@ -176,6 +193,9 @@ impl MacroVm {
         }
         let mut trace = Vec::new();
         let mut env = MacroEnv::new();
+        env.set_probe(Some(Arc::new(
+            crate::condition_probe::InjectorConditionProbe::new(Arc::clone(&self.injector)),
+        )));
         let effective_filter = effective_process_filter(&run_doc, process_filter);
         let mut iteration = 0u32;
         loop {
@@ -200,6 +220,8 @@ impl MacroVm {
                 &mut trace,
                 &run_doc.name,
                 effective_filter.as_ref(),
+                run_doc.allow_network,
+                run_doc.allow_process,
             )?;
 
             iteration = iteration.saturating_add(1);
@@ -255,6 +277,8 @@ impl MacroVm {
         trace: &mut Vec<String>,
         macro_name: &str,
         process_filter: Option<&Arc<Mutex<ProcessFilter>>>,
+        allow_network: bool,
+        allow_process: bool,
     ) -> Result<(), ActionError> {
         for (index, action) in actions.iter().enumerate() {
             if cancel.is_cancelled() {
@@ -376,6 +400,11 @@ impl MacroVm {
                         "wait": wait,
                         "timeoutMs": timeout_ms,
                     });
+                    if !allow_process {
+                        return Err(ActionError::Message(
+                            "process.run disabled (process permission required)".into(),
+                        ));
+                    }
                     let ctx = ActionContext {
                         parameters: &params,
                         cancel,
@@ -395,6 +424,11 @@ impl MacroVm {
                     body_var,
                     fail_on_status,
                 } => {
+                    if !allow_network {
+                        return Err(ActionError::Message(
+                            "http.request disabled (network permission required)".into(),
+                        ));
+                    }
                     let url = env.interpolate(url);
                     let body = body.as_ref().map(|b| env.interpolate(b));
                     let headers: Vec<(String, String)> = headers
@@ -553,6 +587,31 @@ impl MacroVm {
                     }
                     trace.push(format!("script.run:{id}"));
                 }
+                ActionNode::MacroRun { id, macro_id } => {
+                    let mid = env.interpolate(macro_id);
+                    if mid.trim().is_empty() {
+                        return Err(ActionError::Message(
+                            "macro.run: macroId manquant".into(),
+                        ));
+                    }
+                    nest_run_macro(&mid, &self.injector, cancel, pause, bus)?;
+                    trace.push(format!("macro.run:{id}:{mid}"));
+                }
+                ActionNode::ClickerStart { id, preset_id } => {
+                    let pid = env.interpolate(preset_id);
+                    if pid.trim().is_empty() {
+                        return Err(ActionError::Message(
+                            "clicker.start: presetId manquant".into(),
+                        ));
+                    }
+                    let Some(cb) = self.start_clicker.as_ref() else {
+                        return Err(ActionError::Message(
+                            "clicker.start: non disponible dans ce contexte".into(),
+                        ));
+                    };
+                    cb(&pid)?;
+                    trace.push(format!("clicker.start:{id}:{pid}"));
+                }
                 ActionNode::KeyTap { id, key, mods } => {
                     let key = env.interpolate(key);
                     let params = serde_json::json!({
@@ -659,6 +718,8 @@ impl MacroVm {
                         trace,
                         macro_name,
                         process_filter,
+                        allow_network,
+                        allow_process,
                     )?;
                 }
                 ActionNode::ControlWhile {
@@ -690,6 +751,8 @@ impl MacroVm {
                             trace,
                             macro_name,
                             process_filter,
+                            allow_network,
+                            allow_process,
                         )?;
                         loops = loops.saturating_add(1);
                     }
@@ -767,6 +830,10 @@ fn action_kind_label(action: &ActionNode) -> String {
             Some(id) if !id.is_empty() => format!("script.run @{id}"),
             _ => "script.run".into(),
         },
+        ActionNode::MacroRun { macro_id, .. } => format!("macro.run {macro_id}"),
+        ActionNode::ClickerStart { preset_id, .. } => {
+            format!("clicker.start {preset_id}")
+        }
         ActionNode::KeyTap { key, .. } => format!("key.tap {key}"),
         ActionNode::KeyDown { key, .. } => format!("key.down {key}"),
         ActionNode::KeyUp { key, .. } => format!("key.up {key}"),

@@ -6,7 +6,7 @@ import { confirmAction } from "../../ui";
 import { useToast } from "../../ui/shell";
 import { ActionList } from "../ActionList";
 import { buildActionAddMenu, makeAction } from "../actionFactory";
-import { MacroMetaBar } from "../MacroMetaBar";
+import { MacroMetaBar, MacroMetaTools } from "../MacroMetaBar";
 import {
   appendChild,
   duplicateAtPath,
@@ -779,30 +779,32 @@ export function MacroEditorView({
     [doc, editorLocked, t, updateDoc],
   );
 
-  const addToBranch = useCallback(
-    (branch: "then" | "else" | "body", kind: MacroAction["type"]) => {
-      if (!selectedPath || editorLocked) return;
-      const selected = getAtPath(doc.actions, selectedPath);
-      if (!selected) return;
-      if (selected.type === "control.if") {
-        if (branch !== "then" && branch !== "else") return;
-        const child = makeAction(kind, t);
-        const actions = appendChild(doc.actions, selectedPath, branch, child);
-        const branchIdx = branch === "then" ? 0 : 1;
-        const list = branch === "then" ? selected.then : selected.else ?? [];
-        updateDoc({ ...doc, actions });
-        setSelectedPath([...selectedPath, branchIdx, list.length]);
-        return;
+  const addToBranchAt = useCallback(
+    (
+      path: ActionPath,
+      branch: "then" | "else" | "body",
+      kind: MacroAction["type"],
+    ) => {
+      if (editorLocked) return;
+      const action = makeAction(kind, t);
+      const parent = getAtPath(doc.actions, path);
+      let childIndex = 0;
+      if (parent?.type === "control.if") {
+        childIndex =
+          branch === "else"
+            ? (parent.else?.length ?? 0)
+            : (parent.then?.length ?? 0);
+      } else if (parent?.type === "control.while" && branch === "body") {
+        childIndex = parent.body?.length ?? 0;
       }
-      if (selected.type === "control.while" && branch === "body") {
-        const child = makeAction(kind, t);
-        const actions = appendChild(doc.actions, selectedPath, "body", child);
-        const list = selected.body ?? [];
-        updateDoc({ ...doc, actions });
-        setSelectedPath([...selectedPath, 0, list.length]);
-      }
+      const branchIdx = branch === "else" ? 1 : 0;
+      updateDoc({
+        ...doc,
+        actions: appendChild(doc.actions, path, branch, action),
+      });
+      setSelectedPath([...path, branchIdx, childIndex]);
     },
-    [doc, editorLocked, selectedPath, t, updateDoc],
+    [doc, editorLocked, t, updateDoc],
   );
 
   const onRemove = useCallback(
@@ -1073,11 +1075,27 @@ export function MacroEditorView({
       meta={
         <MacroMetaBar
           doc={doc}
-          macroId={macroId}
           locked={editorLocked || loading}
           onChange={updateDoc}
           onNameCommit={(name) => void commitRename(name)}
-          onError={(msg) => toast.error(msg)}
+        />
+      }
+      allowNetwork={!!doc.allowNetwork}
+      allowProcess={!!doc.allowProcess}
+      onPermissionsChange={(partial) =>
+        updateDoc({
+          ...docRef.current,
+          schemaVersion: Math.max(docRef.current.schemaVersion, 9),
+          ...partial,
+        })
+      }
+      metaTools={
+        <MacroMetaTools
+          doc={doc}
+          macroId={macroId}
+          locked={editorLocked || loading}
+          onChange={updateDoc}
+          onError={(msg: string) => toast.error(msg)}
         />
       }
     />,
@@ -1178,9 +1196,7 @@ export function MacroEditorView({
                     actions: updateAtPath(doc.actions, path, a),
                   })
                 }
-                branchAddMenuItems={(branch) =>
-                  buildActionAddMenu((kind) => addToBranch(branch, kind), t)
-                }
+                onAddToBranch={editorLocked ? undefined : addToBranchAt}
                 onOpenScript={onOpenScript}
               />
             )}
