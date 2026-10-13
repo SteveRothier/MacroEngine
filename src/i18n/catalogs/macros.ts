@@ -509,6 +509,11 @@ export const macros = defineCatalog({
       recordMouseOnly: "Mouse only",
       recordKeyboardOnly: "Keyboard only",
     },
+    permissions: {
+      label: "Permissions",
+      labelCount: "Permissions ({count})",
+      tip: "Network and process for http.request / process.run",
+    },
     menu: {
       addGroup: {
         mouse: "Mouse",
