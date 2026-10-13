@@ -1,5 +1,6 @@
 import type { TFunction } from "../i18n";
-import { formatKeyChord, type Condition, type MacroAction } from "./types";
+import { formatCond } from "./conditionOps";
+import { formatKeyChord, type MacroAction } from "./types";
 
 const TITLE_KEYS: Record<MacroAction["type"], string> = {
   "mouse.click": "macros.action.title.mouseClick",
@@ -12,6 +13,8 @@ const TITLE_KEYS: Record<MacroAction["type"], string> = {
   "http.request": "macros.action.title.httpRequest",
   "json.path": "macros.action.title.jsonPath",
   "script.run": "macros.action.title.scriptRun",
+  "macro.run": "macros.action.title.macroRun",
+  "clicker.start": "macros.action.title.clickerStart",
   "key.tap": "macros.action.title.keyTap",
   "key.down": "macros.action.title.keyDown",
   "key.up": "macros.action.title.keyUp",
@@ -45,19 +48,6 @@ function xySuffix(x?: number | null, y?: number | null): string {
   return "";
 }
 
-function formatCond(condition: Condition): string {
-  const { left, op, right } = condition;
-  const L =
-    typeof left === "object" && left && "var" in left
-      ? `$${left.var}`
-      : JSON.stringify(left);
-  const R =
-    typeof right === "object" && right && "var" in right
-      ? `$${right.var}`
-      : JSON.stringify(right);
-  return `${L} ${op} ${R}`;
-}
-
 export function actionDetail(action: MacroAction, t: TFunction): string {
   switch (action.type) {
     case "mouse.click":
@@ -71,15 +61,27 @@ export function actionDetail(action: MacroAction, t: TFunction): string {
     case "delay":
       return `${action.ms} ms`;
     case "process.run":
-      return action.command;
-    case "http.request": {
-      const host = action.url.replace(/^https?:\/\//, "");
-      return `${action.method ?? "GET"} ${host}`;
-    }
+      return action.command.trim()
+        ? action.command
+        : t("macros.action.detail.empty");
+    case "macro.run":
+      return action.macroId.trim()
+        ? action.macroId
+        : t("macros.action.detail.empty");
+    case "clicker.start":
+      return action.presetId.trim()
+        ? action.presetId
+        : t("macros.action.detail.empty");
+    case "http.request":
+      return action.url.trim()
+        ? `${(action.method ?? "GET").toUpperCase()} ${action.url}`
+        : t("macros.action.detail.empty");
     case "json.path":
-      return `${action.sourceVar}.${action.path || "…"} → ${action.destVar}`;
+      return action.path.trim()
+        ? `${action.sourceVar} → ${action.path}`
+        : t("macros.action.detail.empty");
     case "script.run":
-      return action.scriptId
+      return action.scriptId?.trim()
         ? action.scriptId
         : action.source?.trim()
           ? t("macros.action.detail.inline")
@@ -99,43 +101,54 @@ export function actionDetail(action: MacroAction, t: TFunction): string {
     case "var.set":
       return `${action.name} = ${JSON.stringify(action.value)}`;
     case "control.if":
-      return formatCond(action.condition);
     case "control.while":
       return formatCond(action.condition);
   }
 }
 
+export function isComplexAction(type: MacroAction["type"]): boolean {
+  return (
+    type === "http.request" ||
+    type === "json.path" ||
+    type === "script.run" ||
+    type === "macro.run" ||
+    type === "clicker.start" ||
+    type === "process.run"
+  );
+}
+
+/** Category tone for action-list `#` coloring (see shell.css `[data-tone]`). */
 export function actionTone(type: MacroAction["type"]): string {
   switch (type) {
+    case "control.if":
+    case "control.while":
+      return "logic";
     case "mouse.click":
     case "mouse.move":
     case "mouse.down":
     case "mouse.up":
     case "mouse.wheel":
       return "mouse";
-    case "delay":
-      return "delay";
     case "key.tap":
     case "key.down":
     case "key.up":
       return "key";
+    case "delay":
+      return "wait";
+    case "var.set":
     case "clipboard.set":
     case "clipboard.get":
-      return "var";
-    case "control.if":
-      return "if";
-    case "control.while":
-      return "if";
+      return "data";
+    case "macro.run":
+    case "clicker.start":
     case "http.request":
-      return "http";
     case "json.path":
-      return "var";
-    case "script.run":
-      return "process";
-    case "var.set":
-      return "var";
     case "process.run":
-      return "process";
+      return "system";
+    case "script.run":
+      return "run";
+    default:
+      return "run";
   }
 }
 

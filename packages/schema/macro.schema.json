@@ -68,10 +68,24 @@
       "required": ["left", "op", "right"],
       "additionalProperties": false,
       "properties": {
+        "predicate": { "type": "string" },
+        "value": { "type": "string" },
+        "params": { "type": "object" },
         "left": { "$ref": "#/$defs/operand" },
         "op": {
           "type": "string",
-          "enum": ["eq", "ne", "gt", "lt", "gte", "lte"]
+          "enum": [
+            "eq",
+            "ne",
+            "gt",
+            "lt",
+            "gte",
+            "lte",
+            "contains",
+            "startsWith",
+            "endsWith",
+            "empty"
+          ]
         },
         "right": { "$ref": "#/$defs/operand" }
       }

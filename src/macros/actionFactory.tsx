@@ -8,9 +8,11 @@ import {
   Globe,
   Keyboard,
   MousePointer2,
+  Play,
   Repeat,
   Terminal,
   Variable,
+  Zap,
 } from "lucide-react";
 import type { TFunction } from "../i18n";
 import type { ActionPickerEntry } from "../ui/shell/ActionPickerMenu";
@@ -245,6 +247,20 @@ export function buildActionAddMenu(
       id: "sys",
       label: t("macros.menu.addGroup.system"),
       items: [
+        {
+          id: "macro-run",
+          label: t("macros.menu.add.macroRun"),
+          hint: "macro.run",
+          icon: ic(<Play size={s} />),
+          onSelect: () => onSelect("macro.run"),
+        },
+        {
+          id: "clicker-start",
+          label: t("macros.menu.add.clickerStart"),
+          hint: "clicker.start",
+          icon: ic(<Zap size={s} />),
+          onSelect: () => onSelect("clicker.start"),
+        },
         {
           id: "http",
           label: t("macros.menu.add.http"),

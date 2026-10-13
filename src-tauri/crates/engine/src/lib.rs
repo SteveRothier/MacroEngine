@@ -10,6 +10,7 @@ pub mod cancel;
 pub mod clicker;
 pub mod clicker_capture;
 pub mod clicker_presets;
+pub mod condition_probe;
 pub mod convert;
 pub mod env;
 pub mod event_bus;

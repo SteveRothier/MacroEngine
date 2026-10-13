@@ -3,8 +3,9 @@ use thiserror::Error;
 
 use crate::settings::ProcessFilter;
 
-/// Current document format (json.path, http failOnStatus, script.run).
-pub const SCHEMA_VERSION_CURRENT: u32 = 8;
+/// Current document format (macro allowNetwork / allowProcess).
+pub const SCHEMA_VERSION_CURRENT: u32 = 9;
+pub const SCHEMA_VERSION_V9: u32 = 9;
 pub const SCHEMA_VERSION_V8: u32 = 8;
 pub const SCHEMA_VERSION_V6: u32 = 6;
 pub const SCHEMA_VERSION_V7: u32 = 7;
@@ -28,6 +29,12 @@ pub struct MacroDocument {
     pub process_filter: MacroProcessFilterMode,
     #[serde(default, rename = "localProcessFilter")]
     pub local_process_filter: ProcessFilter,
+    /// When false, `http.request` is blocked (same model as scripts).
+    #[serde(default, rename = "allowNetwork")]
+    pub allow_network: bool,
+    /// When false, `process.run` is blocked (same model as scripts).
+    #[serde(default, rename = "allowProcess")]
+    pub allow_process: bool,
     pub actions: Vec<ActionNode>,
 }
 
@@ -105,16 +112,32 @@ pub enum CompareOp {
     Lt,
     Gte,
     Lte,
+    /// String contains (coerced to string).
+    Contains,
+    /// String starts with (coerced to string).
+    #[serde(rename = "startsWith")]
+    StartsWith,
+    /// String ends with (coerced to string).
+    #[serde(rename = "endsWith")]
+    EndsWith,
+    /// Left string is empty / whitespace-only (`right` ignored).
+    Empty,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Condition {
-    /// When set (`process.eq`, `process.contains`), `left`/`op`/`right` are ignored.
+    /// When set, `left`/`op`/`right` are ignored (except unused placeholders).
+    /// Known predicates: `process.eq`, `process.contains`, `process.running`,
+    /// `window.title.eq`, `window.title.contains`, `pixel.color`, `mouse.inRect`,
+    /// `key.down`, `time.compare`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub predicate: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
+    /// Extra fields for non-compare predicates (coords, color, mods, …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub params: Option<serde_json::Value>,
     #[serde(default)]
     pub left: Operand,
     #[serde(default)]
@@ -235,6 +258,20 @@ pub enum ActionNode {
         #[serde(default, rename = "resultVar")]
         result_var: Option<String>,
     },
+    /// Run another library macro nested in this VM (depth ≤ 3).
+    #[serde(rename = "macro.run")]
+    MacroRun {
+        id: String,
+        #[serde(rename = "macroId")]
+        macro_id: String,
+    },
+    /// Stop the current macro and start a clicker preset (engine handoff).
+    #[serde(rename = "clicker.start")]
+    ClickerStart {
+        id: String,
+        #[serde(rename = "presetId")]
+        preset_id: String,
+    },
     #[serde(rename = "key.tap")]
     KeyTap {
         id: String,
@@ -317,9 +354,69 @@ impl MacroDocument {
             repeat_count: 1,
             process_filter: MacroProcessFilterMode::default(),
             local_process_filter: ProcessFilter::default(),
+            allow_network: false,
+            allow_process: false,
             actions: Vec::new(),
         }
     }
+}
+
+fn actions_need_network(actions: &[ActionNode]) -> bool {
+    for a in actions {
+        match a {
+            ActionNode::HttpRequest { .. } => return true,
+            ActionNode::ControlIf {
+                then,
+                else_branch,
+                ..
+            } => {
+                if actions_need_network(then) || actions_need_network(else_branch) {
+                    return true;
+                }
+            }
+            ActionNode::ControlWhile { body, .. } => {
+                if actions_need_network(body) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+fn actions_need_process(actions: &[ActionNode]) -> bool {
+    for a in actions {
+        match a {
+            ActionNode::ProcessRun { .. } => return true,
+            ActionNode::ControlIf {
+                then,
+                else_branch,
+                ..
+            } => {
+                if actions_need_process(then) || actions_need_process(else_branch) {
+                    return true;
+                }
+            }
+            ActionNode::ControlWhile { body, .. } => {
+                if actions_need_process(body) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Migrate pre-v9 macros: enable network/process only if those actions exist.
+pub fn migrate_macro_permissions(doc: &mut MacroDocument) {
+    if doc.schema_version >= SCHEMA_VERSION_V9 {
+        return;
+    }
+    doc.allow_network = actions_need_network(&doc.actions);
+    doc.allow_process = actions_need_process(&doc.actions);
+    doc.schema_version = SCHEMA_VERSION_CURRENT;
 }
 
 #[derive(Debug, Error)]
@@ -331,7 +428,7 @@ pub enum SchemaError {
 }
 
 pub fn parse_macro_json(json: &str) -> Result<MacroDocument, SchemaError> {
-    let doc: MacroDocument = serde_json::from_str(json)?;
+    let mut doc: MacroDocument = serde_json::from_str(json)?;
     match doc.schema_version {
         SCHEMA_VERSION_V1
         | SCHEMA_VERSION_V2
@@ -340,7 +437,11 @@ pub fn parse_macro_json(json: &str) -> Result<MacroDocument, SchemaError> {
         | SCHEMA_VERSION_V5
         | SCHEMA_VERSION_V6
         | SCHEMA_VERSION_V7
-        | SCHEMA_VERSION_CURRENT => Ok(doc),
+        | SCHEMA_VERSION_V8
+        | SCHEMA_VERSION_CURRENT => {
+            migrate_macro_permissions(&mut doc);
+            Ok(doc)
+        }
         other => Err(SchemaError::UnsupportedVersion(other)),
     }
 }
@@ -388,7 +489,9 @@ mod tests {
     #[test]
     fn parses_v3_http_and_key() {
         let doc = parse_macro_json(EXAMPLE_V3).unwrap();
-        assert_eq!(doc.schema_version, 3);
+        assert_eq!(doc.schema_version, SCHEMA_VERSION_CURRENT);
+        assert!(doc.allow_network);
+        assert!(!doc.allow_process);
         assert!(matches!(&doc.actions[0], ActionNode::KeyTap { key, .. } if key == "A"));
         assert!(matches!(
             &doc.actions[1],
@@ -400,7 +503,7 @@ mod tests {
     #[test]
     fn parses_v4_var_and_if() {
         let doc = parse_macro_json(EXAMPLE_V4).unwrap();
-        assert_eq!(doc.schema_version, 4);
+        assert_eq!(doc.schema_version, SCHEMA_VERSION_CURRENT);
         assert!(matches!(
             &doc.actions[0],
             ActionNode::VarSet { name, value: MacroValue::Number(n), .. }
@@ -435,6 +538,30 @@ mod tests {
     }
 
     #[test]
+    fn parses_macro_run_and_clicker_start() {
+        let doc = parse_macro_json(
+            r#"{
+              "schemaVersion": 9,
+              "name": "Handoff",
+              "trigger": { "type": "manual" },
+              "actions": [
+                { "id": "m1", "type": "macro.run", "macroId": "Other" },
+                { "id": "c1", "type": "clicker.start", "presetId": "Fast" }
+              ]
+            }"#,
+        )
+        .unwrap();
+        assert!(matches!(
+            &doc.actions[0],
+            ActionNode::MacroRun { macro_id, .. } if macro_id == "Other"
+        ));
+        assert!(matches!(
+            &doc.actions[1],
+            ActionNode::ClickerStart { preset_id, .. } if preset_id == "Fast"
+        ));
+    }
+
+    #[test]
     fn parses_v5_mouse_gestures() {
         let doc = parse_macro_json(
             r#"{
@@ -449,7 +576,7 @@ mod tests {
             }"#,
         )
         .unwrap();
-        assert_eq!(doc.schema_version, 5);
+        assert_eq!(doc.schema_version, SCHEMA_VERSION_CURRENT);
         assert!(matches!(&doc.actions[0], ActionNode::MouseDown { x: Some(10), .. }));
         assert!(matches!(&doc.actions[1], ActionNode::MouseMove { x: 40, y: 80, .. }));
         assert!(matches!(&doc.actions[2], ActionNode::MouseUp { y: Some(80), .. }));
@@ -474,7 +601,8 @@ mod tests {
             }"#,
         )
         .unwrap();
-        assert_eq!(doc.schema_version, 6);
+        assert_eq!(doc.schema_version, SCHEMA_VERSION_CURRENT);
+        assert!(doc.allow_network);
         assert!(matches!(
             &doc.actions[0],
             ActionNode::KeyTap { key, mods, .. } if key == "C" && mods.ctrl
