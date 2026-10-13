@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Keyboard, Repeat } from "lucide-react";
 import { useT } from "../i18n";
-import { KbdChip } from "../ui";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
+import { Tooltip } from "../ui/shell";
 import {
   eventToVk,
   hotkeyTriggerMatches,
@@ -19,12 +20,18 @@ type LibRow = {
   triggerMods?: KeyMods | null;
 };
 
-type Props = {
+type SharedProps = {
   doc: MacroDocument;
-  macroId: string;
   locked: boolean;
   onChange: (next: MacroDocument) => void;
+};
+
+type NameProps = SharedProps & {
   onNameCommit?: (name: string) => void;
+};
+
+type ToolsProps = SharedProps & {
+  macroId: string;
   onError: (message: string) => void;
 };
 
@@ -52,14 +59,45 @@ function triggerConflictsWithReserved(
   return false;
 }
 
+/** Name field only — lives in toolbar start. */
 export function MacroMetaBar({
+  doc,
+  locked,
+  onChange,
+  onNameCommit,
+}: NameProps) {
+  const t = useT();
+  return (
+    <div className="caster-macro-meta">
+      <label className="caster-macro-meta-row caster-macro-meta-row--name">
+        <span className="sr-only">{t("macros.toolbar.metaName")}</span>
+        <input
+          className="caster-macro-meta-input caster-macro-meta-input--name"
+          value={doc.name}
+          disabled={locked}
+          aria-label={t("macros.toolbar.metaName")}
+          onChange={(e) => onChange({ ...doc, name: e.target.value })}
+          onBlur={(e) => onNameCommit?.(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+        />
+      </label>
+    </div>
+  );
+}
+
+/** Repeat + hotkey chips — live next to Processus in toolbar end. */
+export function MacroMetaTools({
   doc,
   macroId,
   locked,
   onChange,
-  onNameCommit,
   onError,
-}: Props) {
+}: ToolsProps) {
   const t = useT();
   const [capturing, setCapturing] = useState(false);
   const docRef = useRef(doc);
@@ -125,67 +163,112 @@ export function MacroMetaBar({
     if (locked) setCapturing(false);
   }, [locked]);
 
+  const repeatToolRef = useRef<HTMLDivElement>(null);
+  const hotkeyToolRef = useRef<HTMLDivElement>(null);
+  const repeatInputRef = useRef<HTMLInputElement>(null);
+  const hotkeyBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target as Node | null;
+      if (!target) return;
+      const inRepeat = repeatToolRef.current?.contains(target) ?? false;
+      const inHotkey = hotkeyToolRef.current?.contains(target) ?? false;
+      if (!inRepeat && document.activeElement === repeatInputRef.current) {
+        repeatInputRef.current?.blur();
+      }
+      if (!inHotkey && capturing) {
+        setCapturing(false);
+      }
+    }
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () =>
+      window.removeEventListener("pointerdown", onPointerDown, true);
+  }, [capturing]);
+
   return (
-    <div className="caster-macro-meta">
-      <label className="caster-macro-meta-row">
-        <span className="sr-only">{t("macros.toolbar.metaName")}</span>
-        <input
-          className="caster-macro-meta-input caster-macro-meta-input--name"
-          value={doc.name}
-          disabled={locked}
-          aria-label={t("macros.toolbar.metaName")}
-          onChange={(e) => onChange({ ...doc, name: e.target.value })}
-          onBlur={(e) => onNameCommit?.(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-        />
-      </label>
-      <label className="caster-macro-meta-row">
-        <span className="caster-macro-meta-label">{t("macros.toolbar.metaRepeat")}</span>
-        <WheelNumberInput
-          className="caster-macro-meta-input caster-macro-meta-input--repeat"
-          min={0}
-          value={doc.repeatCount}
-          disabled={locked}
-          onValueChange={(n) => onChange({ ...doc, repeatCount: n })}
-        />
-      </label>
-      <div className="caster-macro-meta-row caster-macro-meta-row--hotkey">
-        <span className="caster-macro-meta-label">{t("macros.toolbar.metaHotkey")}</span>
-        <button
-          type="button"
+    <>
+      <Tooltip content={t("macros.toolbar.repeatTitle")}>
+        <div
+          ref={repeatToolRef}
           className={[
-            "caster-macro-hotkey-btn",
-            capturing ? "is-capturing" : "",
+            "caster-macro-meta-tool",
+            locked ? "is-disabled" : "",
           ]
             .filter(Boolean)
             .join(" ")}
-          disabled={locked}
-          title={t("macros.toolbar.metaHotkeyTitle")}
-          aria-label={
-            capturing
-              ? t("macros.params.hotkeyCapturing")
-              : triggerLabel
-                ? t("macros.params.hotkeyValue", { label: triggerLabel })
-                : t("macros.params.hotkeySet")
-          }
-          onClick={() => setCapturing((v) => !v)}
-          onContextMenu={(e) => {
-            e.preventDefault();
+          onMouseDown={(e) => {
             if (locked) return;
-            setCapturing(false);
-            onChange({ ...doc, trigger: { type: "manual" } });
+            if (e.target === repeatInputRef.current) return;
+            e.preventDefault();
+            repeatInputRef.current?.focus();
           }}
         >
-          <KbdChip className="caster-macro-hotkey-chip">
-            {capturing ? "…" : triggerLabel ?? t("macros.toolbar.metaHotkeyNone")}
-          </KbdChip>
-        </button>
-      </div>
-    </div>
+          <Repeat
+            className="caster-macro-meta-tool-icon"
+            size={14}
+            aria-hidden
+          />
+          <WheelNumberInput
+            ref={repeatInputRef}
+            className="caster-macro-meta-tool-field caster-macro-meta-tool-field--repeat"
+            min={0}
+            value={doc.repeatCount}
+            disabled={locked}
+            aria-label={t("macros.toolbar.repeatAria")}
+            onValueChange={(n) => onChange({ ...doc, repeatCount: n })}
+          />
+        </div>
+      </Tooltip>
+      <Tooltip content={t("macros.toolbar.metaHotkeyTitle")}>
+        <div
+          ref={hotkeyToolRef}
+          className={[
+            "caster-macro-meta-tool",
+            "caster-macro-meta-tool--hotkey",
+            capturing ? "is-capturing" : "",
+            locked ? "is-disabled" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          onMouseDown={(e) => {
+            if (locked) return;
+            if (e.target === hotkeyBtnRef.current) return;
+            e.preventDefault();
+            hotkeyBtnRef.current?.click();
+          }}
+        >
+          <Keyboard
+            className="caster-macro-meta-tool-icon"
+            size={14}
+            aria-hidden
+          />
+          <button
+            ref={hotkeyBtnRef}
+            type="button"
+            className="caster-macro-meta-tool-field caster-macro-meta-tool-field--hotkey"
+            disabled={locked}
+            aria-label={
+              capturing
+                ? t("macros.params.hotkeyCapturing")
+                : triggerLabel
+                  ? t("macros.params.hotkeyValue", { label: triggerLabel })
+                  : t("macros.params.hotkeySet")
+            }
+            onClick={() => setCapturing((v) => !v)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              if (locked) return;
+              setCapturing(false);
+              onChange({ ...doc, trigger: { type: "manual" } });
+            }}
+          >
+            {capturing
+              ? "…"
+              : (triggerLabel ?? t("macros.toolbar.metaHotkeyNone"))}
+          </button>
+        </div>
+      </Tooltip>
+    </>
   );
 }

@@ -183,3 +183,66 @@ pub fn list_visible_process_exe_entries() -> Vec<ProcessExeEntry> {
         Vec::new()
     }
 }
+
+/// Foreground window title (Windows).
+pub fn foreground_window_title() -> Option<String> {
+    #[cfg(windows)]
+    {
+        win32::foreground_window_title()
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+/// Whether any process with this exe basename is running (Windows).
+pub fn is_process_running(exe: &str) -> bool {
+    #[cfg(windows)]
+    {
+        win32::is_process_running(exe)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = exe;
+        false
+    }
+}
+
+/// Whether a named key is currently down (Windows `GetAsyncKeyState`).
+pub fn is_key_down(key: &str) -> bool {
+    #[cfg(windows)]
+    {
+        win32::is_key_down(key)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = key;
+        false
+    }
+}
+
+/// Local wall clock (hour/minute/weekday/day/month/year).
+pub fn local_clock() -> crate::condition_probe::LocalClock {
+    #[cfg(windows)]
+    {
+        win32::local_clock()
+    }
+    #[cfg(not(windows))]
+    {
+        crate::condition_probe::LocalClock::default()
+    }
+}
+
+/// Whether a mouse button is currently down (`left` / `right` / `middle`).
+pub fn is_mouse_button_down(button: &str) -> bool {
+    #[cfg(windows)]
+    {
+        win32::is_mouse_button_down(button)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = button;
+        false
+    }
+}

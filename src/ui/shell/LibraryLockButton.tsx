@@ -1,4 +1,5 @@
 import { Lock } from "lucide-react";
+import { Tooltip } from "./Tooltip";
 
 type Props = {
   locked: boolean;
@@ -18,23 +19,24 @@ export function LibraryLockButton({
 }: Props) {
   const title = locked ? unlockTitle : lockTitle;
   return (
-    <button
-      type="button"
-      className={[
-        "caster-titlebar-btn",
-        "caster-btn",
-        "caster-btn-ghost",
-        locked ? "caster-clicker-lock" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-      onClick={() => onToggle(!locked)}
-      disabled={disabled}
-      title={title}
-      aria-label={title}
-      aria-pressed={locked}
-    >
-      <Lock size={14} aria-hidden />
-    </button>
+    <Tooltip content={title}>
+      <button
+        type="button"
+        className={[
+          "caster-titlebar-btn",
+          "caster-btn",
+          "caster-btn-ghost",
+          locked ? "caster-clicker-lock" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        onClick={() => onToggle(!locked)}
+        disabled={disabled}
+        aria-label={title}
+        aria-pressed={locked}
+      >
+        <Lock size={14} aria-hidden />
+      </button>
+    </Tooltip>
   );
 }

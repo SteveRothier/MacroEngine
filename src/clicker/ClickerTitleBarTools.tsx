@@ -16,16 +16,21 @@ import {
   Play,
   Redo2,
   Save,
+  Square,
   Undo2,
   Upload,
 } from "lucide-react";
 import {
+  ContextMenu,
   DisplayPopover,
   DropdownMenu,
   EditorToolbar,
+  Tooltip,
+  findMenuItem,
+  useContextMenuState,
   useToast,
 } from "../ui/shell";
-import type { DropdownEntry } from "../ui/shell";
+import type { DropdownEntry, MenuItemDef } from "../ui/shell";
 import { promptAction } from "../ui";
 import {
   chordLabel,
@@ -53,13 +58,17 @@ type Props = {
   hotkeys: HotkeyBindings;
   /** Called with the new preset id after « Sauver comme nouveau preset ». */
   onSavedAsNew?: (id: string) => void;
-  /** Nom / raccourci — fused into this bar (same as macros). */
+  /** Nom — toolbar start (same as macros). */
   meta?: ReactNode;
+  /** Raccourci chip — same group as Processus. */
+  metaTools?: ReactNode;
   onOpenProcessSettings?: () => void;
 };
 
 function displayOptionLabel(d: DisplayDto, primarySuffix: string): string {
-  const base = d.label?.trim() || `${d.width}×${d.height}`;
+  const title = d.label?.trim() || `Écran`;
+  const meta = `${d.width}×${d.height}`;
+  const base = `${title} · ${meta}`;
   return d.isPrimary ? `${base}${primarySuffix}` : base;
 }
 
@@ -69,10 +78,12 @@ export function ClickerTitleBarTools({
   hotkeys,
   onSavedAsNew,
   meta,
+  metaTools,
   onOpenProcessSettings,
 }: Props) {
   const t = useT();
   const toast = useToast();
+  const toolbarCtx = useContextMenuState();
   const [displayOpen, setDisplayOpen] = useState(false);
   const displayBtnRef = useRef<HTMLButtonElement>(null);
   const displayTitleId = useId();
@@ -356,85 +367,127 @@ export function ClickerTitleBarTools({
     },
   ];
 
+  const contextItems: MenuItemDef[] = [
+    ...(moreItems as MenuItemDef[]),
+    { id: "sep-ctx-run", label: "", separator: true },
+    {
+      id: "start",
+      label: t("clicker.toolbar.start"),
+      icon: <Play size={14} />,
+      disabled: editor.running,
+      onSelect: () => void editor.onStart(),
+    },
+    {
+      id: "back",
+      label: t("clicker.toolbar.back"),
+      icon: <ArrowLeft size={14} />,
+      onSelect: onBack,
+    },
+  ];
+
   return (
+    <>
     <EditorToolbar
+      onContextMenu={toolbarCtx.openFromEvent}
       start={
         <>
-          <button
-            type="button"
-            className="caster-titlebar-btn caster-btn caster-btn-ghost"
-            onClick={onBack}
-            title={t("clicker.toolbar.back")}
-          >
-            <ArrowLeft size={14} aria-hidden />
-          </button>
+          <Tooltip content={t("clicker.toolbar.back")}>
+            <button
+              type="button"
+              className="caster-titlebar-btn caster-titlebar-icon-btn"
+              onClick={onBack}
+              aria-label={t("clicker.toolbar.back")}
+            >
+              <ArrowLeft size={14} aria-hidden />
+            </button>
+          </Tooltip>
           {meta}
         </>
       }
       end={
         <>
-          <div className="caster-toolbar-menu">
-            <button
-              ref={displayBtnRef}
-              type="button"
-              className={[
-                "caster-titlebar-btn",
-                "caster-btn",
-                "caster-btn-ghost",
-                displayOpen ? "is-active" : "",
-                displayMissing ? "is-warn" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              disabled={displayDisabled || editor.displays.length === 0}
-              title={
-                displayMissing
-                  ? t("clicker.zones.displayMissing")
-                  : activeDisplay
-                    ? displayOptionLabel(
-                        activeDisplay,
-                        t("clicker.zones.primarySuffix"),
-                      )
-                    : t("clicker.zones.displayAria")
-              }
-              aria-label={
-                displayMissing
-                  ? t("clicker.zones.displayMissing")
-                  : t("clicker.zones.displayAria")
-              }
-              aria-expanded={displayOpen}
-              aria-haspopup="dialog"
-              onClick={() => setDisplayOpen((v) => !v)}
-            >
-              <Monitor size={14} aria-hidden />
-            </button>
-            <DisplayPopover
-              open={displayOpen}
-              onClose={() => setDisplayOpen(false)}
-              anchorRef={displayBtnRef}
-              labelledBy={displayTitleId}
-            >
-              <div className="caster-display-popover-panel">
-                <p id={displayTitleId} className="caster-display-popover-title">
-                  {t("clicker.zones.displayAria")}
-                </p>
-                {displayMissing ? (
-                  <p className="caster-display-popover-warn">
-                    {t("clicker.zones.displayMissing")}
+          <div className="caster-toolbar-group">
+            <div className="caster-toolbar-menu">
+              <Tooltip
+                content={
+                  displayMissing
+                    ? t("clicker.zones.displayMissing")
+                    : activeDisplay
+                      ? displayOptionLabel(
+                          activeDisplay,
+                          t("clicker.zones.primarySuffix"),
+                        )
+                      : t("clicker.zones.displayAria")
+                }
+                disabled={displayOpen}
+              >
+                <button
+                  ref={displayBtnRef}
+                  type="button"
+                  className={[
+                    "caster-titlebar-btn",
+                    "caster-btn",
+                    "caster-btn-ghost",
+                    displayOpen ? "is-active" : "",
+                    displayMissing ? "is-warn" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  disabled={displayDisabled || editor.displays.length === 0}
+                  aria-label={
+                    displayMissing
+                      ? t("clicker.zones.displayMissing")
+                      : t("clicker.zones.displayAria")
+                  }
+                  aria-expanded={displayOpen}
+                  aria-haspopup="dialog"
+                  onClick={() => setDisplayOpen((v) => !v)}
+                >
+                  <Monitor size={14} aria-hidden />
+                </button>
+              </Tooltip>
+              <DisplayPopover
+                open={displayOpen}
+                onClose={() => setDisplayOpen(false)}
+                anchorRef={displayBtnRef}
+                labelledBy={displayTitleId}
+              >
+                <div className="caster-display-popover-panel">
+                  <p
+                    id={displayTitleId}
+                    className="caster-display-popover-title"
+                  >
+                    {t("clicker.zones.displayAria")}
                   </p>
-                ) : null}
-                <ul className="caster-display-popover-list" role="listbox">
-                  {editor.displays.map((d) => {
-                    const selected = d.id === editor.activeDisplayId;
-                    return (
-                      <li key={d.id}>
+                  {displayMissing ? (
+                    <p className="caster-display-popover-warn">
+                      {t("clicker.zones.displayMissing")}
+                    </p>
+                  ) : null}
+                  <div
+                    className="caster-segmented caster-segmented--wide caster-display-popover-segmented"
+                    role="radiogroup"
+                    aria-labelledby={displayTitleId}
+                  >
+                    {editor.displays.map((d) => {
+                      const selected = d.id === editor.activeDisplayId;
+                      const scale = Math.round(d.scaleFactor * 100);
+                      const title =
+                        d.label?.trim() || `${d.width}×${d.height}`;
+                      const tip = displayOptionLabel(
+                        d,
+                        t("clicker.zones.primarySuffix"),
+                      );
+                      return (
                         <button
+                          key={d.id}
                           type="button"
-                          role="option"
-                          aria-selected={selected}
+                          role="radio"
+                          aria-checked={selected}
+                          title={tip}
                           className={[
-                            "caster-display-popover-option",
-                            selected ? "is-selected" : "",
+                            "caster-segmented-btn",
+                            selected ? "active" : "",
                           ]
                             .filter(Boolean)
                             .join(" ")}
@@ -443,147 +496,193 @@ export function ClickerTitleBarTools({
                             setDisplayOpen(false);
                           }}
                         >
-                          {displayOptionLabel(
-                            d,
-                            t("clicker.zones.primarySuffix"),
-                          )}
+                          <span className="caster-display-segment-label">
+                            {title}
+                            {d.isPrimary
+                              ? ` · ${t("clicker.zones.primaryBadge")}`
+                              : ""}
+                          </span>
+                          <span className="caster-display-segment-meta">
+                            {d.width}×{d.height}
+                            {scale !== 100 ? ` · ${scale}%` : ""}
+                          </span>
                         </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </DisplayPopover>
+                      );
+                    })}
+                  </div>
+                </div>
+              </DisplayPopover>
+            </div>
+            {metaTools}
+            <ProcessFilterTool
+              filter={editor.processFilter}
+              mode={editor.presetFilterMode}
+              onModeChange={editor.setPresetFilterMode}
+              localFilter={editor.localProcessFilter}
+              onLocalFilterChange={editor.setLocalProcessFilter}
+              disabled={editor.locked}
+              onOpenSettings={onOpenProcessSettings}
+              onGlobalFilterChange={editor.setGlobalProcessFilter}
+              presets={editor.processFilterPresets}
+              onPresetsChange={editor.setProcessFilterPresets}
+            />
           </div>
-          <ProcessFilterTool
-            filter={editor.processFilter}
-            mode={editor.presetFilterMode}
-            onModeChange={editor.setPresetFilterMode}
-            localFilter={editor.localProcessFilter}
-            onLocalFilterChange={editor.setLocalProcessFilter}
-            disabled={editor.locked}
-            onOpenSettings={onOpenProcessSettings}
-            onGlobalFilterChange={editor.setGlobalProcessFilter}
-            presets={editor.processFilterPresets}
-            onPresetsChange={editor.setProcessFilterPresets}
-          />
-          <button
-            type="button"
-            className="caster-titlebar-btn caster-btn caster-btn-ghost"
-            disabled={!editor.canUndo || editor.editDisabled}
-            title={t("clicker.toolbar.undoTitle")}
-            aria-label={t("clicker.toolbar.undo")}
-            onClick={() => editor.undoConfig()}
-          >
-            <Undo2 size={14} aria-hidden />
-          </button>
-          <button
-            type="button"
-            className="caster-titlebar-btn caster-btn caster-btn-ghost"
-            disabled={!editor.canRedo || editor.editDisabled}
-            title={t("clicker.toolbar.redoTitle")}
-            aria-label={t("clicker.toolbar.redo")}
-            onClick={() => editor.redoConfig()}
-          >
-            <Redo2 size={14} aria-hidden />
-          </button>
-          <button
-            type="button"
-            className="caster-titlebar-btn caster-btn caster-btn-primary"
-            disabled={editor.running}
-            title={hotkeyHint}
-            onClick={() => void editor.onStart()}
-          >
-            {t("clicker.toolbar.start")}
-          </button>
-          {editor.running ? (
-            <span className="caster-clicker-runtime" aria-live="polite">
-              <span>
-                {t("clicker.toolbar.runtimeCps", {
-                  cps:
-                    editor.metrics != null
-                      ? editor.metrics.measuredCps.toFixed(1)
-                      : editor.cadenceDisplay,
-                })}
+          <span className="caster-toolbar-sep" aria-hidden />
+          <div className="caster-toolbar-group">
+            <Tooltip content={t("clicker.toolbar.undoTitle")}>
+              <button
+                type="button"
+                className="caster-titlebar-btn caster-titlebar-icon-btn"
+                disabled={!editor.canUndo || editor.editDisabled}
+                aria-label={t("clicker.toolbar.undo")}
+                onClick={() => editor.undoConfig()}
+              >
+                <Undo2 size={14} aria-hidden />
+              </button>
+            </Tooltip>
+            <Tooltip content={t("clicker.toolbar.redoTitle")}>
+              <button
+                type="button"
+                className="caster-titlebar-btn caster-titlebar-icon-btn"
+                disabled={!editor.canRedo || editor.editDisabled}
+                aria-label={t("clicker.toolbar.redo")}
+                onClick={() => editor.redoConfig()}
+              >
+                <Redo2 size={14} aria-hidden />
+              </button>
+            </Tooltip>
+          </div>
+          <span className="caster-toolbar-sep" aria-hidden />
+          <div className="caster-toolbar-group">
+            <Tooltip content={hotkeyHint}>
+              <button
+                type="button"
+                className="caster-titlebar-btn caster-btn caster-btn-primary"
+                disabled={editor.running}
+                aria-label={t("clicker.toolbar.start")}
+                onClick={() => void editor.onStart()}
+              >
+                {t("clicker.toolbar.start")}
+              </button>
+            </Tooltip>
+            {editor.running ? (
+              <span className="caster-clicker-runtime" aria-live="polite">
+                <span>
+                  {t("clicker.toolbar.runtimeCps", {
+                    cps:
+                      editor.metrics != null
+                        ? editor.metrics.measuredCps.toFixed(1)
+                        : editor.cadenceDisplay,
+                  })}
+                </span>
+                <span>
+                  {t("clicker.toolbar.runtimeClicks", {
+                    n: editor.metrics?.clicksEmitted ?? 0,
+                  })}
+                </span>
+                {showClicksLimit ? (
+                  <span className="caster-clicker-runtime-limit">
+                    {t("clicker.limits.progressClicks", {
+                      done: editor.metrics?.clicksEmitted ?? 0,
+                      max: Number(editor.maxClicks),
+                    })}
+                  </span>
+                ) : null}
+                {showTimeLimit ? (
+                  <span className="caster-clicker-runtime-limit">
+                    {t("clicker.limits.progressTime", {
+                      elapsed: formatLimitClock(editor.metrics?.elapsedMs ?? 0),
+                      max: formatLimitClock(
+                        Number(editor.maxDurationSec) * 1000,
+                      ),
+                    })}
+                  </span>
+                ) : null}
+                {(editor.metrics?.filterBlockedTicks ?? 0) > 0 ? (
+                  <span className="caster-clicker-runtime-blocked">
+                    {t("clicker.toolbar.runtimeBlocked", {
+                      n: editor.metrics?.filterBlockedTicks ?? 0,
+                    })}
+                  </span>
+                ) : null}
+                {sessionPaused ? (
+                  <span className="caster-clicker-runtime-paused">
+                    {t("clicker.toolbar.runtimePaused")}
+                  </span>
+                ) : null}
               </span>
-              <span>
-                {t("clicker.toolbar.runtimeClicks", {
-                  n: editor.metrics?.clicksEmitted ?? 0,
-                })}
-              </span>
-              {showClicksLimit ? (
-                <span className="caster-clicker-runtime-limit">
-                  {t("clicker.limits.progressClicks", {
-                    done: editor.metrics?.clicksEmitted ?? 0,
-                    max: Number(editor.maxClicks),
-                  })}
-                </span>
-              ) : null}
-              {showTimeLimit ? (
-                <span className="caster-clicker-runtime-limit">
-                  {t("clicker.limits.progressTime", {
-                    elapsed: formatLimitClock(editor.metrics?.elapsedMs ?? 0),
-                    max: formatLimitClock(Number(editor.maxDurationSec) * 1000),
-                  })}
-                </span>
-              ) : null}
-              {(editor.metrics?.filterBlockedTicks ?? 0) > 0 ? (
-                <span className="caster-clicker-runtime-blocked">
-                  {t("clicker.toolbar.runtimeBlocked", {
-                    n: editor.metrics?.filterBlockedTicks ?? 0,
-                  })}
-                </span>
-              ) : null}
-              {sessionPaused ? (
-                <span className="caster-clicker-runtime-paused">
-                  {t("clicker.toolbar.runtimePaused")}
-                </span>
-              ) : null}
-            </span>
-          ) : null}
-          {editor.running ? (
-            <button
-              type="button"
-              className="caster-titlebar-btn caster-btn caster-btn-ghost"
-              title={
-                sessionPaused
-                  ? t("clicker.toolbar.resumeSession")
-                  : t("clicker.toolbar.pauseSession", { hint: pauseHint })
-              }
-              onClick={() =>
-                void (sessionPaused ? editor.onResume() : editor.onPause())
-              }
+            ) : null}
+            {editor.running ? (
+              <Tooltip
+                content={
+                  sessionPaused
+                    ? t("clicker.toolbar.resumeSession")
+                    : t("clicker.toolbar.pauseSession", { hint: pauseHint })
+                }
+              >
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  aria-label={
+                    sessionPaused
+                      ? t("clicker.toolbar.resume")
+                      : t("clicker.toolbar.pause")
+                  }
+                  onClick={() =>
+                    void (sessionPaused ? editor.onResume() : editor.onPause())
+                  }
+                >
+                  {sessionPaused ? (
+                    <Play size={14} aria-hidden />
+                  ) : (
+                    <Pause size={14} aria-hidden />
+                  )}
+                </button>
+              </Tooltip>
+            ) : null}
+            <Tooltip content={t("clicker.toolbar.stop")}>
+              <button
+                type="button"
+                className="caster-titlebar-btn caster-titlebar-icon-btn caster-titlebar-icon-btn-danger"
+                disabled={!editor.running}
+                aria-label={t("clicker.toolbar.stop")}
+                onClick={() => void editor.onStop()}
+              >
+                <Square size={14} aria-hidden />
+              </button>
+            </Tooltip>
+          </div>
+          <span className="caster-toolbar-sep" aria-hidden />
+          <div className="caster-toolbar-group">
+            <DropdownMenu
+              label={t("clicker.toolbar.moreActions")}
+              ariaLabel={t("clicker.toolbar.moreActions")}
+              align="end"
+              disabled={editor.running}
+              triggerClassName={[
+                "caster-titlebar-btn",
+                "caster-titlebar-icon-btn",
+                editor.locked ? "caster-clicker-lock" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+              items={moreItems}
             >
-              {sessionPaused ? (
-                <Play size={14} aria-hidden />
-              ) : (
-                <Pause size={14} aria-hidden />
-              )}
-              {sessionPaused
-                ? t("clicker.toolbar.resume")
-                : t("clicker.toolbar.pause")}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="caster-titlebar-btn caster-btn caster-btn-danger-ghost"
-            disabled={!editor.running}
-            onClick={() => void editor.onStop()}
-          >
-            {t("clicker.toolbar.stop")}
-          </button>
-          <DropdownMenu
-            label={t("clicker.toolbar.moreActions")}
-            ariaLabel={t("clicker.toolbar.moreActions")}
-            align="end"
-            disabled={editor.running}
-            triggerClassName="caster-titlebar-btn caster-btn caster-btn-ghost"
-            items={moreItems}
-          >
-            <MoreHorizontal size={16} aria-hidden />
-          </DropdownMenu>
+              <MoreHorizontal size={16} aria-hidden />
+            </DropdownMenu>
+          </div>
         </>
       }
     />
+    <ContextMenu
+      open={toolbarCtx.open}
+      x={toolbarCtx.x}
+      y={toolbarCtx.y}
+      items={contextItems}
+      onClose={toolbarCtx.close}
+      onSelect={(id) => findMenuItem(contextItems, id)?.onSelect?.()}
+      ariaLabel={t("clicker.toolbar.moreActions")}
+    />
+    </>
   );
 }

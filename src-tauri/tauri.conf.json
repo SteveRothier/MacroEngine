@@ -66,18 +66,31 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost; worker-src 'self' blob:"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": ["nsis", "msi"],
+    "publisher": "SteveRothier",
+    "copyright": "Copyright © 2026 SteveRothier",
+    "category": "Productivity",
+    "shortDescription": "Automatisation Windows — macros, clicker et scripts locaux.",
+    "longDescription": "Caster est une application d’automatisation Windows 100 % locale (macros, clicker, scripts). Aucune télémétrie. Injection clavier/souris et hotkeys globales nécessitent un package full-trust (Desktop Bridge).",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
   }
 }

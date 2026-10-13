@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rust": "cargo test --manifest-path src-tauri/crates/engine/Cargo.toml"
+    "test:rust": "cargo test --manifest-path src-tauri/crates/engine/Cargo.toml",
+    "pack:msix": "powershell -File scripts/pack-msix.ps1"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

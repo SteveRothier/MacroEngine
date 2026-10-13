@@ -86,6 +86,8 @@ struct AppPathsDto {
     accueil_order_path: String,
     library_path: String,
     quick_access_path: String,
+    /// `store` (MSIX), `direct` (NSIS), or `dev`.
+    install_channel: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -1414,6 +1416,111 @@ fn startup_cmd_path() -> Option<PathBuf> {
     )
 }
 
+/// True when running inside an MSIX/AppX package (Store or sideload).
+fn is_msix_packaged() -> bool {
+    #[cfg(windows)]
+    {
+        use windows::core::PWSTR;
+        use windows::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName;
+        let mut len: u32 = 0;
+        // First call returns the required length (or APPMODEL_ERROR_NO_PACKAGE).
+        let _ = unsafe { GetCurrentPackageFullName(&mut len, None) };
+        if len > 0 {
+            let mut buf = vec![0u16; len as usize];
+            let r = unsafe {
+                GetCurrentPackageFullName(&mut len, Some(PWSTR(buf.as_mut_ptr())))
+            };
+            if r.is_ok() {
+                return true;
+            }
+        }
+        if let Ok(exe) = std::env::current_exe() {
+            let s = exe.to_string_lossy().to_ascii_lowercase();
+            if s.contains(r"\windowsapps\") {
+                return true;
+            }
+        }
+        false
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+fn install_channel() -> &'static str {
+    if is_msix_packaged() {
+        "store"
+    } else if cfg!(debug_assertions) {
+        "dev"
+    } else {
+        "direct"
+    }
+}
+
+#[cfg(windows)]
+fn set_start_msix_run_key(enable: bool) -> Result<(), String> {
+    use windows::core::w;
+    use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS};
+    use windows::Win32::System::Registry::{
+        RegCloseKey, RegDeleteValueW, RegOpenKeyExW, RegSetValueExW, HKEY_CURRENT_USER, KEY_WRITE,
+        REG_SZ,
+    };
+
+    let mut hkey = Default::default();
+    let status = unsafe {
+        RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            w!(r"Software\Microsoft\Windows\CurrentVersion\Run"),
+            Some(0),
+            KEY_WRITE,
+            &mut hkey,
+        )
+    };
+    if status != ERROR_SUCCESS {
+        return Err(format!("RegOpenKeyEx failed: {status:?}"));
+    }
+
+    let name = w!("Caster");
+    let result = if enable {
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let value = format!("\"{}\" --autostart", exe.display());
+        let wide: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+        let bytes = unsafe {
+            std::slice::from_raw_parts(
+                wide.as_ptr() as *const u8,
+                wide.len() * std::mem::size_of::<u16>(),
+            )
+        };
+        unsafe { RegSetValueExW(hkey, name, Some(0), REG_SZ, Some(bytes)) }
+    } else {
+        unsafe { RegDeleteValueW(hkey, name) }
+    };
+    let _ = unsafe { RegCloseKey(hkey) };
+    if result != ERROR_SUCCESS && !(!enable && result == ERROR_FILE_NOT_FOUND) {
+        return Err(format!("registry Run key update failed: {result:?}"));
+    }
+    Ok(())
+}
+
+fn set_start_startup_cmd(enable: bool) -> Result<(), String> {
+    let path = startup_cmd_path().ok_or_else(|| "APPDATA manquant".to_string())?;
+    if enable {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        let body = format!(
+            "@echo off\r\nstart \"\" \"{}\" --autostart\r\n",
+            exe.display()
+        );
+        std::fs::write(&path, body).map_err(|e| e.to_string())?;
+    } else if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
 fn set_start_with_windows(enable: bool) -> Result<(), String> {
     #[cfg(not(windows))]
     {
@@ -1422,21 +1529,15 @@ fn set_start_with_windows(enable: bool) -> Result<(), String> {
     }
     #[cfg(windows)]
     {
-        let path = startup_cmd_path().ok_or_else(|| "APPDATA manquant".to_string())?;
-        if enable {
-            if let Some(parent) = path.parent() {
-                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-            }
-            let exe = std::env::current_exe().map_err(|e| e.to_string())?;
-            let body = format!(
-                "@echo off\r\nstart \"\" \"{}\" --autostart\r\n",
-                exe.display()
-            );
-            std::fs::write(&path, body).map_err(|e| e.to_string())?;
-        } else if path.exists() {
-            std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+        if is_msix_packaged() {
+            // Prefer HKCU Run (rewritten on each enable / boot) — Startup .cmd
+            // is fragile under package updates. Clear any leftover .cmd.
+            let _ = set_start_startup_cmd(false);
+            set_start_msix_run_key(enable)
+        } else {
+            let _ = set_start_msix_run_key(false);
+            set_start_startup_cmd(enable)
         }
-        Ok(())
     }
 }
 
@@ -1573,7 +1674,16 @@ fn get_paths(app: AppHandle, dir: State<'_, SettingsDir>) -> Result<AppPathsDto,
             .join("quick-access.json")
             .to_string_lossy()
             .into_owned(),
+        install_channel: install_channel().into(),
     })
+}
+
+#[tauri::command]
+fn open_url(app: AppHandle, url: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2294,11 +2404,8 @@ fn collect_displays(app: &AppHandle) -> Result<Vec<DisplayDto>, String> {
         };
         let width = size.width as i32;
         let height = size.height as i32;
-        let label = if is_primary {
-            format!("Écran {} · {width}×{height} (principal)", i + 1)
-        } else {
-            format!("Écran {} · {width}×{height}", i + 1)
-        };
+        // Keep label locale-neutral; UI adds “primary” badge via is_primary.
+        let label = format!("Écran {}", i + 1);
         out.push(DisplayDto {
             id,
             label,
@@ -3162,6 +3269,7 @@ pub fn run() {
             confirm_app_exit,
             show_main_when_frontend_ready,
             get_paths,
+            open_url,
             open_path,
             reveal_library_entry,
             purge_library_trash_cmd,

@@ -3,7 +3,7 @@ import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import type { EngineStatus, HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import { useT } from "../i18n";
-import { ClickerMetaBar } from "./ClickerMetaBar";
+import { ClickerMetaBar, ClickerMetaTools } from "./ClickerMetaBar";
 import { ClickerTitleBarTools } from "./ClickerTitleBarTools";
 import { ClickerZonePreview } from "./ClickerZonePreview";
 import { ClickerTargetPreview } from "./ClickerTargetPreview";

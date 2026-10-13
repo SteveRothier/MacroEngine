@@ -72,7 +72,9 @@
 ## Qualité & plateforme
 
 - CI GitHub Actions : typecheck + Vitest + `cargo test` caster-engine sur chaque PR
-- Release sur tags `v*` : build NSIS + artefact GitHub Release (`.github/workflows/release.yml`)
+- Release sur tags `v*` : build **NSIS + MSI** + pack MSIX (`scripts/pack-msix.ps1`) + artefacts GitHub Release
+- Préparation Microsoft Store : voir [`docs/STORE.md`](STORE.md) (privacy/EULA, `runFullTrust`, sideload)
+- Macros schema v9 : permissions `allowNetwork` / `allowProcess` (alignées scripts)
 - Boot Accueil accéléré (lazy editors, IPC home léger, show-when-ready, fenêtres overlay à la demande)
 
 ## Scripts

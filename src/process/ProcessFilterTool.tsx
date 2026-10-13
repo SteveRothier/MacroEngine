@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { AppWindow } from "lucide-react";
 import { useT, type TFunction } from "../i18n";
+import { Tooltip } from "../ui/shell";
 import {
   ProcessFilterPanel,
   type ProcessFilterPanelProps,
@@ -246,34 +247,35 @@ export function ProcessFilterTool({
 
   return (
     <div className="caster-process-filter-tool" ref={rootRef}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={[
-          "caster-titlebar-btn",
-          "caster-btn",
-          "caster-btn-ghost",
-          mode === "off" ? "is-off" : "",
-          mode === "local" ? "is-active" : "",
-          mode === "local" && localFilter.mode === "allow" ? "is-allow" : "",
-          mode === "local" && localFilter.mode === "deny" ? "is-deny" : "",
-          blocked ? "is-blocked" : "",
-        ]
-          .filter(Boolean)
-          .join(" ")}
-        title={title}
-        aria-label={t("common.process.toolAria", {
-          mode: modeLabel,
-          detail,
-        })}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <AppWindow size={14} aria-hidden />
-        {triggerLabel}
-      </button>
+      <Tooltip content={title} disabled={open}>
+        <button
+          ref={triggerRef}
+          type="button"
+          className={[
+            "caster-titlebar-btn",
+            "caster-btn",
+            "caster-btn-ghost",
+            mode === "off" ? "is-off" : "",
+            mode === "local" ? "is-active" : "",
+            mode === "local" && localFilter.mode === "allow" ? "is-allow" : "",
+            mode === "local" && localFilter.mode === "deny" ? "is-deny" : "",
+            blocked ? "is-blocked" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label={t("common.process.toolAria", {
+            mode: modeLabel,
+            detail,
+          })}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          aria-controls={open ? menuId : undefined}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <AppWindow size={14} aria-hidden />
+          <span className="caster-process-filter-label">{triggerLabel}</span>
+        </button>
+      </Tooltip>
       {panel}
     </div>
   );

@@ -48,12 +48,21 @@ import {
   type UiLocale,
 } from "./settingsTypes";
 import { useT, localePreferenceOptions } from "../i18n";
+import {
+  EULA_URL,
+  GITHUB_RELEASES_URL,
+  PRIVACY_POLICY_URL,
+  STORE_PAGE_URL,
+} from "../legal/urls";
+
+type InstallChannel = "store" | "direct" | "dev";
 
 type AppPaths = {
   configDir: string;
   settingsPath: string;
   logDir: string;
   version: string;
+  installChannel?: InstallChannel;
 };
 
 type Props = {
@@ -1736,7 +1745,51 @@ export function SettingsView({
                         <dt>{t("settings.data.platform")}</dt>
                         <dd>Windows</dd>
                       </div>
+                      <div>
+                        <dt>{t("settings.data.installChannel")}</dt>
+                        <dd>
+                          {paths?.installChannel === "store"
+                            ? t("settings.data.channelStore")
+                            : paths?.installChannel === "direct"
+                              ? t("settings.data.channelDirect")
+                              : t("settings.data.channelDev")}
+                        </dd>
+                      </div>
                     </dl>
+                    <div className="caster-settings-about-links">
+                      <button
+                        type="button"
+                        className="caster-btn caster-btn-ghost"
+                        onClick={() =>
+                          void invoke("open_url", { url: PRIVACY_POLICY_URL })
+                        }
+                      >
+                        {t("settings.data.privacyLink")}
+                      </button>
+                      <button
+                        type="button"
+                        className="caster-btn caster-btn-ghost"
+                        onClick={() =>
+                          void invoke("open_url", { url: EULA_URL })
+                        }
+                      >
+                        {t("settings.data.eulaLink")}
+                      </button>
+                      <button
+                        type="button"
+                        className="caster-btn caster-btn-ghost"
+                        onClick={() =>
+                          void invoke("open_url", {
+                            url:
+                              paths?.installChannel === "store"
+                                ? STORE_PAGE_URL
+                                : GITHUB_RELEASES_URL,
+                          })
+                        }
+                      >
+                        {t("settings.data.updatesLink")}
+                      </button>
+                    </div>
                     <p className="caster-settings-group-hint">
                       {t("settings.data.aboutFooter")}
                     </p>

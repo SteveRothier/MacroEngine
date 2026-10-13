@@ -1,4 +1,4 @@
-use windows::Win32::Foundation::{CloseHandle, LPARAM, POINT};
+use windows::Win32::Foundation::{CloseHandle, LPARAM, POINT, SYSTEMTIME};
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
@@ -20,10 +20,19 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::Storage::FileSystem::FILE_ATTRIBUTE_NORMAL;
 use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_SMALLICON};
+use windows::Win32::System::Diagnostics::ToolHelp::{
+    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+    TH32CS_SNAPPROCESS,
+};
+use windows::Win32::System::SystemInformation::GetLocalTime;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    GetAsyncKeyState, VK_LBUTTON, VK_MBUTTON, VK_RBUTTON,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, DrawIconEx, EnumWindows, GetCursorPos, GetForegroundWindow, GetSystemMetrics,
-    GetWindowThreadProcessId, IsWindowVisible, DI_NORMAL, HICON, SM_CXSCREEN,
-    SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+    GetWindowTextLengthW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible, DI_NORMAL,
+    HICON, SM_CXSCREEN, SM_CXVIRTUALSCREEN, SM_CYSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN,
 };
 use windows::core::PCWSTR;
 
@@ -592,6 +601,95 @@ pub(crate) fn list_visible_process_exe_entries() -> Vec<ProcessExeEntry> {
             }
         })
         .collect()
+}
+
+pub(crate) fn foreground_window_title() -> Option<String> {
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return None;
+        }
+        let len = GetWindowTextLengthW(hwnd);
+        if len <= 0 {
+            return Some(String::new());
+        }
+        let mut buf = vec![0u16; (len + 1) as usize];
+        let written = GetWindowTextW(hwnd, &mut buf);
+        if written <= 0 {
+            return Some(String::new());
+        }
+        Some(String::from_utf16_lossy(&buf[..written as usize]))
+    }
+}
+
+pub(crate) fn is_process_running(exe: &str) -> bool {
+    let needle = crate::settings::normalize_exe_name(exe);
+    if needle.is_empty() {
+        return false;
+    }
+    unsafe {
+        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        let Ok(snap) = snap else {
+            return false;
+        };
+        let mut entry = PROCESSENTRY32W {
+            dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
+            ..Default::default()
+        };
+        let mut found = false;
+        if Process32FirstW(snap, &mut entry).is_ok() {
+            loop {
+                let name = String::from_utf16_lossy(
+                    entry
+                        .szExeFile
+                        .iter()
+                        .take_while(|c| **c != 0)
+                        .copied()
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                );
+                if crate::settings::normalize_exe_name(&name) == needle {
+                    found = true;
+                    break;
+                }
+                if Process32NextW(snap, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = CloseHandle(snap);
+        found
+    }
+}
+
+pub(crate) fn is_key_down(key: &str) -> bool {
+    let Ok(vk) = key_vk(key) else {
+        return false;
+    };
+    unsafe { GetAsyncKeyState(vk.0 as i32) < 0 }
+}
+
+pub(crate) fn local_clock() -> crate::condition_probe::LocalClock {
+    let st: SYSTEMTIME = unsafe { GetLocalTime() };
+    crate::condition_probe::LocalClock {
+        hour: st.wHour as u32,
+        minute: st.wMinute as u32,
+        // SYSTEMTIME.wDayOfWeek: 0=Sunday … 6=Saturday
+        weekday: st.wDayOfWeek as u32,
+        day: st.wDay as u32,
+        month: st.wMonth as u32,
+        year: st.wYear as u32,
+    }
+}
+
+pub(crate) fn is_mouse_button_down(button: &str) -> bool {
+    let vk = match button.trim().to_ascii_lowercase().as_str() {
+        "left" | "lbutton" => VK_LBUTTON,
+        "right" | "rbutton" => VK_RBUTTON,
+        "middle" | "mbutton" => VK_MBUTTON,
+        _ => return false,
+    };
+    unsafe { GetAsyncKeyState(vk.0 as i32) < 0 }
 }
 
 #[cfg(test)]

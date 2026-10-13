@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Keyboard } from "lucide-react";
 import { useT } from "../i18n";
-import { KbdChip } from "../ui";
-import { useToast } from "../ui/shell";
+import { Tooltip, useToast } from "../ui/shell";
 import {
   eventToVk,
   hotkeyTriggerMatches,
@@ -54,11 +54,39 @@ type Props = {
   editor: ClickerEditor;
 };
 
-/** Meta bar over the clicker studio — name + hotkey, same UX as MacroMetaBar. */
+/** Name field only — lives in toolbar start (same as MacroMetaBar). */
 export function ClickerMetaBar({ editor: e }: Props) {
+  const t = useT();
+  return (
+    <div className="caster-macro-meta">
+      <label className="caster-macro-meta-row caster-macro-meta-row--name">
+        <span className="sr-only">{t("clicker.meta.name")}</span>
+        <input
+          className="caster-macro-meta-input caster-macro-meta-input--name"
+          value={e.presetName}
+          disabled={e.editDisabled}
+          aria-label={t("clicker.meta.name")}
+          onChange={(ev) => e.setPresetName(ev.target.value)}
+          onBlur={(ev) => void e.onRenamePreset(ev.target.value)}
+          onKeyDown={(ev) => {
+            if (ev.key === "Enter") {
+              ev.preventDefault();
+              (ev.target as HTMLInputElement).blur();
+            }
+          }}
+        />
+      </label>
+    </div>
+  );
+}
+
+/** Hotkey chip — same silhouette as macro raccourci, next to Processus. */
+export function ClickerMetaTools({ editor: e }: Props) {
   const t = useT();
   const toast = useToast();
   const [capturing, setCapturing] = useState(false);
+  const hotkeyToolRef = useRef<HTMLDivElement>(null);
+  const hotkeyBtnRef = useRef<HTMLButtonElement>(null);
 
   const triggerLabel =
     e.trigger.type === "hotkey" ? triggerHotkeyLabel(e.trigger) : null;
@@ -138,39 +166,47 @@ export function ClickerMetaBar({ editor: e }: Props) {
     if (e.locked) setCapturing(false);
   }, [e.locked]);
 
+  useEffect(() => {
+    function onPointerDown(ev: PointerEvent) {
+      const target = ev.target as Node | null;
+      if (!target) return;
+      if (hotkeyToolRef.current?.contains(target)) return;
+      if (capturing) setCapturing(false);
+    }
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () =>
+      window.removeEventListener("pointerdown", onPointerDown, true);
+  }, [capturing]);
+
   return (
-    <div className="caster-macro-meta">
-      <label className="caster-macro-meta-row">
-        <span className="sr-only">{t("clicker.meta.name")}</span>
-        <input
-          className="caster-macro-meta-input caster-macro-meta-input--name"
-          value={e.presetName}
-          disabled={e.editDisabled}
-          aria-label={t("clicker.meta.name")}
-          onChange={(ev) => e.setPresetName(ev.target.value)}
-          onBlur={(ev) => void e.onRenamePreset(ev.target.value)}
-          onKeyDown={(ev) => {
-            if (ev.key === "Enter") {
-              ev.preventDefault();
-              (ev.target as HTMLInputElement).blur();
-            }
-          }}
+    <Tooltip content={t("clicker.trigger.captureTitle")}>
+      <div
+        ref={hotkeyToolRef}
+        className={[
+          "caster-macro-meta-tool",
+          "caster-macro-meta-tool--hotkey",
+          capturing ? "is-capturing" : "",
+          e.editDisabled ? "is-disabled" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        onMouseDown={(ev) => {
+          if (e.editDisabled) return;
+          if (ev.target === hotkeyBtnRef.current) return;
+          ev.preventDefault();
+          hotkeyBtnRef.current?.click();
+        }}
+      >
+        <Keyboard
+          className="caster-macro-meta-tool-icon"
+          size={14}
+          aria-hidden
         />
-      </label>
-      <div className="caster-macro-meta-row caster-macro-meta-row--hotkey">
-        <span className="caster-macro-meta-label">
-          {t("clicker.meta.hotkey")}
-        </span>
         <button
+          ref={hotkeyBtnRef}
           type="button"
-          className={[
-            "caster-macro-hotkey-btn",
-            capturing ? "is-capturing" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
+          className="caster-macro-meta-tool-field caster-macro-meta-tool-field--hotkey"
           disabled={e.editDisabled}
-          title={t("clicker.trigger.captureTitle")}
           aria-label={
             capturing
               ? t("clicker.trigger.capturing")
@@ -189,11 +225,9 @@ export function ClickerMetaBar({ editor: e }: Props) {
             );
           }}
         >
-          <KbdChip className="caster-macro-hotkey-chip">
-            {capturing ? "…" : triggerLabel ?? t("clicker.trigger.none")}
-          </KbdChip>
+          {capturing ? "…" : (triggerLabel ?? t("clicker.trigger.none"))}
         </button>
       </div>
-    </div>
+    </Tooltip>
   );
 }

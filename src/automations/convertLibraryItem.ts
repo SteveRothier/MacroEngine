@@ -93,6 +93,10 @@ export function localizeConvertToken(token: string, t: TFunction): string {
       return t("automations.convert.tokens.controlWhile");
     case "script.run":
       return t("automations.convert.tokens.scriptRun");
+    case "macro.run":
+      return t("automations.convert.tokens.macroRun");
+    case "clicker.start":
+      return t("automations.convert.tokens.clickerStart");
     case "orphan delay":
       return t("automations.convert.tokens.orphanDelay");
     case "mixed cursor/fixed clicks":
