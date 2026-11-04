@@ -2,8 +2,12 @@
 //!
 //! This is *not* the macro recorder: it only collects left-button screen
 //! positions and turns them into [`ClickPoint`]s. Repeated clicks on the same
-//! spot bump `clicks` instead of appending a duplicate point. Esc / right-click
-//! cancels.
+//! spot bump `clicks` instead of appending a duplicate point. Esc cancels
+//! (discard). Right-click stops and keeps the captured points.
+//!
+//! On Windows, a `WH_MOUSE_LL` hook swallows LMB/RMB outside this process so
+//! the desktop / other apps do not react to capture clicks. Clicks on our own
+//! windows pass through (Terminer / UI).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -89,9 +93,11 @@ struct CaptureShared {
     stop: AtomicBool,
     running: AtomicBool,
     cancelled: AtomicBool,
+    /// Ignore LMB until this instant (UI button that started capture).
+    armed_at: Instant,
 }
 
-/// One capture session: a polling thread plus its shared buffer.
+/// One capture session: a polling / hook thread plus its shared buffer.
 pub struct ClickPointCapture {
     shared: Arc<CaptureShared>,
     thread: Mutex<Option<JoinHandle<()>>>,
@@ -104,12 +110,13 @@ impl ClickPointCapture {
             stop: AtomicBool::new(false),
             running: AtomicBool::new(true),
             cancelled: AtomicBool::new(false),
+            armed_at: Instant::now() + UI_STOP_DISCARD,
         });
         let worker = Arc::clone(&shared);
         let handle = thread::Builder::new()
             .name("clicker-point-capture".into())
             .spawn(move || {
-                capture_loop(worker.as_ref(), injector.as_ref());
+                capture_loop(worker, injector);
             })
             .ok();
         if handle.is_none() {
@@ -148,8 +155,11 @@ impl ClickPointCapture {
 
     /// Ask the thread to stop, join it, and return what was captured.
     /// A cancelled session (Esc) yields no points.
-    /// The trailing point is dropped when it was recorded in the same gesture as
-    /// Stop (clicking « Terminer » must not become a capture point).
+    ///
+    /// Note: we do **not** drop a trailing recent point here. Fixed-mode auto-stop
+    /// finishes within `UI_STOP_DISCARD` of the only click — discarding would wipe
+    /// the coordinates. UI « Terminer » clicks are already excluded by the
+    /// WH_MOUSE_LL own-window pass-through (they never enter the buffer).
     pub fn finish(&self) -> Vec<ClickPoint> {
         self.shared.stop.store(true, Ordering::SeqCst);
         if let Some(handle) = self.thread.lock().ok().and_then(|mut g| g.take()) {
@@ -158,15 +168,29 @@ impl ClickPointCapture {
         if self.was_cancelled() {
             return Vec::new();
         }
-        let Ok(mut buffer) = self.shared.buffer.lock() else {
-            return Vec::new();
-        };
-        let _ = buffer.discard_trailing_if_recent(UI_STOP_DISCARD);
-        buffer.points()
+        self.shared
+            .buffer
+            .lock()
+            .map(|b| b.points())
+            .unwrap_or_default()
     }
 }
 
-fn capture_loop(shared: &CaptureShared, injector: &dyn MouseInjector) {
+fn capture_loop(shared: Arc<CaptureShared>, injector: Arc<dyn MouseInjector>) {
+    #[cfg(windows)]
+    {
+        let _ = injector;
+        capture_loop_windows(shared);
+    }
+    #[cfg(not(windows))]
+    {
+        capture_loop_fallback(shared.as_ref(), injector.as_ref());
+    }
+}
+
+/// Polling fallback (no click swallow) for non-Windows builds / tests.
+#[cfg(not(windows))]
+fn capture_loop_fallback(shared: &CaptureShared, injector: &dyn MouseInjector) {
     let deadline = Instant::now() + CAPTURE_TIMEOUT;
     let mut was_down = button_down();
     let mut was_escape = escape_down();
@@ -183,12 +207,11 @@ fn capture_loop(shared: &CaptureShared, injector: &dyn MouseInjector) {
         was_escape = esc;
         let rbutton = right_button_down();
         if rbutton && !was_rbutton {
-            shared.cancelled.store(true, Ordering::SeqCst);
             break;
         }
         was_rbutton = rbutton;
         let down = button_down();
-        if down && !was_down {
+        if down && !was_down && Instant::now() >= shared.armed_at {
             if let Ok(p) = injector.cursor_position() {
                 if let Ok(mut buffer) = shared.buffer.lock() {
                     buffer.push(p, Instant::now());
@@ -199,6 +222,171 @@ fn capture_loop(shared: &CaptureShared, injector: &dyn MouseInjector) {
         thread::sleep(POLL);
     }
     shared.running.store(false, Ordering::SeqCst);
+}
+
+/// Blocks LMB/RMB outside this process so capture clicks do not activate other apps.
+#[cfg(windows)]
+fn capture_loop_windows(shared: Arc<CaptureShared>) {
+    use std::sync::OnceLock;
+    use windows::Win32::Foundation::{LPARAM, LRESULT, POINT, WPARAM};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        CallNextHookEx, DispatchMessageW, GetWindowThreadProcessId, PeekMessageW,
+        SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WindowFromPoint,
+        MSLLHOOKSTRUCT, MSG, PM_REMOVE, WH_MOUSE_LL, WM_LBUTTONDOWN, WM_LBUTTONUP,
+        WM_RBUTTONDOWN, WM_RBUTTONUP,
+    };
+
+    struct PointHookBridge {
+        shared: Arc<CaptureShared>,
+        pending_stop: AtomicBool,
+        our_pid: u32,
+    }
+
+    static BRIDGE: OnceLock<Mutex<Option<Arc<PointHookBridge>>>> = OnceLock::new();
+
+    fn bridge_slot() -> &'static Mutex<Option<Arc<PointHookBridge>>> {
+        BRIDGE.get_or_init(|| Mutex::new(None))
+    }
+
+    fn click_is_on_our_window(pt: POINT, our_pid: u32) -> bool {
+        let hwnd = unsafe { WindowFromPoint(pt) };
+        if hwnd.0.is_null() {
+            return false;
+        }
+        let mut pid = 0u32;
+        unsafe {
+            GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        }
+        pid == our_pid
+    }
+
+    unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+        if code >= 0 {
+            if let Ok(guard) = bridge_slot().lock() {
+                if let Some(bridge) = guard.as_ref() {
+                    if bridge.shared.running.load(Ordering::SeqCst) {
+                        let msg = wparam.0 as u32;
+                        let info = &*(lparam.0 as *const MSLLHOOKSTRUCT);
+                        let on_us = click_is_on_our_window(info.pt, bridge.our_pid);
+                        match msg {
+                            WM_LBUTTONDOWN => {
+                                if on_us {
+                                    // Let Terminer / UI receive the click.
+                                    return CallNextHookEx(None, code, wparam, lparam);
+                                }
+                                if Instant::now() >= bridge.shared.armed_at
+                                    && !bridge.shared.stop.load(Ordering::SeqCst)
+                                {
+                                    if let Ok(mut buffer) = bridge.shared.buffer.lock() {
+                                        buffer.push(
+                                            Point {
+                                                x: info.pt.x,
+                                                y: info.pt.y,
+                                            },
+                                            Instant::now(),
+                                        );
+                                    }
+                                }
+                                return LRESULT(1);
+                            }
+                            WM_LBUTTONUP => {
+                                if on_us {
+                                    return CallNextHookEx(None, code, wparam, lparam);
+                                }
+                                return LRESULT(1);
+                            }
+                            WM_RBUTTONDOWN => {
+                                if on_us {
+                                    return CallNextHookEx(None, code, wparam, lparam);
+                                }
+                                bridge.pending_stop.store(true, Ordering::SeqCst);
+                                return LRESULT(1);
+                            }
+                            WM_RBUTTONUP => {
+                                if on_us {
+                                    return CallNextHookEx(None, code, wparam, lparam);
+                                }
+                                return LRESULT(1);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+        unsafe { CallNextHookEx(None, code, wparam, lparam) }
+    }
+
+    let bridge = Arc::new(PointHookBridge {
+        shared: Arc::clone(&shared),
+        pending_stop: AtomicBool::new(false),
+        our_pid: std::process::id(),
+    });
+    {
+        let mut slot = bridge_slot().lock().expect("point hook bridge");
+        *slot = Some(Arc::clone(&bridge));
+    }
+
+    let hook = unsafe { SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), None, 0) };
+    if hook.is_err() {
+        shared.cancelled.store(true, Ordering::SeqCst);
+        shared.running.store(false, Ordering::SeqCst);
+        let mut slot = bridge_slot().lock().expect("point hook bridge");
+        *slot = None;
+        return;
+    }
+    let hook = hook.expect("hook");
+
+    let deadline = Instant::now() + CAPTURE_TIMEOUT;
+    let mut was_escape = escape_down();
+    let mut msg = MSG::default();
+    while !shared.stop.load(Ordering::SeqCst) {
+        if Instant::now() >= deadline {
+            break;
+        }
+        let esc = escape_down();
+        if esc && !was_escape {
+            shared.cancelled.store(true, Ordering::SeqCst);
+            break;
+        }
+        was_escape = esc;
+
+        if bridge.pending_stop.load(Ordering::SeqCst) {
+            break;
+        }
+
+        let has = unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) };
+        if has.as_bool() {
+            unsafe {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        } else {
+            thread::sleep(POLL);
+        }
+    }
+
+    shared.stop.store(true, Ordering::SeqCst);
+    // Keep `running` true briefly so the hook still swallows LBUTTONUP.
+    let drain_until = Instant::now() + Duration::from_millis(80);
+    while Instant::now() < drain_until {
+        let has = unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) };
+        if has.as_bool() {
+            unsafe {
+                let _ = TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+            }
+        } else {
+            thread::sleep(Duration::from_millis(8));
+        }
+    }
+
+    unsafe {
+        let _ = UnhookWindowsHookEx(hook);
+    }
+    shared.running.store(false, Ordering::SeqCst);
+    let mut slot = bridge_slot().lock().expect("point hook bridge");
+    *slot = None;
 }
 
 /// One-shot screen color sample (same polling style as [`ClickPointCapture`]).
@@ -457,6 +645,7 @@ fn pixel_capture_loop_windows(shared: Arc<PixelCaptureShared>, injector: Arc<dyn
 }
 
 #[cfg(windows)]
+#[allow(dead_code)] // used by non-Windows fallback; kept for parity / tests
 fn button_down() -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
     let state = unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) };
@@ -464,6 +653,7 @@ fn button_down() -> bool {
 }
 
 #[cfg(windows)]
+#[allow(dead_code)]
 fn right_button_down() -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_RBUTTON};
     let state = unsafe { GetAsyncKeyState(VK_RBUTTON.0 as i32) };

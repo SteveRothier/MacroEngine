@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { Switch } from "../../ui";
 import { Select, useToast } from "../../ui/shell";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
+import { PixelPickBanner } from "../../ui/PixelPickBanner";
 import { useT } from "../../i18n";
 import { ClickerInfoTip } from "../ClickerInfoTip";
 import type { ClickerEditor } from "../useClickerEditor";
@@ -165,6 +165,19 @@ export function ClickerLimitsSection({ editor: e }: Props) {
     }
   }, [sampling, t, toast]);
 
+  // Esc = annuler (en plus du hook natif / clic droit = arrêter).
+  useEffect(() => {
+    if (!pickingScreen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      void cancelPixelCapture();
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [pickingScreen, cancelPixelCapture]);
+
   // Live color under cursor while picking (swatch + hex in banner).
   useEffect(() => {
     if (!pickingScreen) {
@@ -172,7 +185,10 @@ export function ClickerLimitsSection({ editor: e }: Props) {
       return;
     }
     let cancelled = false;
+    let inflight = false;
     const tick = async () => {
+      if (inflight) return;
+      inflight = true;
       try {
         const pos = await invoke<{ x: number; y: number }>("get_cursor_position");
         const sample = await invoke<PixelSample>("read_pixel", {
@@ -182,10 +198,12 @@ export function ClickerLimitsSection({ editor: e }: Props) {
         if (!cancelled) setPickPreview(sample);
       } catch {
         /* ignore transient read errors */
+      } finally {
+        inflight = false;
       }
     };
     void tick();
-    const id = window.setInterval(() => void tick(), 80);
+    const id = window.setInterval(() => void tick(), 100);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -206,7 +224,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
           }
         })
         .catch(() => {});
-    }, 200);
+    }, 50);
     return () => {
       stopped = true;
       window.clearInterval(id);
@@ -300,49 +318,23 @@ export function ClickerLimitsSection({ editor: e }: Props) {
         );
   const pixelMatch =
     pixelDelta == null ? null : pixelDelta <= pixel.tolerance;
-  const pickPreviewCss = pickPreview
-    ? `rgb(${pickPreview.r}, ${pickPreview.g}, ${pickPreview.b})`
-    : "transparent";
-  const pickPreviewHex = pickPreview
-    ? rgbToHex(pickPreview.r, pickPreview.g, pickPreview.b)
-    : "—";
-
   return (
     <div className="caster-clicker-limits-panel">
-      {pickingScreen && typeof document !== "undefined"
-        ? createPortal(
-            <div className="caster-pixel-pick-banner" role="status">
-              <strong>{t("shell.pickPixelTitle")}</strong>
-              <span>{t("clicker.limits.pickHint")}</span>
-              <div className="caster-pixel-pick-preview">
-                <span
-                  className={[
-                    "caster-pixel-pick-swatch",
-                    pickPreview ? "" : "is-empty",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  style={{ background: pickPreviewCss }}
-                  aria-hidden
-                />
-                <code className="caster-pixel-pick-hex">{pickPreviewHex}</code>
-                {pickPreview ? (
-                  <span className="caster-pixel-pick-rgb">
-                    {pickPreview.r}, {pickPreview.g}, {pickPreview.b}
-                  </span>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                className="caster-btn caster-btn-ghost caster-btn-sm"
-                onClick={() => void cancelPixelCapture()}
-              >
-                {t("clicker.limits.pickCancelBtn")}
-              </button>
-            </div>,
-            document.body,
-          )
-        : null}
+      <PixelPickBanner
+        active={pickingScreen}
+        preview={
+          pickPreview
+            ? {
+                x: pickPreview.x,
+                y: pickPreview.y,
+                r: pickPreview.r,
+                g: pickPreview.g,
+                b: pickPreview.b,
+              }
+            : null
+        }
+        title={t("shell.pickPixelTitle")}
+      />
       <div className="caster-clicker-limits-block">
         <h3 className="caster-clicker-limits-block-title caster-settings-row-label-with-info">
           <span>{t("clicker.scenario.limitsTitle")}</span>
@@ -571,10 +563,10 @@ export function ClickerLimitsSection({ editor: e }: Props) {
                       >
                         {pixelMatch
                           ? t("clicker.limits.pixelMatchOk", {
-                              delta: pixelDelta,
+                              delta: pixelDelta ?? 0,
                             })
                           : t("clicker.limits.pixelMatchBad", {
-                              delta: pixelDelta,
+                              delta: pixelDelta ?? 0,
                             })}
                       </span>
                     ) : null}

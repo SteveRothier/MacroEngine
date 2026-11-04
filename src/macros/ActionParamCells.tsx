@@ -1,8 +1,13 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useT, type TFunction } from "../i18n";
-import { Select } from "../ui/shell";
+import { Select, useToast } from "../ui/shell";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
+import {
+  pickScreenPointDetailed,
+  type PixelPickPreview,
+} from "../pick";
+import { PixelPickBanner } from "../ui/PixelPickBanner";
 import { ActionProps } from "./ActionProps";
 import { ConditionEditor } from "./ConditionEditor";
 import { ConditionInlineFields } from "./ConditionInlineFields";
@@ -61,14 +66,39 @@ function CompactXY({
   onChangeXY: (x: number | null, y: number | null) => void;
 }) {
   const t = useT();
+  const toast = useToast();
+  const [picking, setPicking] = useState(false);
+  const [pickPreview, setPickPreview] = useState<PixelPickPreview>(null);
   const isCursor = optional && x == null && y == null;
+
+  async function onPickScreen() {
+    if (disabled || picking) return;
+    setPicking(true);
+    setPickPreview(null);
+    try {
+      const result = await pickScreenPointDetailed(setPickPreview);
+      if (result.ok) {
+        onChangeXY(result.point.x, result.point.y);
+      } else if (result.reason !== "cancel") {
+        toast.error(t("macros.params.pickCancelled"));
+      }
+    } finally {
+      setPickPreview(null);
+      setPicking(false);
+    }
+  }
 
   return (
     <>
+      <PixelPickBanner
+        active={picking}
+        preview={pickPreview}
+        showColor={false}
+      />
       {optional ? (
         <Select
           className="action-cell-select"
-          disabled={disabled}
+          disabled={disabled || picking}
           value={isCursor ? "cursor" : "position"}
           title={t("macros.params.position")}
           ariaLabel={t("macros.params.position")}
@@ -83,7 +113,7 @@ function CompactXY({
         <>
           <WheelNumberInput
             className="action-cell-input action-cell-num"
-            disabled={disabled}
+            disabled={disabled || picking}
             value={x ?? 0}
             title={t("macros.params.coordX")}
             aria-label={t("macros.params.coordX")}
@@ -91,7 +121,7 @@ function CompactXY({
           />
           <WheelNumberInput
             className="action-cell-input action-cell-num"
-            disabled={disabled}
+            disabled={disabled || picking}
             value={y ?? 0}
             title={t("macros.params.coordY")}
             aria-label={t("macros.params.coordY")}
@@ -99,6 +129,30 @@ function CompactXY({
           />
         </>
       ) : null}
+      <button
+        type="button"
+        className={[
+          "action-cell-btn",
+          "action-cell-btn--pick",
+          picking ? "is-capturing" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        disabled={disabled || picking}
+        title={
+          picking
+            ? t("macros.params.pickOverlay")
+            : t("macros.params.pickScreen")
+        }
+        aria-label={
+          picking
+            ? t("macros.params.pickOverlay")
+            : t("macros.params.pickScreen")
+        }
+        onClick={() => void onPickScreen()}
+      >
+        <span aria-hidden>⌖</span>
+      </button>
     </>
   );
 }

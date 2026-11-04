@@ -1,0 +1,45 @@
+---
+description: Overlays natifs et pick écran — chemins autorisés (anti-freeze)
+alwaysApply: true
+---
+
+# Overlays & pick écran
+
+## Interdits (freeze / crash UI)
+
+- **Ne jamais** utiliser `pick_screen_point_native` ni `show_screen_picker`.
+- Ne pas inventer un nouveau picker bloquant côté Tauri.
+
+## Pick point (macros / action clic XY)
+
+- Entry point FE : [`src/pick.ts`](src/pick.ts)
+  - Capture anti-crash : `start_pixel_color_capture` → poll `get_pixel_color_capture_state` → `stop_pixel_color_capture`
+  - **Pas** d’overlay marqueur bleu — réservé aux cibles clicker
+  - Bannière coords only : [`src/ui/PixelPickBanner.tsx`](src/ui/PixelPickBanner.tsx) (`showColor={false}`)
+  - Annulation : Esc FE (`cancelScreenPick`) · clic droit hook natif
+- Consommateurs : CompactXY / PointFields (`ActionParamCells`, `ActionProps`)
+
+## Pick couleur clicker
+
+- Même capture pixel + même `PixelPickBanner` (swatch / hex) — **sans** marqueur cible
+- Logique dans [`src/clicker/sections/ClickerLimitsSection.tsx`](src/clicker/sections/ClickerLimitsSection.tsx)
+
+## Overlay cible (clicker uniquement)
+
+- Helper : [`src/clicker/targetOverlay.ts`](src/clicker/targetOverlay.ts)
+- Modes qui **dessinent** des marqueurs : `fixed`, `sequence` seulement
+- Mode `cursor` → **aucun marqueur** → la fenêtre native est masquée si bands/markers vides (voir `markers_from_target` dans `src-tauri/src/lib.rs`)
+- Pick / preview cible : via `useClickerEditor` + overlay `fixed` / `sequence` — **ne pas** réutiliser ce marqueur pour le pick d’action macro
+- Bannière capture cible : même `PixelPickBanner` (pastilles Gauche/Échap/Droit + compteur) — Esc annule, clic droit **arrête** en gardant les points
+- Capture points Windows : `WH_MOUSE_LL` avale LMB/RMB hors process (l’écran ne réagit pas) ; clics sur nos fenêtres passent (Terminer UI)
+
+## Overlay zones
+
+- Helper : [`src/clicker/zoneOverlay.ts`](src/clicker/zoneOverlay.ts) (`set_zone_overlay_visible`, `push_zone_overlay_state`, `drawSafetyZone`)
+
+## IPC utiles
+
+- Cursor : `get_cursor_position`, `read_pixel`
+- Capture : `start_pixel_color_capture`, `get_pixel_color_capture_state`, `stop_pixel_color_capture`
+- Target overlay : `set_target_overlay_visible`, `push_target_overlay_state` (**cibles clicker seulement**)
+- Zone overlay : `set_zone_overlay_visible`, `push_zone_overlay_state`

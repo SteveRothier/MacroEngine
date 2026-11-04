@@ -695,34 +695,52 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
   useEffect(() => {
     if (!capturingPoints) return;
     let stopped = false;
+    const fixedPick =
+      targetFixedRef.current && !pointsEnabledRef.current;
+    const pollMs = fixedPick ? 50 : 220;
+    let lastCount = -1;
+    let lastPointsKey = "";
+    const pointsKey = (pts: ClickPoint[]) =>
+      pts.map((p) => `${p.x},${p.y},${p.clicks}`).join("|");
+
     const id = window.setInterval(() => {
-      void invoke<{
-        active: boolean;
-        count: number;
-        cancelled: boolean;
-        points: ClickPoint[];
-      }>("get_clicker_point_capture_state")
-        .then((s) => {
+      void (async () => {
+        if (stopped) return;
+        try {
+          const s = await invoke<{
+            active: boolean;
+            count: number;
+            cancelled: boolean;
+            points: ClickPoint[];
+          }>("get_clicker_point_capture_state");
           if (stopped) return;
-          setCapturedCount(s.count);
-          setLiveCapturePoints(s.points ?? []);
+
+          const pts = s.points ?? [];
+          const key = pointsKey(pts);
+          if (s.count !== lastCount) {
+            lastCount = s.count;
+            setCapturedCount(s.count);
+          }
+          if (key !== lastPointsKey) {
+            lastPointsKey = key;
+            setLiveCapturePoints(pts);
+          }
+
           if (!s.active) {
             stopped = true;
             void finishPointCapture().catch(() => {});
             return;
           }
           // Fixed-mode pick: accept the first click and stop (no multi-point UI).
-          if (
-            targetFixedRef.current &&
-            !pointsEnabledRef.current &&
-            s.count >= 1
-          ) {
+          if (fixedPick && s.count >= 1) {
             stopped = true;
             void finishPointCapture().catch(() => {});
           }
-        })
-        .catch(() => {});
-    }, 250);
+        } catch {
+          /* ignore poll errors */
+        }
+      })();
+    }, pollMs);
     return () => {
       stopped = true;
       window.clearInterval(id);
@@ -1134,8 +1152,12 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
       const show = targetOverlayVisible || capturingPoints;
       await setTargetOverlayVisible(show);
       if (show) {
-        const mode =
-          capturingPoints || pointsEnabled
+        // Fixed pick: no following marker (banner only). Sequence keeps live points.
+        const fixedCapturing =
+          capturingPoints && targetFixed && !pointsEnabled;
+        const mode = fixedCapturing
+          ? "cursor"
+          : capturingPoints || pointsEnabled
             ? "sequence"
             : targetFixed
               ? "fixed"
@@ -1149,8 +1171,7 @@ export function useClickerEditor(opts: UseClickerEditorOptions) {
         await pushTargetOverlayState({
           geom: screenGeom,
           mode,
-          fixed:
-            mode === "fixed" ? { x: targetX, y: targetY } : null,
+          fixed: mode === "fixed" ? { x: targetX, y: targetY } : null,
           points: overlayPoints,
         });
       }

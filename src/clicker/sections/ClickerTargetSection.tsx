@@ -5,6 +5,7 @@ import type { ClickerEditor } from "../useClickerEditor";
 import type { ClickPoint } from "../clickerTypes";
 import { useT } from "../../i18n";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
+import { PixelPickBanner } from "../../ui/PixelPickBanner";
 import { ClickerInfoTip } from "../ClickerInfoTip";
 
 type Props = {
@@ -360,48 +361,43 @@ export function ClickerTargetSection({ editor: e }: Props) {
 
   return (
     <div className="caster-clicker-section caster-clicker-target-panel caster-clicker-zones-panel">
-      {e.capturingPoints && typeof document !== "undefined"
-        ? createPortal(
-            <div className="caster-pixel-pick-banner" role="status">
-              <strong>
-                {mode === "fixed"
-                  ? t("clicker.target.captureBannerFixedTitle")
-                  : t("clicker.target.captureBannerSequenceTitle", {
-                      n: e.capturedCount,
-                    })}
-              </strong>
-              <span>
-                {mode === "fixed"
-                  ? t("clicker.target.captureBannerFixedHint")
-                  : t("clicker.target.captureScreenHint", {
-                      n: e.capturedCount,
-                    })}
-              </span>
-              <button
-                type="button"
-                className="caster-btn caster-btn-ghost caster-btn-sm"
-                onPointerDown={(ev) => {
-                  if (ev.button !== 0) return;
-                  ev.preventDefault();
-                  suppressCaptureClickRef.current = true;
-                  void e.onTogglePointCapture();
-                }}
-                onClick={() => {
-                  if (suppressCaptureClickRef.current) {
-                    suppressCaptureClickRef.current = false;
-                    return;
-                  }
-                  void e.onTogglePointCapture();
-                }}
-              >
-                {mode === "fixed"
-                  ? t("clicker.limits.pickCancelBtn")
-                  : t("clicker.target.captureStop", { n: e.capturedCount })}
-              </button>
-            </div>,
-            document.body,
-          )
-        : null}
+      <PixelPickBanner
+        active={e.capturingPoints}
+        title={
+          mode === "fixed"
+            ? t("clicker.target.captureBannerFixedTitle")
+            : t("clicker.target.captureBannerSequenceTitle")
+        }
+        keys={[
+          {
+            kbd: t("shell.pickKeyLeft"),
+            label:
+              mode === "fixed"
+                ? t("shell.pickActionValidate")
+                : t("clicker.target.captureActionAdd"),
+          },
+          {
+            kbd: t("shell.pickKeyEsc"),
+            label: t("shell.pickActionCancel"),
+          },
+          {
+            kbd: t("shell.pickKeyRight"),
+            label:
+              mode === "fixed"
+                ? t("shell.pickActionCancel")
+                : t("shell.pickActionStop"),
+          },
+        ]}
+        center={
+          mode === "sequence" ? (
+            <code className="caster-pixel-pick-coords">
+              {t("clicker.target.captureBannerCount", {
+                n: e.capturedCount,
+              })}
+            </code>
+          ) : null
+        }
+      />
       <div className="caster-settings-row-label-with-info caster-clicker-target-mode-head">
         <span>{t("clicker.target.modeAria")}</span>
         <ClickerInfoTip text={t("clicker.target.priorityHint")} />

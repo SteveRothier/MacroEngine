@@ -264,9 +264,11 @@ export const clicker = defineCatalog({
       bulkDelete: "Supprimer",
       capture: "Capturer des points",
       captureHint:
-        "Cliquez à l’écran pour ajouter des points (clics répétés au même endroit = compteur). Échap ou clic droit annule.",
+        "Cliquez à l’écran pour ajouter des points (clics répétés au même endroit = compteur). Échap = annuler · clic droit = arrêter.",
       captureStart: "Démarrer la capture",
       captureStop: "Terminer ({n})",
+      captureActionAdd: "Ajouter",
+      captureBannerCount: "{n}",
       preview: "Aperçu",
       liveCursor: "Curseur live",
       noPoint: "Aucun point",
@@ -277,7 +279,7 @@ export const clicker = defineCatalog({
         "Glisser une ligne pour réordonner · clic droit : ajouter / capturer · glisser un marqueur · clic droit sur un point : supprimer.",
       previewPlaceHint: "Cliquez pour placer",
       captureScreenHint:
-        "Cliquez sur l’écran ({n}) · Échap ou clic droit annule · Terminer pour valider.",
+        "Gauche = ajouter · Échap = annuler · Droit = arrêter.",
       selectPoint: "Sélectionner",
       contextAria: "Menu du point",
       addPointHere: "Ajouter un point ici",
@@ -285,9 +287,9 @@ export const clicker = defineCatalog({
       hideOverlay: "Masquer l’overlay",
       clearAllPoints: "Supprimer tous les points",
       captureBannerFixedTitle: "Choisir le point fixe",
-      captureBannerSequenceTitle: "Capture · {n} point(s)",
+      captureBannerSequenceTitle: "Capture",
       captureBannerFixedHint:
-        "Clic gauche pour placer · Échap / Annuler pour abandonner.",
+        "Gauche = valider · Échap / Droit = annuler.",
     },
     zones: {
       safetyBlock: "Sécurité",
@@ -403,7 +405,7 @@ export const clicker = defineCatalog({
       enabled: "Activée",
       pickColor: "Pick couleur",
       pickHint:
-        "Clic gauche = échantillonner · Échap / clic droit = annuler.",
+        "Clic gauche = échantillonner · Échap = annuler · Clic droit = arrêter.",
       pickOk: "Couleur {rgb} · ({x}, {y})",
       pickFailed: "Impossible de lire la couleur à cet endroit.",
       pickCancel: "Pick couleur annulé.",
@@ -786,9 +788,11 @@ export const clicker = defineCatalog({
       bulkDelete: "Delete",
       capture: "Capture points",
       captureHint:
-        "Click on screen to add points (repeated clicks on the same spot raise the counter). Esc or right-click cancels.",
+        "Click on screen to add points (repeated clicks on the same spot raise the counter). Esc = cancel · Right click = stop.",
       captureStart: "Start capture",
       captureStop: "Finish ({n})",
+      captureActionAdd: "Add",
+      captureBannerCount: "{n}",
       preview: "Preview",
       liveCursor: "Live cursor",
       noPoint: "No point",
@@ -799,7 +803,7 @@ export const clicker = defineCatalog({
         "Drag a list row to reorder · right-click: add / capture · drag a marker · right-click a point: delete.",
       previewPlaceHint: "Click to place",
       captureScreenHint:
-        "Click on screen ({n}) · Esc or right-click cancels · Finish to confirm.",
+        "Left = add · Esc = cancel · Right = stop.",
       selectPoint: "Select",
       contextAria: "Point menu",
       addPointHere: "Add point here",
@@ -807,9 +811,9 @@ export const clicker = defineCatalog({
       hideOverlay: "Hide overlay",
       clearAllPoints: "Clear all points",
       captureBannerFixedTitle: "Pick fixed point",
-      captureBannerSequenceTitle: "Capture · {n} point(s)",
+      captureBannerSequenceTitle: "Capture",
       captureBannerFixedHint:
-        "Left click to place · Esc / Cancel to abort.",
+        "Left = confirm · Esc / Right = cancel.",
     },
     zones: {
       safetyBlock: "Safety",
@@ -922,7 +926,8 @@ export const clicker = defineCatalog({
       pixelGroupAction: "If out of tolerance",
       enabled: "Enabled",
       pickColor: "Pick color",
-      pickHint: "Left click = sample · Esc / right click = cancel.",
+      pickHint:
+        "Left click = sample · Esc = cancel · Right click = stop.",
       pickOk: "Color {rgb} · ({x}, {y})",
       pickFailed: "Could not read the color at that point.",
       pickCancel: "Color pick cancelled.",

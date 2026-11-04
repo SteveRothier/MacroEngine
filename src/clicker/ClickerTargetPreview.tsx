@@ -17,6 +17,8 @@ type CtxKind =
   | { kind: "canvas"; x: number; y: number };
 
 function targetMode(e: ClickerEditor): TargetMode {
+  // Fixed pick: no following marker / no sequence pastilles (banner only).
+  if (e.capturingPoints && e.targetFixed && !e.pointsEnabled) return "cursor";
   if (e.pointsEnabled || e.capturingPoints) return "sequence";
   if (e.targetFixed) return "fixed";
   return "cursor";
@@ -31,11 +33,19 @@ export function ClickerTargetPreview({ editor: e }: Props) {
   const displayValue =
     e.activeDisplayId ?? e.displays.find((d) => d.isPrimary)?.id ?? "";
 
-  const previewPoints = e.capturingPoints
-    ? [...e.points, ...e.liveCapturePoints]
-    : mode === "sequence"
-      ? e.points
-      : [];
+  const fixedCapturing =
+    e.capturingPoints && e.targetFixed && !e.pointsEnabled;
+
+  const previewPoints = fixedCapturing
+    ? []
+    : e.capturingPoints
+      ? [...e.points, ...e.liveCapturePoints]
+      : mode === "sequence"
+        ? e.points
+        : [];
+
+  const fixedMarker =
+    mode === "fixed" ? { x: e.targetX, y: e.targetY } : null;
 
   const canEdit = !e.editDisabled && !e.running && !e.capturingPoints;
 
@@ -86,7 +96,10 @@ export function ClickerTargetPreview({ editor: e }: Props) {
   const addPointAt = (x: number, y: number) => {
     const nextIndex = e.points.length;
     e.setPointsEnabled(true);
-    e.setPoints((prev) => [...prev, { x, y, clicks: 1, radius: 0, pauseAfterMs: 0 }]);
+    e.setPoints((prev) => [
+      ...prev,
+      { x, y, clicks: 1, radius: 0, pauseAfterMs: 0 },
+    ]);
     e.setSelectedPointIndex(nextIndex);
   };
 
@@ -119,7 +132,9 @@ export function ClickerTargetPreview({ editor: e }: Props) {
       </div>
       {e.capturingPoints ? (
         <p className="caster-clicker-hint caster-clicker-zone-draw-hint">
-          {t("clicker.target.captureScreenHint", { n: e.capturedCount })}
+          {fixedCapturing
+            ? t("clicker.target.captureBannerFixedHint")
+            : t("clicker.target.captureScreenHint", { n: e.capturedCount })}
         </p>
       ) : mode !== "cursor" && !e.editDisabled ? (
         <p className="caster-clicker-hint caster-clicker-zone-draw-hint">
@@ -131,7 +146,7 @@ export function ClickerTargetPreview({ editor: e }: Props) {
       <TargetMap
         geom={e.screenGeom}
         mode={mode}
-        fixed={mode === "fixed" ? { x: e.targetX, y: e.targetY } : null}
+        fixed={fixedMarker}
         points={previewPoints}
         selectedIndex={e.selectedPointIndex}
         editable={canEdit}

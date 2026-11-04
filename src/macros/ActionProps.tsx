@@ -2,9 +2,14 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileCode2 } from "lucide-react";
 import { Segmented } from "../ui";
-import { DropdownMenu, Select, Tooltip } from "../ui/shell";
+import { DropdownMenu, Select, Tooltip, useToast } from "../ui/shell";
 import type { DropdownEntry } from "../ui/shell";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
+import {
+  pickScreenPointDetailed,
+  type PixelPickPreview,
+} from "../pick";
+import { PixelPickBanner } from "../ui/PixelPickBanner";
 import type { KeyMods, MacroAction } from "./types";
 import { parseLit } from "./conditionOps";
 import type { ScriptDoc } from "../scripts/types";
@@ -66,30 +71,89 @@ function PointFields({
   hint,
 }: PointFieldsProps) {
   const t = useT();
+  const toast = useToast();
+  const [picking, setPicking] = useState(false);
+  const [pickPreview, setPickPreview] = useState<PixelPickPreview>(null);
   const mode: "cursor" | "position" =
     optional && x == null && y == null ? "cursor" : "position";
+
+  async function onPickScreen() {
+    if (disabled || picking) return;
+    setPicking(true);
+    setPickPreview(null);
+    try {
+      const result = await pickScreenPointDetailed(setPickPreview);
+      if (result.ok) {
+        onChangeXY(result.point.x, result.point.y);
+      } else if (result.reason !== "cancel") {
+        toast.error(t("macros.params.pickCancelled"));
+      }
+    } finally {
+      setPickPreview(null);
+      setPicking(false);
+    }
+  }
+
+  const banner = (
+    <PixelPickBanner
+      active={picking}
+      preview={pickPreview}
+      showColor={false}
+    />
+  );
+
+  const pickButton = (
+    <button
+      type="button"
+      className={[
+        "caster-btn",
+        "caster-btn-ghost",
+        "action-props-pick-btn",
+        picking ? "is-capturing" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      disabled={disabled || picking}
+      title={
+        picking ? t("macros.params.pickOverlay") : t("macros.params.pickScreen")
+      }
+      aria-label={
+        picking ? t("macros.params.pickOverlay") : t("macros.params.pickScreen")
+      }
+      onClick={() => void onPickScreen()}
+    >
+      <span aria-hidden>⌖</span>
+      {picking
+        ? t("macros.params.pickOverlay")
+        : t("macros.params.pickScreen")}
+    </button>
+  );
 
   if (optional) {
     return (
       <>
+        {banner}
         <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
           <span>{t("macros.params.position")}</span>
-          <Segmented
-            ariaLabel={t("macros.params.positionModeAria")}
-            value={mode}
-            disabled={disabled}
-            options={[
-              { value: "cursor", label: t("macros.params.cursor") },
-              { value: "position", label: t("macros.params.position") },
-            ]}
-            onChange={(v) => {
-              if (v === "cursor") {
-                onChangeXY(null, null);
-              } else if (x == null && y == null) {
-                onChangeXY(0, 0);
-              }
-            }}
-          />
+          <div className="action-props-point-mode-row">
+            <Segmented
+              ariaLabel={t("macros.params.positionModeAria")}
+              value={mode}
+              disabled={disabled || picking}
+              options={[
+                { value: "cursor", label: t("macros.params.cursor") },
+                { value: "position", label: t("macros.params.position") },
+              ]}
+              onChange={(v) => {
+                if (v === "cursor") {
+                  onChangeXY(null, null);
+                } else if (x == null && y == null) {
+                  onChangeXY(0, 0);
+                }
+              }}
+            />
+            {pickButton}
+          </div>
         </div>
         {mode === "cursor" ? (
           hint ? (
@@ -102,7 +166,7 @@ function PointFields({
             <label className="caster-field">
               <span>{t("macros.params.coordX")}</span>
               <WheelNumberInput
-                disabled={disabled}
+                disabled={disabled || picking}
                 value={x ?? ""}
                 onValueChange={(n) => onChangeXY(n, y ?? null)}
                 onEmptyChange={() => onChangeXY(null, y ?? null)}
@@ -111,7 +175,7 @@ function PointFields({
             <label className="caster-field">
               <span>{t("macros.params.coordY")}</span>
               <WheelNumberInput
-                disabled={disabled}
+                disabled={disabled || picking}
                 value={y ?? ""}
                 onValueChange={(n) => onChangeXY(x ?? null, n)}
                 onEmptyChange={() => onChangeXY(x ?? null, null)}
@@ -130,10 +194,11 @@ function PointFields({
 
   return (
     <>
+      {banner}
       <label className="caster-field">
         <span>{t("macros.params.coordX")}</span>
         <WheelNumberInput
-          disabled={disabled}
+          disabled={disabled || picking}
           value={x ?? ""}
           onValueChange={(n) => onChangeXY(n, y ?? 0)}
         />
@@ -141,11 +206,12 @@ function PointFields({
       <label className="caster-field">
         <span>{t("macros.params.coordY")}</span>
         <WheelNumberInput
-          disabled={disabled}
+          disabled={disabled || picking}
           value={y ?? ""}
           onValueChange={(n) => onChangeXY(x ?? 0, n)}
         />
       </label>
+      <div style={{ gridColumn: "1 / -1" }}>{pickButton}</div>
       {hint ? (
         <p className="hint" style={{ gridColumn: "1 / -1" }}>
           {hint}
