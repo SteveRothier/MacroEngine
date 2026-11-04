@@ -1103,6 +1103,34 @@ export function SettingsView({
                   </div>
                   <div className="caster-settings-row">
                     <div className="caster-settings-row-label">
+                      <span>{t("settings.application.accueilLayout")}</span>
+                      <p>{t("settings.application.accueilLayoutHint")}</p>
+                    </div>
+                    <div className="caster-settings-row-control">
+                      <Select
+                        className="caster-select"
+                        value={accueil.accueilLayout}
+                        ariaLabel={t("settings.application.accueilLayout")}
+                        options={[
+                          {
+                            value: "media",
+                            label: t("settings.application.accueilLayoutMedia"),
+                          },
+                          {
+                            value: "legacy",
+                            label: t("settings.application.accueilLayoutLegacy"),
+                          },
+                        ]}
+                        onChange={(v) =>
+                          persistAccueilPrefs({
+                            accueilLayout: v as AccueilPrefs["accueilLayout"],
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="caster-settings-row">
+                    <div className="caster-settings-row-label">
                       <span>{t("settings.application.defaultSortBy")}</span>
                       <p>{t("settings.application.defaultSortByHint")}</p>
                     </div>

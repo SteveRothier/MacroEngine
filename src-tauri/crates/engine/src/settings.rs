@@ -208,6 +208,13 @@ pub struct AccueilPrefs {
     pub double_click_delay_ms: u32,
     #[serde(default = "default_drag_threshold")]
     pub drag_threshold_px: u32,
+    /// Accueil list presentation (`media` | `legacy`).
+    #[serde(default = "default_accueil_layout")]
+    pub accueil_layout: String,
+}
+
+fn default_accueil_layout() -> String {
+    "media".into()
 }
 
 impl Default for AccueilPrefs {
@@ -226,6 +233,7 @@ impl Default for AccueilPrefs {
             sync_library_sort_on_reorder: true,
             double_click_delay_ms: 300,
             drag_threshold_px: 6,
+            accueil_layout: default_accueil_layout(),
         }
     }
 }

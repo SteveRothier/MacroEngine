@@ -4,6 +4,7 @@
 
 - Accueil : import / export JSON & ZIP bibliothèque, enable/disable, icône emoji, badge conflit hotkey + preview au survol
 - Accueil : liste **media-rows** (identité + sous-ligne kind · trigger) ; chrome navigation / actions séparé ; dock bulk allégé (ouvrir / exporter / déplacer / corbeille)
+- Pref Accueil `accueilLayout` media|legacy (Paramètres)
 
 ## Phase 25
 

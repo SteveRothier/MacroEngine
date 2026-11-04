@@ -172,6 +172,9 @@ export function mergeAccueilPrefs(
   // Purged FE field (still may exist in older settings.json / Rust).
   delete (merged as AccueilPrefs & { doubleClickDelayMs?: number })
     .doubleClickDelayMs;
+  if (merged.accueilLayout !== "media" && merged.accueilLayout !== "legacy") {
+    merged.accueilLayout = "media";
+  }
   return merged;
 }
 
