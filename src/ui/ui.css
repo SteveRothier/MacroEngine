@@ -33,9 +33,11 @@ select:hover:not(:disabled) {
   background-color: var(--bg-card);
 }
 
+select:focus,
 select:focus-visible {
-  outline: 2px solid var(--accent-border);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: none;
+  border-color: var(--accent-border);
 }
 
 select:disabled {
@@ -1754,10 +1756,12 @@ textarea {
     box-shadow var(--dur-fast) var(--ease-out);
 }
 
+input:not([type="checkbox"]):not([type="radio"]):focus,
 input:not([type="checkbox"]):not([type="radio"]):focus-visible,
+textarea:focus,
 textarea:focus-visible {
-  outline: var(--focus-ring);
-  outline-offset: 1px;
+  outline: none;
+  box-shadow: none;
   border-color: var(--accent-border);
 }
 

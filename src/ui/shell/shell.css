@@ -4000,27 +4000,46 @@ button.caster-sidebar-item,
   resize: vertical;
 }
 
+.caster-root input[type="text"]:focus,
 .caster-root input[type="text"]:focus-visible,
+.caster-root input[type="number"]:focus,
 .caster-root input[type="number"]:focus-visible,
+.caster-root input[type="search"]:focus,
 .caster-root input[type="search"]:focus-visible,
+.caster-root input[type="password"]:focus,
 .caster-root input[type="password"]:focus-visible,
+.caster-root input:not([type]):focus,
 .caster-root input:not([type]):focus-visible,
+.caster-root select:focus,
 .caster-root select:focus-visible,
+.caster-root textarea:focus,
 .caster-root textarea:focus-visible,
+.caster-root .action-cell-input:focus,
 .caster-root .action-cell-input:focus-visible,
+.caster-root .action-cell-select:focus,
 .caster-root .action-cell-select:focus-visible,
+.caster-root .caster-select:focus,
 .caster-root .caster-select:focus-visible,
+.caster-root .caster-select-trigger.caster-select:focus,
 .caster-root .caster-select-trigger.caster-select:focus-visible,
+.caster-root .caster-select-trigger.caster-clicker-zone-select:focus,
 .caster-root .caster-select-trigger.caster-clicker-zone-select:focus-visible,
+.caster-root .caster-dialog-input:focus,
 .caster-root .caster-dialog-input:focus-visible,
+.caster-root .caster-macro-meta-input:focus,
 .caster-root .caster-macro-meta-input:focus-visible,
+.caster-root .caster-titlebar-name-input:focus,
 .caster-root .caster-titlebar-name-input:focus-visible,
+.caster-field input:focus,
 .caster-field input:focus-visible,
+.caster-field select:focus,
 .caster-field select:focus-visible,
+.caster-field textarea:focus,
 .caster-field textarea:focus-visible {
-  outline: none;
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
   border-color: color-mix(in srgb, var(--caster-accent) 55%, var(--caster-border-subtle));
-  box-shadow: var(--caster-focus-ring);
 }
 
 .caster-root .action-cell-input,
@@ -6033,11 +6052,12 @@ button.caster-clicker-lock:focus-visible:not(:disabled) {
 
 .caster-clicker-point-main .action-cell-input:focus,
 .caster-clicker-point-main .action-cell-input:focus-visible {
-  outline: none;
+  outline: none !important;
+  outline-offset: 0 !important;
   z-index: 1;
   position: relative;
   border-color: color-mix(in srgb, var(--caster-accent) 55%, var(--caster-border-subtle));
-  box-shadow: var(--caster-focus-ring);
+  box-shadow: none !important;
 }
 
 .caster-clicker-point-row.is-drag-source {
