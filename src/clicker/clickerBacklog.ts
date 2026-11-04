@@ -139,31 +139,31 @@ export const CLICKER_STUDIO_NOTES: readonly ClickerBacklogItem[] = [
 /** Accueil : liste, sélection, dossiers, conversion. */
 export const ACCUEIL_NOTES: readonly ClickerBacklogItem[] = [
   {
-    id: "accueil-columns",
-    title: "Colonnes adaptatives",
+    id: "accueil-media-rows",
+    title: "Media-rows Phase 26",
     summary:
-      "Large : check · kind · nom (1fr) · Infos/hotkey/lastRun/trail à largeurs fixes (grille dense). Étroit (container ~720px) : Infos/hotkey/lastRun dans le subtitle. Hairlines + hover tokens ; dossiers teinte légère. Pas de colonnes État / Dossier / Type / #. Déclencheur masqué si Manuel ; lastRun sans tiret vide.",
+      "Ligne identité : emoji/icône · nom · subtitle kind·trigger ; trail play/★/enable ; meta/info en hover preview. Pref accueilLayout media|legacy. Pas de colonne Types.",
     priority: 1,
   },
   {
     id: "accueil-open-selection",
     title: "Clic et sélection",
     summary:
-      "Clic gauche ouvre toujours ; avec sélection : clear + ouvrir. Shift/Ctrl/Cmd+clic = coche additive ; Espace toggle, Entrée ouvre ; Esc ou clic dehors désélectionne. lastRun relatif rafraîchi ~45 s. Tri Nom↔Ordre explicite ; Infos/Déclencheur inertes.",
+      "Clic gauche ouvre toujours ; avec sélection : clear + ouvrir. Shift/Ctrl/Cmd+clic = coche additive ; Espace toggle, Entrée ouvre ; Esc ou clic dehors désélectionne. Tri Nom↔Ordre explicite.",
     priority: 2,
   },
   {
     id: "accueil-dock",
     title: "Dock multi-sélection",
     summary:
-      "Ouvrir (tous si multi) · Lancer « nom » (premier) · Dupliquer · Corbeille (masquée si tout verrouillé) + menu Plus (favori/verrou/dossier/convert). Verrouillé = lecture seule (pas rename/dupliquer/corbeille/déplacer/convert/DnD ; éditeurs RO ; backend refuse trash/save/move/convert).",
+      "Bulk only : Ouvrir · Exporter · Déplacer · Corbeille/Restaurer. Favori/verrou/convert restent au menu ligne. Verrouillé = lecture seule (pas rename/dupliquer/corbeille/déplacer/convert/DnD).",
     priority: 3,
   },
   {
     id: "accueil-filters",
     title: "Filtres et empty",
     summary:
-      "Filtre vue + menu Types (Tous/Macro/Clicker/Script, compteurs). Sections dossier vides masquées ; empty kind dédié. Recherche : surlignage + aller au dossier (expand/scroll).",
+      "Vues Tous/Favoris/Récents/Corbeille + search (plus de filtre Types). Empty : Import + Créer. Recherche : surlignage + aller au dossier.",
     priority: 4,
   },
   {

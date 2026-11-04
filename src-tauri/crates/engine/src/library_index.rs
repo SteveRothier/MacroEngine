@@ -66,18 +66,41 @@ pub struct LibraryFolder {
     pub sort_order: i32,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LibraryEntryMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folder_id: Option<String>,
     #[serde(default)]
     pub locked: bool,
+    /// When false, hotkey/schedule/FG/title triggers are ignored.
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    /// Optional emoji / short glyph shown on Accueil.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
     #[serde(default)]
     pub sort_order: i32,
     /// Unix seconds when moved to trash (for auto-purge).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trashed_at: Option<u64>,
+}
+
+fn default_enabled() -> bool {
+    true
+}
+
+impl Default for LibraryEntryMeta {
+    fn default() -> Self {
+        Self {
+            folder_id: None,
+            locked: false,
+            enabled: true,
+            icon: None,
+            sort_order: 0,
+            trashed_at: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,6 +140,10 @@ pub struct LibraryItemDto {
     pub kind: String,
     pub folder_id: Option<String>,
     pub locked: bool,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
     pub trashed: bool,
     pub updated_at: u64,
     pub meta: Option<String>,
@@ -501,6 +528,8 @@ fn build_dto(
             kind: key.to_string(),
             folder_id: meta.folder_id,
             locked: meta.locked,
+            enabled: meta.enabled,
+            icon: meta.icon.clone(),
             trashed,
             updated_at,
             meta: None,
@@ -840,6 +869,57 @@ pub fn set_library_item_locked(
     let mut index = load_index(config_dir)?;
     let mut meta = entry_meta(&index, kind, &id);
     meta.locked = locked;
+    set_entry(&mut index, kind, &id, meta);
+    save_index(config_dir, &index)?;
+    Ok(())
+}
+
+pub fn is_enabled(config_dir: &Path, kind: LibraryKind, id: &str) -> Result<bool, LibraryIndexError> {
+    let index = load_index(config_dir)?;
+    if is_trashed(&index, kind, id) {
+        return Ok(false);
+    }
+    Ok(entry_meta(&index, kind, id).enabled)
+}
+
+pub fn set_library_item_enabled(
+    config_dir: &Path,
+    kind: LibraryKind,
+    id: String,
+    enabled: bool,
+) -> Result<(), LibraryIndexError> {
+    list_disk_ids(config_dir, kind)?
+        .iter()
+        .find(|x| **x == id)
+        .ok_or_else(|| LibraryIndexError::Other(format!("élément introuvable: {id}")))?;
+    let mut index = load_index(config_dir)?;
+    let mut meta = entry_meta(&index, kind, &id);
+    meta.enabled = enabled;
+    set_entry(&mut index, kind, &id, meta);
+    save_index(config_dir, &index)?;
+    Ok(())
+}
+
+pub fn set_library_item_icon(
+    config_dir: &Path,
+    kind: LibraryKind,
+    id: String,
+    icon: Option<String>,
+) -> Result<(), LibraryIndexError> {
+    list_disk_ids(config_dir, kind)?
+        .iter()
+        .find(|x| **x == id)
+        .ok_or_else(|| LibraryIndexError::Other(format!("élément introuvable: {id}")))?;
+    let mut index = load_index(config_dir)?;
+    let mut meta = entry_meta(&index, kind, &id);
+    let next = icon
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            // Keep at most a short glyph / emoji sequence.
+            s.chars().take(8).collect::<String>()
+        });
+    meta.icon = next;
     set_entry(&mut index, kind, &id, meta);
     save_index(config_dir, &index)?;
     Ok(())
@@ -1201,6 +1281,7 @@ mod tests {
             param_values: Default::default(),
             process_filter: Default::default(),
             local_process_filter: Default::default(),
+            trigger: crate::schema::Trigger::Manual,
         };
         save_script(&dir, &doc).unwrap();
         let folder =

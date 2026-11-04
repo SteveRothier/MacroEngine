@@ -20,8 +20,18 @@ export type AutomationRow = {
   lastRunAt?: number;
   favorite: boolean;
   locked: boolean;
+  /** When false, triggers are ignored by the engine. */
+  enabled?: boolean;
+  /** Optional emoji glyph for Accueil. */
+  icon?: string | null;
+  /** Hotkey conflict with another item id (same kind or cross-kind). */
+  conflictWith?: { kind: AutomationKind; id: string; name: string } | null;
   dirty: boolean;
   meta?: string;
+  /** Preview extras (hover). */
+  previewCps?: number;
+  previewMode?: string;
+  previewActionCount?: number;
   /** Library index order within kind+folder. */
   sortOrder?: number;
   /** True when the item is in the library trash. */

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::actions::registry::ActionError;
-use crate::schema::{MacroProcessFilterMode, MacroValue};
+use crate::schema::{MacroProcessFilterMode, MacroValue, Trigger};
 use crate::settings::ProcessFilter;
 
 #[derive(Debug, Error)]
@@ -69,6 +69,13 @@ pub struct ScriptDoc {
     pub process_filter: MacroProcessFilterMode,
     #[serde(default, rename = "localProcessFilter")]
     pub local_process_filter: ProcessFilter,
+    /// Per-script launch trigger (hotkey / schedule / FG / window title).
+    #[serde(default = "default_script_trigger")]
+    pub trigger: Trigger,
+}
+
+fn default_script_trigger() -> Trigger {
+    Trigger::Manual
 }
 
 impl ScriptDoc {
@@ -108,10 +115,62 @@ pub struct ScriptSummary {
     pub allow_input: bool,
     #[serde(default)]
     pub allow_process: bool,
+    #[serde(default = "default_trigger_type_str")]
+    pub trigger_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trigger_key: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schedule_hour: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schedule_minute: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foreground_exe: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_title: Option<String>,
+}
+
+fn default_trigger_type_str() -> String {
+    "manual".into()
 }
 
 impl From<&ScriptDoc> for ScriptSummary {
     fn from(doc: &ScriptDoc) -> Self {
+        let (trigger_type, trigger_key, schedule_hour, schedule_minute, foreground_exe, window_title) =
+            match &doc.trigger {
+                Trigger::Hotkey { key, .. } => (
+                    "hotkey".into(),
+                    Some(key.clone()),
+                    None,
+                    None,
+                    None,
+                    None,
+                ),
+                Trigger::Manual => ("manual".into(), None, None, None, None, None),
+                Trigger::Schedule { hour, minute, .. } => (
+                    "schedule".into(),
+                    None,
+                    Some(*hour),
+                    Some(*minute),
+                    None,
+                    None,
+                ),
+                Trigger::ForegroundProcess { exe, .. } => (
+                    "foreground_process".into(),
+                    None,
+                    None,
+                    None,
+                    Some(exe.clone()),
+                    None,
+                ),
+                Trigger::WindowTitle { pattern, .. } => (
+                    "window_title".into(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(pattern.clone()),
+                ),
+            };
         Self {
             id: doc.id.clone(),
             name: doc.name.clone(),
@@ -123,6 +182,12 @@ impl From<&ScriptDoc> for ScriptSummary {
             allow_macro_control: doc.allow_macro_control,
             allow_input: doc.allow_input,
             allow_process: doc.allow_process,
+            trigger_type,
+            trigger_key,
+            schedule_hour,
+            schedule_minute,
+            foreground_exe,
+            window_title,
         }
     }
 }
@@ -292,6 +357,71 @@ pub fn delete_script(config_dir: &Path, id: &str) -> Result<(), ScriptLibraryErr
     Ok(())
 }
 
+fn unique_script_id(config_dir: &Path, base: &str) -> Result<String, ScriptLibraryError> {
+    let base = base
+        .trim()
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let base = if base.is_empty() {
+        "script".into()
+    } else {
+        base.chars().take(48).collect()
+    };
+    let existing: Vec<String> = list_scripts(config_dir)?.into_iter().map(|d| d.id).collect();
+    if !existing.iter().any(|id| id == &base) {
+        return Ok(base);
+    }
+    for i in 2..1000 {
+        let candidate = format!("{base}-{i}");
+        if !existing.iter().any(|id| id == &candidate) {
+            return Ok(candidate);
+        }
+    }
+    Err(ScriptLibraryError::Other(format!(
+        "could not allocate unique script id for {base}"
+    )))
+}
+
+/// Write a library script JSON to an arbitrary path (share / backup).
+pub fn export_script_to_path(
+    config_dir: &Path,
+    id: &str,
+    path: &Path,
+) -> Result<(), ScriptLibraryError> {
+    let doc = load_script(config_dir, id)?;
+    let raw = serde_json::to_string_pretty(&doc)?;
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    fs::write(path, raw)?;
+    Ok(())
+}
+
+/// Import a script JSON file into the library (unique id if collision).
+pub fn import_script_from_path(
+    config_dir: &Path,
+    path: &Path,
+) -> Result<ScriptDoc, ScriptLibraryError> {
+    let raw = fs::read_to_string(path)?;
+    let mut doc: ScriptDoc = serde_json::from_str(&raw)?;
+    let base = if doc.id.trim().is_empty() {
+        doc.name.clone()
+    } else {
+        doc.id.clone()
+    };
+    doc.id = unique_script_id(config_dir, &base)?;
+    if doc.name.trim().is_empty() {
+        doc.name = doc.id.clone();
+    }
+    save_script(config_dir, &doc)?;
+    Ok(doc)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -320,6 +450,7 @@ mod tests {
             param_values: HashMap::new(),
             process_filter: Default::default(),
             local_process_filter: Default::default(),
+            trigger: Trigger::Manual,
         };
         save_script(&dir, &doc).unwrap();
         let loaded = load_script(&dir, "hello").unwrap();
@@ -357,6 +488,42 @@ mod tests {
             raw.contains("\"language\": \"javascript\"") || raw.contains("\"language\":\"javascript\""),
             "expected persisted javascript, got {raw}"
         );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn import_export_script_roundtrip() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let dir = std::env::temp_dir().join(format!("caster-scripts-ie-{stamp}"));
+        let _ = fs::remove_dir_all(&dir);
+        let doc = ScriptDoc {
+            id: "share".into(),
+            name: "Share".into(),
+            source: "caster.log('hi');".into(),
+            language: ScriptLanguage::Javascript,
+            is_module: false,
+            allow_network: false,
+            allow_clipboard: false,
+            allow_fs: false,
+            allow_macro_control: false,
+            allow_input: true,
+            allow_process: false,
+            param_values: HashMap::new(),
+            process_filter: Default::default(),
+            local_process_filter: Default::default(),
+            trigger: Trigger::Manual,
+        };
+        save_script(&dir, &doc).unwrap();
+        let out = dir.join("share-export.json");
+        export_script_to_path(&dir, "share", &out).unwrap();
+        delete_script(&dir, "share").unwrap();
+        let imported = import_script_from_path(&dir, &out).unwrap();
+        assert_eq!(imported.id, "share");
+        assert!(imported.allow_input);
+        assert_eq!(imported.source, doc.source);
         let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -2,24 +2,21 @@ import { useRef, type RefObject } from "react";
 import {
   ChevronDown,
   Code2,
+  Download,
   FolderPlus,
-  LayoutGrid,
   MousePointer2,
   Plus,
   Redo2,
   Search,
   Trash2,
   Undo2,
+  Upload,
   Workflow,
   X,
 } from "lucide-react";
 import { useT } from "../i18n";
 import { DropdownMenu, Tooltip } from "../ui/shell";
-import type {
-  AutomationFilter,
-  AutomationKindFilter,
-  FilterCounts,
-} from "./types";
+import type { AutomationFilter, FilterCounts } from "./types";
 import { filterPillTooltip } from "./rowLabels";
 
 type Props = {
@@ -27,8 +24,6 @@ type Props = {
   onQueryChange: (q: string) => void;
   filter: AutomationFilter;
   onFilterChange: (f: AutomationFilter) => void;
-  kindFilter: AutomationKindFilter;
-  onKindFilterChange: (k: AutomationKindFilter) => void;
   counts: FilterCounts;
   onCreateMacro: () => void;
   onCreateClicker: () => void;
@@ -41,8 +36,13 @@ type Props = {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
-  /** When filter is trash and count > 0, show empty-trash control. */
   onPurgeTrash?: () => void;
+  onImport?: () => void;
+  onExportLibrary?: () => void;
+  onExportSelection?: () => void;
+  canExportSelection?: boolean;
+  onDeleteSelection?: () => void;
+  canDeleteSelection?: boolean;
 };
 
 const FILTER_VIEW_DEFS: {
@@ -76,49 +76,11 @@ const FILTER_VIEW_DEFS: {
   },
 ];
 
-const KIND_FILTER_DEFS: {
-  value: AutomationKindFilter;
-  labelKey:
-    | "automations.filter.kindAll"
-    | "automations.filter.kindMacro"
-    | "automations.filter.kindClicker"
-    | "automations.filter.kindScript";
-  countKey: keyof FilterCounts | null;
-  icon: "all" | "macro" | "clicker" | "script";
-}[] = [
-  {
-    value: "all",
-    labelKey: "automations.filter.kindAll",
-    countKey: null,
-    icon: "all",
-  },
-  {
-    value: "macro",
-    labelKey: "automations.filter.kindMacro",
-    countKey: "macro",
-    icon: "macro",
-  },
-  {
-    value: "clicker",
-    labelKey: "automations.filter.kindClicker",
-    countKey: "clicker",
-    icon: "clicker",
-  },
-  {
-    value: "script",
-    labelKey: "automations.filter.kindScript",
-    countKey: "script",
-    icon: "script",
-  },
-];
-
 export function AutomationsToolbar({
   query,
   onQueryChange,
   filter,
   onFilterChange,
-  kindFilter,
-  onKindFilterChange,
   counts,
   onCreateMacro,
   onCreateClicker,
@@ -132,14 +94,16 @@ export function AutomationsToolbar({
   onUndo,
   onRedo,
   onPurgeTrash,
+  onImport,
+  onExportLibrary,
+  onExportSelection,
+  canExportSelection = false,
+  onDeleteSelection,
+  canDeleteSelection = false,
 }: Props) {
   const t = useT();
   const localSearchRef = useRef<HTMLInputElement>(null);
   const searchRef = searchInputRef ?? localSearchRef;
-
-  const kindFilterDef =
-    KIND_FILTER_DEFS.find((d) => d.value === kindFilter) ?? KIND_FILTER_DEFS[0]!;
-  const kindFilterLabel = t(kindFilterDef.labelKey);
 
   const createItems = [
     {
@@ -176,9 +140,30 @@ export function AutomationsToolbar({
       : []),
   ];
 
+  const exportItems = [
+    ...(canExportSelection && onExportSelection
+      ? [
+          {
+            id: "selection",
+            label: t("automations.toolbar.exportSelection"),
+            onSelect: onExportSelection,
+          },
+        ]
+      : []),
+    ...(onExportLibrary
+      ? [
+          {
+            id: "library",
+            label: t("automations.toolbar.exportLibrary"),
+            onSelect: onExportLibrary,
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="caster-automations-chrome">
-      <div className="caster-automations-filter-bar">
+      <div className="caster-automations-chrome-nav">
         <div
           className="caster-segmented caster-segmented--compact caster-automations-view-segmented"
           role="group"
@@ -206,45 +191,7 @@ export function AutomationsToolbar({
           ))}
         </div>
 
-        <DropdownMenu
-          label={kindFilterLabel}
-          ariaLabel={t("automations.filter.kindAria")}
-          align="start"
-          triggerClassName={[
-            "caster-btn",
-            "caster-btn-ghost",
-            "caster-automations-kind-menu-btn",
-            kindFilter !== "all" ? "is-filtered" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          items={KIND_FILTER_DEFS.map(({ value, labelKey, countKey, icon }) => {
-            const Icon =
-              icon === "macro"
-                ? Workflow
-                : icon === "clicker"
-                  ? MousePointer2
-                  : icon === "script"
-                    ? Code2
-                    : LayoutGrid;
-            const countSuffix =
-              countKey != null ? ` · ${counts[countKey]}` : "";
-            return {
-              id: value,
-              label: `${t(labelKey)}${countSuffix}`,
-              icon: <Icon size={14} />,
-              onSelect: () => onKindFilterChange(value),
-            };
-          })}
-        >
-          <LayoutGrid size={14} aria-hidden />
-          <span className="caster-automations-kind-menu-label">
-            {kindFilterLabel}
-          </span>
-          <ChevronDown size={14} aria-hidden />
-        </DropdownMenu>
-
-        <label className="caster-automations-search">
+        <label className="caster-automations-search caster-automations-search--nav">
           <Search
             size={12}
             aria-hidden
@@ -287,61 +234,105 @@ export function AutomationsToolbar({
             </button>
           ) : null}
         </label>
+      </div>
 
-        <div className="caster-automations-filter-bar-end">
-          {onUndo || onRedo ? (
-            <div
-              className="caster-segmented caster-segmented--compact caster-automations-history"
-              role="group"
-              aria-label={t("automations.toolbar.aria")}
-            >
-              <button
-                type="button"
-                className="caster-segmented-btn caster-automations-history-btn"
-                disabled={!canUndo}
-                onClick={onUndo}
-                title={t("automations.toolbar.undoTitle")}
-                aria-label={t("automations.toolbar.undo")}
-              >
-                <Undo2 size={14} aria-hidden />
-              </button>
-              <button
-                type="button"
-                className="caster-segmented-btn caster-automations-history-btn"
-                disabled={!canRedo}
-                onClick={onRedo}
-                title={t("automations.toolbar.redoTitle")}
-                aria-label={t("automations.toolbar.redo")}
-              >
-                <Redo2 size={14} aria-hidden />
-              </button>
-            </div>
-          ) : null}
-          {filter === "trash" && counts.trash > 0 && onPurgeTrash ? (
+      <div className="caster-automations-chrome-actions">
+        {onUndo || onRedo ? (
+          <div
+            className="caster-segmented caster-segmented--compact caster-automations-history"
+            role="group"
+            aria-label={t("automations.toolbar.aria")}
+          >
             <button
               type="button"
-              className="caster-btn caster-btn-danger-ghost"
-              onClick={onPurgeTrash}
-              title={t("automations.toolbar.purgeTrashTitle")}
+              className="caster-segmented-btn caster-automations-history-btn"
+              disabled={!canUndo}
+              onClick={onUndo}
+              title={t("automations.toolbar.undoTitle")}
+              aria-label={t("automations.toolbar.undo")}
             >
-              <Trash2 size={14} aria-hidden />
-              {t("automations.toolbar.purgeTrash")}
+              <Undo2 size={14} aria-hidden />
             </button>
+            <button
+              type="button"
+              className="caster-segmented-btn caster-automations-history-btn"
+              disabled={!canRedo}
+              onClick={onRedo}
+              title={t("automations.toolbar.redoTitle")}
+              aria-label={t("automations.toolbar.redo")}
+            >
+              <Redo2 size={14} aria-hidden />
+            </button>
+          </div>
+        ) : null}
+
+        <div
+          className="caster-automations-icon-bar"
+          role="group"
+          aria-label={t("automations.toolbar.iconBarAria")}
+        >
+          {onImport ? (
+            <Tooltip content={t("automations.toolbar.importTip")}>
+              <button
+                type="button"
+                className="caster-btn caster-btn-ghost caster-automations-icon-btn"
+                onClick={onImport}
+                aria-label={t("automations.toolbar.importTip")}
+              >
+                <Upload size={14} aria-hidden />
+              </button>
+            </Tooltip>
           ) : null}
-          <DropdownMenu
-            label={t("automations.create.label")}
-            ariaLabel={t("automations.create.aria")}
-            align="end"
-            triggerClassName="caster-btn caster-btn-primary caster-automations-create-btn"
-            open={createOpen}
-            onOpenChange={onCreateOpenChange}
-            items={createItems}
-          >
-            <Plus size={14} aria-hidden />
-            {t("automations.create.label")}
-            <ChevronDown size={14} aria-hidden />
-          </DropdownMenu>
+          {exportItems.length > 0 ? (
+            <DropdownMenu
+              label={t("automations.toolbar.exportTip")}
+              ariaLabel={t("automations.toolbar.exportTip")}
+              align="end"
+              triggerClassName="caster-btn caster-btn-ghost caster-automations-icon-btn"
+              items={exportItems}
+            >
+              <Download size={14} aria-hidden />
+            </DropdownMenu>
+          ) : null}
+          {onDeleteSelection ? (
+            <Tooltip content={t("automations.toolbar.deleteSelectionTip")}>
+              <button
+                type="button"
+                className="caster-btn caster-btn-ghost caster-automations-icon-btn"
+                disabled={!canDeleteSelection}
+                onClick={onDeleteSelection}
+                aria-label={t("automations.toolbar.deleteSelectionTip")}
+              >
+                <Trash2 size={14} aria-hidden />
+              </button>
+            </Tooltip>
+          ) : null}
         </div>
+
+        {filter === "trash" && counts.trash > 0 && onPurgeTrash ? (
+          <button
+            type="button"
+            className="caster-btn caster-btn-danger-ghost"
+            onClick={onPurgeTrash}
+            title={t("automations.toolbar.purgeTrashTitle")}
+          >
+            <Trash2 size={14} aria-hidden />
+            {t("automations.toolbar.purgeTrash")}
+          </button>
+        ) : null}
+        <DropdownMenu
+          label={t("automations.create.label")}
+          ariaLabel={t("automations.create.aria")}
+          align="end"
+          triggerClassName="caster-btn caster-btn-primary caster-automations-create-btn"
+          open={createOpen}
+          onOpenChange={onCreateOpenChange}
+          items={createItems}
+        >
+          <Plus size={14} aria-hidden />
+          {t("automations.create.label")}
+          <ChevronDown size={14} aria-hidden />
+        </DropdownMenu>
       </div>
     </div>
   );

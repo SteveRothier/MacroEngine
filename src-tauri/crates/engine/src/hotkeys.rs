@@ -146,6 +146,7 @@ pub struct HotkeyCallbacks {
     pub on_script_down: Box<dyn Fn() + Send + Sync>,
     pub on_named_macro: Box<dyn Fn(String) + Send + Sync>,
     pub on_named_clicker: Box<dyn Fn(String) + Send + Sync>,
+    pub on_named_script: Box<dyn Fn(String) + Send + Sync>,
     pub on_clicker_pause: Box<dyn Fn() + Send + Sync>,
     pub on_emergency: Box<dyn Fn() + Send + Sync>,
 }
@@ -157,6 +158,8 @@ struct HookShared {
     triggers: Mutex<HashMap<TriggerBinding, String>>,
     /// Chord → clicker preset name for per-preset triggers.
     clicker_triggers: Mutex<HashMap<TriggerBinding, String>>,
+    /// Chord → script id for per-script triggers.
+    script_triggers: Mutex<HashMap<TriggerBinding, String>>,
     action_down: AtomicBool,
     macro_down: AtomicBool,
     script_down: AtomicBool,
@@ -195,6 +198,15 @@ pub fn update_live_clicker_triggers(triggers: HashMap<TriggerBinding, String>) {
     if let Ok(guard) = hook_state().lock() {
         if let Some(shared) = guard.as_ref() {
             *shared.clicker_triggers.lock().expect("clicker triggers") = triggers;
+        }
+    }
+}
+
+/// Live-update per-script trigger index.
+pub fn update_live_script_triggers(triggers: HashMap<TriggerBinding, String>) {
+    if let Ok(guard) = hook_state().lock() {
+        if let Some(shared) = guard.as_ref() {
+            *shared.script_triggers.lock().expect("script triggers") = triggers;
         }
     }
 }
@@ -279,6 +291,12 @@ unsafe extern "system" fn low_level_keyboard_proc(
                         .expect("clicker triggers")
                         .get(&binding)
                         .cloned();
+                    let script_name = shared
+                        .script_triggers
+                        .lock()
+                        .expect("script triggers")
+                        .get(&binding)
+                        .cloned();
                     if let Some(name) = macro_name {
                         if is_down {
                             let mut named = shared.named_down.lock().expect("named");
@@ -296,6 +314,17 @@ unsafe extern "system" fn low_level_keyboard_proc(
                             if named.insert(binding) {
                                 drop(named);
                                 (shared.callbacks.on_named_clicker)(name);
+                            }
+                        } else if is_up {
+                            shared.named_down.lock().expect("named").remove(&binding);
+                        }
+                        handled = true;
+                    } else if let Some(name) = script_name {
+                        if is_down {
+                            let mut named = shared.named_down.lock().expect("named");
+                            if named.insert(binding) {
+                                drop(named);
+                                (shared.callbacks.on_named_script)(name);
                             }
                         } else if is_up {
                             shared.named_down.lock().expect("named").remove(&binding);
@@ -379,6 +408,7 @@ impl HotkeyHook {
                 callbacks,
                 triggers: Mutex::new(HashMap::new()),
                 clicker_triggers: Mutex::new(HashMap::new()),
+                script_triggers: Mutex::new(HashMap::new()),
                 action_down: AtomicBool::new(false),
                 macro_down: AtomicBool::new(false),
                 script_down: AtomicBool::new(false),
@@ -435,6 +465,7 @@ pub fn install_test_callbacks(callbacks: HotkeyCallbacks, bindings: HotkeyBindin
         callbacks,
         triggers: Mutex::new(HashMap::new()),
         clicker_triggers: Mutex::new(HashMap::new()),
+        script_triggers: Mutex::new(HashMap::new()),
         action_down: AtomicBool::new(false),
         macro_down: AtomicBool::new(false),
         script_down: AtomicBool::new(false),
@@ -521,6 +552,7 @@ mod tests {
                 on_script_down: Box::new(|| {}),
                 on_named_macro: Box::new(|_| {}),
                 on_named_clicker: Box::new(|_| {}),
+                on_named_script: Box::new(|_| {}),
                 on_clicker_pause: Box::new(|| {}),
                 on_emergency: Box::new(move || {
                     n2.fetch_add(1, Ordering::SeqCst);
@@ -547,6 +579,7 @@ mod tests {
                 on_script_down: Box::new(|| {}),
                 on_named_macro: Box::new(|_| {}),
                 on_named_clicker: Box::new(|_| {}),
+                on_named_script: Box::new(|_| {}),
                 on_clicker_pause: Box::new(|| {}),
                 on_emergency: Box::new(|| {}),
             },
@@ -575,6 +608,7 @@ mod tests {
                 on_script_down: Box::new(|| {}),
                 on_named_macro: Box::new(|_| {}),
                 on_named_clicker: Box::new(|_| {}),
+                on_named_script: Box::new(|_| {}),
                 on_clicker_pause: Box::new(|| {}),
                 on_emergency: Box::new(|| {}),
             },

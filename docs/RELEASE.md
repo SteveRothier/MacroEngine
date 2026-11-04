@@ -1,5 +1,26 @@
 # Notes de version — Caster
 
+## Phase 26
+
+- Accueil : import / export JSON & ZIP bibliothèque, enable/disable, icône emoji, badge conflit hotkey + preview au survol
+- Accueil : liste **media-rows** (identité + sous-ligne kind · trigger) ; chrome navigation / actions séparé ; dock bulk allégé (ouvrir / exporter / déplacer / corbeille)
+
+## Phase 25
+
+- Store : checklist Partner Center (`docs/STORE.md`) + listing FR/EN prêts à coller
+- Trigger **titre de fenêtre** (macros / clickers / scripts) + poller contextuel partagé
+- Triggers clicker & scripts : parité horaire / FG / titre (hotkey global « dernier script » en fallback)
+- Convert script→clicker : heuristiques `click` / `moveTo` → points (+ warnings)
+- Scripts : `caster.listWindows` / `activateWindow` (`allowInput`)
+
+## Phase 24
+
+- Store / MSIX : version sync `package.json`, signature (`sign-msix.ps1`), autostart HKCU Run seul, CI MakeAppx durcie, listing FR/EN (`docs/store/`)
+- Triggers macro : **horaire** puis **processus au premier plan** (poller hors hook clavier)
+- Scripts : `caster.screenSize` / `readPixel` / `foregroundTitle` / `foregroundExe` (`allowInput`)
+- Permissions macro : menu titlebar (réseau / process) aligné scripts
+- Docs : guide liste seule + Zone Start Idle→Running ; retrait `@xyflow/react`
+
 ## Phase 22
 
 - Feedback si l’écran clicker actif n’est plus branché

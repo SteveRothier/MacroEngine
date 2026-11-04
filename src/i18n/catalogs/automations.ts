@@ -102,7 +102,9 @@ export const automations = defineCatalog({
       newMacro: "Nouvelle macro",
       noAutomationsTitle: "Aucune automation",
       noAutomationsLead:
-        "Créez une macro, un preset clicker ou un script pour commencer.",
+        "Importez un JSON/ZIP, ou créez une macro, un clicker ou un script pour commencer.",
+      importFile: "Importer un fichier…",
+      useTemplate: "Modèle clicker",
       noKindMacroTitle: "Aucune macro",
       noKindMacroLead: "Aucune macro ne correspond à ce filtre.",
       noKindClickerTitle: "Aucun clicker",
@@ -133,6 +135,10 @@ export const automations = defineCatalog({
         convertTo: "Convertir en",
         trash: "Mettre à la corbeille",
         delete: "Supprimer",
+        export: "Exporter…",
+        enable: "Activer",
+        disable: "Désactiver",
+        changeIcon: "Changer l’icône…",
       },
       empty: {
         aria: "Actions Accueil",
@@ -169,6 +175,7 @@ export const automations = defineCatalog({
       restore: "Restaurer",
       more: "Plus",
       moreAria: "Autres actions de sélection",
+      move: "Déplacer",
       moveToFolder: "Dossier : {name}",
     },
     confirm: {
@@ -220,6 +227,7 @@ export const automations = defineCatalog({
       locked: "Verrouillage effectué",
       unlocked: "Déverrouillage effectué",
       lockFail: "Impossible de modifier le verrouillage",
+      saveFail: "Impossible d’enregistrer",
       folderIncompatible: "Dossier incompatible avec ce type",
       moved: "Déplacement effectué",
       moveFail: "Impossible de déplacer",
@@ -290,6 +298,18 @@ export const automations = defineCatalog({
       sortType: "Type",
       sortStatus: "Statut",
       sortLastRun: "Dernière exé",
+      disabled: "Désactivé",
+      enable: "Activer",
+      disable: "Désactiver",
+      conflictTip: "Conflit de raccourci avec « {name} »",
+      conflictReserved: "Conflit avec un raccourci réservé (Paramètres)",
+      changeIcon: "Changer l’icône…",
+      clearIcon: "Icône par défaut",
+      iconPrompt: "Emoji ou symbole (max. 8 caractères)",
+      previewTrigger: "Déclencheur : {label}",
+      previewActions: "{count} action(s)",
+      previewCps: "{cps} CPS · {mode}",
+      previewScript: "{lang} · {perms}",
     },
     relative: {
       empty: "—",
@@ -311,6 +331,9 @@ export const automations = defineCatalog({
     trigger: {
       manual: "Manuel",
       script: "Script",
+      schedule: "{hh}:{mm}",
+      foreground: "FG · {exe}",
+      windowTitle: "Titre · {title}",
     },
     toolbar: {
       aria: "Barre d’outils Accueil",
@@ -320,6 +343,25 @@ export const automations = defineCatalog({
       redoTitle: "Rétablir (Ctrl+Y)",
       purgeTrash: "Vider",
       purgeTrashTitle: "Vider la corbeille définitivement",
+      importTip: "Importer un fichier JSON ou une sauvegarde ZIP",
+      exportTip: "Exporter la sélection ou toute la bibliothèque",
+      exportLibrary: "Exporter la bibliothèque (ZIP)",
+      exportSelection: "Exporter la sélection…",
+      deleteSelectionTip: "Mettre la sélection à la corbeille",
+      iconBarAria: "Actions rapides Accueil",
+    },
+    io: {
+      dialogAll: "JSON ou ZIP",
+      importOk: "Importé : {name}",
+      importZipOk: "Bibliothèque restaurée",
+      importFail: "Import impossible",
+      exportOk: "Export terminé",
+      exportFail: "Export impossible",
+      exportCount: "{count} fichier(s) exporté(s)",
+      zipConfirmTitle: "Remplacer la bibliothèque ?",
+      zipConfirmMessage:
+        "L’import ZIP remplace macros, clickers, scripts et index. Continuer ?",
+      zipConfirm: "Remplacer",
     },
     convert: {
       kind: {
@@ -380,6 +422,7 @@ export const automations = defineCatalog({
         orphanDelay: "délai orphelin",
         mixedClicks: "mélange curseur / fixe",
         scriptBody: "corps du script",
+        scriptControlFlow: "flux de contrôle / autres APIs du script",
       },
       warnings: {
         clickerLimited:
@@ -400,6 +443,12 @@ export const automations = defineCatalog({
           "Certaines actions de la macro ont été ignorées à la conversion clicker",
         scriptClickerStub:
           "Stub clicker : le corps du script ne peut pas être transcrit en clics",
+        scriptClickerNoPoints:
+          "Aucune coordonnée caster.click/moveTo — preset clicker vide ; logique JS non transcrite",
+        scriptClickerLogicSkipped:
+          "La logique JS au-delà des coordonnées click/moveTo n’a pas été transcrite",
+        scriptClickerPointsKept:
+          "{count} point(s) extraits de click/moveTo",
       },
     },
   },
@@ -500,7 +549,10 @@ export const automations = defineCatalog({
       newScript: "New script",
       newMacro: "New macro",
       noAutomationsTitle: "No automations",
-      noAutomationsLead: "Create a macro, clicker preset, or script to get started.",
+      noAutomationsLead:
+        "Import a JSON/ZIP library, or create a macro, clicker, or script to get started.",
+      importFile: "Import a file…",
+      useTemplate: "Clicker template",
       noKindMacroTitle: "No macros",
       noKindMacroLead: "No macros match this filter.",
       noKindClickerTitle: "No clickers",
@@ -531,6 +583,10 @@ export const automations = defineCatalog({
         convertTo: "Convert to",
         trash: "Move to trash",
         delete: "Delete",
+        export: "Export…",
+        enable: "Enable",
+        disable: "Disable",
+        changeIcon: "Change icon…",
       },
       empty: {
         aria: "Home actions",
@@ -567,6 +623,7 @@ export const automations = defineCatalog({
       restore: "Restore",
       more: "More",
       moreAria: "More selection actions",
+      move: "Move",
       moveToFolder: "Folder: {name}",
     },
     confirm: {
@@ -618,6 +675,7 @@ export const automations = defineCatalog({
       locked: "Locked",
       unlocked: "Unlocked",
       lockFail: "Could not update lock",
+      saveFail: "Could not save",
       folderIncompatible: "Folder incompatible with this type",
       moved: "Moved",
       moveFail: "Could not move",
@@ -688,6 +746,18 @@ export const automations = defineCatalog({
       sortType: "Type",
       sortStatus: "Status",
       sortLastRun: "Last run",
+      disabled: "Disabled",
+      enable: "Enable",
+      disable: "Disable",
+      conflictTip: "Hotkey conflicts with “{name}”",
+      conflictReserved: "Conflicts with a reserved hotkey (Settings)",
+      changeIcon: "Change icon…",
+      clearIcon: "Default icon",
+      iconPrompt: "Emoji or symbol (max 8 characters)",
+      previewTrigger: "Trigger: {label}",
+      previewActions: "{count} action(s)",
+      previewCps: "{cps} CPS · {mode}",
+      previewScript: "{lang} · {perms}",
     },
     relative: {
       empty: "—",
@@ -709,6 +779,9 @@ export const automations = defineCatalog({
     trigger: {
       manual: "Manual",
       script: "Script",
+      schedule: "{hh}:{mm}",
+      foreground: "FG · {exe}",
+      windowTitle: "Title · {title}",
     },
     toolbar: {
       aria: "Home toolbar",
@@ -718,6 +791,25 @@ export const automations = defineCatalog({
       redoTitle: "Redo (Ctrl+Y)",
       purgeTrash: "Empty",
       purgeTrashTitle: "Permanently empty trash",
+      importTip: "Import a JSON file or ZIP backup",
+      exportTip: "Export selection or full library",
+      exportLibrary: "Export library (ZIP)",
+      exportSelection: "Export selection…",
+      deleteSelectionTip: "Move selection to trash",
+      iconBarAria: "Home quick actions",
+    },
+    io: {
+      dialogAll: "JSON or ZIP",
+      importOk: "Imported: {name}",
+      importZipOk: "Library restored",
+      importFail: "Import failed",
+      exportOk: "Export complete",
+      exportFail: "Export failed",
+      exportCount: "{count} file(s) exported",
+      zipConfirmTitle: "Replace library?",
+      zipConfirmMessage:
+        "ZIP import replaces macros, clickers, scripts, and the index. Continue?",
+      zipConfirm: "Replace",
     },
     convert: {
       kind: {
@@ -778,6 +870,7 @@ export const automations = defineCatalog({
         orphanDelay: "orphan delay",
         mixedClicks: "mixed cursor/fixed clicks",
         scriptBody: "script body",
+        scriptControlFlow: "script control flow / other APIs",
       },
       warnings: {
         clickerLimited:
@@ -797,6 +890,11 @@ export const automations = defineCatalog({
           "Some macro actions were skipped during clicker conversion",
         scriptClickerStub:
           "Clicker stub: script body cannot be transcribed to clicks",
+        scriptClickerNoPoints:
+          "No caster.click/moveTo coordinates found — empty clicker preset; JS logic not transcribed",
+        scriptClickerLogicSkipped:
+          "JS logic beyond click/moveTo coordinates was not transcribed",
+        scriptClickerPointsKept: "{count} point(s) from click/moveTo",
       },
     },
   },

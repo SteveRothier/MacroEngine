@@ -99,10 +99,24 @@ pub struct ClickerPresetSummary {
     pub name: String,
     pub cps: f64,
     pub mode: String,
+    #[serde(default = "default_clicker_trigger_type")]
+    pub trigger_type: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trigger_key: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trigger_mods: Option<crate::schema::KeyMods>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule_hour: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule_minute: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub foreground_exe: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_title: Option<String>,
+}
+
+fn default_clicker_trigger_type() -> String {
+    "manual".into()
 }
 
 fn unique_name(config_dir: &Path, base: &str) -> Result<String, PresetError> {
@@ -129,9 +143,60 @@ pub fn list_preset_summaries(config_dir: &Path) -> Result<Vec<ClickerPresetSumma
     for name in names {
         match load_preset(config_dir, &name) {
             Ok(p) => {
-                let (trigger_key, trigger_mods) = match &p.trigger {
-                    Trigger::Hotkey { key, mods } => (Some(key.clone()), Some(*mods)),
-                    Trigger::Manual => (None, None),
+                let (
+                    trigger_type,
+                    trigger_key,
+                    trigger_mods,
+                    schedule_hour,
+                    schedule_minute,
+                    foreground_exe,
+                    window_title,
+                ) = match &p.trigger {
+                    Trigger::Hotkey { key, mods } => (
+                        "hotkey".into(),
+                        Some(key.clone()),
+                        Some(*mods),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
+                    Trigger::Schedule { hour, minute, .. } => (
+                        "schedule".into(),
+                        None,
+                        None,
+                        Some(*hour),
+                        Some(*minute),
+                        None,
+                        None,
+                    ),
+                    Trigger::ForegroundProcess { exe, .. } => (
+                        "foreground_process".into(),
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(exe.clone()),
+                        None,
+                    ),
+                    Trigger::WindowTitle { pattern, .. } => (
+                        "window_title".into(),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(pattern.clone()),
+                    ),
+                    Trigger::Manual => (
+                        "manual".into(),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ),
                 };
                 out.push(ClickerPresetSummary {
                     name: p.name,
@@ -140,16 +205,26 @@ pub fn list_preset_summaries(config_dir: &Path) -> Result<Vec<ClickerPresetSumma
                         crate::clicker::ClickMode::Hold => "hold".into(),
                         crate::clicker::ClickMode::Toggle => "toggle".into(),
                     },
+                    trigger_type,
                     trigger_key,
                     trigger_mods,
+                    schedule_hour,
+                    schedule_minute,
+                    foreground_exe,
+                    window_title,
                 })
             }
             Err(_) => out.push(ClickerPresetSummary {
                 name,
                 cps: 0.0,
                 mode: "toggle".into(),
+                trigger_type: "manual".into(),
                 trigger_key: None,
                 trigger_mods: None,
+                schedule_hour: None,
+                schedule_minute: None,
+                foreground_exe: None,
+                window_title: None,
             }),
         }
     }

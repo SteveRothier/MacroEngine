@@ -24,6 +24,11 @@ import {
   lastRunTooltipMap,
   rowKey,
 } from "./relativeTime";
+import {
+  applyHotkeyConflicts,
+  parseTriggerChord,
+  type HotkeyChordKey,
+} from "./hotkeyConflicts";
 
 function rowEditorStatus(
   locked: boolean,
@@ -41,6 +46,13 @@ type MacroSummary = {
   actionCount: number;
   triggerKey?: string | null;
   triggerMods?: { ctrl?: boolean; alt?: boolean; shift?: boolean } | null;
+  triggerType?: string | null;
+  scheduleHour?: number | null;
+  scheduleMinute?: number | null;
+  scheduleWeekdays?: number | null;
+  foregroundExe?: string | null;
+  foregroundMatch?: string | null;
+  windowTitle?: string | null;
   folderId?: string | null;
   locked?: boolean;
 };
@@ -49,6 +61,13 @@ type ClickerSummary = {
   name: string;
   cps: number;
   mode: string;
+  triggerType?: string | null;
+  triggerKey?: string | null;
+  triggerMods?: { ctrl?: boolean; alt?: boolean; shift?: boolean } | null;
+  scheduleHour?: number | null;
+  scheduleMinute?: number | null;
+  foregroundExe?: string | null;
+  windowTitle?: string | null;
 };
 
 function folderName(
@@ -106,9 +125,57 @@ export function flattenFolderTree(
   return out;
 }
 
+function pad2(n: number): string {
+  return String(Math.max(0, Math.min(99, Math.floor(n)))).padStart(2, "0");
+}
+
+function scriptTriggerLabel(s: ScriptSummary, t: TFunction): string {
+  const kind = s.triggerType ?? (s.triggerKey ? "hotkey" : "manual");
+  if (kind === "schedule") {
+    return t("automations.trigger.schedule", {
+      hh: pad2(s.scheduleHour ?? 0),
+      mm: pad2(s.scheduleMinute ?? 0),
+    });
+  }
+  if (kind === "foreground_process") {
+    return t("automations.trigger.foreground", {
+      exe: (s.foregroundExe ?? "").trim() || "…",
+    });
+  }
+  if (kind === "window_title") {
+    return t("automations.trigger.windowTitle", {
+      title: (s.windowTitle ?? "").trim() || "…",
+    });
+  }
+  const key = s.triggerKey?.trim();
+  if (!key || key === "0") return t("automations.trigger.script");
+  const n = Number(key);
+  if (!Number.isNaN(n) && n > 0) {
+    return formatKeyChord(vkLabel(n), undefined);
+  }
+  return key;
+}
+
 function macroTriggerLabel(m: MacroSummary, t: TFunction): string {
+  const kind = m.triggerType ?? (m.triggerKey ? "hotkey" : "manual");
+  if (kind === "schedule") {
+    return t("automations.trigger.schedule", {
+      hh: pad2(m.scheduleHour ?? 0),
+      mm: pad2(m.scheduleMinute ?? 0),
+    });
+  }
+  if (kind === "foreground_process") {
+    return t("automations.trigger.foreground", {
+      exe: (m.foregroundExe ?? "").trim() || "…",
+    });
+  }
+  if (kind === "window_title") {
+    return t("automations.trigger.windowTitle", {
+      title: (m.windowTitle ?? "").trim() || "…",
+    });
+  }
   const key = m.triggerKey?.trim();
-  if (!key) return t("automations.trigger.manual");
+  if (!key || key === "0") return t("automations.trigger.manual");
   const n = Number(key);
   if (!Number.isNaN(n) && n > 0) {
     return formatKeyChord(vkLabel(n), m.triggerMods ?? undefined);
@@ -116,7 +183,40 @@ function macroTriggerLabel(m: MacroSummary, t: TFunction): string {
   return key;
 }
 
-function clickerTriggerLabel(hotkeys: HotkeyBindings): string {
+function clickerPresetTriggerLabel(
+  c: ClickerSummary | undefined,
+  hotkeys: HotkeyBindings | null,
+  t: TFunction,
+): string {
+  if (c) {
+    const kind = c.triggerType ?? (c.triggerKey ? "hotkey" : "manual");
+    if (kind === "schedule") {
+      return t("automations.trigger.schedule", {
+        hh: pad2(c.scheduleHour ?? 0),
+        mm: pad2(c.scheduleMinute ?? 0),
+      });
+    }
+    if (kind === "foreground_process") {
+      return t("automations.trigger.foreground", {
+        exe: (c.foregroundExe ?? "").trim() || "…",
+      });
+    }
+    if (kind === "window_title") {
+      return t("automations.trigger.windowTitle", {
+        title: (c.windowTitle ?? "").trim() || "…",
+      });
+    }
+    const key = c.triggerKey?.trim();
+    if (key && key !== "0") {
+      const n = Number(key);
+      if (!Number.isNaN(n) && n > 0) {
+        return formatKeyChord(vkLabel(n), c.triggerMods ?? undefined);
+      }
+      return key;
+    }
+    if (kind === "manual") return t("automations.trigger.manual");
+  }
+  if (!hotkeys) return "F6";
   const parts: string[] = [];
   if (hotkeys.actionCtrl) parts.push("Ctrl");
   if (hotkeys.actionAlt) parts.push("Alt");
@@ -251,8 +351,10 @@ export function useUnifiedAutomations(options: {
       const empty = t("common.empty");
 
       const next: AutomationRow[] = [];
+      const chords = new Map<string, HotkeyChordKey | null>();
 
       for (const it of macroIndex.items) {
+        const enabled = it.enabled !== false;
         if (it.trashed) {
           next.push({
             id: it.id,
@@ -265,6 +367,8 @@ export function useUnifiedAutomations(options: {
             lastRunLabel: empty,
             favorite: false,
             locked: it.locked,
+            enabled,
+            icon: it.icon ?? null,
             dirty: false,
             trashed: true,
             sortOrder: it.sortOrder ?? 0,
@@ -272,6 +376,10 @@ export function useUnifiedAutomations(options: {
           continue;
         }
         const m = macroMap.get(it.id);
+        chords.set(
+          `macro:${it.id}`,
+          parseTriggerChord(m?.triggerKey, m?.triggerMods),
+        );
         next.push({
           id: it.id,
           name: it.name,
@@ -291,28 +399,34 @@ export function useUnifiedAutomations(options: {
           lastRunAt: runAt.get(rowKey("macro", it.id)),
           favorite: favMacros.includes(it.id),
           locked: it.locked,
+          enabled,
+          icon: it.icon ?? null,
           dirty: false,
           trashed: false,
           meta: m
             ? t("automations.row.metaActions", { count: m.actionCount })
             : undefined,
+          previewActionCount: m?.actionCount,
           sortOrder: it.sortOrder ?? 0,
         });
       }
 
       for (const it of clickerIndex.items) {
+        const enabled = it.enabled !== false;
         if (it.trashed) {
           next.push({
             id: it.id,
             name: it.name,
             kind: "clicker",
-            triggerLabel: hk ? clickerTriggerLabel(hk) : "F6",
+            triggerLabel: clickerPresetTriggerLabel(undefined, hk, t),
             folderLabel: folderName(allFolders, it.folderId ?? null, t),
             folderId: it.folderId ?? null,
             status: "attention",
             lastRunLabel: empty,
             favorite: false,
             locked: it.locked,
+            enabled,
+            icon: it.icon ?? null,
             dirty: false,
             trashed: true,
             sortOrder: it.sortOrder ?? 0,
@@ -320,11 +434,15 @@ export function useUnifiedAutomations(options: {
           continue;
         }
         const c = clickerMap.get(it.id);
+        chords.set(
+          `clicker:${it.id}`,
+          parseTriggerChord(c?.triggerKey, c?.triggerMods),
+        );
         next.push({
           id: it.id,
           name: it.name,
           kind: "clicker",
-          triggerLabel: hk ? clickerTriggerLabel(hk) : "F6",
+          triggerLabel: clickerPresetTriggerLabel(c, hk, t),
           folderLabel: folderName(allFolders, it.folderId ?? null, t),
           folderId: it.folderId ?? null,
           status: rowEditorStatus(
@@ -337,29 +455,36 @@ export function useUnifiedAutomations(options: {
           lastRunAt: runAt.get(rowKey("clicker", it.id)),
           favorite: favClickers.includes(it.id),
           locked: it.locked,
+          enabled,
+          icon: it.icon ?? null,
           dirty: false,
           trashed: false,
           meta: c
             ? t("automations.row.metaCps", { cps: c.cps.toFixed(0) })
             : undefined,
+          previewCps: c?.cps,
+          previewMode: c?.mode,
           sortOrder: it.sortOrder ?? 0,
         });
       }
 
       for (const s of scripts) {
         const lib = scriptLibById.get(s.id);
+        const enabled = lib?.enabled !== false;
         if (lib?.trashed) {
           next.push({
             id: s.id,
             name: s.name,
             kind: "script",
-            triggerLabel: t("automations.trigger.script"),
+            triggerLabel: scriptTriggerLabel(s, t),
             folderLabel: folderName(allFolders, lib.folderId ?? null, t),
             folderId: lib.folderId ?? null,
             status: "attention",
             lastRunLabel: empty,
             favorite: false,
             locked: lib.locked ?? false,
+            enabled,
+            icon: lib.icon ?? null,
             dirty: false,
             trashed: true,
             isModule: !!s.isModule,
@@ -371,11 +496,15 @@ export function useUnifiedAutomations(options: {
         }
         const folderId = lib?.folderId ?? null;
         const permLabels = activePermissionLabels(s, t);
+        chords.set(
+          `script:${s.id}`,
+          parseTriggerChord(s.triggerKey, undefined),
+        );
         next.push({
           id: s.id,
           name: s.name,
           kind: "script",
-          triggerLabel: t("automations.trigger.script"),
+          triggerLabel: scriptTriggerLabel(s, t),
           folderLabel: folderName(allFolders, folderId, t),
           folderId,
           status: rowEditorStatus(
@@ -388,6 +517,8 @@ export function useUnifiedAutomations(options: {
           lastRunAt: runAt.get(rowKey("script", s.id)),
           favorite: favScripts.includes(s.id),
           locked: lib?.locked ?? false,
+          enabled,
+          icon: lib?.icon ?? null,
           dirty: false,
           trashed: false,
           isModule: !!s.isModule,
@@ -408,10 +539,11 @@ export function useUnifiedAutomations(options: {
         });
       }
 
-      setRows(next);
+      const withConflicts = applyHotkeyConflicts(next, chords, hk);
+      setRows(withConflicts);
       hasLoadedRef.current = true;
       lastHomeSnapshot = {
-        rows: next,
+        rows: withConflicts,
         recentOrder: nextRecent,
         folders: nextFolders,
         hotkeys: hk,

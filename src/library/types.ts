@@ -13,6 +13,8 @@ export type LibraryItemDto = {
   kind: string;
   folderId?: string | null;
   locked: boolean;
+  enabled?: boolean;
+  icon?: string | null;
   trashed: boolean;
   updatedAt: number;
   meta?: string | null;

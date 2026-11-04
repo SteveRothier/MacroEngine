@@ -16,6 +16,11 @@ type MacroSummary = {
   actionCount: number;
   triggerKey?: string | null;
   triggerMods?: { ctrl?: boolean; alt?: boolean; shift?: boolean } | null;
+  triggerType?: string | null;
+  scheduleHour?: number | null;
+  scheduleMinute?: number | null;
+  foregroundExe?: string | null;
+  windowTitle?: string | null;
   folderId?: string | null;
   locked?: boolean;
 };
@@ -24,16 +29,38 @@ type ClickerSummary = {
   name: string;
   cps: number;
   mode: string;
+  triggerType?: string | null;
+  triggerKey?: string | null;
+  scheduleHour?: number | null;
+  scheduleMinute?: number | null;
+  foregroundExe?: string | null;
+  windowTitle?: string | null;
 };
 
 function libraryLocale(): AppLocale {
   return resolveLocale(mergeShellPrefs().uiLocale);
 }
 
+function pad2(n: number): string {
+  return String(Math.max(0, Math.min(99, Math.floor(n)))).padStart(2, "0");
+}
+
 function macroMetaLabel(m: MacroSummary, locale: AppLocale): string {
   const count = tStatic(locale, "library.meta.actionsCount", { n: m.actionCount });
+  const kind = m.triggerType ?? (m.triggerKey ? "hotkey" : "manual");
+  if (kind === "schedule") {
+    return `${count} · ${pad2(m.scheduleHour ?? 0)}:${pad2(m.scheduleMinute ?? 0)}`;
+  }
+  if (kind === "foreground_process") {
+    const exe = (m.foregroundExe ?? "").trim() || "…";
+    return `${count} · FG · ${exe}`;
+  }
+  if (kind === "window_title") {
+    const title = (m.windowTitle ?? "").trim() || "…";
+    return `${count} · ${title}`;
+  }
   const key = m.triggerKey?.trim();
-  if (!key) return count;
+  if (!key || key === "0") return count;
   const n = Number(key);
   const label =
     !Number.isNaN(n) && n > 0
@@ -50,7 +77,18 @@ function clickerModeLabel(mode: string, locale: AppLocale): string {
 }
 
 function clickerMetaLabel(p: ClickerSummary, locale: AppLocale): string {
-  return `${p.cps.toFixed(0)} CPS · ${clickerModeLabel(p.mode, locale)}`;
+  const base = `${p.cps.toFixed(0)} CPS · ${clickerModeLabel(p.mode, locale)}`;
+  const kind = p.triggerType ?? (p.triggerKey ? "hotkey" : "manual");
+  if (kind === "schedule") {
+    return `${base} · ${pad2(p.scheduleHour ?? 0)}:${pad2(p.scheduleMinute ?? 0)}`;
+  }
+  if (kind === "foreground_process") {
+    return `${base} · FG · ${(p.foregroundExe ?? "").trim() || "…"}`;
+  }
+  if (kind === "window_title") {
+    return `${base} · ${(p.windowTitle ?? "").trim() || "…"}`;
+  }
+  return base;
 }
 
 export function useLibraryIndex(

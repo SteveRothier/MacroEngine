@@ -35,12 +35,127 @@ pub struct MacroSummary {
     pub trigger_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trigger_mods: Option<KeyMods>,
+    /// `manual` | `hotkey` | `schedule` | `foreground_process`
+    #[serde(default = "default_trigger_type")]
+    pub trigger_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schedule_hour: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schedule_minute: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schedule_weekdays: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foreground_exe: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub foreground_match: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window_title_match: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folder_id: Option<String>,
     #[serde(default)]
     pub locked: bool,
     #[serde(default)]
     pub updated_at: u64,
+}
+
+fn default_trigger_type() -> String {
+    "manual".into()
+}
+
+fn match_mode_str(m: crate::schema::ExeMatchMode) -> String {
+    match m {
+        crate::schema::ExeMatchMode::Eq => "eq".into(),
+        crate::schema::ExeMatchMode::Contains => "contains".into(),
+    }
+}
+
+fn summary_from_trigger(trigger: &Trigger) -> (
+    Option<String>,
+    Option<KeyMods>,
+    String,
+    Option<u8>,
+    Option<u8>,
+    Option<u8>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
+    match trigger {
+        Trigger::Hotkey { key, mods } => {
+            let mods_opt = if mods.any() { Some(*mods) } else { None };
+            (
+                Some(key.clone()),
+                mods_opt,
+                "hotkey".into(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+        }
+        Trigger::Manual => (
+            None,
+            None,
+            "manual".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
+        Trigger::Schedule {
+            hour,
+            minute,
+            weekdays,
+        } => (
+            None,
+            None,
+            "schedule".into(),
+            Some(*hour),
+            Some(*minute),
+            *weekdays,
+            None,
+            None,
+            None,
+            None,
+        ),
+        Trigger::ForegroundProcess { exe, match_mode } => (
+            None,
+            None,
+            "foreground_process".into(),
+            None,
+            None,
+            None,
+            Some(exe.clone()),
+            Some(match_mode_str(*match_mode)),
+            None,
+            None,
+        ),
+        Trigger::WindowTitle {
+            pattern,
+            match_mode,
+            exe,
+        } => (
+            None,
+            None,
+            "window_title".into(),
+            None,
+            None,
+            None,
+            exe.clone(),
+            None,
+            Some(pattern.clone()),
+            Some(match_mode_str(*match_mode)),
+        ),
+    }
 }
 
 fn sanitize_name(name: &str) -> Result<String, MacroLibraryError> {
@@ -109,18 +224,31 @@ pub fn list_macro_summaries(config_dir: &Path) -> Result<Vec<MacroSummary>, Macr
             .unwrap_or(0);
         match load_macro(config_dir, &name) {
             Ok(doc) => {
-                let (trigger_key, trigger_mods) = match &doc.trigger {
-                    Trigger::Hotkey { key, mods } => {
-                        let mods_opt = if mods.any() { Some(*mods) } else { None };
-                        (Some(key.clone()), mods_opt)
-                    }
-                    Trigger::Manual => (None, None),
-                };
+                let (
+                    trigger_key,
+                    trigger_mods,
+                    trigger_type,
+                    schedule_hour,
+                    schedule_minute,
+                    schedule_weekdays,
+                    foreground_exe,
+                    foreground_match,
+                    window_title,
+                    window_title_match,
+                ) = summary_from_trigger(&doc.trigger);
                 out.push(MacroSummary {
                     name: doc.name,
                     action_count: doc.actions.len(),
                     trigger_key,
                     trigger_mods,
+                    trigger_type,
+                    schedule_hour,
+                    schedule_minute,
+                    schedule_weekdays,
+                    foreground_exe,
+                    foreground_match,
+                    window_title,
+                    window_title_match,
                     folder_id: None,
                     locked: false,
                     updated_at,
@@ -132,6 +260,14 @@ pub fn list_macro_summaries(config_dir: &Path) -> Result<Vec<MacroSummary>, Macr
                     action_count: 0,
                     trigger_key: None,
                     trigger_mods: None,
+                    trigger_type: "manual".into(),
+                    schedule_hour: None,
+                    schedule_minute: None,
+                    schedule_weekdays: None,
+                    foreground_exe: None,
+                    foreground_match: None,
+                    window_title: None,
+                    window_title_match: None,
                     folder_id: None,
                     locked: false,
                     updated_at,
@@ -296,6 +432,41 @@ pub fn delete_macro(config_dir: &Path, name: &str) -> Result<(), MacroLibraryErr
     }
     fs::remove_file(path)?;
     Ok(())
+}
+
+/// Write a library macro JSON to an arbitrary path (share / backup).
+pub fn export_macro_to_path(
+    config_dir: &Path,
+    id: &str,
+    path: &Path,
+) -> Result<(), MacroLibraryError> {
+    let doc = load_macro(config_dir, id)?;
+    let raw = macro_to_json(&doc).map_err(|e| MacroLibraryError::Schema(e.to_string()))?;
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    fs::write(path, raw)?;
+    Ok(())
+}
+
+/// Import a macro JSON file into the library (unique name if collision).
+pub fn import_macro_from_path(
+    config_dir: &Path,
+    path: &Path,
+) -> Result<MacroDocument, MacroLibraryError> {
+    let raw = fs::read_to_string(path)?;
+    let parsed = parse_macro_json(&raw).map_err(|e| MacroLibraryError::Schema(e.to_string()))?;
+    let base = if parsed.name.trim().is_empty() {
+        "Imported macro"
+    } else {
+        parsed.name.trim()
+    };
+    let id = unique_name(config_dir, base)?;
+    let mut doc = parsed;
+    doc.name = id.clone();
+    save_macro(config_dir, &id, &doc)
 }
 
 pub fn duplicate_macro(

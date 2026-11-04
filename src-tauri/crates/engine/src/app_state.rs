@@ -10,15 +10,18 @@ use crate::clicker_capture::{ClickPointCapture, PixelColorCapture, PixelSample};
 use crate::event_bus::{EngineEvent, EventBus, LogLevel, ZoneFeedbackKind};
 use crate::hotkeys::{
     default_bindings, update_live_bindings, update_live_clicker_triggers,
-    update_live_macro_triggers, HotkeyBindings, HotkeyCallbacks, HotkeyHook, TriggerBinding,
+    update_live_macro_triggers, update_live_script_triggers, HotkeyBindings, HotkeyCallbacks,
+    HotkeyHook, TriggerBinding,
 };
-use crate::input::{default_injector, MouseInjector};
+use crate::input::{default_injector, foreground_window_title, local_clock, MouseInjector};
 use crate::macro_vm::MacroVm;
 use crate::metrics::{ClickerMetrics, MetricsCollector};
 use crate::pause::PauseGate;
 use crate::record::{postprocess_actions, RecordOptions, RecordPostProcess, RecordSession};
-use crate::schema::{ActionNode, MacroDocument, SCHEMA_VERSION_CURRENT};
-use crate::settings::ProcessFilter;
+use crate::schema::{
+    ActionNode, ExeMatchMode, MacroDocument, Trigger, SCHEMA_VERSION_CURRENT,
+};
+use crate::settings::{normalize_exe_name, ProcessFilter};
 use crate::state::{EngineState, StateTransitionError};
 use crate::stop_zones::{zone_hit, ScreenGeom, ZoneAction};
 
@@ -42,6 +45,38 @@ enum HotkeyCmd {
     ToggleClickerPause,
     NamedMacro(String),
     NamedClicker(String),
+    NamedScript(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ContextTarget {
+    Macro,
+    Clicker,
+    Script,
+}
+
+#[derive(Debug, Clone)]
+enum ContextTrigger {
+    Schedule {
+        target: ContextTarget,
+        name: String,
+        hour: u8,
+        minute: u8,
+        weekdays: Option<u8>,
+    },
+    ForegroundProcess {
+        target: ContextTarget,
+        name: String,
+        exe: String,
+        match_mode: ExeMatchMode,
+    },
+    WindowTitle {
+        target: ContextTarget,
+        name: String,
+        pattern: String,
+        match_mode: ExeMatchMode,
+        exe: Option<String>,
+    },
 }
 
 /// Thread-safe handle to engine run state + cancellation + workers.
@@ -82,6 +117,10 @@ pub struct AppState {
     macro_triggers: Arc<Mutex<std::collections::HashMap<TriggerBinding, String>>>,
     /// Live chord → clicker preset name for per-preset triggers.
     clicker_triggers: Arc<Mutex<std::collections::HashMap<TriggerBinding, String>>>,
+    /// Schedule / FG / window-title triggers (macros, clickers, scripts).
+    context_triggers: Arc<Mutex<Vec<ContextTrigger>>>,
+    /// Live chord → script id for per-script hotkeys.
+    script_triggers: Arc<Mutex<std::collections::HashMap<TriggerBinding, String>>>,
     /// Optional UI teardown (e.g. hide fullscreen picker) on stop/emergency.
     ui_release: Arc<Mutex<Option<Arc<dyn Fn() + Send + Sync>>>>,
     /// Optional Start-zone cold-start config (tray last-preset parity).
@@ -140,6 +179,8 @@ impl AppState {
             script_step_gate: Arc::new(Mutex::new(None)),
             macro_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
             clicker_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            script_triggers: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            context_triggers: Arc::new(Mutex::new(Vec::new())),
             ui_release: Arc::new(Mutex::new(None)),
             start_zone_config: Arc::new(Mutex::new(None)),
             picking: Arc::new(AtomicBool::new(false)),
@@ -162,6 +203,10 @@ impl AppState {
         let _ = std::thread::Builder::new()
             .name("start-zone-arm".into())
             .spawn(move || arm.run_start_zone_arm_loop());
+        let ctx = state.clone();
+        let _ = std::thread::Builder::new()
+            .name("context-triggers".into())
+            .spawn(move || ctx.run_context_trigger_loop());
         state
     }
 
@@ -1066,6 +1111,14 @@ impl AppState {
                 }
                 self.on_named_clicker_key_down(name);
             }
+            HotkeyCmd::NamedScript(name) => {
+                if self.is_recording() || self.is_picking() {
+                    return;
+                }
+                if let Err(e) = self.start_script_session(&name, false, false) {
+                    self.log_hotkey_err("named script", e);
+                }
+            }
         }
     }
 
@@ -1197,9 +1250,9 @@ impl AppState {
 
     pub fn rebuild_macro_triggers(&self) -> Result<(), String> {
         use crate::macro_library::{list_macros, load_macro};
-        use crate::schema::Trigger;
         let Some(dir) = self.macros_config_dir() else {
             *self.macro_triggers.lock().expect("triggers") = Default::default();
+            retain_context_except(self, ContextTarget::Macro);
             crate::hotkeys::update_live_macro_triggers(Default::default());
             return Ok(());
         };
@@ -1211,42 +1264,253 @@ impl AppState {
             bindings.emergency_vk,
         ];
         let names = list_macros(&dir).map_err(|e| e.to_string())?;
+        let index = crate::library_index::load_index(&dir).ok();
         let mut map = std::collections::HashMap::new();
+        let mut context = Vec::new();
         for name in names {
+            if let Some(idx) = index.as_ref() {
+                if crate::library_index::is_trashed_for(idx, crate::library_index::LibraryKind::Macro, &name)
+                    || !crate::library_index::entry_meta_for(
+                        idx,
+                        crate::library_index::LibraryKind::Macro,
+                        &name,
+                    )
+                    .enabled
+                {
+                    continue;
+                }
+            }
             let doc = load_macro(&dir, &name).map_err(|e| e.to_string())?;
-            if let Trigger::Hotkey { key, mods } = &doc.trigger {
-                if let Some(vk) = parse_trigger_vk(key).map(|v| normalize_trigger_vk(v, *mods)) {
-                    if reserved.contains(&vk) {
+            match &doc.trigger {
+                Trigger::Hotkey { key, mods } => {
+                    if let Some(vk) =
+                        parse_trigger_vk(key).map(|v| normalize_trigger_vk(v, *mods))
+                    {
+                        if reserved.contains(&vk) {
+                            self.bus.publish(EngineEvent::Log {
+                                level: LogLevel::Warn,
+                                message: format!(
+                                    "trigger VK 0x{vk:X} for « {name} » ignored (reserved hotkey)"
+                                ),
+                            });
+                            continue;
+                        }
+                        let binding = TriggerBinding::from_mods(vk, *mods);
+                        if let Some(prev) = map.insert(binding, name.clone()) {
+                            self.bus.publish(EngineEvent::Log {
+                                level: LogLevel::Warn,
+                                message: format!(
+                                    "trigger chord for « {name} » overrides « {prev} »"
+                                ),
+                            });
+                        }
+                    }
+                }
+                Trigger::Schedule {
+                    hour,
+                    minute,
+                    weekdays,
+                } => {
+                    if *hour > 23 || *minute > 59 {
                         self.bus.publish(EngineEvent::Log {
                             level: LogLevel::Warn,
                             message: format!(
-                                "trigger VK 0x{vk:X} for « {name} » ignored (reserved hotkey)"
+                                "schedule trigger for « {name} » ignored (invalid time)"
                             ),
                         });
                         continue;
                     }
-                    let binding = TriggerBinding::from_mods(vk, *mods);
-                    if let Some(prev) = map.insert(binding, name.clone()) {
+                    context.push(ContextTrigger::Schedule {
+                        target: ContextTarget::Macro,
+                        name: name.clone(),
+                        hour: *hour,
+                        minute: *minute,
+                        weekdays: *weekdays,
+                    });
+                }
+                Trigger::ForegroundProcess { exe, match_mode } => {
+                    if let Some(ct) = context_from_trigger(
+                        ContextTarget::Macro,
+                        &name,
+                        &Trigger::ForegroundProcess {
+                            exe: exe.clone(),
+                            match_mode: *match_mode,
+                        },
+                    ) {
+                        context.push(ct);
+                    } else {
                         self.bus.publish(EngineEvent::Log {
                             level: LogLevel::Warn,
                             message: format!(
-                                "trigger chord for « {name} » overrides « {prev} »"
+                                "foreground trigger for « {name} » ignored (empty exe)"
                             ),
                         });
                     }
                 }
+                Trigger::WindowTitle {
+                    pattern,
+                    match_mode,
+                    exe,
+                } => {
+                    if let Some(ct) = context_from_trigger(
+                        ContextTarget::Macro,
+                        &name,
+                        &Trigger::WindowTitle {
+                            pattern: pattern.clone(),
+                            match_mode: *match_mode,
+                            exe: exe.clone(),
+                        },
+                    ) {
+                        context.push(ct);
+                    } else {
+                        self.bus.publish(EngineEvent::Log {
+                            level: LogLevel::Warn,
+                            message: format!(
+                                "window-title trigger for « {name} » ignored (empty pattern)"
+                            ),
+                        });
+                    }
+                }
+                Trigger::Manual => {}
             }
         }
+        // Preserve clicker/script context entries already registered.
+        let mut merged = self
+            .context_triggers
+            .lock()
+            .expect("context triggers")
+            .clone();
+        merged.retain(|e| context_target(e) != ContextTarget::Macro);
+        merged.extend(context);
         update_live_macro_triggers(map.clone());
         *self.macro_triggers.lock().expect("triggers") = map;
+        *self.context_triggers.lock().expect("context triggers") = merged;
         Ok(())
+    }
+
+    /// Poll schedule / FG / window-title triggers (outside the keyboard hook).
+    fn run_context_trigger_loop(&self) {
+        use std::collections::HashMap;
+        let mut last_schedule_fire: HashMap<String, (u32, u32, u32, u32)> = HashMap::new();
+        let mut last_edge: HashMap<String, bool> = HashMap::new();
+        loop {
+            std::thread::sleep(Duration::from_millis(400));
+            let entries = self
+                .context_triggers
+                .lock()
+                .expect("context triggers")
+                .clone();
+            if entries.is_empty() {
+                continue;
+            }
+            let clock = local_clock();
+            let fg_raw = self.injector.foreground_exe();
+            let fg = fg_raw
+                .as_deref()
+                .map(normalize_exe_name)
+                .unwrap_or_default();
+            let title = foreground_window_title().unwrap_or_default();
+
+            for entry in entries {
+                match entry {
+                    ContextTrigger::Schedule {
+                        target,
+                        name,
+                        hour,
+                        minute,
+                        weekdays,
+                    } => {
+                        if clock.hour != hour as u32 || clock.minute != minute as u32 {
+                            continue;
+                        }
+                        if let Some(mask) = weekdays {
+                            if mask != 0 && (mask & schedule_weekday_bit(clock.weekday)) == 0 {
+                                continue;
+                            }
+                        }
+                        let stamp =
+                            (clock.year, clock.month, clock.day, clock.hour * 60 + clock.minute);
+                        let key = format!("{:?}:{name}", target);
+                        if last_schedule_fire.get(&key) == Some(&stamp) {
+                            continue;
+                        }
+                        last_schedule_fire.insert(key, stamp);
+                        self.fire_context_target(target, name);
+                    }
+                    ContextTrigger::ForegroundProcess {
+                        target,
+                        name,
+                        exe,
+                        match_mode,
+                    } => {
+                        let needle = normalize_exe_name(&exe);
+                        let matched = if needle.is_empty() || fg.is_empty() {
+                            false
+                        } else {
+                            match match_mode {
+                                ExeMatchMode::Eq => fg == needle,
+                                ExeMatchMode::Contains => fg.contains(&needle),
+                            }
+                        };
+                        let key = format!("fg:{:?}:{name}", target);
+                        let was = last_edge.get(&key).copied().unwrap_or(false);
+                        last_edge.insert(key, matched);
+                        if matched && !was {
+                            self.fire_context_target(target, name);
+                        }
+                    }
+                    ContextTrigger::WindowTitle {
+                        target,
+                        name,
+                        pattern,
+                        match_mode,
+                        exe,
+                    } => {
+                        let pat = pattern.trim();
+                        let matched = if pat.is_empty() {
+                            false
+                        } else {
+                            let title_ok = match match_mode {
+                                ExeMatchMode::Eq => title.eq_ignore_ascii_case(pat),
+                                ExeMatchMode::Contains => title
+                                    .to_ascii_lowercase()
+                                    .contains(&pat.to_ascii_lowercase()),
+                            };
+                            if !title_ok {
+                                false
+                            } else if let Some(exe_f) = exe.as_deref().map(str::trim).filter(|s| !s.is_empty())
+                            {
+                                let needle = normalize_exe_name(exe_f);
+                                !needle.is_empty() && fg == needle
+                            } else {
+                                true
+                            }
+                        };
+                        let key = format!("title:{:?}:{name}", target);
+                        let was = last_edge.get(&key).copied().unwrap_or(false);
+                        last_edge.insert(key, matched);
+                        if matched && !was {
+                            self.fire_context_target(target, name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn fire_context_target(&self, target: ContextTarget, name: String) {
+        match target {
+            ContextTarget::Macro => self.enqueue_hotkey(HotkeyCmd::NamedMacro(name)),
+            ContextTarget::Clicker => self.enqueue_hotkey(HotkeyCmd::NamedClicker(name)),
+            ContextTarget::Script => self.enqueue_hotkey(HotkeyCmd::NamedScript(name)),
+        }
     }
 
     pub fn rebuild_clicker_triggers(&self) -> Result<(), String> {
         use crate::clicker_presets::{list_presets, load_preset};
-        use crate::schema::Trigger;
         let Some(dir) = self.macros_config_dir() else {
             *self.clicker_triggers.lock().expect("clicker triggers") = Default::default();
+            retain_context_except(self, ContextTarget::Clicker);
             update_live_clicker_triggers(Default::default());
             return Ok(());
         };
@@ -1256,49 +1520,163 @@ impl AppState {
             bindings.macro_vk,
             bindings.pause_vk,
             bindings.emergency_vk,
+            bindings.script_vk,
         ];
         let macro_map = self.macro_triggers.lock().expect("triggers").clone();
         let names = list_presets(&dir).map_err(|e| e.to_string())?;
+        let index = crate::library_index::load_index(&dir).ok();
         let mut map = std::collections::HashMap::new();
+        let mut context = Vec::new();
         for name in names {
+            if let Some(idx) = index.as_ref() {
+                if crate::library_index::is_trashed_for(
+                    idx,
+                    crate::library_index::LibraryKind::Clicker,
+                    &name,
+                ) || !crate::library_index::entry_meta_for(
+                    idx,
+                    crate::library_index::LibraryKind::Clicker,
+                    &name,
+                )
+                .enabled
+                {
+                    continue;
+                }
+            }
             let preset = match load_preset(&dir, &name) {
                 Ok(p) => p,
                 Err(_) => continue,
             };
-            if let Trigger::Hotkey { key, mods } = &preset.trigger {
-                if let Some(vk) = parse_trigger_vk(key).map(|v| normalize_trigger_vk(v, *mods)) {
-                    if reserved.contains(&vk) {
-                        self.bus.publish(EngineEvent::Log {
-                            level: LogLevel::Warn,
-                            message: format!(
-                                "clicker trigger VK 0x{vk:X} for « {name} » ignored (reserved hotkey)"
-                            ),
-                        });
-                        continue;
+            match &preset.trigger {
+                Trigger::Hotkey { key, mods } => {
+                    if let Some(vk) =
+                        parse_trigger_vk(key).map(|v| normalize_trigger_vk(v, *mods))
+                    {
+                        if reserved.contains(&vk) {
+                            self.bus.publish(EngineEvent::Log {
+                                level: LogLevel::Warn,
+                                message: format!(
+                                    "clicker trigger VK 0x{vk:X} for « {name} » ignored (reserved hotkey)"
+                                ),
+                            });
+                            continue;
+                        }
+                        let binding = TriggerBinding::from_mods(vk, *mods);
+                        if macro_map.contains_key(&binding) {
+                            self.bus.publish(EngineEvent::Log {
+                                level: LogLevel::Warn,
+                                message: format!(
+                                    "clicker trigger for « {name} » ignored (conflicts with macro)"
+                                ),
+                            });
+                            continue;
+                        }
+                        if let Some(prev) = map.insert(binding, name.clone()) {
+                            self.bus.publish(EngineEvent::Log {
+                                level: LogLevel::Warn,
+                                message: format!(
+                                    "clicker trigger for « {name} » overrides « {prev} »"
+                                ),
+                            });
+                        }
                     }
-                    let binding = TriggerBinding::from_mods(vk, *mods);
-                    if macro_map.contains_key(&binding) {
-                        self.bus.publish(EngineEvent::Log {
-                            level: LogLevel::Warn,
-                            message: format!(
-                                "clicker trigger for « {name} » ignored (conflicts with macro)"
-                            ),
-                        });
-                        continue;
-                    }
-                    if let Some(prev) = map.insert(binding, name.clone()) {
-                        self.bus.publish(EngineEvent::Log {
-                            level: LogLevel::Warn,
-                            message: format!(
-                                "clicker trigger for « {name} » overrides « {prev} »"
-                            ),
-                        });
+                }
+                other => {
+                    if let Some(ct) =
+                        context_from_trigger(ContextTarget::Clicker, &name, other)
+                    {
+                        context.push(ct);
                     }
                 }
             }
         }
+        let mut merged = self
+            .context_triggers
+            .lock()
+            .expect("context triggers")
+            .clone();
+        merged.retain(|e| context_target(e) != ContextTarget::Clicker);
+        merged.extend(context);
+        *self.context_triggers.lock().expect("context triggers") = merged;
         update_live_clicker_triggers(map.clone());
         *self.clicker_triggers.lock().expect("clicker triggers") = map;
+        Ok(())
+    }
+
+    pub fn rebuild_script_triggers(&self) -> Result<(), String> {
+        use crate::script_library::list_scripts;
+        let Some(dir) = self.macros_config_dir() else {
+            *self.script_triggers.lock().expect("script triggers") = Default::default();
+            retain_context_except(self, ContextTarget::Script);
+            update_live_script_triggers(Default::default());
+            return Ok(());
+        };
+        let bindings = self.hotkey_bindings();
+        let reserved = [
+            bindings.action_vk,
+            bindings.macro_vk,
+            bindings.pause_vk,
+            bindings.emergency_vk,
+            bindings.script_vk,
+        ];
+        let macro_map = self.macro_triggers.lock().expect("triggers").clone();
+        let clicker_map = self.clicker_triggers.lock().expect("clicker triggers").clone();
+        let docs = list_scripts(&dir).map_err(|e| e.to_string())?;
+        let index = crate::library_index::load_index(&dir).ok();
+        let mut map = std::collections::HashMap::new();
+        let mut context = Vec::new();
+        for doc in docs {
+            let name = doc.id.clone();
+            if let Some(idx) = index.as_ref() {
+                if crate::library_index::is_trashed_for(
+                    idx,
+                    crate::library_index::LibraryKind::Script,
+                    &name,
+                ) || !crate::library_index::entry_meta_for(
+                    idx,
+                    crate::library_index::LibraryKind::Script,
+                    &name,
+                )
+                .enabled
+                {
+                    continue;
+                }
+            }
+            match &doc.trigger {
+                Trigger::Hotkey { key, mods } => {
+                    if let Some(vk) =
+                        parse_trigger_vk(key).map(|v| normalize_trigger_vk(v, *mods))
+                    {
+                        if reserved.contains(&vk) {
+                            continue;
+                        }
+                        let binding = TriggerBinding::from_mods(vk, *mods);
+                        if macro_map.contains_key(&binding) || clicker_map.contains_key(&binding)
+                        {
+                            continue;
+                        }
+                        let _ = map.insert(binding, name.clone());
+                    }
+                }
+                other => {
+                    if let Some(ct) =
+                        context_from_trigger(ContextTarget::Script, &name, other)
+                    {
+                        context.push(ct);
+                    }
+                }
+            }
+        }
+        let mut merged = self
+            .context_triggers
+            .lock()
+            .expect("context triggers")
+            .clone();
+        merged.retain(|e| context_target(e) != ContextTarget::Script);
+        merged.extend(context);
+        *self.context_triggers.lock().expect("context triggers") = merged;
+        update_live_script_triggers(map.clone());
+        *self.script_triggers.lock().expect("script triggers") = map;
         Ok(())
     }
 
@@ -1737,6 +2115,7 @@ impl AppState {
         let app_script = self.clone();
         let app_named = self.clone();
         let app_named_clicker = self.clone();
+        let app_named_script = self.clone();
         let app_pause = self.clone();
         let app_em = self.clone();
         let stop = Arc::clone(&self.hotkey_stop);
@@ -1762,6 +2141,9 @@ impl AppState {
                 on_named_clicker: Box::new(move |name| {
                     app_named_clicker.enqueue_hotkey(HotkeyCmd::NamedClicker(name));
                 }),
+                on_named_script: Box::new(move |name| {
+                    app_named_script.enqueue_hotkey(HotkeyCmd::NamedScript(name));
+                }),
                 on_clicker_pause: Box::new(move || {
                     app_pause.enqueue_hotkey(HotkeyCmd::ToggleClickerPause);
                 }),
@@ -1772,13 +2154,14 @@ impl AppState {
             stop,
         )?;
         *self.hotkey_thread.lock().expect("hotkey thread") = Some(handle);
-        // Named macro/clicker triggers scan every JSON on disk — do it off the setup path.
+        // Named triggers scan every JSON on disk — do it off the setup path.
         let rebuild = self.clone();
         std::thread::Builder::new()
             .name("hotkey-triggers".into())
             .spawn(move || {
                 let _ = rebuild.rebuild_macro_triggers();
                 let _ = rebuild.rebuild_clicker_triggers();
+                let _ = rebuild.rebuild_script_triggers();
             })
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -1823,7 +2206,8 @@ impl AppState {
             .map_err(|e| e.to_string())
     }
 
-    /// Start collecting left-click positions as clicker points (Esc cancels).
+    /// Start collecting left-click positions as clicker points
+    /// (Esc cancels · right-click stops and keeps points).
     pub fn start_clicker_point_capture(&self) -> Result<(), String> {
         if matches!(self.state(), EngineState::Running | EngineState::Paused) {
             return Err("cannot capture points while a session is running".into());
@@ -1848,7 +2232,9 @@ impl AppState {
         drop(guard);
         self.bus.publish(EngineEvent::Log {
             level: LogLevel::Info,
-            message: "capture de points clicker démarrée (Échap / clic droit pour annuler)".into(),
+            message:
+                "capture de points clicker démarrée (Échap = annuler · clic droit = arrêter)"
+                    .into(),
         });
         Ok(())
     }
@@ -1913,8 +2299,9 @@ impl AppState {
         drop(guard);
         self.bus.publish(EngineEvent::Log {
             level: LogLevel::Info,
-            message: "échantillon couleur démarré (clic gauche · Échap / clic droit pour annuler)"
-                .into(),
+            message:
+                "échantillon couleur démarré (clic gauche · Échap = annuler · clic droit = arrêter)"
+                    .into(),
         });
         Ok(())
     }
@@ -1979,6 +2366,84 @@ impl Default for AppState {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn context_target(entry: &ContextTrigger) -> ContextTarget {
+    match entry {
+        ContextTrigger::Schedule { target, .. }
+        | ContextTrigger::ForegroundProcess { target, .. }
+        | ContextTrigger::WindowTitle { target, .. } => *target,
+    }
+}
+
+fn retain_context_except(app: &AppState, drop: ContextTarget) {
+    let mut guard = app.context_triggers.lock().expect("context triggers");
+    guard.retain(|e| context_target(e) != drop);
+}
+
+fn context_from_trigger(
+    target: ContextTarget,
+    name: &str,
+    trigger: &Trigger,
+) -> Option<ContextTrigger> {
+    match trigger {
+        Trigger::Schedule {
+            hour,
+            minute,
+            weekdays,
+        } => {
+            if *hour > 23 || *minute > 59 {
+                return None;
+            }
+            Some(ContextTrigger::Schedule {
+                target,
+                name: name.to_string(),
+                hour: *hour,
+                minute: *minute,
+                weekdays: *weekdays,
+            })
+        }
+        Trigger::ForegroundProcess { exe, match_mode } => {
+            let exe = exe.trim().to_string();
+            if exe.is_empty() {
+                return None;
+            }
+            Some(ContextTrigger::ForegroundProcess {
+                target,
+                name: name.to_string(),
+                exe,
+                match_mode: *match_mode,
+            })
+        }
+        Trigger::WindowTitle {
+            pattern,
+            match_mode,
+            exe,
+        } => {
+            let pattern = pattern.trim().to_string();
+            if pattern.is_empty() {
+                return None;
+            }
+            Some(ContextTrigger::WindowTitle {
+                target,
+                name: name.to_string(),
+                pattern,
+                match_mode: *match_mode,
+                exe: exe.clone(),
+            })
+        }
+        Trigger::Hotkey { .. } | Trigger::Manual => None,
+    }
+}
+
+/// `LocalClock.weekday` is 0=Sunday…6=Saturday; schedule mask uses Mon=bit0…Sun=bit6.
+fn schedule_weekday_bit(clock_weekday: u32) -> u8 {
+    let plan_idx = if clock_weekday == 0 {
+        6
+    } else {
+        clock_weekday.saturating_sub(1).min(6)
+    };
+    1u8 << plan_idx
 }
 
 /// Parse trigger key stored as decimal (`"120"`) or hex (`"0x78"`).
@@ -2355,6 +2820,7 @@ mod tests {
             param_values: HashMap::new(),
             process_filter: Default::default(),
             local_process_filter: Default::default(),
+            trigger: Trigger::Manual,
         };
         save_script(&dir, &doc).unwrap();
 

@@ -7,7 +7,8 @@ use std::time::{Duration, Instant};
 use caster_engine::{
     assert_not_locked, convert_library_item_lang, create_library_folder, create_macro, delete_library_folder, delete_macro,
     delete_preset, delete_script, duplicate_macro, duplicate_preset, enrich_macro_summaries,
-    export_preset_to_path, get_library_index, import_preset_from_path, list_library_items,
+    export_macro_to_path, export_preset_to_path, export_script_to_path, get_library_index,
+    import_macro_from_path, import_preset_from_path, import_script_from_path, list_library_items,
     list_library_items_from_index, list_macro_summaries, list_macros, list_preset_summaries,
     list_presets, list_script_summaries, list_scripts, load_macro, load_preset, load_quick_access,
     load_script, load_settings, load_accueil_order, list_visible_process_exe_entries,
@@ -18,7 +19,8 @@ use caster_engine::{
     remove_library_entry, rename_library_entry_key, rename_library_folder,
     reorder_library_folders, rename_macro, rename_preset, restore_library_item, save_macro_checked, save_preset,
     set_library_folder_parent, save_preset_with_trigger, save_quick_access, save_script, save_settings, save_accueil_order,
-    set_favorite, set_library_item_locked, trash_library_item, normalize_app_settings, AccueilPrefs,
+    set_favorite, set_library_item_enabled, set_library_item_icon, set_library_item_locked,
+    trash_library_item, normalize_app_settings, AccueilPrefs,
     AppearancePrefs, AppSettings, AppState, AutomationPrefs, ClickPoint, ClickerConfig,
     ClickerMetrics,
     ClickerPreset, ClickerPresetSummary, ConfirmationsPrefs, ConvertMode, ConvertResult, DrawnRect,
@@ -667,6 +669,71 @@ fn set_library_item_locked_cmd(
 ) -> Result<(), String> {
     let kind = LibraryKind::parse(&kind).map_err(|e| e.to_string())?;
     set_library_item_locked(&dir.0, kind, id, locked).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_library_item_enabled_cmd(
+    dir: State<'_, SettingsDir>,
+    engine: State<'_, AppState>,
+    kind: String,
+    id: String,
+    enabled: bool,
+) -> Result<(), String> {
+    let kind = LibraryKind::parse(&kind).map_err(|e| e.to_string())?;
+    set_library_item_enabled(&dir.0, kind, id, enabled).map_err(|e| e.to_string())?;
+    rebuild_triggers(&engine);
+    Ok(())
+}
+
+#[tauri::command]
+fn set_library_item_icon_cmd(
+    dir: State<'_, SettingsDir>,
+    kind: String,
+    id: String,
+    icon: Option<String>,
+) -> Result<(), String> {
+    let kind = LibraryKind::parse(&kind).map_err(|e| e.to_string())?;
+    set_library_item_icon(&dir.0, kind, id, icon).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn export_library_macro_path(
+    dir: State<'_, SettingsDir>,
+    id: String,
+    path: String,
+) -> Result<(), String> {
+    export_macro_to_path(&dir.0, &id, Path::new(&path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn import_library_macro_path(
+    dir: State<'_, SettingsDir>,
+    engine: State<'_, AppState>,
+    path: String,
+) -> Result<MacroDocument, String> {
+    let doc = import_macro_from_path(&dir.0, Path::new(&path)).map_err(|e| e.to_string())?;
+    rebuild_triggers(&engine);
+    Ok(doc)
+}
+
+#[tauri::command]
+fn export_script_path(
+    dir: State<'_, SettingsDir>,
+    id: String,
+    path: String,
+) -> Result<(), String> {
+    export_script_to_path(&dir.0, &id, Path::new(&path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn import_script_path(
+    dir: State<'_, SettingsDir>,
+    engine: State<'_, AppState>,
+    path: String,
+) -> Result<ScriptDoc, String> {
+    let doc = import_script_from_path(&dir.0, Path::new(&path)).map_err(|e| e.to_string())?;
+    rebuild_triggers(&engine);
+    Ok(doc)
 }
 
 #[tauri::command]
@@ -1530,8 +1597,8 @@ fn set_start_with_windows(enable: bool) -> Result<(), String> {
     #[cfg(windows)]
     {
         if is_msix_packaged() {
-            // Prefer HKCU Run (rewritten on each enable / boot) — Startup .cmd
-            // is fragile under package updates. Clear any leftover .cmd.
+            // Sole MSIX autostart path: HKCU Run (rewritten on enable).
+            // No Appx StartupTask — keeps Store manifest and runtime aligned.
             let _ = set_start_startup_cmd(false);
             set_start_msix_run_key(enable)
         } else {
@@ -1773,9 +1840,17 @@ fn load_script_cmd(dir: State<'_, SettingsDir>, id: String) -> Result<ScriptDoc,
 }
 
 #[tauri::command]
-fn save_script_cmd(dir: State<'_, SettingsDir>, doc: ScriptDoc) -> Result<(), String> {
+fn save_script_cmd(
+    dir: State<'_, SettingsDir>,
+    engine: State<'_, AppState>,
+    doc: ScriptDoc,
+) -> Result<(), String> {
     assert_not_locked(&dir.0, LibraryKind::Script, &doc.id).map_err(|e| e.to_string())?;
-    save_script(&dir.0, &doc).map_err(|e| e.to_string())
+    save_script(&dir.0, &doc).map_err(|e| e.to_string())?;
+    if let Err(e) = engine.rebuild_script_triggers() {
+        log::warn!("rebuild script triggers after save: {e}");
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1939,6 +2014,9 @@ fn set_hotkey_bindings(
     if let Err(e) = engine.rebuild_clicker_triggers() {
         log::warn!("rebuild clicker triggers after hotkey change: {e}");
     }
+    if let Err(e) = engine.rebuild_script_triggers() {
+        log::warn!("rebuild script triggers after hotkey change: {e}");
+    }
     persist(&app, &engine);
     Ok(engine.hotkey_bindings())
 }
@@ -1974,6 +2052,9 @@ fn rebuild_triggers(engine: &AppState) {
     }
     if let Err(e) = engine.rebuild_clicker_triggers() {
         log::warn!("rebuild clicker triggers: {e}");
+    }
+    if let Err(e) = engine.rebuild_script_triggers() {
+        log::warn!("rebuild script triggers: {e}");
     }
 }
 
@@ -3354,6 +3435,12 @@ pub fn run() {
             move_library_item_cmd,
             convert_library_item_cmd,
             set_library_item_locked_cmd,
+            set_library_item_enabled_cmd,
+            set_library_item_icon_cmd,
+            export_library_macro_path,
+            import_library_macro_path,
+            export_script_path,
+            import_script_path,
             trash_library_item_cmd,
             restore_library_item_cmd,
             list_clicker_library,

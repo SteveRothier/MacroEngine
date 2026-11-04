@@ -848,11 +848,9 @@ function MainAppInner({
         query={automationsPage.query}
         onQueryChange={automationsPage.setQuery}
         filter={automationsPage.filter}
-        kindFilter={automationsPage.kindFilter}
         display={automationsPage.display}
         onDisplayChange={automationsPage.setDisplay}
         onFilterChange={automationsPage.setFilter}
-        onKindFilterChange={automationsPage.setKindFilter}
         onRefresh={bumpRefresh}
         onResourceRenamed={(kind, fromId, toId, label) => {
           const tabId = docTabId(kind, fromId);

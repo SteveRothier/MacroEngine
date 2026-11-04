@@ -5,6 +5,7 @@ import type { UiLocalePref } from "../i18n/locales";
 export type AccueilSortBy = "order" | "name" | "type" | "status" | "lastRun";
 export type AccueilSortDir = "asc" | "desc";
 export type AccueilFilter = "all" | "favorites" | "recent";
+export type AccueilLayout = "media" | "legacy";
 export type StartupView = "home" | "lastDocument";
 export type UiDensity = "comfortable" | "compact";
 export type AccentTheme = "default" | "blue" | "teal";
@@ -32,6 +33,8 @@ export type AccueilPrefs = {
   hideScriptLanguages: string[];
   syncLibrarySortOnReorder: boolean;
   dragThresholdPx: number;
+  /** Accueil list presentation (`media` = identity rows; `legacy` = denser grid). */
+  accueilLayout: AccueilLayout;
 };
 
 export type ShellPrefs = {
@@ -102,6 +105,7 @@ export const DEFAULT_ACCUEIL_PREFS: AccueilPrefs = {
   hideScriptLanguages: [],
   syncLibrarySortOnReorder: true,
   dragThresholdPx: 6,
+  accueilLayout: "media",
 };
 
 export const DEFAULT_SHELL_PREFS: ShellPrefs = {
