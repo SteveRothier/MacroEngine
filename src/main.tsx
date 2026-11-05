@@ -11,13 +11,18 @@ import {
   removeBootSplashImmediate,
   startBootSplashEntrance,
 } from "./bootSplash";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
 /* Legacy tokens/ui.css kept for overlays (App.tsx), shell window controls, and
    residual Clicker/Macro preview classes still shared with the shell. Prefer caster tokens. */
 import "./styles/tokens.css";
 import "./ui/shell/tokens.css";
 import "./ui/ui.css";
 import "./ui/shell/shell.css";
-import "./library/library.css";
+import "./library/workspaceLibrary.css";
 
 applyTheme(readStoredTheme());
 

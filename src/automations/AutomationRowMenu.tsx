@@ -22,9 +22,6 @@ type Props = {
   onMoveToFolder?: (folder: AutomationFolderOption | null) => void;
   onConvertTo?: (toKind: AutomationRow["kind"]) => void;
   onExport?: () => void;
-  onToggleEnabled?: () => void;
-  onPickIcon?: (icon: string) => void;
-  onClearIcon?: () => void;
 };
 
 export function AutomationRowMenu({
@@ -44,9 +41,6 @@ export function AutomationRowMenu({
   onMoveToFolder,
   onConvertTo,
   onExport,
-  onToggleEnabled,
-  onPickIcon,
-  onClearIcon,
 }: Props) {
   const t = useT();
   const items = buildAutomationRowMenuItems(row, t, {
@@ -63,9 +57,6 @@ export function AutomationRowMenu({
     onMoveToFolder,
     onConvertTo,
     onExport,
-    onToggleEnabled,
-    onPickIcon,
-    onClearIcon,
     icons: automationRowMenuIcons(),
   });
 

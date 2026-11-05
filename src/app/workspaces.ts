@@ -24,8 +24,6 @@ export function normalizeSettingsSection(section: unknown): SettingsSection {
   return LEGACY_SETTINGS_SECTIONS[section] ?? "application";
 }
 
-export const HOME_TAB_ID = "home";
-
 export type DocTabKind = "macro" | "clicker" | "script";
 
 export type DocTab = {
@@ -38,10 +36,9 @@ export type DocTab = {
 };
 
 export type ShellView =
-  | { type: "home" }
-  | { type: "library" }
+  | { type: "empty" }
   | { type: "doc"; tabId: string }
-  | { type: "settings"; section?: SettingsSection; returnTabId?: string };
+  | { type: "settings"; section?: SettingsSection; returnTabId?: string | null };
 
 export type WorkspaceState = {
   tabs: DocTab[];
@@ -67,8 +64,8 @@ function readStorageRaw(): string | null {
 
 type Persisted = {
   tabs: DocTab[];
-  activeTabId: string;
-  shellView: ShellView["type"];
+  activeTabId: string | null;
+  shellView: ShellView["type"] | "home" | "library";
   settingsSection?: SettingsSection;
 };
 
@@ -76,7 +73,9 @@ export function docTabId(kind: DocTabKind, resourceId: string): string {
   return `${kind}:${resourceId}`;
 }
 
-export function parseDocTabId(id: string): { kind: DocTabKind; resourceId: string } | null {
+export function parseDocTabId(
+  id: string,
+): { kind: DocTabKind; resourceId: string } | null {
   const i = id.indexOf(":");
   if (i <= 0) return null;
   const kind = id.slice(0, i);
@@ -93,7 +92,7 @@ export function sortTabsForDisplay(tabs: DocTab[]): DocTab[] {
 export function initialWorkspace(): WorkspaceState {
   return {
     tabs: [],
-    shellView: { type: "home" },
+    shellView: { type: "empty" },
   };
 }
 
@@ -106,10 +105,10 @@ export function loadWorkspace(): WorkspaceState {
     if (data.shellView === "settings") {
       const returnTabId =
         typeof data.activeTabId === "string" &&
-        data.activeTabId !== HOME_TAB_ID &&
+        data.activeTabId !== "home" &&
         tabs.some((t) => t.id === data.activeTabId)
           ? data.activeTabId
-          : HOME_TAB_ID;
+          : tabs[0]?.id ?? null;
       return {
         tabs,
         shellView: {
@@ -119,13 +118,21 @@ export function loadWorkspace(): WorkspaceState {
         },
       };
     }
-    if (data.shellView === "doc" && data.activeTabId && tabs.some((t) => t.id === data.activeTabId)) {
+    if (
+      data.shellView === "doc" &&
+      data.activeTabId &&
+      tabs.some((t) => t.id === data.activeTabId)
+    ) {
       return { tabs, shellView: { type: "doc", tabId: data.activeTabId } };
     }
-    if (data.shellView === "library") {
-      return { tabs, shellView: { type: "library" } };
+    // Legacy home/library → empty (library is always visible as sidebar)
+    if (tabs.length > 0) {
+      return {
+        tabs,
+        shellView: { type: "doc", tabId: tabs[tabs.length - 1]!.id },
+      };
     }
-    return { tabs, shellView: { type: "home" } };
+    return { tabs, shellView: { type: "empty" } };
   } catch {
     return initialWorkspace();
   }
@@ -154,11 +161,13 @@ export function persistWorkspace(state: WorkspaceState): void {
         state.shellView.type === "doc"
           ? state.shellView.tabId
           : state.shellView.type === "settings"
-            ? (state.shellView.returnTabId ?? HOME_TAB_ID)
-            : HOME_TAB_ID,
+            ? (state.shellView.returnTabId ?? null)
+            : null,
       shellView: state.shellView.type,
       settingsSection:
-        state.shellView.type === "settings" ? state.shellView.section : undefined,
+        state.shellView.type === "settings"
+          ? state.shellView.section
+          : undefined,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
@@ -183,16 +192,14 @@ export function openDocTab(
   };
 }
 
-export function selectHome(state: WorkspaceState): WorkspaceState {
-  return { ...state, shellView: { type: "home" } };
+export function selectEmpty(state: WorkspaceState): WorkspaceState {
+  return { ...state, shellView: { type: "empty" } };
 }
 
-export function selectLibrary(state: WorkspaceState): WorkspaceState {
-  return { ...state, shellView: { type: "library" } };
-}
-
-export function selectDocTab(state: WorkspaceState, tabId: string): WorkspaceState {
-  if (tabId === HOME_TAB_ID) return selectHome(state);
+export function selectDocTab(
+  state: WorkspaceState,
+  tabId: string,
+): WorkspaceState {
   if (!state.tabs.some((t) => t.id === tabId)) return state;
   return { ...state, shellView: { type: "doc", tabId } };
 }
@@ -221,11 +228,13 @@ function resolveShellAfterClose(
   }
   const idx = state.tabs.findIndex((t) => t.id === closedTabId);
   const next = tabs[idx] ?? tabs[idx - 1] ?? tabs[0];
-  return next ? { type: "doc", tabId: next.id } : { type: "home" };
+  return next ? { type: "doc", tabId: next.id } : { type: "empty" };
 }
 
-export function closeDocTab(state: WorkspaceState, tabId: string): WorkspaceState {
-  if (tabId === HOME_TAB_ID) return state;
+export function closeDocTab(
+  state: WorkspaceState,
+  tabId: string,
+): WorkspaceState {
   const tab = state.tabs.find((t) => t.id === tabId);
   if (!tab || tab.pinned) return state;
   const idx = state.tabs.findIndex((t) => t.id === tabId);
@@ -234,7 +243,10 @@ export function closeDocTab(state: WorkspaceState, tabId: string): WorkspaceStat
   return { tabs, shellView: resolveShellAfterClose(state, tabs, tabId) };
 }
 
-export function closeOtherDocTabs(state: WorkspaceState, keepTabId: string): WorkspaceState {
+export function closeOtherDocTabs(
+  state: WorkspaceState,
+  keepTabId: string,
+): WorkspaceState {
   if (!state.tabs.some((t) => t.id === keepTabId)) return state;
   const tabs = state.tabs.filter((t) => t.id === keepTabId || t.pinned);
   let shellView = state.shellView;
@@ -247,7 +259,10 @@ export function closeOtherDocTabs(state: WorkspaceState, keepTabId: string): Wor
   return { tabs, shellView };
 }
 
-export function closeDocTabsToRight(state: WorkspaceState, fromTabId: string): WorkspaceState {
+export function closeDocTabsToRight(
+  state: WorkspaceState,
+  fromTabId: string,
+): WorkspaceState {
   const idx = state.tabs.findIndex((t) => t.id === fromTabId);
   if (idx < 0) return state;
   const tabs = state.tabs.filter((t, i) => i <= idx || t.pinned);
@@ -263,8 +278,10 @@ export function closeDocTabsToRight(state: WorkspaceState, fromTabId: string): W
 
 export function closeAllDocTabs(state: WorkspaceState): WorkspaceState {
   const tabs = state.tabs.filter((t) => t.pinned);
-  if (tabs.length === state.tabs.length && state.shellView.type === "home") return state;
-  let shellView: ShellView = { type: "home" };
+  if (tabs.length === state.tabs.length && state.shellView.type === "empty") {
+    return state;
+  }
+  let shellView: ShellView = { type: "empty" };
   if (state.shellView.type === "doc") {
     const activeTabId = state.shellView.tabId;
     const active = state.tabs.find((t) => t.id === activeTabId);
@@ -285,7 +302,10 @@ export function tabsClosedBy(
   return before.tabs.filter((t) => !afterIds.has(t.id));
 }
 
-export function toggleTabPin(state: WorkspaceState, tabId: string): WorkspaceState {
+export function toggleTabPin(
+  state: WorkspaceState,
+  tabId: string,
+): WorkspaceState {
   const tab = state.tabs.find((t) => t.id === tabId);
   if (!tab) return state;
   const pinned = !tab.pinned;
@@ -370,19 +390,25 @@ export function renameDocTab(
   };
 }
 
-export function nextDocTabId(state: WorkspaceState, currentId: string | null): string | null {
+export function nextDocTabId(
+  state: WorkspaceState,
+  currentId: string | null,
+): string | null {
   const ordered = sortTabsForDisplay(state.tabs);
   if (ordered.length === 0) return null;
-  if (!currentId || currentId === HOME_TAB_ID) return ordered[0]!.id;
+  if (!currentId) return ordered[0]!.id;
   const idx = ordered.findIndex((t) => t.id === currentId);
   if (idx < 0) return ordered[0]!.id;
   return ordered[(idx + 1) % ordered.length]!.id;
 }
 
-export function prevDocTabId(state: WorkspaceState, currentId: string | null): string | null {
+export function prevDocTabId(
+  state: WorkspaceState,
+  currentId: string | null,
+): string | null {
   const ordered = sortTabsForDisplay(state.tabs);
   if (ordered.length === 0) return null;
-  if (!currentId || currentId === HOME_TAB_ID) return ordered[ordered.length - 1]!.id;
+  if (!currentId) return ordered[ordered.length - 1]!.id;
   const idx = ordered.findIndex((t) => t.id === currentId);
   if (idx < 0) return ordered[ordered.length - 1]!.id;
   return ordered[(idx - 1 + ordered.length) % ordered.length]!.id;
@@ -420,16 +446,16 @@ export function activeDocTab(state: WorkspaceState): DocTab | null {
   return state.tabs.find((t) => t.id === view.tabId) ?? null;
 }
 
-export function titleBarActiveTabId(state: WorkspaceState): string {
+export function titleBarActiveTabId(state: WorkspaceState): string | null {
   if (state.shellView.type === "doc") return state.shellView.tabId;
-  return HOME_TAB_ID;
+  return null;
 }
 
-export function titleBarHighlightTabId(state: WorkspaceState): string {
+export function titleBarHighlightTabId(state: WorkspaceState): string | null {
   if (state.shellView.type === "settings") {
-    const id = state.shellView.returnTabId ?? HOME_TAB_ID;
-    if (id !== HOME_TAB_ID && state.tabs.some((t) => t.id === id)) return id;
-    return HOME_TAB_ID;
+    const id = state.shellView.returnTabId ?? null;
+    if (id && state.tabs.some((t) => t.id === id)) return id;
+    return null;
   }
   return titleBarActiveTabId(state);
 }

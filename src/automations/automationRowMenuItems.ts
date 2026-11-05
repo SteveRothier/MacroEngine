@@ -3,7 +3,6 @@ import type { TFunction } from "../i18n";
 import type { MenuItemDef } from "../ui/shell";
 import type { AutomationFolderOption, AutomationRow } from "./types";
 import { folderOptionKey } from "./types";
-import { LIBRARY_ICON_CHOICES } from "./libraryIcons";
 
 export type AutomationRowMenuActions = {
   onOpen: () => void;
@@ -24,10 +23,6 @@ export type AutomationRowMenuActions = {
   onDelete: () => void;
   onRestore?: () => void;
   onExport?: () => void;
-  onToggleEnabled?: () => void;
-  /** Pick a curated emoji icon (submenu). */
-  onPickIcon?: (icon: string) => void;
-  onClearIcon?: () => void;
   icons?: {
     open?: ReactNode;
     launch?: ReactNode;
@@ -117,38 +112,6 @@ export function buildAutomationRowMenuItems(
         : t("automations.menu.row.addFavorite"),
       icon: actions.icons?.favorite,
       onSelect: actions.onToggleFavorite,
-    });
-  }
-  if (actions.onToggleEnabled) {
-    items.push({
-      id: "enabled",
-      label:
-        row.enabled === false
-          ? t("automations.row.enable")
-          : t("automations.row.disable"),
-      onSelect: actions.onToggleEnabled,
-    });
-  }
-  if (actions.onPickIcon) {
-    const iconSub: MenuItemDef[] = LIBRARY_ICON_CHOICES.map((emoji) => ({
-      id: `icon-${emoji}`,
-      label: emoji,
-      onSelect: () => actions.onPickIcon?.(emoji),
-    }));
-    if (actions.onClearIcon && row.icon) {
-      iconSub.push(
-        { id: "sep-icon-clear", label: "", separator: true },
-        {
-          id: "icon-clear",
-          label: t("automations.row.clearIcon"),
-          onSelect: actions.onClearIcon,
-        },
-      );
-    }
-    items.push({
-      id: "icon",
-      label: t("automations.row.changeIcon"),
-      submenu: iconSub,
     });
   }
   if (actions.onExport) {
@@ -243,7 +206,7 @@ export function buildAutomationRowMenuItems(
       { id: "sep-del", label: "", separator: true },
       {
         id: "delete",
-        label: t("automations.menu.row.trash"),
+        label: t("automations.menu.row.delete"),
         icon: actions.icons?.delete,
         danger: true,
         onSelect: actions.onDelete,

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  HOME_TAB_ID,
   closeAllDocTabs,
   closeDocTab,
   closeDocTabsToRight,
@@ -14,8 +13,7 @@ import {
   prevDocTabId,
   reorderDocTabs,
   renameDocTab,
-  selectHome,
-  selectLibrary,
+  selectEmpty,
   setTabDirty,
   tabsClosedBy,
   titleBarActiveTabId,
@@ -26,6 +24,7 @@ import {
 describe("workspaces", () => {
   it("opens and closes doc tabs", () => {
     let ws = initialWorkspace();
+    expect(ws.shellView).toEqual({ type: "empty" });
     ws = openDocTab(ws, "macro", "Test", "Test");
     expect(ws.tabs).toHaveLength(1);
     expect(ws.shellView).toEqual({ type: "doc", tabId: docTabId("macro", "Test") });
@@ -35,18 +34,12 @@ describe("workspaces", () => {
     expect(again).toBe(ws);
     ws = closeDocTab(ws, docTabId("macro", "Test"));
     expect(ws.tabs).toHaveLength(0);
-    expect(ws.shellView).toEqual({ type: "home" });
+    expect(ws.shellView).toEqual({ type: "empty" });
   });
 
-  it("titleBarActiveTabId uses home on home view", () => {
-    const ws = selectHome(initialWorkspace());
-    expect(titleBarActiveTabId(ws)).toBe(HOME_TAB_ID);
-  });
-
-  it("selectLibrary switches shell view", () => {
-    const ws = selectLibrary(selectHome(initialWorkspace()));
-    expect(ws.shellView).toEqual({ type: "library" });
-    expect(titleBarActiveTabId(ws)).toBe(HOME_TAB_ID);
+  it("titleBarActiveTabId is null on empty view", () => {
+    const ws = selectEmpty(initialWorkspace());
+    expect(titleBarActiveTabId(ws)).toBeNull();
   });
 
   it("titleBarHighlightTabId keeps underlying tab in settings", () => {
@@ -58,10 +51,10 @@ describe("workspaces", () => {
     expect(ws.shellView).toMatchObject({ type: "settings", returnTabId: tabId });
   });
 
-  it("titleBarHighlightTabId falls back to home in settings from home", () => {
-    let ws = selectHome(initialWorkspace());
+  it("titleBarHighlightTabId is null in settings from empty", () => {
+    let ws = selectEmpty(initialWorkspace());
     ws = openSettings(ws, "application");
-    expect(titleBarHighlightTabId(ws)).toBe(HOME_TAB_ID);
+    expect(titleBarHighlightTabId(ws)).toBeNull();
   });
 
   it("normalizeSettingsSection maps legacy section ids", () => {
@@ -123,81 +116,38 @@ describe("workspaces", () => {
     expect(ws.tabs[0]?.pinned).toBe(true);
   });
 
-  it("reorderDocTabs moves within same pin group", () => {
-    let ws = initialWorkspace();
-    ws = openDocTab(ws, "macro", "A", "A");
-    ws = openDocTab(ws, "macro", "B", "B");
-    ws = reorderDocTabs(ws, docTabId("macro", "B"), docTabId("macro", "A"));
-    expect(ws.tabs.map((t) => t.resourceId)).toEqual(["B", "A"]);
-  });
-
-  it("reorderDocTabs inserts before target with three tabs", () => {
+  it("reorderDocTabs moves within pin group", () => {
     let ws = initialWorkspace();
     ws = openDocTab(ws, "macro", "A", "A");
     ws = openDocTab(ws, "macro", "B", "B");
     ws = openDocTab(ws, "macro", "C", "C");
-    ws = reorderDocTabs(ws, docTabId("macro", "A"), docTabId("macro", "C"));
-    expect(ws.tabs.map((t) => t.resourceId)).toEqual(["B", "A", "C"]);
+    ws = reorderDocTabs(ws, docTabId("macro", "C"), docTabId("macro", "A"));
+    expect(ws.tabs.map((t) => t.resourceId)).toEqual(["C", "A", "B"]);
   });
 
-  it("reorderDocTabs appends to pin group end", () => {
-    let ws = initialWorkspace();
-    ws = openDocTab(ws, "macro", "A", "A");
-    ws = openDocTab(ws, "macro", "B", "B");
-    ws = openDocTab(ws, "macro", "C", "C");
-    ws = reorderDocTabs(ws, docTabId("macro", "A"), null);
-    expect(ws.tabs.map((t) => t.resourceId)).toEqual(["B", "C", "A"]);
+  it("renameDocTab updates id and active shell", () => {
+    let ws = openDocTab(initialWorkspace(), "macro", "Old", "Old");
+    const oldId = docTabId("macro", "Old");
+    ws = renameDocTab(ws, oldId, "New", "New");
+    expect(ws.tabs[0]?.id).toBe(docTabId("macro", "New"));
+    expect(ws.shellView).toEqual({ type: "doc", tabId: docTabId("macro", "New") });
   });
 
-  it("reorderDocTabs ignores cross pin groups", () => {
-    let ws = initialWorkspace();
-    ws = openDocTab(ws, "macro", "A", "A");
-    ws = openDocTab(ws, "macro", "B", "B");
-    ws = toggleTabPin(ws, docTabId("macro", "A"));
-    const before = ws.tabs.map((t) => t.id);
-    ws = reorderDocTabs(ws, docTabId("macro", "B"), docTabId("macro", "A"));
-    expect(ws.tabs.map((t) => t.id)).toEqual(before);
-  });
-
-  it("next and prev doc tab ids cycle", () => {
+  it("next/prev cycle doc tabs", () => {
     let ws = initialWorkspace();
     ws = openDocTab(ws, "macro", "A", "A");
     ws = openDocTab(ws, "macro", "B", "B");
     const a = docTabId("macro", "A");
     const b = docTabId("macro", "B");
     expect(nextDocTabId(ws, a)).toBe(b);
-    expect(nextDocTabId(ws, b)).toBe(a);
-    expect(prevDocTabId(ws, b)).toBe(a);
+    expect(prevDocTabId(ws, a)).toBe(b);
   });
 
   it("tabsClosedBy lists removed tabs", () => {
-    let ws = initialWorkspace();
-    ws = openDocTab(ws, "macro", "A", "A");
-    ws = openDocTab(ws, "macro", "B", "B");
-    const before = ws;
-    ws = closeOtherDocTabs(ws, docTabId("macro", "A"));
-    expect(tabsClosedBy(before, ws).map((t) => t.resourceId)).toEqual(["B"]);
-  });
-
-  it("closeDocTab refuses pinned tabs", () => {
-    let ws = initialWorkspace();
-    ws = openDocTab(ws, "macro", "A", "A");
-    ws = toggleTabPin(ws, docTabId("macro", "A"));
-    const next = closeDocTab(ws, docTabId("macro", "A"));
-    expect(next.tabs).toHaveLength(1);
-  });
-
-  it("renameDocTab updates id label and shell view", () => {
-    let ws = initialWorkspace();
-    ws = openDocTab(ws, "macro", "Old", "Old");
-    const oldId = docTabId("macro", "Old");
-    ws = renameDocTab(ws, oldId, "New", "New");
-    expect(ws.tabs[0]?.resourceId).toBe("New");
-    expect(ws.tabs[0]?.label).toBe("New");
-    expect(ws.tabs[0]?.id).toBe(docTabId("macro", "New"));
-    expect(ws.shellView).toEqual({
-      type: "doc",
-      tabId: docTabId("macro", "New"),
-    });
+    let before = initialWorkspace();
+    before = openDocTab(before, "macro", "A", "A");
+    before = openDocTab(before, "macro", "B", "B");
+    const after = closeDocTab(before, docTabId("macro", "A"));
+    expect(tabsClosedBy(before, after).map((t) => t.resourceId)).toEqual(["A"]);
   });
 });

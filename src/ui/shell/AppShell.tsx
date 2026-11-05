@@ -3,6 +3,8 @@ import { useTitleBarDispatch } from "./TitleBarContext";
 
 type Props = {
   titleBar: ReactNode;
+  library?: ReactNode;
+  execBar?: ReactNode;
   children: ReactNode;
   rootClassName?: string;
   density?: "comfortable" | "compact";
@@ -13,6 +15,8 @@ type Props = {
 
 export function AppShell({
   titleBar,
+  library,
+  execBar,
   children,
   rootClassName,
   density = "comfortable",
@@ -37,10 +41,16 @@ export function AppShell({
       style={{ fontSize: `${fontScale * 100}%` }}
     >
       <div className="caster-titlebar-shell">{titleBar}</div>
+      {library ? (
+        <aside className="caster-library-pane">{library}</aside>
+      ) : null}
       <div className="caster-content">
         <div className="caster-editor-toolbar-host" ref={subToolbarRef} />
         <div className="caster-main">
           <div className="caster-stage">{children}</div>
+          {execBar ? (
+            <div className="caster-exec-bar-host">{execBar}</div>
+          ) : null}
         </div>
       </div>
     </div>

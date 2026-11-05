@@ -13,7 +13,7 @@ import { ContextMenu } from "./ContextMenu";
 
 type Props = {
   tabs: DocumentTabItem[];
-  activeTabId: string;
+  activeTabId: string | null;
   onTabSelect: (id: string) => void;
   onTabClose?: (id: string) => void;
   onCreateMacro?: () => void;

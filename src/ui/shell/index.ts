@@ -25,7 +25,7 @@ export { EditorToolbar } from "./EditorToolbar";
 export { LibraryLockButton } from "./LibraryLockButton";
 export { usePointerReorder, type PointerReorderHandlers } from "./usePointerReorder";
 export { AppShell } from "./AppShell";
-export { AppNavTabs } from "./AppNavTabs";
+export { ExecutionBar } from "./ExecutionBar";
 export { RecentMenu, type RecentMenuItem } from "./RecentMenu";
 export { Sidebar, type SidebarItem } from "./Sidebar";
 export { WindowTitleBar } from "./WindowTitleBar";

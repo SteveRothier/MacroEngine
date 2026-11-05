@@ -109,7 +109,7 @@ export const DEFAULT_ACCUEIL_PREFS: AccueilPrefs = {
 };
 
 export const DEFAULT_SHELL_PREFS: ShellPrefs = {
-  startupView: "home",
+  startupView: "lastDocument",
   restoreWorkspaceTabs: true,
   startInTray: false,
   recentListMax: 12,

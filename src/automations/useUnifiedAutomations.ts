@@ -682,5 +682,7 @@ export function useUnifiedAutomations(options: {
     setQuery,
     refresh,
     hotkeys,
+    /** Capped recent keys (`kind:id`) for the Récents section. */
+    recentOrder: cappedRecentOrder,
   };
 }

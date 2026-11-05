@@ -24,7 +24,7 @@ function baseRow(
 }
 
 describe("buildAutomationRowMenuItems", () => {
-  it("labels trash for macro/clicker and script", () => {
+  it("labels delete for macro/clicker and script", () => {
     const actions = {
       onOpen: vi.fn(),
       onLaunch: vi.fn(),
@@ -40,12 +40,8 @@ describe("buildAutomationRowMenuItems", () => {
       t,
       actions,
     );
-    expect(macroItems.find((i) => i.id === "delete")?.label).toBe(
-      "Mettre à la corbeille",
-    );
-    expect(scriptItems.find((i) => i.id === "delete")?.label).toBe(
-      "Mettre à la corbeille",
-    );
+    expect(macroItems.find((i) => i.id === "delete")?.label).toBe("Supprimer");
+    expect(scriptItems.find((i) => i.id === "delete")?.label).toBe("Supprimer");
     expect(scriptItems.find((i) => i.id === "launch")?.label).toBe("Exécuter");
   });
 

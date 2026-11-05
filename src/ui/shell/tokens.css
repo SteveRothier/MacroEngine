@@ -7,8 +7,8 @@
 }
 
 :root {
-  --caster-font: "Segoe UI", system-ui, -apple-system, "IBM Plex Sans", sans-serif;
-  --caster-font-mono: "Cascadia Code", Consolas, "IBM Plex Mono", ui-monospace, monospace;
+  --caster-font: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --caster-font-mono: "IBM Plex Mono", "Cascadia Code", Consolas, ui-monospace, monospace;
 
   --caster-text-xs: 11px;
   --caster-text-sm: 12px;
@@ -18,23 +18,24 @@
   --caster-bg-app: #0c0c0c;
   --caster-bg-elevated: #101012;
   --caster-bg-canvas: #0e0e10;
-  --caster-bg-input: #161618;
-  --caster-border-subtle: #1f1f22;
-  --caster-border-strong: #2a2a2e;
+  --caster-bg-input: #171719;
+  --caster-bg-interactive: #171719;
+  --caster-border-subtle: #252529;
+  --caster-border-strong: #2e2e33;
 
   --caster-text-primary: #ececec;
   --caster-text-secondary: #a1a1a1;
   --caster-text-muted: #666666;
 
-  /* Default accent = neutral gray/white (blue/teal via data-accent) */
-  --caster-accent: #e8e8ea;
-  --caster-accent-soft: rgba(232, 232, 234, 0.12);
-  --caster-accent-contrast: #0c0c0c;
+  /* Linear default accent */
+  --caster-accent: #2f6fed;
+  --caster-accent-soft: rgba(47, 111, 237, 0.15);
+  --caster-accent-contrast: #ffffff;
   --caster-focus-ring: 0 0 0 2px color-mix(in srgb, var(--caster-accent) 45%, transparent);
 
   --caster-dur-fast: 120ms;
-  --caster-dur-med: 200ms;
-  --caster-dur-slow: 320ms;
+  --caster-dur-med: 180ms;
+  --caster-dur-slow: 240ms;
   /* Primary motion curve (menus, tabs, docks). */
   --caster-ease: cubic-bezier(0.22, 1, 0.36, 1);
   /* Soft decelerate for exits / collapse. */
@@ -63,13 +64,15 @@
   --caster-type-clicker: #22c55e;
   --caster-type-clicker-bg: rgba(34, 197, 94, 0.14);
 
-  --caster-radius-sm: 6px;
-  --caster-radius-md: 8px;
-  --caster-radius-lg: 10px;
-  --caster-shadow-float: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --caster-radius-sm: 4px;
+  --caster-radius-md: 6px;
+  --caster-radius-lg: 8px;
+  --caster-shadow-float: 0 8px 24px rgba(0, 0, 0, 0.4);
 
-  --caster-sidebar-w: 220px;
-  --caster-sidebar-collapsed: 56px;
+  --caster-sidebar-w: 250px;
+  --caster-sidebar-collapsed: 0px;
+  --caster-library-w: 280px;
+  --caster-exec-bar-h: 38px;
   --caster-titlebar-h: 36px;
   --caster-tab-h: 30px;
   --caster-tab-min-w: 72px;

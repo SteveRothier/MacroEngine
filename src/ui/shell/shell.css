@@ -61,7 +61,7 @@
 
 .caster-root {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: var(--caster-library-w, 250px) minmax(0, 1fr);
   grid-template-rows: var(--caster-titlebar-h) minmax(0, 1fr);
   height: 100%;
   min-height: 0;
@@ -868,8 +868,20 @@ button.caster-btn.caster-btn-primary {
   --caster-sidebar-w: 56px;
 }
 
-.caster-content {
+.caster-library-pane {
   grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--caster-border-subtle);
+  background: var(--caster-bg-elevated);
+  display: flex;
+  flex-direction: column;
+}
+
+.caster-content {
+  grid-column: 2;
   grid-row: 2;
   display: flex;
   flex-direction: column;
@@ -1212,11 +1224,94 @@ button.caster-sidebar-item,
 }
 
 .caster-stage-home {
+  display: none;
+}
+
+.caster-stage-empty {
   height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--caster-space-3);
+  padding: var(--caster-space-5);
   background: var(--caster-bg-canvas);
+  text-align: center;
+}
+
+.caster-stage-empty h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.caster-stage-empty p {
+  margin: 0;
+  max-width: 28rem;
+  color: var(--caster-text-secondary);
+  font-size: 13px;
+}
+
+.caster-stage-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: var(--caster-space-2);
+}
+
+.caster-exec-bar-host {
+  flex-shrink: 0;
+  border-top: 1px solid var(--caster-border-subtle);
+  background: var(--caster-bg-elevated);
+}
+
+.caster-exec-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--caster-exec-bar-h, 38px);
+  padding: 0 12px;
+  box-sizing: border-box;
+  font-size: 12px;
+}
+
+.caster-exec-bar-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--caster-text-muted);
+  flex-shrink: 0;
+}
+
+.caster-exec-bar-dot.is-on,
+.caster-exec-bar.is-running .caster-exec-bar-dot {
+  background: var(--caster-status-healthy);
+}
+
+.caster-exec-bar-label {
+  color: var(--caster-text-primary);
+  font-weight: 500;
+}
+
+.caster-exec-bar-session {
+  color: var(--caster-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.caster-exec-bar-spacer {
+  flex: 1;
+}
+
+.caster-exec-bar-btn {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  gap: 6px;
 }
 
 .caster-topbar {
@@ -7958,12 +8053,27 @@ body.caster-pointer-reorder-dragging {
       14px
       30px
       minmax(120px, 1fr)
-      112px;
+      96px;
+  }
+
+  .caster-auto-colhead.is-media,
+  .caster-auto-row--media {
+    grid-template-columns:
+      14px
+      36px
+      minmax(120px, 1fr)
+      96px;
   }
 
   .caster-auto-row-prop--info,
   .caster-auto-row-prop--trigger,
   .caster-auto-row-prop--run {
+    display: none !important;
+  }
+
+  .caster-tooltip-wrap:has(.caster-auto-row-prop--info),
+  .caster-tooltip-wrap:has(.caster-auto-row-prop--trigger),
+  .caster-tooltip-wrap:has(.caster-auto-row-prop--run) {
     display: none !important;
   }
 
@@ -8278,7 +8388,7 @@ button.caster-auto-colhead-label:focus-visible {
 }
 
 .caster-auto-colhead-trail {
-  width: 104px;
+  width: 96px;
 }
 
 .caster-auto-row {
@@ -8315,13 +8425,21 @@ button.caster-auto-colhead-label:focus-visible {
     36px
     minmax(200px, 1fr)
     minmax(64px, 120px)
-    132px;
+    96px;
 }
 
 .caster-auto-row--media .caster-auto-row-prop--info,
 .caster-auto-row--media .caster-auto-row-prop--run,
 .caster-auto-colhead.is-media .caster-auto-colhead-label--info,
 .caster-auto-colhead.is-media .caster-auto-colhead-label--run {
+  display: none;
+}
+
+/* Tooltip wraps survive display:none on the inner prop and steal grid tracks. */
+.caster-auto-row--media .caster-tooltip-wrap:has(.caster-auto-row-prop--info),
+.caster-auto-row--media .caster-tooltip-wrap:has(.caster-auto-row-prop--run),
+.caster-auto-colhead.is-media .caster-tooltip-wrap:has(.caster-auto-row-prop--info),
+.caster-auto-colhead.is-media .caster-tooltip-wrap:has(.caster-auto-row-prop--run) {
   display: none;
 }
 
@@ -9290,8 +9408,14 @@ button.caster-auto-colhead-label:focus-visible {
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
-  min-width: 104px;
+  min-width: 88px;
   justify-content: flex-end;
+}
+
+.caster-auto-row--media .caster-auto-row-trail,
+.caster-auto-colhead.is-media .caster-auto-colhead-trail {
+  width: 96px;
+  min-width: 96px;
 }
 
 .caster-auto-row-play-btn,

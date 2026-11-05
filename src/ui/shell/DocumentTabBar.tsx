@@ -32,7 +32,6 @@ import { Tooltip } from "./Tooltip";
 import { useDocumentTabReorder } from "./useDocumentTabReorder";
 import { useTabStripLayoutAnimation } from "./useTabStripLayoutAnimation";
 import { computeTargetTabWidth } from "./tabLayout";
-import { HOME_TAB_ID } from "../../app/workspaces";
 import { CasterLogo } from "./CasterLogo";
 
 export type DocumentTabItem = {
@@ -62,7 +61,7 @@ export type BarContextAction =
 
 type Props = {
   tabs: DocumentTabItem[];
-  activeTabId: string;
+  activeTabId: string | null;
   onSelect: (id: string) => void;
   onClose?: (id: string) => void;
   onCreateMacro?: () => void;
@@ -518,7 +517,7 @@ export function DocumentTabBar({
   );
 
   const scrollActiveTabIntoView = useCallback(() => {
-    if (activeTabId === HOME_TAB_ID) return;
+    if (!activeTabId) return;
     const scroll = scrollRef.current;
     if (!scroll) return;
     const active = scroll.querySelector(".caster-doc-tab.active");

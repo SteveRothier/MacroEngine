@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { AutomationsTable } from "../automations/AutomationsTable";
-import { useAutomationsPageState } from "../automations/useAutomationsPageState";
 import type { ScriptDoc } from "../scripts/types";
 import { newScriptId } from "../scripts/newScriptId";
 import {
@@ -23,6 +21,7 @@ import {
   type ScriptsPrefs,
   type ShellPrefs,
 } from "../settings/settingsTypes";
+import { WorkspaceLibrary } from "../library/WorkspaceLibrary";
 import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
 import { useZoneFeedbackToasts } from "../clicker/useZoneFeedbackToasts";
@@ -61,13 +60,11 @@ import {
   prefetchEditor,
 } from "./lazyEditors";
 import {
-  HOME_TAB_ID,
   activeDocTab,
   closeAllDocTabs,
   closeDocTab,
   closeDocTabsToRight,
   closeOtherDocTabs,
-  docTabId,
   loadWorkspace,
   nextDocTabId,
   openDocTab,
@@ -77,7 +74,7 @@ import {
   renameDocTab,
   reorderDocTabs,
   selectDocTab,
-  selectHome,
+  selectEmpty,
   setTabDirty,
   setTabLabel,
   sortTabsForDisplay,
@@ -107,6 +104,12 @@ const SettingsView = lazy(async () => {
 
 function EditorSuspenseFallback() {
   return <div className="caster-editor-suspense" aria-busy="true" />;
+}
+
+function errMessage(e: unknown, fallback: string): string {
+  if (e instanceof Error && e.message) return e.message;
+  if (typeof e === "string" && e.trim()) return e;
+  return fallback;
 }
 
 const JOURNAL_OPEN_KEY = "caster-journal-open";
@@ -186,7 +189,6 @@ function MainAppInner({
   const toast = useToast();
   const t = useT();
   const titleBarCtx = useTitleBarContext();
-  const automationsPage = useAutomationsPageState();
   const [shellPrefs, setShellPrefs] = useState<ShellPrefs>(() => mergeShellPrefs());
   const [automationPrefs, setAutomationPrefs] = useState<AutomationPrefs>(() =>
     mergeAutomationPrefs(),
@@ -277,7 +279,7 @@ function MainAppInner({
         setAppearancePrefs(mergeAppearancePrefs(s.appearance));
         setConfirmationsPrefs(mergeConfirmationsPrefs(s.confirmations));
         if (!sh.restoreWorkspaceTabs) {
-          setWorkspace((ws) => selectHome({ ...ws, tabs: [] }));
+          setWorkspace((ws) => selectEmpty({ ...ws, tabs: [] }));
         } else if (sh.startupView === "lastDocument") {
           const last = loadLastStudio();
           if (last) {
@@ -413,21 +415,12 @@ function MainAppInner({
     [rememberLastRun],
   );
 
-  const goHome = useCallback(() => {
-    setWorkspace((ws) => selectHome(ws));
-  }, []);
-
   const goSettings = useCallback((section: SettingsSection = "application") => {
     setSettingsSection(section);
     setWorkspace((ws) => openSettings(ws, section));
   }, []);
 
   const onTabSelect = useCallback((tabId: string) => {
-    if (tabId === HOME_TAB_ID) {
-      // Accueil stays mounted — no forced remount refresh (avoids empty flash).
-      goHome();
-      return;
-    }
     const activeId =
       workspace.shellView.type === "doc" ? workspace.shellView.tabId : null;
     if (activeId === tabId) {
@@ -437,7 +430,7 @@ function MainAppInner({
       }));
     }
     setWorkspace((ws) => selectDocTab(ws, tabId));
-  }, [goHome, workspace.shellView]);
+  }, [workspace.shellView]);
 
   const onTabClose = useCallback(
     async (tabId: string) => {
@@ -791,124 +784,95 @@ function MainAppInner({
   }, [onCreateMacro, onTabClose, workspace]);
 
   const documentTabs = useMemo((): DocumentTabItem[] => {
-    return [
-      { id: HOME_TAB_ID, label: t("shell.navHome"), kind: "home", closable: false },
-      ...sortTabsForDisplay(workspace.tabs).map((tab) => ({
-        id: tab.id,
-        label: tab.label,
-        kind: tab.kind,
-        dirty: tab.dirty,
-        pinned: tab.pinned,
-        closable: !tab.pinned,
-      })),
-    ];
-  }, [t, workspace.tabs]);
+    return sortTabsForDisplay(workspace.tabs).map((tab) => ({
+      id: tab.id,
+      label: tab.label,
+      kind: tab.kind,
+      dirty: tab.dirty,
+      pinned: tab.pinned,
+      closable: !tab.pinned,
+    }));
+  }, [workspace.tabs]);
 
   const tabBarActiveId = titleBarHighlightTabId(workspace);
-
-  const showHome =
-    workspace.shellView.type === "home" ||
-    workspace.shellView.type === "library";
   const showSettings = workspace.shellView.type === "settings";
+  const showEmpty =
+    !showSettings &&
+    (workspace.shellView.type === "empty" || workspace.tabs.length === 0);
+  const activeLibKey = activeDoc
+    ? `${activeDoc.kind}:${activeDoc.resourceId}`
+    : null;
 
-  const homeTable = (
-    <div
-      className="caster-stage-home"
-      hidden={!showHome}
-      style={showHome ? { height: "100%" } : { display: "none" }}
-      aria-hidden={!showHome}
-      ref={(el) => {
-        if (!el) return;
-        if (!showHome) el.setAttribute("inert", "");
-        else el.removeAttribute("inert");
-      }}
-    >
-      <AutomationsTable
-        active={showHome}
-        onNavigate={(r) => {
-          if (r.name === "automation") {
-            openDoc(r.kind, r.id, r.label ?? r.id);
-          }
-        }}
-        onCreateMacro={() => void onCreateMacro()}
-        onCreateClicker={() => void onCreateClicker()}
-        onCreateScript={() => void onCreateScript()}
-        onLaunchClicker={(n) => void onLaunchClicker(n)}
-        onLaunchMacro={(n) => void onLaunchMacro(n)}
-        dirtyMacroId={
-          workspace.tabs.find((t) => t.kind === "macro" && t.dirty)?.resourceId ?? null
-        }
-        dirtyClickerId={
-          workspace.tabs.find((t) => t.kind === "clicker" && t.dirty)?.resourceId ?? null
-        }
-        dirtyScriptId={
-          workspace.tabs.find((t) => t.kind === "script" && t.dirty)?.resourceId ?? null
-        }
-        refreshKey={refreshKey}
-        query={automationsPage.query}
-        onQueryChange={automationsPage.setQuery}
-        filter={automationsPage.filter}
-        display={automationsPage.display}
-        onDisplayChange={automationsPage.setDisplay}
-        onFilterChange={automationsPage.setFilter}
-        onRefresh={bumpRefresh}
-        onResourceRenamed={(kind, fromId, toId, label) => {
-          const tabId = docTabId(kind, fromId);
-          setWorkspace((ws) => {
-            if (!ws.tabs.some((t) => t.id === tabId)) return ws;
-            if (kind === "script") return setTabLabel(ws, tabId, label);
-            return renameDocTab(ws, tabId, toId, label);
-          });
-        }}
-        runningScriptName={
-          running && status.sessionKind === "script"
-            ? status.sessionName ?? null
-            : null
-        }
-        onFocusKeyChange={automationsPage.setFocusKey}
-        scriptsPrefs={scriptsPrefs}
-        accueilPrefs={accueilPrefs}
-        automationPrefs={automationPrefs}
-        confirmationsPrefs={confirmationsPrefs}
-        recentListMax={shellPrefs.recentListMax}
-        onOpenSettings={() => goSettings("application")}
-      />
-    </div>
-  );
+  const onStopSession = useCallback(async () => {
+    try {
+      await invoke("stop");
+    } catch (e) {
+      toast.error(errMessage(e, t("shell.cannotStop")));
+    }
+  }, [t, toast]);
 
   const stageInner = (() => {
-    const settingsPane =
-      showSettings ? (
-        <SettingsView
-          section={
-            workspace.shellView.type === "settings"
-              ? (workspace.shellView.section ?? settingsSection)
-              : settingsSection
-          }
-          onSectionChange={(s) => {
-            setSettingsSection(s);
-            setWorkspace((ws) => openSettings(ws, s));
-          }}
-          theme={theme}
-          onThemeChange={onThemeChange}
-          onHotkeysChange={setHotkeys}
-          running={running}
-          journalOpen={journalOpen}
-          onJournalOpenChange={(v) => {
-            setJournalOpen(v);
-            void persistShell({ journalOpen: v });
-          }}
-          onShellPrefsChange={(prefs) => {
-            setShellPrefs(prefs);
-            onUiLocalePrefChange(prefs.uiLocale);
-          }}
-          onAutomationPrefsChange={setAutomationPrefs}
-          onScriptsPrefsChange={setScriptsPrefs}
-          onAccueilPrefsChange={setAccueilPrefs}
-          onAppearancePrefsChange={setAppearancePrefs}
-          onConfirmationsPrefsChange={setConfirmationsPrefs}
-        />
-      ) : null;
+    const settingsPane = showSettings ? (
+      <SettingsView
+        section={
+          workspace.shellView.type === "settings"
+            ? (workspace.shellView.section ?? settingsSection)
+            : settingsSection
+        }
+        onSectionChange={(s) => {
+          setSettingsSection(s);
+          setWorkspace((ws) => openSettings(ws, s));
+        }}
+        theme={theme}
+        onThemeChange={onThemeChange}
+        onHotkeysChange={setHotkeys}
+        running={running}
+        journalOpen={journalOpen}
+        onJournalOpenChange={(v) => {
+          setJournalOpen(v);
+          void persistShell({ journalOpen: v });
+        }}
+        onShellPrefsChange={(prefs) => {
+          setShellPrefs(prefs);
+          onUiLocalePrefChange(prefs.uiLocale);
+        }}
+        onAutomationPrefsChange={setAutomationPrefs}
+        onScriptsPrefsChange={setScriptsPrefs}
+        onAccueilPrefsChange={setAccueilPrefs}
+        onAppearancePrefsChange={setAppearancePrefs}
+        onConfirmationsPrefsChange={setConfirmationsPrefs}
+      />
+    ) : null;
+
+    const emptyPane = showEmpty ? (
+      <div className="caster-stage-empty">
+        <h2>{t("shell.library.emptyTitle")}</h2>
+        <p>{t("shell.library.emptyLead")}</p>
+        <div className="caster-stage-empty-actions">
+          <button
+            type="button"
+            className="caster-btn caster-btn-primary"
+            onClick={() => void onCreateMacro()}
+          >
+            {t("shell.newMacro")}
+          </button>
+          <button
+            type="button"
+            className="caster-btn"
+            onClick={() => void onCreateClicker()}
+          >
+            {t("shell.newClicker")}
+          </button>
+          <button
+            type="button"
+            className="caster-btn"
+            onClick={() => void onCreateScript()}
+          >
+            {t("shell.newScript")}
+          </button>
+        </div>
+      </div>
+    ) : null;
 
     const docPanes = workspace.tabs.map((tab) => {
       const isVisible =
@@ -922,7 +886,6 @@ function MainAppInner({
               key={`${tab.id}:${remount}`}
               active={isVisible}
               macroId={tab.resourceId}
-              onBack={goHome}
               onDirtyChange={onActiveDocDirtyChange}
               automationPrefs={automationPrefs}
               confirmationsPrefs={confirmationsPrefs}
@@ -944,7 +907,6 @@ function MainAppInner({
               key={`${tab.id}:${remount}`}
               active={isVisible}
               scriptId={tab.resourceId}
-              onBack={goHome}
               onDirtyChange={onActiveDocDirtyChange}
               onLabelChange={(name) => {
                 setWorkspace((ws) => setTabLabel(ws, tab.id, name));
@@ -962,7 +924,6 @@ function MainAppInner({
             key={`${tab.id}:${remount}`}
             active={isVisible}
             presetId={tab.resourceId}
-            onBack={goHome}
             status={status}
             onStatus={setStatus}
             refresh={refresh}
@@ -1003,28 +964,63 @@ function MainAppInner({
 
     return (
       <>
+        {emptyPane}
         {settingsPane}
         {docPanes}
       </>
     );
   })();
 
-  const stage = (
-    <>
-      {homeTable}
-      {showSettings || workspace.tabs.length > 0 ? (
-        <Suspense fallback={<EditorSuspenseFallback />}>{stageInner}</Suspense>
-      ) : null}
-    </>
-  );
+  const stage =
+    showSettings || workspace.tabs.length > 0 || showEmpty ? (
+      <Suspense fallback={<EditorSuspenseFallback />}>{stageInner}</Suspense>
+    ) : null;
 
   return (
     <>
       <AppShell
         density={appearancePrefs.density}
-        accent={appearancePrefs.accent}
+        accent={appearancePrefs.accent === "default" ? "blue" : appearancePrefs.accent}
         fontScale={appearancePrefs.fontScale}
         reduceMotion={appearancePrefs.reduceMotion}
+        library={
+          <WorkspaceLibrary
+            activeKey={activeLibKey}
+            refreshKey={refreshKey}
+            dirtyMacroId={
+              workspace.tabs.find((t) => t.kind === "macro" && t.dirty)
+                ?.resourceId ?? null
+            }
+            dirtyClickerId={
+              workspace.tabs.find((t) => t.kind === "clicker" && t.dirty)
+                ?.resourceId ?? null
+            }
+            dirtyScriptId={
+              workspace.tabs.find((t) => t.kind === "script" && t.dirty)
+                ?.resourceId ?? null
+            }
+            recentListMax={shellPrefs.recentListMax}
+            confirmTrash={accueilPrefs.confirmTrash}
+            confirmDeleteFolder={accueilPrefs.confirmDeleteFolder}
+            onOpen={(row) => openDoc(row.kind, row.id, row.name)}
+            onCreateMacro={() => void onCreateMacro()}
+            onCreateClicker={() => void onCreateClicker()}
+            onCreateScript={() => void onCreateScript()}
+            onRefresh={bumpRefresh}
+            onItemRenamed={(kind, id, newName) => {
+              setWorkspace((ws) => {
+                const tab = ws.tabs.find(
+                  (t) => t.kind === kind && t.resourceId === id,
+                );
+                if (!tab) return ws;
+                if (kind === "script") {
+                  return setTabLabel(ws, tab.id, newName);
+                }
+                return renameDocTab(ws, tab.id, newName, newName);
+              });
+            }}
+          />
+        }
         titleBar={
           <WindowTitleBar
             tabs={documentTabs}
@@ -1036,7 +1032,9 @@ function MainAppInner({
             onCreateScript={() => void onCreateScript()}
             onOpenExisting={(kind, id, label) => openDoc(kind, id, label ?? id)}
             onPrefetchEditor={prefetchEditor}
-            onTabContextAction={(tabId, action) => void onTabContextAction(tabId, action)}
+            onTabContextAction={(tabId, action) =>
+              void onTabContextAction(tabId, action)
+            }
             onBarContextAction={(action) => void onBarContextAction(action)}
             onTabReorder={onTabReorder}
             onPinnedCloseAttempt={() => toast.info(t("shell.pinnedTab"))}
@@ -1071,7 +1069,7 @@ function MainAppInner({
           onClick: () => {
             setJournalOpen(false);
             void persistShell({ journalOpen: false });
-            goHome();
+            setWorkspace((ws) => selectEmpty(ws));
           },
         }}
       />
