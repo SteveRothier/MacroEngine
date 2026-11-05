@@ -1,3 +1,4 @@
+import type { MacroTrigger } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import type { TFunction } from "../i18n";
 
@@ -114,10 +115,8 @@ export type ClickPoint = {
   pauseAfterMs: number;
 };
 
-/** Same shape as macro triggers (manual | hotkey). */
-export type ClickerTrigger =
-  | { type: "manual" }
-  | { type: "hotkey"; key: string; mods?: { ctrl?: boolean; alt?: boolean; shift?: boolean } };
+/** Same shape as macro triggers (manual / hotkey / schedule / FG / window title). */
+export type ClickerTrigger = MacroTrigger;
 
 export const MANUAL_TRIGGER: ClickerTrigger = { type: "manual" };
 

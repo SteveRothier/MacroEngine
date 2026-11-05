@@ -96,7 +96,7 @@ function isScriptSessionBusy(status: {
 
 type Props = {
   scriptId: string;
-  onBack: () => void;
+  onBack?: () => void;
   onDirtyChange?: (id: string, dirty: boolean) => void;
   onLabelChange?: (name: string) => void;
   onOpenSettings?: () => void;
@@ -715,9 +715,13 @@ export function ScriptEditorView({
   const titleBarPortal = useTitleBarSlot(
     draft?.name ?? scriptId,
     <ScriptTitleBarTools
-      onBack={() => {
-        void flushAutosave().finally(onBack);
-      }}
+      onBack={
+        onBack
+          ? () => {
+              void flushAutosave().finally(onBack);
+            }
+          : undefined
+      }
       name={draft?.name ?? scriptId}
       onNameChange={(name) => patch({ name })}
       language={

@@ -5,8 +5,8 @@ Vérifications manuelles rapides après une build ou un gros changement.
 ## Boot & shell
 
 - [ ] Fenêtre principale : `visible: false` au lancement, affichage via `show_main_when_frontend_ready` (show-when-ready, pas de délai artificiel)
-- [ ] Splash boot disparaît après le premier paint ; Accueil sans skeleton shimmer au rechargement silencieux
-- [ ] L’app démarre (Accueil visible, moteur idle)
+- [ ] Splash boot disparaît après le premier paint ; panneau bibliothèque sans skeleton shimmer au rechargement silencieux
+- [ ] L’app démarre (bibliothèque + empty state ou dernier onglet, moteur idle)
 - [ ] F6 démarre/arrête le clicker (mode toggle)
 - [ ] F9 lance la macro chargée (ou fallback global)
 - [ ] F8 arrêt d’urgence
@@ -48,7 +48,7 @@ Vérifications manuelles rapides après une build ou un gros changement.
 - [ ] Post-traitement : délais courts fusionnés après stop
 - [ ] Séquence : réordonner racine et branches `then`/`else`, éditer un délai en cellules
 - [ ] Éditeur **liste** : multi-sélection (Shift/Ctrl), barre bulk (monter/descendre/**dupliquer**/supprimer) ; undo groupé ; plus de vue graphe
-- [ ] Convertir macro → script **ou clicker** depuis Accueil (plus depuis la titlebar)
+- [ ] Convertir macro → script **ou clicker** depuis la bibliothèque (plus depuis la titlebar)
 - [ ] Convertir macro multi-points → preset clicker (séquence de points)
 - [ ] Convert soft-fail : macro avec clics + non-clics → clicker créé + warnings `dropped` (pas d’échec total)
 - [ ] Coller multi : copier plusieurs actions → coller après (clipboard interne)
@@ -59,43 +59,35 @@ Vérifications manuelles rapides après une build ou un gros changement.
 
 ## Scripts
 
-- [ ] Ouvrir un script depuis la bibliothèque / Accueil
+- [ ] Ouvrir un script depuis la bibliothèque
 - [ ] Titlebar `⋯` : Verrouiller / Déverrouiller en tête (avec module / dry-run / step) ; plus de cadenas standalone
 - [ ] **Run** session autonome ; **Stop** / F8
 - [ ] Dry-run : toggle titlebar → badge visible, pas d’effet host, lignes `dry-run skipped` en console
 - [ ] **Pas à pas** : pause avant effets de bord → Continuer
 - [ ] Permission refusée (ex. `fetch` sans réseau) → toast indiquant le flag à activer
-- [ ] Convertir script → macro (envelopper) ou **→ clicker** depuis Accueil
+- [ ] Convertir script → macro (envelopper) ou **→ clicker** depuis la bibliothèque
 - [ ] Snippets / aide API : inserts keyTap, runProcess, clipboard
 - [ ] Console vide : CTA « Exécuter »
 - [ ] Erreur / lint avec n° de ligne : clic console → curseur sur la ligne
 
-## Accueil
+## Bibliothèque + éditeur
 
-- [ ] Media-rows : emoji/icône · nom · sous-ligne `kind · trigger` ; play · ★ · enable ; pas de grille Types / Excel
-- [ ] Import JSON/ZIP + export sélection / bibliothèque (toolbar, menu ligne, dock)
-- [ ] Enable off → hotkey ne lance plus ; ligne atténuée ; icône emoji via picker
-- [ ] Conflit hotkey : badge/tooltip « Conflit avec … » ; hover preview (CPS / actions / chemin)
-- [ ] Chrome : vues + search à gauche ; I/O + Nouveau à droite
-- [ ] Dock bulk : Ouvrir · Exporter · Déplacer · Corbeille/Restaurer (pas de menu Plus saturé)
-- [ ] Empty bibliothèque : Import + Créer ; empty Favoris/Récents/Corbeille inchangés
-- [ ] Pref « Ouvrir au simple clic » on : 1 clic ouvre ; off : double-clic ; avec sélection : clic = clear (+ open si pref on)
-- [ ] Shift+clic / Ctrl+clic ligne = checkmark additif ; Esc ou clic dehors désélectionne
-- [ ] Clavier : Entrée ouvre ; Espace coche/décoche
-- [ ] Tri : en-tête Nom↔Ordre lisible
-- [ ] Verrouillé : menu sans rename/dupliquer/corbeille/déplacer/convert ; DnD inert ; Delete/dock corbeille bloqués
-- [ ] Densité compacte : lignes Accueil plus basses (`appearance.density`)
-- [ ] Réordonner les dossiers (DnD sur en-têtes de section)
-- [ ] Dossiers imbriqués : créer un sous-dossier, indent/collapse, plafond 3 niveaux
-- [ ] Recherche : matches surlignés ; « Aller au dossier » expand + scroll
-- [ ] Liste longue (> ~80 lignes) : scroll fluide (content-visibility)
+- [ ] Layout : bibliothèque gauche + éditeur droite ; pas de page Accueil / onglet Accueil
+- [ ] Bibliothèque repliable + bouton pour rouvrir
+- [ ] Favoris / Récents / dossiers + recherche + `+ Créer` (crée dans le dossier focusé)
+- [ ] Clic item → ouvre onglet doc ; empty state si aucun doc
+- [ ] Play / Stop dans la titlebar éditeur (pas de barre d’exécution bas)
+- [ ] Supprimer depuis le menu contextuel → suppression définitive + fermeture de l’onglet ouvert
+- [ ] Onglets docs (macro / clicker / script) sans bouton « retour Accueil »
+- [ ] Fermer dernier onglet → empty state (pas Accueil)
+- [ ] Densité compacte / tokens Linear (IBM Plex, accent bleu)
 
 ## Données
 
 - [ ] Paramètres → Données : export/import **settings.json**
 - [ ] Export/import **bibliothèque ZIP** (macros + clickers + scripts + index)
 - [ ] Journal : persiste après relaunch ; recherche, filtre **Erreurs / warn**, Suivre ; Esc ferme
-- [ ] Corbeille : purge par âge (aperçu N éléments) + vider tout
+- [ ] Paramètres → Données : vider / purge corbeille résiduelle (legacy soft-delete)
 
 ## Release (tag)
 
@@ -108,4 +100,4 @@ npm run tauri build
 ```
 
 Artefact NSIS : `src-tauri/target/release/bundle/nsis/` (cible `bundle.targets: ["nsis"]` dans `src-tauri/tauri.conf.json`).
-Smoke hors dev : démarrage → Accueil → F6 une fois → quit.
+Smoke hors dev : démarrage → bibliothèque → F6 une fois → quit.

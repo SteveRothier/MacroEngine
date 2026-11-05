@@ -159,7 +159,6 @@
 }
 
 .caster-lib-item.is-draggable {
-  cursor: grab;
   touch-action: none;
 }
 

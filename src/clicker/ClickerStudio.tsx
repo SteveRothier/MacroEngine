@@ -3,7 +3,7 @@ import { useTitleBarSlot } from "../ui/shell/TitleBarContext";
 import type { EngineStatus, HotkeyBindings } from "../macros/types";
 import type { ThemeMode } from "../theme";
 import { useT } from "../i18n";
-import { ClickerMetaBar, ClickerMetaTools } from "./ClickerMetaBar";
+import { ClickerMetaBar } from "./ClickerMetaBar";
 import { ClickerTitleBarTools } from "./ClickerTitleBarTools";
 import { ClickerZonePreview } from "./ClickerZonePreview";
 import { ClickerTargetPreview } from "./ClickerTargetPreview";
@@ -15,7 +15,7 @@ import { useClickerEditor } from "./useClickerEditor";
 
 type Props = {
   presetId: string;
-  onBack: () => void;
+  onBack?: () => void;
   status: EngineStatus;
   onStatus: (s: EngineStatus) => void;
   refresh: () => Promise<void>;

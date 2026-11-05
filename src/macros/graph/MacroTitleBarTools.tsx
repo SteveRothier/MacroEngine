@@ -36,7 +36,7 @@ import {
 } from "../../process";
 
 type Props = {
-  onBack: () => void;
+  onBack?: () => void;
   locked: boolean;
   onLockChange?: (locked: boolean) => void;
   onDuplicate?: () => void;
@@ -218,12 +218,16 @@ export function MacroTitleBarTools({
         disabled: busy,
         onSelect: onPlay,
       },
-      {
-        id: "back",
-        label: t("macros.toolbar.back"),
-        icon: <ArrowLeft size={14} />,
-        onSelect: onBack,
-      },
+      ...(onBack
+        ? [
+            {
+              id: "back",
+              label: t("macros.toolbar.back"),
+              icon: <ArrowLeft size={14} />,
+              onSelect: onBack,
+            },
+          ]
+        : []),
     ],
     [moreItems, t, busy, onPlay, onBack],
   );
@@ -234,16 +238,18 @@ export function MacroTitleBarTools({
         onContextMenu={toolbarCtx.openFromEvent}
         start={
           <>
-            <Tooltip content={t("macros.toolbar.back")}>
-              <button
-                type="button"
-                className="caster-titlebar-btn caster-titlebar-icon-btn"
-                onClick={onBack}
-                aria-label={t("macros.toolbar.back")}
-              >
-                <ArrowLeft size={14} aria-hidden />
-              </button>
-            </Tooltip>
+            {onBack ? (
+              <Tooltip content={t("macros.toolbar.back")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  onClick={onBack}
+                  aria-label={t("macros.toolbar.back")}
+                >
+                  <ArrowLeft size={14} aria-hidden />
+                </button>
+              </Tooltip>
+            ) : null}
             {meta}
           </>
         }

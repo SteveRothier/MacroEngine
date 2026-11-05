@@ -64,7 +64,6 @@ export function LibItem({
       onClick={onOpen}
       onDoubleClick={onOpen}
       onContextMenu={onContextMenu}
-      title={row.triggerLabel || row.name}
     >
       <KindIcon kind={row.kind} />
       <span className="caster-lib-nav-label">{row.name}</span>

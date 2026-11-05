@@ -1,5 +1,5 @@
 /**
- * Caster UI shell (AppShell, menus, tabs, Accueil primitives).
+ * Caster UI shell (AppShell, menus, tabs, library panel primitives).
  * CSS: `./tokens.css` + `./shell.css` with class/token prefix `caster-`.
  */
 export { Tooltip, TruncatedTooltip, type TooltipSide, type TooltipAlign } from "./Tooltip";
@@ -25,7 +25,6 @@ export { EditorToolbar } from "./EditorToolbar";
 export { LibraryLockButton } from "./LibraryLockButton";
 export { usePointerReorder, type PointerReorderHandlers } from "./usePointerReorder";
 export { AppShell } from "./AppShell";
-export { ExecutionBar } from "./ExecutionBar";
 export { RecentMenu, type RecentMenuItem } from "./RecentMenu";
 export { Sidebar, type SidebarItem } from "./Sidebar";
 export { WindowTitleBar } from "./WindowTitleBar";

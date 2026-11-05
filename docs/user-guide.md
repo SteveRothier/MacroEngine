@@ -1,14 +1,15 @@
 # Guide utilisateur — Caster
 
-Caster est une application Windows locale : autoclicker, séquenceur de macros et scripts JavaScript/TypeScript. L’**Accueil** centralise macros, presets clicker et scripts (favoris, récents, lancement rapide).
+Caster est une application Windows locale : autoclicker, séquenceur de macros et scripts JavaScript/TypeScript. Le workspace combine une **bibliothèque latérale** et un **éditeur** (onglets).
 
-## Accueil
+## Bibliothèque
 
-- **Liste** : lignes media (icône / emoji · nom · kind · déclencheur) ; play, favori et enable sur la ligne ; le reste au menu contextuel.
-- **Import / export** : toolbar ou menu — fichier JSON d’un item, ou ZIP bibliothèque ; export de la sélection depuis le dock.
-- **Enable** : désactiver une automation ignore son raccourci ; style atténué sur la ligne.
-- **Conflits de raccourci** : badge / tooltip sur le déclencheur quand deux items partagent le même chord.
-- **Vues** : Tous / Favoris / Récents / Corbeille + recherche ; plus de filtre Types.
+- **Panneau gauche** (repliable) : Favoris, Récents, dossiers imbriqués ; recherche et `+ Créer` (macro / clicker / script / dossier).
+- **Création dans un dossier** : avec un dossier focusé, `+` crée l’automation (ou un sous-dossier) directement dedans.
+- **Ouverture** : clic / Entrée ouvre l’éditeur à droite ; empty state si aucun document.
+- **Types** : icônes discrètes macro / clicker / script.
+- **Suppression** : définitive depuis le menu contextuel (plus de corbeille dans le panneau).
+- **Exécution** : bouton Play / Stop dans la titlebar de chaque éditeur, ou déclencheur / raccourci global.
 
 ## Clicker
 
@@ -40,9 +41,9 @@ Caster est une application Windows locale : autoclicker, séquenceur de macros e
 - **Permissions** : `allowNetwork`, `allowClipboard`, `allowFs`, `allowMacroControl`, `allowInput` (souris/clavier + fenêtres), `allowProcess` — refus → toast avec indication du flag manquant.
 - **Dry-run** : bascule titlebar ; exécution sans effets host (journaux `dry-run skipped …`).
 - **Déclencheurs** : par script (manuel, raccourci, horaire, FG, titre) — chip titlebar. Le raccourci global « dernier script » (Paramètres) reste un **fallback** si aucun trigger hotkey dédié ne correspond.
-- **Lancement** : bouton **Run** titlebar, trigger dédié, raccourci global dernier script, ou depuis l’**Accueil** / favoris.
+- **Lancement** : bouton **Run** titlebar, trigger dédié, raccourci global dernier script, ou depuis Favoris / Récents.
 - **Fenêtres** : `caster.listWindows()` / `activateWindow({ title?, exe?, match? })` sous `allowInput` (pas de move/resize HWND).
-- **Conversion** : menu bibliothèque / Accueil — macro ↔ script ; script→clicker extrait les `click`/`moveTo` en points (logique JS non transcrite).
+- **Conversion** : menu bibliothèque — macro ↔ script ; script→clicker extrait les `click`/`moveTo` en points (logique JS non transcrite).
 
 ## Raccourcis par défaut
 

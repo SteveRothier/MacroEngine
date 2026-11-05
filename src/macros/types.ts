@@ -8,9 +8,29 @@ export type EngineStatus = {
   sessionName?: string | null;
 };
 
+export type ExeMatchMode = "eq" | "contains";
+
 export type MacroTrigger =
   | { type: "manual" }
-  | { type: "hotkey"; key: string; mods?: KeyMods };
+  | { type: "hotkey"; key: string; mods?: KeyMods }
+  | {
+      type: "schedule";
+      hour: number;
+      minute: number;
+      /** Bitmask Mon=bit0 … Sun=bit6; omit = every day. */
+      weekdays?: number | null;
+    }
+  | {
+      type: "foreground_process";
+      exe: string;
+      match?: ExeMatchMode;
+    }
+  | {
+      type: "window_title";
+      pattern: string;
+      match?: ExeMatchMode;
+      exe?: string | null;
+    };
 
 export type MacroValue = boolean | number | string;
 

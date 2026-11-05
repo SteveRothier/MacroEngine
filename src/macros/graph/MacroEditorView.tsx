@@ -58,7 +58,7 @@ function cloneDoc(doc: MacroDocument): MacroDocument {
 
 type Props = {
   macroId: string;
-  onBack: () => void;
+  onBack?: () => void;
   onDirtyChange?: (id: string, dirty: boolean) => void;
   /** Called after a successful library rename (id changed). */
   onRenamed?: (from: string, to: string) => void;

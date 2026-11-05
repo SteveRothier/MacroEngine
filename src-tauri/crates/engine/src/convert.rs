@@ -962,6 +962,7 @@ fn macro_to_script(
         param_values: Default::default(),
         process_filter: Default::default(),
         local_process_filter: Default::default(),
+        trigger: doc.trigger.clone(),
     };
     save_script(config_dir, &script).map_err(|e| ConvertError::Message(e.to_string()))?;
     assign_folder(config_dir, LibraryKind::Script, &script.id, folder)?;

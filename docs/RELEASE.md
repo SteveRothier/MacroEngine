@@ -1,10 +1,16 @@
 # Notes de version — Caster
 
+## Phase 27
+
+- Workspace Linear : **bibliothèque latérale** + éditeur (plus de page Accueil)
+- Tokens Linear (IBM Plex, accent `#2F6FED`, surfaces `#0C0C0C` / `#171719`)
+- Play / Stop dans les titlebars éditeurs (plus de barre d’exécution bas) ; onglets docs seuls
+- Suppression définitive depuis le panneau (plus de filtre Corbeille UI) ; `+` crée dans le dossier focusé
+
 ## Phase 26
 
-- Accueil : import / export JSON & ZIP bibliothèque, enable/disable, icône emoji, badge conflit hotkey + preview au survol
-- Accueil : liste **media-rows** (identité + sous-ligne kind · trigger) ; chrome navigation / actions séparé ; dock bulk allégé (ouvrir / exporter / déplacer / corbeille)
-- Pref Accueil `accueilLayout` media|legacy (Paramètres)
+- Bibliothèque : import / export JSON & ZIP, conflits hotkey, filtre type
+- (UI Accueil media-rows remplacée en Phase 27 par la sidebar)
 
 ## Phase 25
 

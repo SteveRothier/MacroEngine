@@ -54,7 +54,7 @@ import { ProcessFilterTool } from "../process";
 
 type Props = {
   editor: ClickerEditor;
-  onBack: () => void;
+  onBack?: () => void;
   hotkeys: HotkeyBindings;
   /** Called with the new preset id after « Sauver comme nouveau preset ». */
   onSavedAsNew?: (id: string) => void;
@@ -377,12 +377,16 @@ export function ClickerTitleBarTools({
       disabled: editor.running,
       onSelect: () => void editor.onStart(),
     },
-    {
-      id: "back",
-      label: t("clicker.toolbar.back"),
-      icon: <ArrowLeft size={14} />,
-      onSelect: onBack,
-    },
+    ...(onBack
+      ? [
+          {
+            id: "back",
+            label: t("clicker.toolbar.back"),
+            icon: <ArrowLeft size={14} />,
+            onSelect: onBack,
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -391,16 +395,18 @@ export function ClickerTitleBarTools({
       onContextMenu={toolbarCtx.openFromEvent}
       start={
         <>
-          <Tooltip content={t("clicker.toolbar.back")}>
-            <button
-              type="button"
-              className="caster-titlebar-btn caster-titlebar-icon-btn"
-              onClick={onBack}
-              aria-label={t("clicker.toolbar.back")}
-            >
-              <ArrowLeft size={14} aria-hidden />
-            </button>
-          </Tooltip>
+          {onBack ? (
+            <Tooltip content={t("clicker.toolbar.back")}>
+              <button
+                type="button"
+                className="caster-titlebar-btn caster-titlebar-icon-btn"
+                onClick={onBack}
+                aria-label={t("clicker.toolbar.back")}
+              >
+                <ArrowLeft size={14} aria-hidden />
+              </button>
+            </Tooltip>
+          ) : null}
           {meta}
         </>
       }

@@ -68,6 +68,15 @@ impl KeyMods {
     }
 }
 
+/// How [`Trigger::ForegroundProcess`] / [`Trigger::WindowTitle`] match.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ExeMatchMode {
+    #[default]
+    Eq,
+    Contains,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Trigger {
@@ -77,6 +86,29 @@ pub enum Trigger {
         mods: KeyMods,
     },
     Manual,
+    /// Fire once at local `hour`:`minute` (edge per calendar minute).
+    /// `weekdays`: optional bitmask Mon=bit0 … Sun=bit6; `None` = every day.
+    Schedule {
+        hour: u8,
+        minute: u8,
+        #[serde(default)]
+        weekdays: Option<u8>,
+    },
+    /// Fire on rising edge when the foreground process matches `exe`.
+    ForegroundProcess {
+        exe: String,
+        #[serde(default, rename = "match")]
+        match_mode: ExeMatchMode,
+    },
+    /// Fire on rising edge when the foreground window title matches `pattern`.
+    /// Optional `exe` further restricts to that process basename.
+    WindowTitle {
+        pattern: String,
+        #[serde(default, rename = "match")]
+        match_mode: ExeMatchMode,
+        #[serde(default)]
+        exe: Option<String>,
+    },
 }
 
 /// Scalar value stored in the macro environment.

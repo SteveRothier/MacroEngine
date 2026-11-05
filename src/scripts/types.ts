@@ -1,3 +1,4 @@
+import type { MacroTrigger } from "../macros/types";
 import type { ProcessFilter, ProcessFilterScopeMode } from "../process";
 
 /** Script language (JavaScript or TypeScript). */
@@ -18,6 +19,8 @@ export type ScriptDoc = {
   paramValues?: Record<string, boolean | number | string>;
   processFilter?: ProcessFilterScopeMode;
   localProcessFilter?: ProcessFilter;
+  /** Per-script launch trigger (same union as macros). */
+  trigger?: MacroTrigger;
 };
 
 /** Accueil / list metadata without source. */
@@ -32,4 +35,10 @@ export type ScriptSummary = {
   allowMacroControl?: boolean;
   allowInput?: boolean;
   allowProcess?: boolean;
+  triggerType?: string;
+  triggerKey?: string | null;
+  scheduleHour?: number | null;
+  scheduleMinute?: number | null;
+  foregroundExe?: string | null;
+  windowTitle?: string | null;
 };

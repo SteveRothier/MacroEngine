@@ -84,6 +84,7 @@ export type WorkspaceLibraryProps = {
     id: string,
     newName: string,
   ) => void;
+  onItemDeleted?: (kind: AutomationRow["kind"], id: string) => void;
 };
 
 function buildFolderMenuItems(
@@ -154,6 +155,7 @@ export function WorkspaceLibrary({
   onCreateScript,
   onRefresh,
   onItemRenamed,
+  onItemDeleted,
 }: WorkspaceLibraryProps) {
   const t = useT();
   const toast = useToast();
@@ -382,31 +384,45 @@ export function WorkspaceLibrary({
     }
   }
 
+  const focusedFolder = useMemo(() => {
+    if (!focusKey?.startsWith("folder:")) return null;
+    const id = focusKey.slice("folder:".length);
+    return folders.find((f) => f.id === id) ?? null;
+  }, [focusKey, folders]);
+
   const createMenuItems: MenuItemDef[] = [
     {
       id: "folder",
-      label: t("automations.folder.create"),
+      label: focusedFolder
+        ? t("automations.folder.createChild")
+        : t("automations.folder.create"),
       icon: <Folder size={14} />,
-      onSelect: () => void createFolder(null),
+      onSelect: () => void createFolder(focusedFolder?.id ?? null),
     },
     { id: "sep-create", label: "", separator: true },
     {
       id: "macro",
       label: t("automations.create.macro"),
       icon: <Workflow size={14} />,
-      onSelect: onCreateMacro,
+      onSelect: focusedFolder
+        ? () => void createKindInFolder("macro", focusedFolder)
+        : onCreateMacro,
     },
     {
       id: "clicker",
       label: t("automations.create.clicker"),
       icon: <MousePointer2 size={14} />,
-      onSelect: onCreateClicker,
+      onSelect: focusedFolder
+        ? () => void createKindInFolder("clicker", focusedFolder)
+        : onCreateClicker,
     },
     {
       id: "script",
       label: t("automations.create.script"),
       icon: <Code2 size={14} />,
-      onSelect: onCreateScript,
+      onSelect: focusedFolder
+        ? () => void createKindInFolder("script", focusedFolder)
+        : onCreateScript,
     },
   ];
 
@@ -570,9 +586,9 @@ export function WorkspaceLibrary({
     }
   }
 
-  async function trashRow(row: AutomationRow) {
+  async function deleteRow(row: AutomationRow) {
     if (row.locked) {
-      toast.error(t("automations.toast.unlockBeforeTrash"));
+      toast.error(t("automations.toast.unlockBeforeDelete"));
       return;
     }
     if (confirmTrash) {
@@ -585,11 +601,18 @@ export function WorkspaceLibrary({
       if (!ok) return;
     }
     try {
-      await invoke("trash_library_item_cmd", { kind: row.kind, id: row.id });
-      toast.success(t("automations.toast.trashed"));
+      if (row.kind === "macro") {
+        await invoke("delete_saved_macro", { name: row.id });
+      } else if (row.kind === "clicker") {
+        await invoke("delete_clicker_preset", { name: row.id });
+      } else {
+        await invoke("delete_script_cmd", { id: row.id });
+      }
+      toast.success(t("automations.toast.deleted"));
+      onItemDeleted?.(row.kind, row.id);
       bump();
     } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
+      toast.error(errMessage(e, t("automations.toast.deleteFail")));
     }
   }
 
@@ -695,7 +718,7 @@ export function WorkspaceLibrary({
       onConvertTo: row.trashed
         ? undefined
         : (toKind) => void convertRow(row, toKind),
-      onDelete: () => void trashRow(row),
+      onDelete: () => void deleteRow(row),
       icons: automationRowMenuIcons(),
     });
     setCtxItems(items);
@@ -779,6 +802,18 @@ export function WorkspaceLibrary({
       e.preventDefault();
       if (entry.type === "folder") toggleExpanded(entry.node.id);
       else onOpen(entry.row);
+      return;
+    }
+    if (e.key === "F2") {
+      e.preventDefault();
+      if (entry.type === "folder") void renameFolder(entry.node.folder);
+      else if (!entry.row.locked) void renameRow(entry.row);
+      return;
+    }
+    if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      if (entry.type === "folder") void deleteFolder(entry.node.folder);
+      else if (!entry.row.locked) void deleteRow(entry.row);
     }
   }
 

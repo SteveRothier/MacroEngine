@@ -30,7 +30,11 @@ export class ErrorBoundary extends Component<Props, State> {
           <button
             type="button"
             className="caster-btn"
-            onClick={() => this.setState({ error: null })}
+            onClick={() => {
+              // Soft remount fails after Vite HMR invalidates React context
+              // modules (e.g. LocaleProvider / useLocale). Full reload recovers.
+              window.location.reload();
+            }}
           >
             {t("shell.retry")}
           </button>

@@ -4,9 +4,9 @@ Automatisation Windows locale — **clicker** + **macros** (Tauri 2 + React + Ru
 
 ## Statut
 
-Bibliothèque unifiée (macros / presets clicker / scripts JS·TS), Accueil media-rows (favoris/récents, import/export, enable/icône), verrou bout-en-bout, undo/dirty, tests Vitest + Rust, CI GitHub Actions (`.github/workflows/`).
+Bibliothèque unifiée (macros / presets clicker / scripts JS·TS) en **sidebar** + éditeur à droite (workspace Linear), verrou bout-en-bout, undo/dirty, tests Vitest + Rust, CI GitHub Actions (`.github/workflows/`).
 
-**Phase 25** (Store Partner Center, trigger titre fenêtre, triggers clicker/scripts complets, convert click/moveTo→points, `listWindows`/`activateWindow`). Voir [`docs/RELEASE.md`](docs/RELEASE.md).
+**Phase 27** (shell bibliothèque + éditeur). Voir [`docs/RELEASE.md`](docs/RELEASE.md).
 
 - Guide utilisateur : [`docs/user-guide.md`](docs/user-guide.md)
 - Checklist smoke : [`docs/smoke-checklist.md`](docs/smoke-checklist.md)

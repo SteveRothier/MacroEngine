@@ -106,12 +106,6 @@ function EditorSuspenseFallback() {
   return <div className="caster-editor-suspense" aria-busy="true" />;
 }
 
-function errMessage(e: unknown, fallback: string): string {
-  if (e instanceof Error && e.message) return e.message;
-  if (typeof e === "string" && e.trim()) return e;
-  return fallback;
-}
-
 const JOURNAL_OPEN_KEY = "caster-journal-open";
 const LEGACY_JOURNAL_OPEN_KEY = "v2-journal-open";
 
@@ -389,12 +383,6 @@ function MainAppInner({
     [],
   );
 
-  const openJournalOnRun = useCallback(() => {
-    if (!automationPrefs.focusFollowsRun) return;
-    setJournalOpen(true);
-    void persistShell({ journalOpen: true });
-  }, [automationPrefs.focusFollowsRun, persistShell]);
-
   const openDoc = useCallback(
     (kind: DocTabKind, resourceId: string, label?: string) => {
       prefetchEditor(kind);
@@ -628,37 +616,6 @@ function MainAppInner({
     setWorkspace((ws) => setTabLabel(ws, activeDocId, title));
   }, [activeDocId, activeDocLabel, pageTitle]);
 
-  const onLaunchClicker = useCallback(
-    async (name: string) => {
-      try {
-        const next = await invoke<EngineStatus>("launch_clicker_preset", { name });
-        setStatus(next);
-        // Accueil refreshes on engine://status busy→idle (last-run finalize).
-        toast.success(t("shell.clickerLaunched", { name }));
-        openJournalOnRun();
-        void rememberLastRun("clicker", name);
-      } catch (e) {
-        toast.error(launchErr(e, t("shell.launchClickerFailed")));
-      }
-    },
-    [openJournalOnRun, rememberLastRun, t, toast],
-  );
-
-  const onLaunchMacro = useCallback(
-    async (name: string) => {
-      try {
-        const next = await invoke<EngineStatus>("launch_saved_macro", { name });
-        setStatus(next);
-        toast.success(t("shell.macroLaunched", { name }));
-        openJournalOnRun();
-        void rememberLastRun("macro", name);
-      } catch (e) {
-        toast.error(launchErr(e, t("shell.launchMacroFailed")));
-      }
-    },
-    [openJournalOnRun, rememberLastRun, t, toast],
-  );
-
   const onCreateMacro = useCallback(async () => {
     try {
       const doc = await invoke<{ name: string }>("create_saved_macro", { name: null });
@@ -802,14 +759,6 @@ function MainAppInner({
   const activeLibKey = activeDoc
     ? `${activeDoc.kind}:${activeDoc.resourceId}`
     : null;
-
-  const onStopSession = useCallback(async () => {
-    try {
-      await invoke("stop");
-    } catch (e) {
-      toast.error(errMessage(e, t("shell.cannotStop")));
-    }
-  }, [t, toast]);
 
   const stageInner = (() => {
     const settingsPane = showSettings ? (
@@ -1017,6 +966,15 @@ function MainAppInner({
                   return setTabLabel(ws, tab.id, newName);
                 }
                 return renameDocTab(ws, tab.id, newName, newName);
+              });
+            }}
+            onItemDeleted={(kind, id) => {
+              setWorkspace((ws) => {
+                const tab = ws.tabs.find(
+                  (t) => t.kind === kind && t.resourceId === id,
+                );
+                if (!tab) return ws;
+                return closeDocTab(ws, tab.id);
               });
             }}
           />

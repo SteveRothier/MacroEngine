@@ -67,8 +67,9 @@ pub use library_index::{
     count_library_trash_older_than, purge_library_trash_older_than, remove_library_entry,
     rename_library_entry_key,
     rename_library_folder, reorder_library_folders, restore_library_item, set_library_folder_parent,
-    set_library_item_locked, trash_library_item, LibraryFolder, LibraryIndex, LibraryIndexDto,
-    LibraryIndexError, LibraryItemDto, LibraryKind, ListLibraryQuery,
+    set_library_item_enabled, set_library_item_icon, set_library_item_locked, trash_library_item,
+    LibraryFolder, LibraryIndex, LibraryIndexDto, LibraryIndexError, LibraryItemDto, LibraryKind,
+    ListLibraryQuery,
 };
 pub use env::MacroEnv;
 pub use event_bus::{EngineEvent, EventBus, LogLevel, PixelFeedbackKind, ZoneFeedbackKind};
@@ -80,8 +81,9 @@ pub use input::{
 #[cfg(windows)]
 pub use input::SendInputInjector;
 pub use macro_library::{
-    create_macro, delete_macro, duplicate_macro, list_macro_summaries, list_macros, load_macro,
-    rename_macro, save_macro, save_macro_checked, MacroLibraryError, MacroSummary,
+    create_macro, delete_macro, duplicate_macro, export_macro_to_path, import_macro_from_path,
+    list_macro_summaries, list_macros, load_macro, rename_macro, save_macro, save_macro_checked,
+    MacroLibraryError, MacroSummary,
 };
 pub use macro_vm::MacroVm;
 pub use metrics::{ClickerMetrics, MetricsCollector};
@@ -101,8 +103,9 @@ pub use schema::{
     SCHEMA_VERSION_V1, SCHEMA_VERSION_V4, SCHEMA_VERSION_V5,
 };
 pub use script_library::{
-    delete_script, list_script_summaries, list_scripts, load_script, save_script, script_path,
-    scripts_dir, ScriptDoc, ScriptLanguage, ScriptLibraryError, ScriptSummary,
+    delete_script, export_script_to_path, import_script_from_path, list_script_summaries,
+    list_scripts, load_script, save_script, script_path, scripts_dir, ScriptDoc, ScriptLanguage,
+    ScriptLibraryError, ScriptSummary,
 };
 pub use script_params::{parse_param_defs, ScriptParamDef};
 pub use script_runtime::ScriptStepGate;

@@ -34,7 +34,7 @@ import type { ScriptLanguage } from "./types";
 export type EngineBusyKind = "macro" | "clicker" | "record" | "script";
 
 type Props = {
-  onBack: () => void;
+  onBack?: () => void;
   name: string;
   onNameChange: (name: string) => void;
   language: ScriptLanguage;
@@ -235,12 +235,16 @@ export function ScriptTitleBarTools({
         disabled: running ? false : runBlocked,
         onSelect: running ? onStop : onRun,
       },
-      {
-        id: "back",
-        label: t("scripts.toolbar.back"),
-        icon: <ArrowLeft size={14} />,
-        onSelect: onBack,
-      },
+      ...(onBack
+        ? [
+            {
+              id: "back",
+              label: t("scripts.toolbar.back"),
+              icon: <ArrowLeft size={14} />,
+              onSelect: onBack,
+            },
+          ]
+        : []),
     ],
     [
       moreItems,
@@ -262,16 +266,18 @@ export function ScriptTitleBarTools({
         onContextMenu={toolbarCtx.openFromEvent}
         start={
           <>
-            <Tooltip content={t("scripts.toolbar.back")}>
-              <button
-                type="button"
-                className="caster-titlebar-btn caster-titlebar-icon-btn"
-                onClick={onBack}
-                aria-label={t("scripts.toolbar.back")}
-              >
-                <ArrowLeft size={14} aria-hidden />
-              </button>
-            </Tooltip>
+            {onBack ? (
+              <Tooltip content={t("scripts.toolbar.back")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  onClick={onBack}
+                  aria-label={t("scripts.toolbar.back")}
+                >
+                  <ArrowLeft size={14} aria-hidden />
+                </button>
+              </Tooltip>
+            ) : null}
             <input
               className="caster-titlebar-name-input caster-titlebar-name-input--wide"
               value={name}

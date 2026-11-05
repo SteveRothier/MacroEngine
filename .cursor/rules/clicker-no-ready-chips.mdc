@@ -1,0 +1,10 @@
+---
+description: Ne pas reproposer les chips prêt clicker sous la nav
+alwaysApply: true
+---
+
+# Clicker — pas de chips « prêt »
+
+Ne pas ajouter (ni proposer) de rangée de boutons / chips sous la nav d’onglets du studio clicker du type **Raccourci / Cible / Cadence / Garde-fou** (`buildReadyItems` UI).
+
+`buildReadyItems` peut rester pour les tests unitaires uniquement — pas d’UI associée dans `ClickerStudio`.
