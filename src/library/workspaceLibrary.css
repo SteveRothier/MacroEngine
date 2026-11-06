@@ -166,6 +166,20 @@
   min-height: 24px;
 }
 
+.caster-lib-chip.caster-lib-selection-btn--label {
+  width: auto;
+  min-width: 0;
+  height: 24px;
+  padding: 0 7px;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 550;
+}
+
+.caster-lib-chip.caster-lib-selection-btn--label > span {
+  line-height: 1;
+}
+
 .caster-lib-chip.caster-lib-selection-btn.is-danger:hover {
   background: color-mix(in srgb, #e5484d 16%, transparent);
   color: #e5484d;
@@ -328,18 +342,19 @@ body.is-lib-dragging .caster-lib-nav-row.is-active:hover:not(.is-drop-target) {
   color: var(--caster-text-primary);
 }
 
-/* Multi-select: subtle accent wash + left tick, distinct from active / focus. */
+/* Multi-select: soft per-row wash (no left rail — avoids a fused block). */
 .caster-lib-nav-row.is-selected,
 .caster-lib-nav-row.is-selected:hover,
 body.is-lib-dragging .caster-lib-nav-row.is-selected:hover:not(.is-drop-target) {
-  background: color-mix(in srgb, var(--caster-accent) 16%, transparent);
+  background: color-mix(in srgb, var(--caster-text-primary) 9%, transparent);
   color: var(--caster-text-primary);
-  box-shadow: inset 2px 0 0
-    color-mix(in srgb, var(--caster-accent) 70%, transparent);
+  box-shadow: none;
 }
 
 .caster-lib-nav-row.is-selected.is-active {
-  background: color-mix(in srgb, var(--caster-accent) 22%, var(--caster-accent-selection));
+  background: var(--caster-accent-selection);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--caster-accent) 40%, transparent);
 }
 
 /* Keyboard only — mouse focus must not flash a border when switching items. */

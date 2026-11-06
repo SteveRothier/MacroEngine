@@ -6,6 +6,7 @@
   useState,
   type KeyboardEvent,
   type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
@@ -210,12 +211,25 @@ export function WorkspaceLibrary({
   const clearSelection = useCallback(() => {
     setSelectedKeys((prev) => (prev.size === 0 ? prev : new Set()));
   }, []);
+  const libRootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (curFocusKeyRef.current !== focusKey) {
       prevFocusKeyRef.current = curFocusKeyRef.current;
       curFocusKeyRef.current = focusKey;
     }
   }, [focusKey]);
+  /** Click outside the library clears multi-selection. */
+  useEffect(() => {
+    if (selectedKeys.size === 0) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const root = libRootRef.current;
+      if (!root) return;
+      if (e.target instanceof Node && root.contains(e.target)) return;
+      clearSelection();
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+  }, [clearSelection, selectedKeys.size]);
   const [ctxItems, setCtxItems] = useState<MenuItemDef[]>([]);
   const ctxMenu = useContextMenuState();
   const foldersRef = useRef<AutomationFolderOption[]>([]);
@@ -922,13 +936,29 @@ export function WorkspaceLibrary({
     ));
   }
 
+  function onLibraryPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (selectedKeys.size === 0) return;
+    const el = e.target;
+    if (!(el instanceof Element)) return;
+    if (
+      el.closest(
+        ".caster-lib-item, .caster-lib-selection-dock, [data-item-draft], [data-folder-draft]",
+      )
+    ) {
+      return;
+    }
+    clearSelection();
+  }
+
   return (
     <div
+      ref={libRootRef}
       className={cx(
         "caster-workspace-library",
         draggingKey && "is-lib-dragging",
       )}
       onContextMenu={openEmptyMenu}
+      onPointerDown={onLibraryPointerDown}
     >
       <header className="caster-lib-brand">
         <span className="caster-lib-brand-mark" aria-hidden>
@@ -1181,44 +1211,40 @@ export function WorkspaceLibrary({
             )}
           </span>
           <div className="caster-lib-selection-actions">
-            <Tooltip
-              content={
+            <button
+              type="button"
+              className="caster-lib-chip caster-lib-selection-btn caster-lib-selection-btn--label"
+              aria-label={
                 selectedRows.length > 1
                   ? t("automations.selection.openAll", {
                       count: Math.min(selectedRows.length, 12),
                     })
                   : t("automations.selection.open")
               }
-              side="top"
+              onClick={openSelected}
             >
-              <button
-                type="button"
-                className="caster-lib-chip caster-lib-selection-btn"
-                aria-label={t("automations.selection.open")}
-                onClick={openSelected}
-              >
-                <ExternalLink size={14} aria-hidden />
-              </button>
-            </Tooltip>
+              <ExternalLink size={13} aria-hidden />
+              <span>{t("automations.selection.open")}</span>
+            </button>
             <DropdownMenu
               label={t("automations.selection.move")}
               ariaLabel={t("automations.selection.folderAria")}
               align="end"
-              triggerClassName="caster-lib-chip caster-lib-selection-btn"
+              triggerClassName="caster-lib-chip caster-lib-selection-btn caster-lib-selection-btn--label"
               items={selectionMoveItems}
             >
-              <FolderInput size={14} aria-hidden />
+              <FolderInput size={13} aria-hidden />
+              <span>{t("automations.selection.move")}</span>
             </DropdownMenu>
-            <Tooltip content={t("automations.confirm.deleteTitle")} side="top">
-              <button
-                type="button"
-                className="caster-lib-chip caster-lib-selection-btn is-danger"
-                aria-label={t("automations.confirm.deleteTitle")}
-                onClick={() => void deleteSelected()}
-              >
-                <Trash2 size={14} aria-hidden />
-              </button>
-            </Tooltip>
+            <button
+              type="button"
+              className="caster-lib-chip caster-lib-selection-btn caster-lib-selection-btn--label is-danger"
+              aria-label={t("automations.confirm.deleteTitle")}
+              onClick={() => void deleteSelected()}
+            >
+              <Trash2 size={13} aria-hidden />
+              <span>{t("automations.confirm.deleteTitle")}</span>
+            </button>
             <Tooltip content={t("automations.selection.clear")} side="top">
               <button
                 type="button"

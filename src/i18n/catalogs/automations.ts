@@ -150,8 +150,8 @@ export const automations = defineCatalog({
     },
     selection: {
       aria: "Actions de sélection",
-      countOne: "{count} élément sélectionné",
-      countMany: "{count} éléments sélectionnés",
+      countOne: "{count} élément",
+      countMany: "{count} éléments",
       open: "Ouvrir",
       openAll: "Ouvrir ({count})",
       launch: "Lancer",
@@ -581,8 +581,8 @@ export const automations = defineCatalog({
     },
     selection: {
       aria: "Selection actions",
-      countOne: "{count} item selected",
-      countMany: "{count} items selected",
+      countOne: "{count} item",
+      countMany: "{count} items",
       open: "Open",
       openAll: "Open ({count})",
       launch: "Run",
