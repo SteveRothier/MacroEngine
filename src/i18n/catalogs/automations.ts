@@ -168,6 +168,7 @@ export const automations = defineCatalog({
       more: "Plus",
       moreAria: "Autres actions de sélection",
       move: "Déplacer",
+      clear: "Désélectionner",
       moveToFolder: "Dossier : {name}",
     },
     confirm: {
@@ -598,6 +599,7 @@ export const automations = defineCatalog({
       more: "More",
       moreAria: "More selection actions",
       move: "Move",
+      clear: "Clear selection",
       moveToFolder: "Folder: {name}",
     },
     confirm: {

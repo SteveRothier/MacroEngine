@@ -107,6 +107,7 @@ export function LibDraftFolderRow({
   navKey,
   focused,
   ariaLabel,
+  initialName,
   remountKey,
   onCommit,
   onCancel,
@@ -114,6 +115,7 @@ export function LibDraftFolderRow({
   navKey: string;
   focused: boolean;
   ariaLabel: string;
+  initialName: string;
   remountKey: number;
   onCommit: (next: string) => void;
   onCancel: () => void;
@@ -144,7 +146,7 @@ export function LibDraftFolderRow({
         <Folder size={15} aria-hidden className="caster-lib-folder-icon" />
         <LibRenameInput
           key={remountKey}
-          initial=""
+          initial={initialName}
           ariaLabel={ariaLabel}
           onCommit={onCommit}
           onCancel={onCancel}
@@ -160,6 +162,7 @@ export function LibDraftItemRow({
   navKey,
   focused,
   ariaLabel,
+  initialName,
   remountKey,
   onCommit,
   onCancel,
@@ -168,6 +171,7 @@ export function LibDraftItemRow({
   navKey: string;
   focused: boolean;
   ariaLabel: string;
+  initialName: string;
   remountKey: number;
   onCommit: (next: string) => void;
   onCancel: () => void;
@@ -194,7 +198,7 @@ export function LibDraftItemRow({
       <KindIcon kind={kind} />
       <LibRenameInput
         key={remountKey}
-        initial=""
+        initial={initialName}
         ariaLabel={ariaLabel}
         onCommit={onCommit}
         onCancel={onCancel}
@@ -207,6 +211,7 @@ export function LibItem({
   row,
   active,
   focused,
+  selected,
   dragging,
   canDrag,
   dropEdge,
@@ -222,11 +227,12 @@ export function LibItem({
   row: AutomationRow;
   active: boolean;
   focused?: boolean;
+  selected?: boolean;
   dragging?: boolean;
   canDrag?: boolean;
   dropEdge?: "before" | "after" | null;
   editing?: boolean;
-  onOpen: () => void;
+  onOpen: (e: MouseEvent) => void;
   onContextMenu: (e: MouseEvent) => void;
   onPointerDown?: (e: ReactPointerEvent) => void;
   onStartRename?: () => void;
@@ -245,6 +251,7 @@ export function LibItem({
         "caster-lib-item",
         canDrag && "is-draggable",
         active && "is-active",
+        selected && "is-selected",
         focused && !editing && "is-focused",
         dragging && "is-dragging",
         editing && "is-editing",
@@ -252,7 +259,7 @@ export function LibItem({
         dropEdge === "after" && "is-drop-after",
       )}
       aria-current={active ? "true" : undefined}
-      aria-selected={focused || undefined}
+      aria-selected={selected || focused || undefined}
       data-nav-key={rowDomKey(row)}
       onFocus={onFocusRow}
       onPointerDown={editing ? undefined : onPointerDown}
@@ -262,7 +269,7 @@ export function LibItem({
           e.preventDefault();
           return;
         }
-        onOpen();
+        onOpen(e);
       }}
       onDoubleClick={(e) => {
         e.preventDefault();
@@ -302,7 +309,9 @@ export function BoundLibItem({
   draggingKey,
   dropIndicator,
   editingKey,
+  selectedKeys,
   onOpen,
+  onActivate,
   onContextMenu,
   onPointerDown,
   onStartRename,
@@ -316,7 +325,10 @@ export function BoundLibItem({
   draggingKey: string | null;
   dropIndicator?: { key: string; edge: "before" | "after" } | null;
   editingKey?: string | null;
+  selectedKeys?: ReadonlySet<string>;
   onOpen: (row: AutomationRow) => void;
+  /** Click with modifiers (multi-select); when set, replaces `onOpen` on click. */
+  onActivate?: (row: AutomationRow, e: MouseEvent) => void;
   onContextMenu: (e: MouseEvent, row: AutomationRow) => void;
   onPointerDown: (row: AutomationRow, e: ReactPointerEvent) => void;
   onStartRename?: (row: AutomationRow) => void;
@@ -333,11 +345,12 @@ export function BoundLibItem({
       row={row}
       active={activeKey === key}
       focused={focusKey === key}
+      selected={selectedKeys?.has(key) ?? false}
       dragging={draggingKey === key}
       canDrag={canDrag}
       dropEdge={dropEdge}
       editing={editingKey === key}
-      onOpen={() => onOpen(row)}
+      onOpen={(e) => (onActivate ? onActivate(row, e) : onOpen(row))}
       onContextMenu={(e) => onContextMenu(e, row)}
       onPointerDown={canDrag ? (e) => onPointerDown(row, e) : undefined}
       onStartRename={
@@ -367,6 +380,8 @@ export type LibTreeFolderHandlers = {
   onCancelRename?: () => void;
   onFocusFolder?: (folder: AutomationFolderOption) => void;
   onOpenItem: (row: AutomationRow) => void;
+  /** Item click (modifier-aware multi-select); falls back to `onOpenItem`. */
+  onActivateItem?: (row: AutomationRow, e: MouseEvent) => void;
   onItemContextMenu: (e: MouseEvent, row: AutomationRow) => void;
   onItemPointerDown: (row: AutomationRow, e: ReactPointerEvent) => void;
   onStartItemRename?: (row: AutomationRow) => void;
@@ -384,17 +399,20 @@ export function LibTreeFolder({
   focusKey,
   draggingKey,
   editingKey,
+  selectedKeys,
   isNodeOpen,
   handlers,
   draftFolder,
   draftNavKey,
   draftAriaLabel,
+  draftFolderInitialName,
   draftRemountKey,
   onCommitDraft,
   onCancelDraft,
   draftItem,
   draftItemNavKey,
   draftItemAriaLabel,
+  draftItemInitialName,
   draftItemRemountKey,
   onCommitDraftItem,
   onCancelDraftItem,
@@ -408,17 +426,20 @@ export function LibTreeFolder({
   focusKey: string | null;
   draggingKey: string | null;
   editingKey?: string | null;
+  selectedKeys?: ReadonlySet<string>;
   isNodeOpen: (n: LibTreeNode) => boolean;
   handlers: LibTreeFolderHandlers;
   draftFolder?: { parentId: string | null } | null;
   draftNavKey?: string;
   draftAriaLabel?: string;
+  draftFolderInitialName?: string;
   draftRemountKey?: number;
   onCommitDraft?: (next: string) => void;
   onCancelDraft?: () => void;
   draftItem?: { folderId: string | null; kind: AutomationRow["kind"] } | null;
   draftItemNavKey?: string;
   draftItemAriaLabel?: string;
+  draftItemInitialName?: string;
   draftItemRemountKey?: number;
   onCommitDraftItem?: (next: string) => void;
   onCancelDraftItem?: () => void;
@@ -432,6 +453,7 @@ export function LibTreeFolder({
     onCancelRename,
     onFocusFolder,
     onOpenItem,
+    onActivateItem,
     onItemContextMenu,
     onItemPointerDown,
     onStartItemRename,
@@ -522,17 +544,20 @@ export function LibTreeFolder({
               focusKey={focusKey}
               draggingKey={draggingKey}
               editingKey={editingKey}
+              selectedKeys={selectedKeys}
               isNodeOpen={isNodeOpen}
               handlers={handlers}
               draftFolder={draftFolder}
               draftNavKey={draftNavKey}
               draftAriaLabel={draftAriaLabel}
+              draftFolderInitialName={draftFolderInitialName}
               draftRemountKey={draftRemountKey}
               onCommitDraft={onCommitDraft}
               onCancelDraft={onCancelDraft}
               draftItem={draftItem}
               draftItemNavKey={draftItemNavKey}
               draftItemAriaLabel={draftItemAriaLabel}
+              draftItemInitialName={draftItemInitialName}
               draftItemRemountKey={draftItemRemountKey}
               onCommitDraftItem={onCommitDraftItem}
               onCancelDraftItem={onCancelDraftItem}
@@ -542,12 +567,14 @@ export function LibTreeFolder({
           draftFolder.parentId === node.id &&
           draftNavKey &&
           draftAriaLabel &&
+          draftFolderInitialName &&
           onCommitDraft &&
           onCancelDraft ? (
             <LibDraftFolderRow
               navKey={draftNavKey}
               focused={focusKey === draftNavKey}
               ariaLabel={draftAriaLabel}
+              initialName={draftFolderInitialName}
               remountKey={draftRemountKey ?? 0}
               onCommit={onCommitDraft}
               onCancel={onCancelDraft}
@@ -562,7 +589,9 @@ export function LibTreeFolder({
               draggingKey={draggingKey}
               dropIndicator={dropIndicator}
               editingKey={editingKey}
+              selectedKeys={selectedKeys}
               onOpen={onOpenItem}
+              onActivate={onActivateItem}
               onContextMenu={onItemContextMenu}
               onPointerDown={onItemPointerDown}
               onStartRename={onStartItemRename}
@@ -575,6 +604,7 @@ export function LibTreeFolder({
           draftItem.folderId === node.id &&
           draftItemNavKey &&
           draftItemAriaLabel &&
+          draftItemInitialName &&
           onCommitDraftItem &&
           onCancelDraftItem ? (
             <LibDraftItemRow
@@ -582,6 +612,7 @@ export function LibTreeFolder({
               navKey={draftItemNavKey}
               focused={focusKey === draftItemNavKey}
               ariaLabel={draftItemAriaLabel}
+              initialName={draftItemInitialName}
               remountKey={draftItemRemountKey ?? 0}
               onCommit={onCommitDraftItem}
               onCancel={onCancelDraftItem}

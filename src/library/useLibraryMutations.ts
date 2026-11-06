@@ -65,41 +65,46 @@ export function useLibraryMutations({
   replaceAutomationsSnapshot,
   setEditingKey,
 }: LibraryMutationsDeps) {
-  /** Persist a new folder; returns false on validation/IPC failure (caller keeps draft). */
+  /** Persist a new folder; returns nav key on success, null on failure/cancel. */
   async function commitCreateFolder(
     parentId: string | null,
     name: string,
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     const trimmed = name.trim();
-    if (!trimmed) return false;
+    if (!trimmed) return null;
     try {
-      await invoke("create_library_folder_cmd", {
+      const folder = await invoke<{ id: string }>("create_library_folder_cmd", {
         kind: "macro",
         name: trimmed,
         parentId,
       });
       toast.success(t("automations.toast.folderCreated", { name: trimmed }));
       bump();
-      return true;
+      return folderNavKey(folder.id);
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.moveFail")));
-      return false;
+      return null;
     }
   }
 
-  /** Persist a named item; returns false on failure (caller keeps draft). */
+  /** Persist a named item; returns rowDomKey on success, null on failure/cancel. */
   async function commitCreateItem(
     kind: AutomationRow["kind"],
     name: string,
     folderId: string | null,
     scriptOpts?: ScriptCreateOpts,
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     const trimmed = name.trim();
-    if (!trimmed) return false;
+    if (!trimmed) return null;
     const folder =
       folderId == null
         ? null
-        : ({ id: folderId, name: "", sortOrder: 0, parentId: null } satisfies AutomationFolderOption);
+        : ({
+            id: folderId,
+            name: "",
+            sortOrder: 0,
+            parentId: null,
+          } satisfies AutomationFolderOption);
     try {
       if (kind === "macro") {
         const doc = await invoke<{ name: string }>("create_saved_macro", {
@@ -115,8 +120,9 @@ export function useLibraryMutations({
         }
         bump();
         toast.success(t("shell.macroCreated"));
-        onOpen(stubRow("macro", doc.name, doc.name, folder));
-        return true;
+        const row = stubRow("macro", doc.name, doc.name, folder);
+        onOpen(row);
+        return rowDomKey(row);
       }
       if (kind === "clicker") {
         await invoke("save_clicker_preset", {
@@ -133,12 +139,13 @@ export function useLibraryMutations({
         }
         bump();
         toast.success(t("shell.clickerCreated"));
-        onOpen(stubRow("clicker", trimmed, trimmed, folder));
-        return true;
+        const row = stubRow("clicker", trimmed, trimmed, folder);
+        onOpen(row);
+        return rowDomKey(row);
       }
       if (!scriptOpts) {
         toast.error(t("automations.toast.moveFail"));
-        return false;
+        return null;
       }
       const id = newScriptId();
       const doc: ScriptDoc = {
@@ -166,11 +173,12 @@ export function useLibraryMutations({
       }
       bump();
       toast.success(t("shell.scriptCreated"));
-      onOpen(stubRow("script", id, trimmed, folder));
-      return true;
+      const row = stubRow("script", id, trimmed, folder);
+      onOpen(row);
+      return rowDomKey(row);
     } catch (e) {
       toast.error(errMessage(e, t("automations.toast.moveFail")));
-      return false;
+      return null;
     }
   }
 
@@ -395,6 +403,54 @@ export function useLibraryMutations({
     }
   }
 
+  /** Bulk delete: one confirm dialog (if `confirmTrash`), locked rows skipped. */
+  async function deleteRows(rows: AutomationRow[]): Promise<boolean> {
+    const deletable = rows.filter((r) => !r.locked);
+    const lockedCount = rows.length - deletable.length;
+    if (deletable.length === 0) {
+      if (lockedCount > 0) {
+        toast.error(t("automations.toast.unlockBeforeDelete"));
+      }
+      return false;
+    }
+    if (confirmTrash) {
+      const ok = await confirmAction({
+        title: t("automations.confirm.deleteTitle"),
+        message:
+          deletable.length === 1
+            ? t("automations.confirm.deleteOne", { name: deletable[0].name })
+            : t("automations.confirm.deleteManyOther", {
+                count: deletable.length,
+              }),
+        confirmLabel: t("automations.confirm.deleteConfirm"),
+        danger: true,
+      });
+      if (!ok) return false;
+    }
+    let failed = false;
+    for (const row of deletable) {
+      try {
+        if (row.kind === "macro") {
+          await invoke("delete_saved_macro", { name: row.id });
+        } else if (row.kind === "clicker") {
+          await invoke("delete_clicker_preset", { name: row.id });
+        } else {
+          await invoke("delete_script_cmd", { id: row.id });
+        }
+        onItemDeleted?.(row.kind, row.id);
+      } catch (e) {
+        failed = true;
+        toast.error(errMessage(e, t("automations.toast.deleteFail")));
+      }
+    }
+    if (!failed) toast.success(t("automations.toast.deleted"));
+    if (lockedCount > 0) {
+      toast.error(t("automations.toast.unlockBeforeDelete"));
+    }
+    bump();
+    return !failed;
+  }
+
   async function moveRow(
     row: AutomationRow,
     folder: AutomationFolderOption | null,
@@ -546,6 +602,7 @@ export function useLibraryMutations({
     toggleFavorite,
     setLocked,
     deleteRow,
+    deleteRows,
     moveRow,
     moveFolder,
     launchRow,

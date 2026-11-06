@@ -22,7 +22,10 @@ import {
   type ScriptsPrefs,
   type ShellPrefs,
 } from "../settings/settingsTypes";
-import { WorkspaceLibrary } from "../library/WorkspaceLibrary";
+import {
+  WorkspaceLibrary,
+  type LibraryCreateRequest,
+} from "../library/WorkspaceLibrary";
 import { RunJournalDock } from "../runs/RunJournalDock";
 import { useEngineLog } from "../runs/useEngineLog";
 import { useZoneFeedbackToasts } from "../clicker/useZoneFeedbackToasts";
@@ -41,9 +44,7 @@ import {
 import { TitleBarProvider, useTitleBarContext } from "../ui/shell/TitleBarContext";
 import {
   ConfirmHost,
-  askScriptLanguage,
   confirmAction,
-  confirmChoice,
   PromptHost,
   promptAction,
   ScriptLanguageHost,
@@ -53,8 +54,6 @@ import { LocaleProvider, useT } from "../i18n";
 import { loadLastStudio, pushRecent, saveLastStudio } from "./recent";
 import type { SettingsSection } from "./types";
 import type { AppSettings } from "../clicker/clickerTypes";
-import { DEFAULT_CLICKER } from "../clicker/clickerTypes";
-import { defaultScriptSource } from "../scripts/defaultSources";
 import {
   loadClickerStudio,
   loadMacroEditor,
@@ -261,6 +260,14 @@ function MainAppInner({
   }, []);
 
   const bumpRefresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const [libraryCreateRequest, setLibraryCreateRequest] =
+    useState<LibraryCreateRequest | null>(null);
+  const requestLibraryCreate = useCallback(
+    (kind: LibraryCreateRequest["kind"]) => {
+      setLibraryCreateRequest({ kind, nonce: Date.now() });
+    },
+    [],
+  );
   const [docRemountKeys, setDocRemountKeys] = useState<Record<string, number>>(
     {},
   );
@@ -684,74 +691,17 @@ function MainAppInner({
     setWorkspace((ws) => setTabLabel(ws, activeDocId, title));
   }, [activeDocId, activeDocLabel, pageTitle]);
 
-  const onCreateMacro = useCallback(async () => {
-    try {
-      const doc = await invoke<{ name: string }>("create_saved_macro", { name: null });
-      bumpRefresh();
-      toast.success(t("shell.macroCreated"));
-      openDoc("macro", doc.name);
-    } catch (e) {
-      toast.error(launchErr(e, t("shell.createMacroFailed")));
-    }
-  }, [bumpRefresh, openDoc, t, toast]);
+  const onCreateMacro = useCallback(() => {
+    requestLibraryCreate("macro");
+  }, [requestLibraryCreate]);
 
-  const onCreateClicker = useCallback(async () => {
-    try {
-      const name = `Preset ${Date.now().toString(36)}`;
-      await invoke("save_clicker_preset", {
-        name,
-        config: DEFAULT_CLICKER,
-      });
-      bumpRefresh();
-      toast.success(t("shell.clickerCreated"));
-      openDoc("clicker", name);
-    } catch (e) {
-      toast.error(launchErr(e, t("shell.createClickerFailed")));
-    }
-  }, [bumpRefresh, openDoc, t, toast]);
+  const onCreateClicker = useCallback(() => {
+    requestLibraryCreate("clicker");
+  }, [requestLibraryCreate]);
 
-  const onCreateScript = useCallback(async () => {
-    const outcome = await confirmChoice({
-      title: t("scripts.create.title"),
-      message: t("scripts.create.message"),
-      confirmLabel: t("scripts.create.runnable"),
-      discardLabel: t("scripts.create.module"),
-      cancelLabel: t("common.cancel"),
-    });
-    if (outcome === "cancel") return;
-    const isModule = outcome === "discard";
-      const language = await askScriptLanguage({
-      title: t("scripts.create.languageTitle"),
-      message: t("scripts.create.languageMessage"),
-      javascriptLabel: t("scripts.language.javascript"),
-      typescriptLabel: t("scripts.language.typescript"),
-      cancelLabel: t("common.cancel"),
-    });
-    if (!language) return;
-    try {
-      const id = newScriptId();
-      const doc: ScriptDoc = {
-        id,
-        name: t("shell.newScriptName"),
-        source: defaultScriptSource(language, isModule),
-        language,
-        isModule,
-        allowNetwork: false,
-        allowClipboard: false,
-        allowFs: false,
-        allowMacroControl: false,
-        allowInput: false,
-        allowProcess: false,
-        paramValues: {},
-      };
-      await invoke("save_script_cmd", { doc });
-      bumpRefresh();
-      toast.success(t("shell.scriptCreated"));
-      openDoc("script", id, doc.name);
-    } catch (e) {
-      toast.error(launchErr(e, t("shell.createScriptFailed")));
-    }
-  }, [bumpRefresh, openDoc, t, toast]);
+  const onCreateScript = useCallback(() => {
+    requestLibraryCreate("script");
+  }, [requestLibraryCreate]);
 
   const onBarContextAction = useCallback(
     async (action: BarContextAction) => {
@@ -1065,10 +1015,8 @@ function MainAppInner({
             recentListMax={shellPrefs.recentListMax}
             confirmTrash={accueilPrefs.confirmTrash}
             confirmDeleteFolder={accueilPrefs.confirmDeleteFolder}
+            createRequest={libraryCreateRequest}
             onOpen={(row) => openDoc(row.kind, row.id, row.name)}
-            onCreateMacro={() => void onCreateMacro()}
-            onCreateClicker={() => void onCreateClicker()}
-            onCreateScript={() => void onCreateScript()}
             onRefresh={bumpRefresh}
             onOpenSettings={(section) => {
               prefetchEditor("settings");

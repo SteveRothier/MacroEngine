@@ -1,4 +1,4 @@
-import {
+﻿import {
   useCallback,
   useEffect,
   useMemo,
@@ -11,7 +11,9 @@ import {
 import { createPortal } from "react-dom";
 import {
   Code2,
+  ExternalLink,
   Folder,
+  FolderInput,
   FolderPlus,
   LayoutGrid,
   MousePointer2,
@@ -72,6 +74,12 @@ import {
 } from "./useLibraryMutations";
 import { libraryEmptyForBrowse, libraryEmptyForScope } from "./libraryEmpty";
 
+export type LibraryCreateRequest = {
+  kind: AutomationRow["kind"] | "folder";
+  /** Bump to re-trigger the same kind. */
+  nonce: number;
+};
+
 export type WorkspaceLibraryProps = {
   activeKey: string | null;
   refreshKey?: number;
@@ -81,10 +89,12 @@ export type WorkspaceLibraryProps = {
   recentListMax?: number;
   confirmTrash?: boolean;
   confirmDeleteFolder?: boolean;
+  /** External create (stage empty, Ctrl+N, tab bar) → inline draft in the tree. */
+  createRequest?: LibraryCreateRequest | null;
   onOpen: (row: AutomationRow) => void;
-  onCreateMacro: () => void;
-  onCreateClicker: () => void;
-  onCreateScript: () => void;
+  onCreateMacro?: () => void;
+  onCreateClicker?: () => void;
+  onCreateScript?: () => void;
   onRefresh?: () => void;
   onItemRenamed?: (
     kind: AutomationRow["kind"],
@@ -160,10 +170,8 @@ export function WorkspaceLibrary({
   recentListMax = 12,
   confirmTrash = true,
   confirmDeleteFolder = true,
+  createRequest = null,
   onOpen,
-  onCreateMacro: _onCreateMacro,
-  onCreateClicker: _onCreateClicker,
-  onCreateScript: _onCreateScript,
   onRefresh,
   onItemRenamed,
   onItemDeleted,
@@ -192,6 +200,22 @@ export function WorkspaceLibrary({
   /** Folders start collapsed; ids present here are expanded. */
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [focusKey, setFocusKey] = useState<string | null>(null);
+  /** Multi-selection (items only), values are `rowDomKey`. */
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const selectionAnchorRef = useRef<string | null>(null);
+  const prevFocusKeyRef = useRef<string | null>(null);
+  const curFocusKeyRef = useRef<string | null>(null);
+  const clearSelection = useCallback(() => {
+    setSelectedKeys((prev) => (prev.size === 0 ? prev : new Set()));
+  }, []);
+  useEffect(() => {
+    if (curFocusKeyRef.current !== focusKey) {
+      prevFocusKeyRef.current = curFocusKeyRef.current;
+      curFocusKeyRef.current = focusKey;
+    }
+  }, [focusKey]);
   const [ctxItems, setCtxItems] = useState<MenuItemDef[]>([]);
   const ctxMenu = useContextMenuState();
   const foldersRef = useRef<AutomationFolderOption[]>([]);
@@ -280,11 +304,12 @@ export function WorkspaceLibrary({
 
   useEffect(() => {
     if (draggingKey) {
+      clearSelection();
       setEditingKey(null);
       setDraftFolder(null);
       setDraftItem(null);
     }
-  }, [draggingKey]);
+  }, [clearSelection, draggingKey]);
 
   const toggleExpanded = useCallback((id: string) => {
     if (shouldSuppressClick()) return;
@@ -365,6 +390,7 @@ export function WorkspaceLibrary({
     toggleFavorite,
     setLocked,
     deleteRow,
+    deleteRows,
     moveRow,
     moveFolder,
     launchRow,
@@ -388,6 +414,101 @@ export function WorkspaceLibrary({
   moveRowRef.current = moveRow;
   moveFolderRef.current = moveFolder;
 
+  /** Visible items (navEntries), in display order. */
+  const visibleItemRows = useMemo(
+    () => navEntries.flatMap((e) => (e.type === "item" ? [e.row] : [])),
+    [navEntries],
+  );
+
+  /** Drop selected keys that are no longer visible (filter / collapse / delete). */
+  useEffect(() => {
+    setSelectedKeys((prev) => {
+      if (prev.size === 0) return prev;
+      const visible = new Set(visibleItemRows.map(rowDomKey));
+      let changed = false;
+      const next = new Set<string>();
+      for (const k of prev) {
+        if (visible.has(k)) next.add(k);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [visibleItemRows]);
+
+  const selectedRows = useMemo(
+    () => visibleItemRows.filter((r) => selectedKeys.has(rowDomKey(r))),
+    [selectedKeys, visibleItemRows],
+  );
+
+  const activateRow = useCallback(
+    (row: AutomationRow, e: MouseEvent) => {
+      if (shouldSuppressClick()) return;
+      const key = rowDomKey(row);
+      if (e.ctrlKey || e.metaKey) {
+        setSelectedKeys((prev) => {
+          const next = new Set(prev);
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
+          return next;
+        });
+        selectionAnchorRef.current = key;
+        return;
+      }
+      if (e.shiftKey) {
+        const itemKeys = visibleItemRows.map(rowDomKey);
+        // Focus already moved to the clicked row on pointer down → use the previous one.
+        const anchorCandidates = [
+          selectionAnchorRef.current,
+          focusKey !== key ? focusKey : prevFocusKeyRef.current,
+          activeKey,
+        ];
+        const anchor =
+          anchorCandidates.find((k) => k && itemKeys.includes(k)) ?? key;
+        const a = itemKeys.indexOf(anchor);
+        const b = itemKeys.indexOf(key);
+        if (a < 0 || b < 0) return;
+        const [from, to] = a <= b ? [a, b] : [b, a];
+        setSelectedKeys(new Set(itemKeys.slice(from, to + 1)));
+        selectionAnchorRef.current = anchor;
+        return;
+      }
+      clearSelection();
+      selectionAnchorRef.current = key;
+      openRow(row);
+    },
+    [
+      activeKey,
+      clearSelection,
+      focusKey,
+      openRow,
+      shouldSuppressClick,
+      visibleItemRows,
+    ],
+  );
+
+  const openSelected = useCallback(() => {
+    const MAX_OPEN = 12;
+    for (const row of selectedRows.slice(0, MAX_OPEN)) onOpen(row);
+  }, [onOpen, selectedRows]);
+
+  const moveSelected = useCallback(
+    async (folder: AutomationFolderOption | null) => {
+      const rows = selectedRows.filter(
+        (r) => !r.locked && (r.folderId ?? null) !== (folder?.id ?? null),
+      );
+      clearSelection();
+      for (const row of rows) {
+        await moveRowRef.current(row, folder);
+      }
+    },
+    [clearSelection, selectedRows],
+  );
+
+  const deleteSelected = useCallback(async () => {
+    const ok = await deleteRows(selectedRows);
+    if (ok) clearSelection();
+  }, [clearSelection, deleteRows, selectedRows]);
+
   const clearDraftFolder = useCallback(() => {
     setDraftFolder(null);
     setEditingKey((key) => (key === DRAFT_FOLDER_KEY ? null : key));
@@ -399,6 +520,7 @@ export function WorkspaceLibrary({
   }, []);
 
   const startCreateFolder = useCallback((parentId: string | null) => {
+    clearSelection();
     setDraftItem(null);
     if (parentId) {
       setExpanded((prev) => {
@@ -412,7 +534,7 @@ export function WorkspaceLibrary({
     setDraftRemountKey((n) => n + 1);
     setEditingKey(DRAFT_FOLDER_KEY);
     setFocusKey(DRAFT_FOLDER_KEY);
-  }, []);
+  }, [clearSelection]);
 
   const startCreateItem = useCallback(
     async (kind: AutomationRow["kind"], folderId: string | null) => {
@@ -422,6 +544,7 @@ export function WorkspaceLibrary({
         if (!opts) return;
         scriptOpts = opts;
       }
+      clearSelection();
       setDraftFolder(null);
       if (folderId) {
         setExpanded((prev) => {
@@ -436,7 +559,7 @@ export function WorkspaceLibrary({
       setEditingKey(DRAFT_ITEM_KEY);
       setFocusKey(DRAFT_ITEM_KEY);
     },
-    [promptScriptCreateOpts],
+    [clearSelection, promptScriptCreateOpts],
   );
 
   const onCommitDraftFolder = useCallback(
@@ -447,9 +570,10 @@ export function WorkspaceLibrary({
         clearDraftFolder();
         return;
       }
-      const ok = await commitCreateFolder(draftFolder.parentId, name);
-      if (ok) {
+      const focus = await commitCreateFolder(draftFolder.parentId, name);
+      if (focus) {
         clearDraftFolder();
+        setFocusKey(focus);
         return;
       }
       setEditingKey(DRAFT_FOLDER_KEY);
@@ -466,14 +590,15 @@ export function WorkspaceLibrary({
         clearDraftItem();
         return;
       }
-      const ok = await commitCreateItem(
+      const focus = await commitCreateItem(
         draftItem.kind,
         name,
         draftItem.folderId,
         draftItem.scriptOpts,
       );
-      if (ok) {
+      if (focus) {
         clearDraftItem();
+        setFocusKey(focus);
         return;
       }
       setEditingKey(DRAFT_ITEM_KEY);
@@ -481,6 +606,18 @@ export function WorkspaceLibrary({
     },
     [clearDraftItem, commitCreateItem, draftItem],
   );
+
+  const createRequestNonceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!createRequest) return;
+    if (createRequestNonceRef.current === createRequest.nonce) return;
+    createRequestNonceRef.current = createRequest.nonce;
+    if (createRequest.kind === "folder") {
+      startCreateFolder(null);
+      return;
+    }
+    void startCreateItem(createRequest.kind, null);
+  }, [createRequest, startCreateFolder, startCreateItem]);
 
   const focusedFolder = useMemo(() => {
     if (!focusKey?.startsWith("folder:")) return null;
@@ -490,12 +627,19 @@ export function WorkspaceLibrary({
   }, [focusKey, folders]);
 
   const draftAriaLabel = t("automations.confirm.createFolderTitle");
+  const draftFolderInitialName = t("automations.folder.create");
   const draftItemAriaLabel =
     draftItem?.kind === "clicker"
       ? t("automations.create.clicker")
       : draftItem?.kind === "script"
         ? t("automations.create.script")
         : t("automations.create.macro");
+  const draftItemInitialName =
+    draftItem?.kind === "clicker"
+      ? t("shell.newClicker")
+      : draftItem?.kind === "script"
+        ? t("shell.newScriptName")
+        : t("shell.newMacro");
 
   const createMenuItems: MenuItemDef[] = [
     {
@@ -567,6 +711,21 @@ export function WorkspaceLibrary({
     ctxMenu.openFromEvent(e);
   }
 
+  const selectionMoveItems: MenuItemDef[] = [
+    {
+      id: "move-root",
+      label: t("automations.menu.row.noFolder"),
+      icon: <Folder size={14} aria-hidden />,
+      onSelect: () => void moveSelected(null),
+    },
+    ...folders.map((f) => ({
+      id: `move-${f.id}`,
+      label: f.name,
+      icon: <Folder size={14} aria-hidden />,
+      onSelect: () => void moveSelected(f),
+    })),
+  ];
+
   const treeHandlers: LibTreeFolderHandlers = {
     onToggle: toggleExpanded,
     onFolderContextMenu: openFolderMenu,
@@ -576,6 +735,7 @@ export function WorkspaceLibrary({
     onCancelRename: () => setEditingKey(null),
     onFocusFolder: (f) => setFocusKey(folderNavKey(f.id)),
     onOpenItem: openRow,
+    onActivateItem: activateRow,
     onItemContextMenu: openItemMenu,
     onItemPointerDown,
     onStartItemRename: startRowRename,
@@ -611,6 +771,7 @@ export function WorkspaceLibrary({
       ];
     if (!next) return;
     setFocusKey(next.key);
+    selectionAnchorRef.current = null;
     requestAnimationFrame(() => {
       document
         .querySelector<HTMLElement>(`[data-nav-key="${CSS.escape(next.key)}"]`)
@@ -630,6 +791,11 @@ export function WorkspaceLibrary({
 
   function onTreeKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (editingKey) return;
+    if (e.key === "Escape" && selectedKeys.size > 0) {
+      e.preventDefault();
+      clearSelection();
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       moveFocus(1);
@@ -743,7 +909,9 @@ export function WorkspaceLibrary({
         draggingKey={draggingKey}
         dropIndicator={dropIndicator}
         editingKey={editingKey}
+        selectedKeys={selectedKeys}
         onOpen={openRow}
+        onActivate={activateRow}
         onContextMenu={openItemMenu}
         onPointerDown={onItemPointerDown}
         onStartRename={startRowRename}
@@ -881,17 +1049,20 @@ export function WorkspaceLibrary({
                   focusKey={focusKey}
                   draggingKey={draggingKey}
                   editingKey={editingKey}
+                  selectedKeys={selectedKeys}
                   isNodeOpen={isNodeOpen}
                   handlers={treeHandlers}
                   draftFolder={draftFolder}
                   draftNavKey={DRAFT_FOLDER_KEY}
                   draftAriaLabel={draftAriaLabel}
+                  draftFolderInitialName={draftFolderInitialName}
                   draftRemountKey={draftRemountKey}
                   onCommitDraft={(name) => void onCommitDraftFolder(name)}
                   onCancelDraft={clearDraftFolder}
                   draftItem={draftItem}
                   draftItemNavKey={DRAFT_ITEM_KEY}
                   draftItemAriaLabel={draftItemAriaLabel}
+                  draftItemInitialName={draftItemInitialName}
                   draftItemRemountKey={draftItemRemountKey}
                   onCommitDraftItem={(name) => void onCommitDraftItem(name)}
                   onCancelDraftItem={clearDraftItem}
@@ -902,6 +1073,7 @@ export function WorkspaceLibrary({
                   navKey={DRAFT_FOLDER_KEY}
                   focused={focusKey === DRAFT_FOLDER_KEY}
                   ariaLabel={draftAriaLabel}
+                  initialName={draftFolderInitialName}
                   remountKey={draftRemountKey}
                   onCommit={(name) => void onCommitDraftFolder(name)}
                   onCancel={clearDraftFolder}
@@ -934,7 +1106,9 @@ export function WorkspaceLibrary({
                       draggingKey={draggingKey}
                       dropIndicator={dropIndicator}
                       editingKey={editingKey}
+                      selectedKeys={selectedKeys}
                       onOpen={openRow}
+                      onActivate={activateRow}
                       onContextMenu={openItemMenu}
                       onPointerDown={onItemPointerDown}
                       onStartRename={startRowRename}
@@ -949,6 +1123,7 @@ export function WorkspaceLibrary({
                       navKey={DRAFT_ITEM_KEY}
                       focused={focusKey === DRAFT_ITEM_KEY}
                       ariaLabel={draftItemAriaLabel}
+                      initialName={draftItemInitialName}
                       remountKey={draftItemRemountKey}
                       onCommit={(name) => void onCommitDraftItem(name)}
                       onCancel={clearDraftItem}
@@ -989,6 +1164,74 @@ export function WorkspaceLibrary({
             document.body,
           )
         : null}
+
+      {selectedKeys.size >= 1 ? (
+        <div
+          className="caster-lib-selection-dock"
+          role="toolbar"
+          aria-label={t("automations.selection.aria")}
+          onContextMenu={(e) => e.stopPropagation()}
+        >
+          <span className="caster-lib-selection-count">
+            {t(
+              selectedKeys.size === 1
+                ? "automations.selection.countOne"
+                : "automations.selection.countMany",
+              { count: selectedKeys.size },
+            )}
+          </span>
+          <div className="caster-lib-selection-actions">
+            <Tooltip
+              content={
+                selectedRows.length > 1
+                  ? t("automations.selection.openAll", {
+                      count: Math.min(selectedRows.length, 12),
+                    })
+                  : t("automations.selection.open")
+              }
+              side="top"
+            >
+              <button
+                type="button"
+                className="caster-lib-chip caster-lib-selection-btn"
+                aria-label={t("automations.selection.open")}
+                onClick={openSelected}
+              >
+                <ExternalLink size={14} aria-hidden />
+              </button>
+            </Tooltip>
+            <DropdownMenu
+              label={t("automations.selection.move")}
+              ariaLabel={t("automations.selection.folderAria")}
+              align="end"
+              triggerClassName="caster-lib-chip caster-lib-selection-btn"
+              items={selectionMoveItems}
+            >
+              <FolderInput size={14} aria-hidden />
+            </DropdownMenu>
+            <Tooltip content={t("automations.confirm.deleteTitle")} side="top">
+              <button
+                type="button"
+                className="caster-lib-chip caster-lib-selection-btn is-danger"
+                aria-label={t("automations.confirm.deleteTitle")}
+                onClick={() => void deleteSelected()}
+              >
+                <Trash2 size={14} aria-hidden />
+              </button>
+            </Tooltip>
+            <Tooltip content={t("automations.selection.clear")} side="top">
+              <button
+                type="button"
+                className="caster-lib-chip caster-lib-selection-btn"
+                aria-label={t("automations.selection.clear")}
+                onClick={clearSelection}
+              >
+                <X size={14} aria-hidden />
+              </button>
+            </Tooltip>
+          </div>
+        </div>
+      ) : null}
 
       <footer className="caster-lib-footer">
         <div className="caster-lib-footer-user">

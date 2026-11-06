@@ -124,6 +124,58 @@
   gap: 4px;
 }
 
+/* —— Selection dock (above footer) —— */
+.caster-lib-selection-dock {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0 12px 4px;
+  padding: 3px 4px 3px 10px;
+  min-height: 32px;
+  border: 1px solid color-mix(in srgb, var(--caster-accent) 28%, transparent);
+  border-radius: var(--caster-radius-md);
+  background: color-mix(in srgb, var(--caster-accent) 10%, var(--caster-bg-secondary));
+  color: var(--caster-text-secondary);
+}
+
+.caster-lib-selection-count {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--caster-text-primary);
+}
+
+.caster-lib-selection-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 1px;
+}
+
+.caster-lib-chip.caster-lib-selection-btn {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.caster-lib-chip.caster-lib-selection-btn.is-danger:hover {
+  background: color-mix(in srgb, #e5484d 16%, transparent);
+  color: #e5484d;
+}
+
+.caster-lib-chip.caster-lib-selection-btn:focus-visible {
+  outline: 1px solid var(--caster-accent);
+  outline-offset: -1px;
+}
+
 .caster-lib-footer-user {
   box-sizing: border-box;
   display: flex;
@@ -274,6 +326,20 @@ body.is-lib-dragging .caster-lib-nav-row.is-active:hover:not(.is-drop-target) {
 .caster-lib-nav-row.is-active {
   background: var(--caster-accent-selection);
   color: var(--caster-text-primary);
+}
+
+/* Multi-select: subtle accent wash + left tick, distinct from active / focus. */
+.caster-lib-nav-row.is-selected,
+.caster-lib-nav-row.is-selected:hover,
+body.is-lib-dragging .caster-lib-nav-row.is-selected:hover:not(.is-drop-target) {
+  background: color-mix(in srgb, var(--caster-accent) 16%, transparent);
+  color: var(--caster-text-primary);
+  box-shadow: inset 2px 0 0
+    color-mix(in srgb, var(--caster-accent) 70%, transparent);
+}
+
+.caster-lib-nav-row.is-selected.is-active {
+  background: color-mix(in srgb, var(--caster-accent) 22%, var(--caster-accent-selection));
 }
 
 /* Keyboard only — mouse focus must not flash a border when switching items. */
