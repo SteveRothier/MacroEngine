@@ -12,12 +12,15 @@ import { createPortal } from "react-dom";
 import {
   Code2,
   Folder,
+  FolderPlus,
   LayoutGrid,
   MousePointer2,
+  PenLine,
   Plus,
   Search,
   Settings,
   Star,
+  Trash2,
   Workflow,
   X,
 } from "lucide-react";
@@ -109,36 +112,39 @@ function buildFolderMenuItems(
     {
       id: "rename-folder",
       label: t("automations.menu.empty.renameFolder"),
+      icon: <PenLine size={14} aria-hidden />,
       onSelect: () => void actions.renameFolder(folder),
     },
     {
       id: "new-subfolder",
       label: t("automations.menu.empty.newFolder"),
+      icon: <FolderPlus size={14} aria-hidden />,
       onSelect: () => void actions.createFolder(folder.id),
     },
     { id: "sep-create-in", label: "", separator: true },
     {
       id: "new-macro-in",
       label: t("automations.create.macro"),
-      icon: <Workflow size={14} />,
+      icon: <Workflow size={14} aria-hidden />,
       onSelect: () => void actions.createItem("macro", folder.id),
     },
     {
       id: "new-clicker-in",
       label: t("automations.create.clicker"),
-      icon: <MousePointer2 size={14} />,
+      icon: <MousePointer2 size={14} aria-hidden />,
       onSelect: () => void actions.createItem("clicker", folder.id),
     },
     {
       id: "new-script-in",
       label: t("automations.create.script"),
-      icon: <Code2 size={14} />,
+      icon: <Code2 size={14} aria-hidden />,
       onSelect: () => void actions.createItem("script", folder.id),
     },
     { id: "sep-f", label: "", separator: true },
     {
       id: "delete-folder",
       label: t("automations.confirm.deleteFolderTitle"),
+      icon: <Trash2 size={14} aria-hidden />,
       danger: true,
       onSelect: () => void actions.deleteFolder(folder),
     },
@@ -497,28 +503,28 @@ export function WorkspaceLibrary({
       label: focusedFolder
         ? t("automations.folder.createChild")
         : t("automations.folder.create"),
-      icon: <Folder size={14} />,
+      icon: <FolderPlus size={14} aria-hidden />,
       onSelect: () => startCreateFolder(focusedFolder?.id ?? null),
     },
     { id: "sep-create", label: "", separator: true },
     {
       id: "macro",
       label: t("automations.create.macro"),
-      icon: <Workflow size={14} />,
+      icon: <Workflow size={14} aria-hidden />,
       onSelect: () =>
         void startCreateItem("macro", focusedFolder?.id ?? null),
     },
     {
       id: "clicker",
       label: t("automations.create.clicker"),
-      icon: <MousePointer2 size={14} />,
+      icon: <MousePointer2 size={14} aria-hidden />,
       onSelect: () =>
         void startCreateItem("clicker", focusedFolder?.id ?? null),
     },
     {
       id: "script",
       label: t("automations.create.script"),
-      icon: <Code2 size={14} />,
+      icon: <Code2 size={14} aria-hidden />,
       onSelect: () =>
         void startCreateItem("script", focusedFolder?.id ?? null),
     },

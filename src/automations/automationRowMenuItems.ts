@@ -32,6 +32,11 @@ export type AutomationRowMenuActions = {
     unlock?: ReactNode;
     move?: ReactNode;
     reveal?: ReactNode;
+    goToFolder?: ReactNode;
+    convert?: ReactNode;
+    convertMacro?: ReactNode;
+    convertScript?: ReactNode;
+    export?: ReactNode;
     delete?: ReactNode;
   };
 };
@@ -98,6 +103,7 @@ export function buildAutomationRowMenuItems(
     items.push({
       id: "export",
       label: t("automations.toolbar.exportSelection").replace("…", ""),
+      icon: actions.icons?.export,
       onSelect: actions.onExport,
     });
   }
@@ -159,6 +165,7 @@ export function buildAutomationRowMenuItems(
     items.push({
       id: "go-folder",
       label: t("automations.menu.row.goToFolder"),
+      icon: actions.icons?.goToFolder,
       onSelect: actions.onGoToFolder,
     });
   }
@@ -173,9 +180,16 @@ export function buildAutomationRowMenuItems(
     items.push({
       id: "convert",
       label: t("automations.menu.row.convertTo"),
+      icon: actions.icons?.convert,
       submenu: targets.map((to) => ({
         id: `convert-${to}`,
         label: t(`automations.convert.kind.${to}`),
+        icon:
+          to === "macro"
+            ? actions.icons?.convertMacro
+            : to === "script"
+              ? actions.icons?.convertScript
+              : undefined,
         onSelect: () => actions.onConvertTo?.(to),
       })),
     });

@@ -1,5 +1,8 @@
 import {
+  ArrowRightLeft,
+  Code2,
   Copy,
+  Download,
   Folder,
   FolderOpen,
   Lock,
@@ -8,23 +11,29 @@ import {
   Play,
   Star,
   Trash2,
+  Workflow,
 } from "lucide-react";
 import type { AutomationRowMenuActions } from "./automationRowMenuItems";
 
-/** Shared Lucide icons for Accueil row ⋯ / context menus. */
+/** Shared Lucide icons for library row context menus. */
 export function automationRowMenuIcons(): NonNullable<
   AutomationRowMenuActions["icons"]
 > {
   return {
-    open: <FolderOpen size={14} />,
-    launch: <Play size={14} />,
-    rename: <PenLine size={14} />,
-    duplicate: <Copy size={14} />,
-    favorite: <Star size={14} />,
-    lock: <Lock size={14} />,
-    unlock: <LockOpen size={14} />,
-    move: <Folder size={14} />,
-    reveal: <FolderOpen size={14} />,
-    delete: <Trash2 size={14} />,
+    open: <FolderOpen size={14} aria-hidden />,
+    launch: <Play size={14} aria-hidden />,
+    rename: <PenLine size={14} aria-hidden />,
+    duplicate: <Copy size={14} aria-hidden />,
+    favorite: <Star size={14} aria-hidden />,
+    lock: <Lock size={14} aria-hidden />,
+    unlock: <LockOpen size={14} aria-hidden />,
+    move: <Folder size={14} aria-hidden />,
+    reveal: <FolderOpen size={14} aria-hidden />,
+    goToFolder: <Folder size={14} aria-hidden />,
+    convert: <ArrowRightLeft size={14} aria-hidden />,
+    convertMacro: <Workflow size={14} aria-hidden />,
+    convertScript: <Code2 size={14} aria-hidden />,
+    export: <Download size={14} aria-hidden />,
+    delete: <Trash2 size={14} aria-hidden />,
   };
 }
