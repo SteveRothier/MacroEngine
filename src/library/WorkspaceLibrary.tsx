@@ -760,6 +760,7 @@ export function WorkspaceLibrary({
         "caster-workspace-library",
         draggingKey && "is-lib-dragging",
       )}
+      onContextMenu={openEmptyMenu}
     >
       <header className="caster-lib-brand">
         <span className="caster-lib-brand-mark" aria-hidden>
@@ -856,7 +857,6 @@ export function WorkspaceLibrary({
         tabIndex={0}
         aria-busy={loading || undefined}
         aria-label={t("shell.library.aria")}
-        onContextMenu={scope === "all" ? openEmptyMenu : undefined}
         onKeyDown={onTreeKeyDown}
       >
         <div className="caster-lib-tree-root">
@@ -1010,6 +1010,7 @@ export function WorkspaceLibrary({
                 className="caster-lib-footer-settings"
                 aria-label={t("shell.navSettings")}
                 onClick={() => onOpenSettings("application")}
+                onContextMenu={(e) => e.stopPropagation()}
               >
                 <Settings size={15} aria-hidden strokeWidth={1.75} />
               </button>

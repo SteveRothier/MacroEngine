@@ -119,7 +119,14 @@ export function LibDraftFolderRow({
   onCancel: () => void;
 }) {
   return (
-    <div className="caster-lib-tree-node" data-folder-draft="">
+    <div
+      className="caster-lib-tree-node"
+      data-folder-draft=""
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
       <div
         role="treeitem"
         tabIndex={-1}
@@ -179,6 +186,10 @@ export function LibDraftItemRow({
       )}
       aria-label={ariaLabel}
       aria-selected={focused || undefined}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
     >
       <KindIcon kind={kind} />
       <LibRenameInput
