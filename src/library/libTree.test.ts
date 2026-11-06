@@ -30,7 +30,6 @@ function row(
     favorite: false,
     locked: false,
     dirty: false,
-    trashed: false,
     ...partial,
   };
 }
@@ -64,13 +63,6 @@ describe("buildLibTree", () => {
     row({ id: "a", name: "In root", kind: "macro", folderId: "root" }),
     row({ id: "b", name: "In child", kind: "clicker", folderId: "child" }),
     row({ id: "c", name: "Unfiled", kind: "script", folderId: null }),
-    row({
-      id: "gone",
-      name: "Trashed",
-      kind: "macro",
-      folderId: "root",
-      trashed: true,
-    }),
   ];
 
   it("nests folders and keeps unfiled at root", () => {
@@ -98,7 +90,6 @@ describe("buildLibTree", () => {
 
 describe("buildNavigationEntries", () => {
   const fav = row({ id: "f", name: "Fav", kind: "macro", favorite: true });
-  const recent = row({ id: "r", name: "Recent", kind: "script" });
   const unfiled = row({ id: "u", name: "U", kind: "clicker" });
   const folderNode = {
     id: "albion",
@@ -107,35 +98,22 @@ describe("buildNavigationEntries", () => {
     children: [] as never[],
   };
 
-  it("flattens favorites / recent scopes", () => {
+  it("flattens favorites scope", () => {
     expect(
       buildNavigationEntries({
         scope: "favorites",
         favVisible: [fav],
-        recentVisible: [recent],
         folderTree: [folderNode],
         unfiledRows: [unfiled],
         isNodeOpen: () => true,
       }).map((e) => e.key),
     ).toEqual([rowDomKey(fav)]);
-
-    expect(
-      buildNavigationEntries({
-        scope: "recent",
-        favVisible: [fav],
-        recentVisible: [recent],
-        folderTree: [folderNode],
-        unfiledRows: [unfiled],
-        isNodeOpen: () => true,
-      }).map((e) => e.key),
-    ).toEqual([rowDomKey(recent)]);
   });
 
   it("includes open folders, items, then unfiled for all", () => {
     const keys = buildNavigationEntries({
       scope: "all",
       favVisible: [],
-      recentVisible: [],
       folderTree: [folderNode],
       unfiledRows: [unfiled],
       isNodeOpen: () => true,

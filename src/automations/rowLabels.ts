@@ -68,7 +68,7 @@ export function sortByLabel(
 }
 
 export function filterPillTooltip(
-  filter: "all" | "favorites" | "recent" | "trash",
+  filter: "all" | "favorites" | "recent",
   t: TFunction,
 ): string {
   switch (filter) {
@@ -78,8 +78,6 @@ export function filterPillTooltip(
       return t("automations.filter.tipFavorites");
     case "recent":
       return t("automations.filter.tipRecent");
-    case "trash":
-      return t("automations.filter.tipTrash");
   }
 }
 

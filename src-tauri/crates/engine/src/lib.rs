@@ -3,7 +3,6 @@
 //! React must never own timing, hooks, input injection, or critical run state.
 //! This crate holds those contracts; the Tauri shell only asks and observes.
 
-pub mod accueil_order;
 pub mod actions;
 pub mod app_state;
 pub mod cancel;
@@ -40,9 +39,6 @@ pub mod zone_native_overlay;
 pub use actions::{
     ActionContext, ActionError, ActionHandler, ActionRegistry, LogHandler, NoopHandler,
 };
-pub use accueil_order::{
-    load_accueil_order, save_accueil_order, AccueilOrderError,
-};
 pub use app_state::AppState;
 pub use cancel::CancellationToken;
 pub use clicker::{
@@ -63,11 +59,10 @@ pub use library_backup::{export_library_zip, import_library_zip, LibraryBackupEr
 pub use library_index::{
     assert_not_locked, create_library_folder, delete_library_folder, enrich_macro_summaries,
     get_library_index, is_locked, list_library_items, list_library_items_from_index, load_index,
-    move_library_item, prepare_library_index, purge_library_trash,
-    count_library_trash_older_than, purge_library_trash_older_than, remove_library_entry,
+    move_library_item, prepare_library_index, remove_library_entry,
     rename_library_entry_key,
-    rename_library_folder, reorder_library_folders, restore_library_item, set_library_folder_parent,
-    set_library_item_enabled, set_library_item_icon, set_library_item_locked, trash_library_item,
+    rename_library_folder, reorder_library_folders, set_library_folder_parent,
+    set_library_item_enabled, set_library_item_icon, set_library_item_locked,
     LibraryFolder, LibraryIndex, LibraryIndexDto, LibraryIndexError, LibraryItemDto, LibraryKind,
     ListLibraryQuery,
 };
@@ -113,7 +108,7 @@ pub use script_transpile::{check_script_source, ScriptSourceDiagnostic};
 pub use settings::{
     clamp_overlay_opacity, load_settings, normalize_app_settings, save_settings, settings_path,
     AccentTheme, AccueilFilter, AccueilPrefs, AccueilSortBy, AccueilSortDir, AppearancePrefs,
-    AppSettings, AutomationPrefs, ConfirmationsPrefs, MaintenancePrefs, ProcessFilter,
+    AppSettings, AutomationPrefs, ConfirmationsPrefs, ProcessFilter,
     ProcessFilterMode, ProcessFilterPreset, ScriptsPrefs, SettingsError, ShellPrefs, StartupView,
     ThemeMode, UiDensity, UiLocale, WindowBounds,
 };

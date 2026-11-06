@@ -20,6 +20,7 @@ import {
   PenLine,
   Pin,
   PinOff,
+  ChevronDown,
   Plus,
   Workflow,
   X,
@@ -28,6 +29,8 @@ import { useT, type TFunction } from "../../i18n";
 import type { LibraryIndexDto } from "../../library/types";
 import type { QuickAccess, RecentEntry } from "../../quickAccess";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { DropdownMenu } from "./DropdownMenu";
+import type { DropdownEntry } from "./DropdownMenu";
 import { Tooltip } from "./Tooltip";
 import { useDocumentTabReorder } from "./useDocumentTabReorder";
 import { useTabStripLayoutAnimation } from "./useTabStripLayoutAnimation";
@@ -101,6 +104,9 @@ function TabFace({
       </span>
       {!compact && tab.kind !== "home" ? (
         <span className="caster-doc-tab-label">{tab.label}</span>
+      ) : null}
+      {tab.dirty ? (
+        <span className="caster-doc-tab-dirty" aria-hidden title="•" />
       ) : null}
       {tab.pinned ? (
         <span className="caster-doc-tab-pin" aria-hidden>
@@ -249,8 +255,7 @@ function collectOpenable(
   index: LibraryIndexDto,
 ): OpenableItem[] {
   return index.items
-    .filter((it) => !it.trashed)
-    .map((it) => ({
+   .map((it) => ({
       kind,
       id: it.id,
       name: it.name,
@@ -607,7 +612,7 @@ export function DocumentTabBar({
     setLibraryIndexes(null);
     setOpenRecent([]);
     setOpenFilterQuery("");
-    const empty: LibraryIndexDto = { folders: [], items: [], trash: [] };
+    const empty: LibraryIndexDto = { folders: [], items: [] };
     void Promise.all([
       invoke<LibraryIndexDto>("get_library_index_cmd", { kind: "macro" }),
       invoke<LibraryIndexDto>("get_library_index_cmd", { kind: "clicker" }),
@@ -890,6 +895,24 @@ export function DocumentTabBar({
               >
                 <Plus size={16} aria-hidden />
               </button>
+              {scrollTabs.length > 0 ? (
+                <DropdownMenu
+                  label={t("shell.openTabsMenu")}
+                  ariaLabel={t("shell.openTabsMenu")}
+                  align="start"
+                  triggerClassName="caster-doc-tab-add-btn caster-doc-tab-overflow-btn"
+                  items={scrollTabs.map(
+                    (tab): DropdownEntry => ({
+                      id: tab.id,
+                      label: tab.dirty ? `${tab.label} •` : tab.label,
+                      icon: <TabKindIcon kind={tab.kind} />,
+                      onSelect: () => onSelect(tab.id),
+                    }),
+                  )}
+                >
+                  <ChevronDown size={14} aria-hidden />
+                </DropdownMenu>
+              ) : null}
             </div>
             <div
               className="caster-doc-tabbar-drag-fill"

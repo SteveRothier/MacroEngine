@@ -17,7 +17,9 @@ import {
   Copy,
   GitBranch,
   LayoutTemplate,
+  Keyboard,
   ListPlus,
+  MoreHorizontal,
   MousePointer2,
   MousePointerClick,
   ChevronDown,
@@ -27,6 +29,8 @@ import {
   Scissors,
   Trash2,
   Undo2,
+  Variable,
+  Workflow,
 } from "lucide-react";
 import { confirmAction } from "../ui";
 import {
@@ -40,7 +44,6 @@ import {
 } from "../ui/shell";
 import { useT, type TFunction } from "../i18n";
 import { buildActionAddMenu } from "./actionFactory";
-import { ActionParamCells } from "./ActionParamCells";
 import {
   flattenTree,
   getAtPath,
@@ -52,9 +55,11 @@ import {
   type MacroAction,
 } from "./types";
 import {
-  actionDetail,
+  actionCategoryPill,
+  actionRowDescription,
   actionTitleInList,
   actionTone,
+  actionValue,
   branchLabel,
   dragGestureEndIndex,
 } from "./actionLabels";
@@ -63,7 +68,32 @@ import {
   parsePathKey,
   remapCollapsedAfterReorder,
 } from "./collapseRemap";
-import { actionOffsetMs, formatActionOffset } from "./sequenceUtils";
+
+function ActionToneIcon({
+  tone,
+}: {
+  tone: string;
+}) {
+  const size = 14;
+  switch (tone) {
+    case "mouse":
+      return <MousePointerClick size={size} aria-hidden />;
+    case "wait":
+      return <Clock size={size} aria-hidden />;
+    case "key":
+      return <Keyboard size={size} aria-hidden />;
+    case "logic":
+      return <GitBranch size={size} aria-hidden />;
+    case "data":
+      return <Variable size={size} aria-hidden />;
+    case "system":
+      return <Workflow size={size} aria-hidden />;
+    case "run":
+      return <Play size={size} aria-hidden />;
+    default:
+      return <CircleDot size={size} aria-hidden />;
+  }
+}
 
 type Props = {
   actions: MacroAction[];
@@ -549,8 +579,9 @@ export function ActionList({
   addMenuItems,
   addMenuOpen,
   onAddMenuOpenChange,
-  onOpenScript,
+  onOpenScript: _onOpenScript,
 }: Props) {
+  void _onOpenScript;
   const t = useT();
   const rows: FlatRow[] = flattenTree(actions);
   const displayItems = useMemo(
@@ -1290,8 +1321,6 @@ export function ActionList({
     t,
   ]);
 
-  let prevAbs = 0;
-
   function clearDrag() {
     sessionRef.current = null;
     dropEdgeRef.current = null;
@@ -1507,15 +1536,6 @@ export function ActionList({
             : undefined
         }
       >
-        {rows.length > 0 ? (
-          <li className="action-list-head" aria-hidden>
-            <span>#</span>
-            <span>{t("macros.menu.list.headAction")}</span>
-            <span>{t("macros.menu.list.headParams")}</span>
-            <span>{t("macros.menu.list.headOffset")}</span>
-            <span />
-          </li>
-        ) : null}
         {displayItems.map((item) => {
           if (item.kind === "branch-slot") {
             if (
@@ -1596,9 +1616,6 @@ export function ActionList({
           }
 
           const { row, flatIndex } = item;
-          const abs = actionOffsetMs(actions, row.path);
-          const displayOffset = formatActionOffset(actions, row.path, prevAbs);
-          prevAbs = abs;
           if (isDescendantOfCollapsed(row.path, collapsedControls)) {
             return null;
           }
@@ -1635,12 +1652,16 @@ export function ActionList({
           })();
 
           const tone = actionTone(row.action.type);
+          const desc = actionRowDescription(siblings, siblingIdx, t);
+          const value = actionValue(row.action, t);
+          const pill = actionCategoryPill(row.action.type, t);
 
           return (
             <Fragment key={pathKey(row.path)}>
               <li
                 className={[
                   "action-list-item",
+                  "action-list-item--linear",
                   "has-hover-reveal",
                   pathsEqual(selectedPath, row.path) ||
                   multiKeys.has(pathKey(row.path))
@@ -1703,47 +1724,32 @@ export function ActionList({
                     }
                   : {})}
               >
-                <span className="idx">
-                  {padIndex(siblingIdx + 1)}
+                <span className="idx">{padIndex(siblingIdx + 1)}</span>
+                <span className="act-icon" aria-hidden>
+                  <ActionToneIcon tone={tone} />
                 </span>
                 <span className="lbl">
-                  <strong className="act-type">
-                    {actionTitleInList(siblings, siblingIdx, t)}
-                  </strong>
+                  <span className="act-type">{pill}</span>
                 </span>
-                <div className="act-params">
-                  {onChangeAction && !readOnly ? (
-                    <ActionParamCells
-                      action={row.action}
-                      disabled={locked}
-                      onChange={(a) => {
-                        onSelect(row.path);
-                        onChangeAction(row.path, a);
-                      }}
-                      onActivate={() => onSelect(row.path)}
-                      onOpenScript={onOpenScript}
-                    />
-                  ) : (
-                    <span className="action-cell-summary">
-                      {actionDetail(row.action, t)}
-                    </span>
-                  )}
-                </div>
-                <span className="act-offset">{displayOffset}</span>
+                <span className="act-desc">{desc}</span>
+                <span className="act-value" title={value}>
+                  {value}
+                </span>
                 {!readOnly ? (
                   <div className="row-ops hover-reveal">
                     <button
                       type="button"
-                      className="icon-ghost danger-text"
+                      className="icon-ghost"
                       disabled={locked}
-                      title={t("macros.menu.list.deleteTitle")}
-                      aria-label={t("macros.menu.list.deleteTitle")}
+                      title={t("macros.menu.list.moreTitle")}
+                      aria-label={t("macros.menu.list.moreTitle")}
                       onClick={(e) => {
                         e.stopPropagation();
-                        onRemove(row.path);
+                        setCtxPath(row.path);
+                        rowCtx.openFromEvent(e);
                       }}
                     >
-                      ×
+                      <MoreHorizontal size={14} aria-hidden />
                     </button>
                   </div>
                 ) : (
@@ -1786,7 +1792,7 @@ export function ActionList({
               items={addMenuItems}
               open={addMenuOpen}
               onOpenChange={onAddMenuOpenChange}
-              triggerClassName="caster-btn caster-btn-primary caster-action-list-add-btn"
+              triggerClassName="caster-btn caster-action-list-add-btn"
             />
           </li>
         ) : null}

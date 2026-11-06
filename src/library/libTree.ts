@@ -5,7 +5,7 @@ import type {
 } from "../automations/types";
 import { rowKey as orderRowKey } from "../automations/relativeTime";
 
-export type LibScope = "all" | "favorites" | "recent";
+export type LibScope = "all" | "favorites";
 
 export type LibTreeNode = {
   id: string;
@@ -19,6 +19,12 @@ export type NavEntry =
   | { type: "item"; key: string; row: AutomationRow };
 
 export const UNFILED_ID = "__unfiled";
+
+/** Nav / editing key for the inline “new folder” draft row (not a real folder id). */
+export const DRAFT_FOLDER_KEY = "folder:__draft__";
+
+/** Nav / editing key for the inline new item draft row. */
+export const DRAFT_ITEM_KEY = "item:__draft__";
 
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -36,15 +42,15 @@ export function stubRow(
   kind: AutomationRow["kind"],
   id: string,
   name: string,
-  folder: AutomationFolderOption,
+  folder: AutomationFolderOption | null,
 ): AutomationRow {
   return {
     id,
     name,
     kind,
     triggerLabel: "",
-    folderLabel: folder.name,
-    folderId: folder.id,
+    folderLabel: folder?.name ?? "",
+    folderId: folder?.id ?? null,
     status: "healthy",
     lastRunLabel: "",
     favorite: false,
@@ -83,6 +89,16 @@ export function sortFolders(
   );
 }
 
+export function sortLibRows(list: AutomationRow[]): AutomationRow[] {
+  return [...list].sort(
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) ||
+      a.id.localeCompare(b.id) ||
+      a.kind.localeCompare(b.kind),
+  );
+}
+
 /** Nested folder tree; pruneEmpty drops branches with no matching items.
  *  Unfiled rows stay flat at the root (no fake « Sans dossier » folder). */
 export function buildLibTree(
@@ -104,8 +120,7 @@ export function buildLibTree(
 
   const itemsByFolder = new Map<string | null, AutomationRow[]>();
   for (const r of rows) {
-    if (r.trashed) continue;
-    if (!match(r)) continue;
+   if (!match(r)) continue;
     const key = r.folderId ?? null;
     const list = itemsByFolder.get(key) ?? [];
     list.push(r);
@@ -117,7 +132,7 @@ export function buildLibTree(
     const nodes: LibTreeNode[] = [];
     for (const f of kids) {
       const children = build(f.id);
-      const items = itemsByFolder.get(f.id) ?? [];
+      const items = sortLibRows(itemsByFolder.get(f.id) ?? []);
       if (pruneEmpty && items.length === 0 && children.length === 0) continue;
       nodes.push({ id: f.id, folder: f, items, children });
     }
@@ -126,7 +141,7 @@ export function buildLibTree(
 
   return {
     folders: build(null),
-    unfiled: itemsByFolder.get(null) ?? [],
+    unfiled: sortLibRows(itemsByFolder.get(null) ?? []),
   };
 }
 
@@ -151,8 +166,7 @@ export function filterBrowseRows(
   kindFilter: AutomationKindFilter,
 ): AutomationRow[] {
   return allRows.filter((r) => {
-    if (r.trashed) return false;
-    if (kindFilter !== "all" && r.kind !== kindFilter) return false;
+   if (kindFilter !== "all" && r.kind !== kindFilter) return false;
     return true;
   });
 }
@@ -174,28 +188,13 @@ export function sortRowsByRecentOrder(
 export function buildNavigationEntries(opts: {
   scope: LibScope;
   favVisible: AutomationRow[];
-  recentVisible: AutomationRow[];
   folderTree: LibTreeNode[];
   unfiledRows: AutomationRow[];
   isNodeOpen: (n: LibTreeNode) => boolean;
 }): NavEntry[] {
-  const {
-    scope,
-    favVisible,
-    recentVisible,
-    folderTree,
-    unfiledRows,
-    isNodeOpen,
-  } = opts;
+  const { scope, favVisible, folderTree, unfiledRows, isNodeOpen } = opts;
   if (scope === "favorites") {
     return favVisible.map((row) => ({
-      type: "item" as const,
-      key: rowDomKey(row),
-      row,
-    }));
-  }
-  if (scope === "recent") {
-    return recentVisible.map((row) => ({
       type: "item" as const,
       key: rowDomKey(row),
       row,

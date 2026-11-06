@@ -1,4 +1,4 @@
-/* Caster shell — Linear / n8n layout + charter accent */
+/* Caster shell — Lavender dark charter (swap via data-accent) */
 
 @property --caster-sidebar-w {
   syntax: "<length>";
@@ -14,75 +14,94 @@
   --caster-text-sm: 12px;
   --caster-text-md: 13px;
   --caster-text-lg: 16px;
+  --caster-text-xl: 18px;
 
-  --caster-bg-app: #0c0c0c;
-  --caster-bg-elevated: #101012;
-  --caster-bg-canvas: #0e0e10;
-  --caster-bg-input: #171719;
-  --caster-bg-interactive: #171719;
-  --caster-border-subtle: #252529;
-  --caster-border-strong: #2e2e33;
+  /* Surfaces — Lavender premium (flat panels + global wash tip) */
+  --caster-bg-app: #101014;
+  --caster-bg-wash: #211c2a;
+  --caster-bg-secondary: #131318;
+  --caster-bg-elevated: #19191f;
+  --caster-bg-canvas: #101014;
+  --caster-bg-input: #19191f;
+  --caster-bg-interactive: #19191f;
+  --caster-bg-active: #292432;
+  --caster-bg-hover: color-mix(in srgb, #a99acb 8%, #19191f);
 
-  --caster-text-primary: #ececec;
-  --caster-text-secondary: #a1a1a1;
-  --caster-text-muted: #666666;
+  --caster-border-subtle: #292831;
+  --caster-border-strong: #292831;
 
-  /* Linear default accent */
-  --caster-accent: #2f6fed;
-  --caster-accent-soft: rgba(47, 111, 237, 0.15);
-  --caster-accent-contrast: #ffffff;
+  --caster-text-primary: #eceaf1;
+  --caster-text-secondary: #aaa7b4;
+  --caster-text-muted: #777480;
+  --caster-text-disabled: #55535e;
+
+  /* Default accent = Lavender */
+  --caster-accent: #a99acb;
+  --caster-accent-hover: #b9aad9;
+  --caster-accent-pressed: #9282b8;
+  --caster-accent-soft: color-mix(in srgb, #a99acb 12%, transparent);
+  --caster-accent-selection: #292432;
+  --caster-accent-contrast: #101014;
   --caster-focus-ring: 0 0 0 2px color-mix(in srgb, var(--caster-accent) 45%, transparent);
 
   --caster-dur-fast: 120ms;
-  --caster-dur-med: 180ms;
-  --caster-dur-slow: 240ms;
-  /* Primary motion curve (menus, tabs, docks). */
+  --caster-dur-med: 160ms;
+  --caster-dur-slow: 180ms;
   --caster-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  /* Soft decelerate for exits / collapse. */
   --caster-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
-  --caster-status-healthy: #22c55e;
-  --caster-status-healthy-bg: rgba(34, 197, 94, 0.12);
-  --caster-status-attention: #f59e0b;
-  --caster-status-attention-bg: rgba(245, 158, 11, 0.12);
-  --caster-status-failed: #ef4444;
-  --caster-status-failed-bg: rgba(239, 68, 68, 0.12);
-  --caster-status-paused: #6b7280;
-  --caster-status-paused-bg: rgba(107, 114, 128, 0.15);
-  --caster-status-running: #3b82f6;
-  --caster-status-running-bg: rgba(59, 130, 246, 0.15);
+  /* Functional (soft) */
+  --caster-status-healthy: #78b89a;
+  --caster-status-healthy-bg: color-mix(in srgb, #78b89a 14%, transparent);
+  --caster-status-attention: #d8b477;
+  --caster-status-attention-bg: color-mix(in srgb, #d8b477 14%, transparent);
+  --caster-status-failed: #d77f88;
+  --caster-status-failed-bg: color-mix(in srgb, #d77f88 14%, transparent);
+  --caster-status-paused: #777480;
+  --caster-status-paused-bg: color-mix(in srgb, #777480 15%, transparent);
+  --caster-status-running: #a99acb;
+  --caster-status-running-bg: color-mix(in srgb, #a99acb 15%, transparent);
+  --caster-status-info: #91a9cb;
+  --caster-status-info-bg: color-mix(in srgb, #91a9cb 14%, transparent);
 
-  --caster-node-trigger: #f97316;
-  --caster-node-logic: #eab308;
-  --caster-node-action: #3b82f6;
-  --caster-node-delay: #a855f7;
-  --caster-node-system: #6b7280;
+  --caster-node-trigger: #d8b477;
+  --caster-node-logic: #d8b477;
+  --caster-node-action: #a99acb;
+  --caster-node-delay: #91a9cb;
+  --caster-node-system: #777480;
 
-  --caster-type-macro: #c4c4c8;
-  --caster-type-macro-bg: rgba(196, 196, 200, 0.12);
-  --caster-type-script: #b0b0b4;
-  --caster-type-clicker: #22c55e;
-  --caster-type-clicker-bg: rgba(34, 197, 94, 0.14);
+  --caster-type-macro: #c4bfd4;
+  --caster-type-macro-bg: color-mix(in srgb, #c4bfd4 12%, transparent);
+  --caster-type-script: #91a9cb;
+  --caster-type-script-bg: color-mix(in srgb, #91a9cb 12%, transparent);
+  --caster-type-clicker: #78b89a;
+  --caster-type-clicker-bg: color-mix(in srgb, #78b89a 14%, transparent);
 
   --caster-radius-sm: 4px;
   --caster-radius-md: 6px;
   --caster-radius-lg: 8px;
-  --caster-shadow-float: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --caster-radius-panel: 8px;
+  --caster-shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);
 
   --caster-sidebar-w: 250px;
   --caster-sidebar-collapsed: 0px;
-  --caster-library-w: 280px;
-  --caster-exec-bar-h: 38px;
-  --caster-titlebar-h: 36px;
+  --caster-library-w: 250px;
+  --caster-library-min: 190px;
+  --caster-library-max: 360px;
+  --caster-exec-bar-h: 34px;
+  --caster-status-bar-h: 28px;
+  --caster-titlebar-h: 34px;
   --caster-tab-h: 30px;
   --caster-tab-min-w: 72px;
   --caster-tab-abs-min-w: 36px;
   --caster-tab-max-w: 160px;
   --caster-tab-compact-w: 56px;
-  --caster-editor-toolbar-h: 36px;
-  --caster-inspector-w: 360px;
-  --caster-journal-h: 160px;
+  --caster-editor-toolbar-h: 32px;
+  --caster-inspector-w: 300px;
+  --caster-journal-h: 200px;
   --caster-settings-pane-max: 680px;
+  --caster-control-h: 32px;
+  --caster-row-h: 34px;
 
   --caster-space-1: 4px;
   --caster-space-2: 8px;
@@ -92,29 +111,40 @@
   --caster-space-6: 32px;
 
   --caster-scrollbar-size: 6px;
-  --caster-scrollbar-track: #121212;
-  --caster-scrollbar-thumb: #4f4f4f;
-  --caster-scrollbar-thumb-hover: #666666;
+  --caster-scrollbar-track: #101014;
+  --caster-scrollbar-thumb: #3a3944;
+  --caster-scrollbar-thumb-hover: #55535e;
 }
 
 [data-theme="light"] .caster-root,
 .caster-root[data-theme="light"] {
-  --caster-bg-app: #f4f4f5;
+  --caster-bg-app: #f4f3f7;
+  --caster-bg-wash: #ebe6f2;
+  --caster-bg-secondary: #ebeaf0;
   --caster-bg-elevated: #ffffff;
-  --caster-bg-canvas: #ebebef;
+  --caster-bg-canvas: #ebeaf0;
   --caster-bg-input: #ffffff;
-  --caster-border-subtle: #e4e4e7;
-  --caster-border-strong: #d4d4d8;
-  --caster-text-primary: #18181b;
-  --caster-text-secondary: #52525b;
-  --caster-text-muted: #a1a1aa;
-  --caster-shadow-float: 0 8px 32px rgba(0, 0, 0, 0.08);
-  --caster-accent: #3f3f46;
-  --caster-accent-soft: rgba(63, 63, 70, 0.12);
-  --caster-accent-contrast: #fafafa;
-  --caster-type-macro: #52525b;
-  --caster-type-macro-bg: rgba(82, 82, 91, 0.12);
-  --caster-type-script: #71717a;
+  --caster-bg-interactive: #ffffff;
+  --caster-bg-active: #e8e5f0;
+  --caster-bg-hover: #e2e0ea;
+  --caster-border-subtle: #dddce4;
+  --caster-border-strong: #c9c7d2;
+  --caster-text-primary: #1a1820;
+  --caster-text-secondary: #5c5968;
+  --caster-text-muted: #8a8796;
+  --caster-text-disabled: #b0adb8;
+  --caster-shadow-float: 0 8px 32px rgba(26, 24, 32, 0.1);
+  --caster-accent: #8f7db8;
+  --caster-accent-hover: #a08fc6;
+  --caster-accent-pressed: #7a69a0;
+  --caster-accent-soft: color-mix(in srgb, #8f7db8 12%, transparent);
+  --caster-accent-selection: color-mix(in srgb, #8f7db8 18%, transparent);
+  --caster-accent-contrast: #ffffff;
+  --caster-status-running: #8f7db8;
+  --caster-status-running-bg: color-mix(in srgb, #8f7db8 15%, transparent);
+  --caster-type-macro: #5c5968;
+  --caster-type-macro-bg: color-mix(in srgb, #5c5968 12%, transparent);
+  --caster-type-script: #5a6f8c;
   --caster-scrollbar-track: var(--caster-bg-canvas);
   --caster-scrollbar-thumb: var(--caster-border-strong);
   --caster-scrollbar-thumb-hover: var(--caster-text-muted);

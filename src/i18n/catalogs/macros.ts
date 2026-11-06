@@ -5,6 +5,28 @@ import { defineCatalog } from "../defineCatalog";
  */
 export const macros = defineCatalog({
   fr: {
+    inspector: {
+      open: "Ouvrir les propriétés",
+      short: "Props",
+      title: "Propriétés",
+      empty: "Sélectionnez une action",
+      emptyLead: "Les paramètres de l’étape choisie apparaissent ici.",
+      params: "Paramètres",
+      options: "Options",
+      optionsLead: "Aucune option supplémentaire pour cette action.",
+      advanced: "Avancé",
+      advancedLead: "Aucun réglage avancé pour cette action.",
+    },
+    editorTabs: {
+      actions: "Actions",
+      params: "Paramètres",
+      variables: "Variables",
+      journal: "Journal",
+      journalErrors: "Erreurs ou avertissements récents",
+      variablesEmpty: "Aucune variable détectée",
+      variablesLead:
+        "Les variables apparaissent quand la macro utilise var.set, clipboard.get, etc.",
+    },
     toolbar: {
       back: "Retour aux automations",
       undo: "Retour en arrière",
@@ -38,7 +60,7 @@ export const macros = defineCatalog({
       stop: "Arrêter",
       stopTitle: "Arrêter la session",
       play: "Jouer",
-      add: "+ Ajouter",
+      add: "+ Ajouter une action",
       viewList: "Liste",
       viewGraph: "Graphe",
       viewListAria: "Vue liste de la séquence",
@@ -151,8 +173,11 @@ export const macros = defineCatalog({
         emptyCtxAria: "Ajouter une étape",
         branchCtxAria: "Actions sur la branche",
         deleteTitle: "Supprimer",
+        moreTitle: "Actions de l’étape",
         kbdHint:
           "↑↓ naviguer · Entrée plier Si/Tant que · Suppr supprimer",
+        stepsCount: "{n} étapes",
+        stepsCountOne: "1 étape",
       },
     },
     toast: {
@@ -279,6 +304,30 @@ export const macros = defineCatalog({
         right: "Droit",
         middle: "Molette",
       },
+      pill: {
+        mouse: "Clic",
+        wait: "Délai",
+        key: "Touche",
+        logic: "Logique",
+        data: "Donnée",
+        system: "Système",
+        run: "Script",
+      },
+      desc: {
+        wait: "Attendre",
+        clickLeft: "Clic gauche",
+        clickRight: "Clic droit",
+        clickMiddle: "Clic molette",
+      },
+      lead: {
+        mouse: "Effectue une action souris à la position spécifiée.",
+        wait: "Met la macro en pause pendant la durée indiquée.",
+        key: "Envoie une touche ou une combinaison au système.",
+        logic: "Contrôle le flux d’exécution selon une condition.",
+        data: "Lit ou écrit une variable / le presse-papiers.",
+        system: "Lance un processus, une requête ou une automation.",
+        run: "Exécute un script de la bibliothèque.",
+      },
       branch: {
         then: "alors",
         else: "sinon",
@@ -287,6 +336,7 @@ export const macros = defineCatalog({
       detail: {
         inline: "Inline",
         empty: "(vide)",
+        cursor: "Curseur",
       },
       graph: {
         triggerManual: "Manuel",
@@ -438,6 +488,28 @@ export const macros = defineCatalog({
     },
   },
   en: {
+    inspector: {
+      open: "Open properties",
+      short: "Props",
+      title: "Properties",
+      empty: "Select an action",
+      emptyLead: "Parameters for the selected step appear here.",
+      params: "Parameters",
+      options: "Options",
+      optionsLead: "No extra options for this action.",
+      advanced: "Advanced",
+      advancedLead: "No advanced settings for this action.",
+    },
+    editorTabs: {
+      actions: "Actions",
+      params: "Parameters",
+      variables: "Variables",
+      journal: "Journal",
+      journalErrors: "Recent errors or warnings",
+      variablesEmpty: "No variables detected",
+      variablesLead:
+        "Variables appear when the macro uses var.set, clipboard.get, and similar actions.",
+    },
     toolbar: {
       back: "Back to automations",
       undo: "Undo",
@@ -471,7 +543,7 @@ export const macros = defineCatalog({
       stop: "Stop",
       stopTitle: "Stop session",
       play: "Play",
-      add: "+ Add",
+      add: "+ Add an action",
       viewList: "List",
       viewGraph: "Graph",
       viewListAria: "Sequence list view",
@@ -584,7 +656,10 @@ export const macros = defineCatalog({
         emptyCtxAria: "Add a step",
         branchCtxAria: "Branch actions",
         deleteTitle: "Delete",
+        moreTitle: "Step actions",
         kbdHint: "↑↓ navigate · Enter fold If/While · Del delete",
+        stepsCount: "{n} steps",
+        stepsCountOne: "1 step",
       },
     },
     toast: {
@@ -707,6 +782,30 @@ export const macros = defineCatalog({
         right: "Right",
         middle: "Middle",
       },
+      pill: {
+        mouse: "Click",
+        wait: "Delay",
+        key: "Key",
+        logic: "Logic",
+        data: "Data",
+        system: "System",
+        run: "Script",
+      },
+      desc: {
+        wait: "Wait",
+        clickLeft: "Left click",
+        clickRight: "Right click",
+        clickMiddle: "Middle click",
+      },
+      lead: {
+        mouse: "Performs a mouse action at the specified position.",
+        wait: "Pauses the macro for the given duration.",
+        key: "Sends a key or chord to the system.",
+        logic: "Controls execution flow based on a condition.",
+        data: "Reads or writes a variable / the clipboard.",
+        system: "Runs a process, request, or automation.",
+        run: "Runs a library script.",
+      },
       branch: {
         then: "then",
         else: "else",
@@ -715,6 +814,7 @@ export const macros = defineCatalog({
       detail: {
         inline: "Inline",
         empty: "(empty)",
+        cursor: "Cursor",
       },
       graph: {
         triggerManual: "Manual",

@@ -133,33 +133,34 @@ html[data-window="zones"] #root {
 }
 
 [data-theme="dark"] {
-  --bg: #0b0c0f;
-  --bg-elev: #101218;
-  --bg-card: #12141a;
-  --bg-sidebar: #0e1015;
-  --bg-input: #12141a;
-  --surface: #12141a;
-  --surface-alt: #161922;
-  --surface-raised: #161922;
-  --surface-hover: color-mix(in srgb, #fff 5%, #12141a);
-  --surface-active: color-mix(in srgb, var(--accent) 12%, #12141a);
+  /* Prefer Caster shell tokens when present (Lavender charter). */
+  --bg: var(--caster-bg-app, #0d0d10);
+  --bg-elev: var(--caster-bg-secondary, #111115);
+  --bg-card: var(--caster-bg-elevated, #17171d);
+  --bg-sidebar: var(--caster-bg-secondary, #111115);
+  --bg-input: var(--caster-bg-input, #17171d);
+  --surface: var(--caster-bg-elevated, #17171d);
+  --surface-alt: var(--caster-bg-active, #1d1d25);
+  --surface-raised: var(--caster-bg-elevated, #17171d);
+  --surface-hover: var(--caster-bg-hover, #22222b);
+  --surface-active: var(--caster-accent-selection, color-mix(in srgb, var(--accent) 12%, #17171d));
 
-  --border: #222632;
-  --border-soft: #1a1e28;
-  --border-strong: #2e3545;
-  --text: #eceef2;
-  --muted: #8b93a3;
-  --label: #6a7385;
+  --border: var(--caster-border-strong, #292831);
+  --border-soft: var(--caster-border-subtle, #222129);
+  --border-strong: var(--caster-border-strong, #292831);
+  --text: var(--caster-text-primary, #eceaf1);
+  --muted: var(--caster-text-secondary, #aaa7b4);
+  --label: var(--caster-text-muted, #777480);
   --text-muted: var(--muted);
-  --text-faint: #555e70;
+  --text-faint: var(--caster-text-disabled, #55535e);
 
-  --accent: #e8e8ea;
-  --accent-hover: #f4f4f5;
-  --accent-soft: rgba(232, 232, 234, 0.12);
-  --accent-text: #e8e8ea;
-  --accent-on: #0c0c0c;
-  --accent-border: rgba(232, 232, 234, 0.45);
-  --accent-tint-strong: rgba(232, 232, 234, 0.24);
+  --accent: var(--caster-accent, #a99acb);
+  --accent-hover: var(--caster-accent-hover, #b9aad9);
+  --accent-soft: var(--caster-accent-soft, color-mix(in srgb, #a99acb 12%, transparent));
+  --accent-text: var(--caster-accent, #a99acb);
+  --accent-on: var(--caster-accent-contrast, #0d0d10);
+  --accent-border: color-mix(in srgb, var(--accent) 45%, transparent);
+  --accent-tint-strong: var(--caster-accent-selection, color-mix(in srgb, #a99acb 18%, transparent));
   --accent-live: #2ee6a6;
   --accent-live-hover: #4aefb5;
   --accent-live-soft: rgba(46, 230, 166, 0.14);

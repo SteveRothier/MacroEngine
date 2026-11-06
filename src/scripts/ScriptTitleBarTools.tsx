@@ -400,13 +400,13 @@ export function ScriptTitleBarTools({
                 <Tooltip content={t("scripts.toolbar.stopTip")}>
                   <button
                     type="button"
-                    className="caster-btn caster-script-run-btn is-stop"
+                    className="caster-titlebar-btn caster-btn-ghost caster-script-run-btn is-stop"
                     onClick={onStop}
                     aria-pressed={true}
                     aria-label={t("scripts.toolbar.stop")}
                   >
                     <Square size={14} aria-hidden />
-                    {t("scripts.toolbar.stop")}
+                    <span>{t("shell.exec.stop")}</span>
                   </button>
                 </Tooltip>
               ) : (
@@ -423,14 +423,14 @@ export function ScriptTitleBarTools({
                 >
                   <button
                     type="button"
-                    className="caster-btn caster-btn-primary caster-script-run-btn"
+                    className="caster-titlebar-btn caster-btn-run caster-script-run-btn"
                     onClick={onRun}
                     disabled={runBlocked}
                     aria-pressed={false}
                     aria-label={t("scripts.toolbar.run")}
                   >
                     <Play size={14} aria-hidden />
-                    {t("scripts.toolbar.run")}
+                    <span>{t("shell.exec.run")}</span>
                   </button>
                 </Tooltip>
               )}

@@ -229,7 +229,6 @@ export type AppSettings = {
   confirmations?: import("../settings/settingsTypes").ConfirmationsPrefs;
   scripts?: import("../settings/settingsTypes").ScriptsPrefs;
   appearance?: import("../settings/settingsTypes").AppearancePrefs;
-  maintenance?: import("../settings/settingsTypes").MaintenancePrefs;
   hotkeys: {
     actionVk: number;
     actionCtrl?: boolean;

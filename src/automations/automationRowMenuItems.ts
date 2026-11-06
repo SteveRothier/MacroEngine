@@ -21,7 +21,6 @@ export type AutomationRowMenuActions = {
   /** Convert to another kind (submenu targets). */
   onConvertTo?: (toKind: AutomationRow["kind"]) => void;
   onDelete: () => void;
-  onRestore?: () => void;
   onExport?: () => void;
   icons?: {
     open?: ReactNode;
@@ -43,25 +42,6 @@ export function buildAutomationRowMenuItems(
   t: TFunction,
   actions: AutomationRowMenuActions,
 ): MenuItemDef[] {
-  if (row.trashed) {
-    const items: MenuItemDef[] = [
-      {
-        id: "open",
-        label: t("common.open"),
-        icon: actions.icons?.open,
-        onSelect: actions.onOpen,
-      },
-    ];
-    if (actions.onRestore) {
-      items.push({
-        id: "restore",
-        label: t("automations.selection.restore"),
-        onSelect: actions.onRestore,
-      });
-    }
-    return items;
-  }
-
   const items: MenuItemDef[] = [
     {
       id: "open",

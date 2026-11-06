@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -7,24 +8,24 @@ import {
   type MouseEvent,
   type ReactNode,
 } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { createPortal } from "react-dom";
 import {
-  Clock,
   Code2,
   Folder,
   LayoutGrid,
   MousePointer2,
   Plus,
   Search,
+  Settings,
   Star,
   Workflow,
   X,
 } from "lucide-react";
 import { useT } from "../i18n";
+import type { SettingsSection } from "../app/types";
 import { useUnifiedAutomations } from "../automations/useUnifiedAutomations";
 import { buildAutomationRowMenuItems } from "../automations/automationRowMenuItems";
 import { automationRowMenuIcons } from "../automations/automationRowMenuIcons";
-import { runLibraryConvert } from "../automations/convertLibraryItem";
 import type {
   AutomationFolderOption,
   AutomationKindFilter,
@@ -40,30 +41,33 @@ import {
   type MenuItemDef,
 } from "../ui/shell";
 import {
-  askScriptLanguage,
-  confirmAction,
-  confirmChoice,
-  promptAction,
-} from "../ui";
-import { DEFAULT_CLICKER } from "../clicker/clickerTypes";
-import { defaultScriptSource } from "../scripts/defaultSources";
-import { newScriptId } from "../scripts/newScriptId";
-import type { ScriptDoc } from "../scripts/types";
-import { BoundLibItem, LibTreeFolder } from "./LibTreeNodes";
+  BoundLibItem,
+  KindIcon,
+  LibDraftFolderRow,
+  LibDraftItemRow,
+  LibTreeFolder,
+  type LibTreeFolderHandlers,
+} from "./LibTreeNodes";
 import {
   buildLibTree,
   buildNavigationEntries,
   cx,
-  errMessage,
+  DRAFT_FOLDER_KEY,
+  DRAFT_ITEM_KEY,
   filterBrowseRows,
+  folderNavKey,
   matchesLibraryQuery,
-  sortRowsByRecentOrder,
-  stubRow,
+  rowDomKey,
   UNFILED_ID,
   type LibScope,
   type LibTreeNode,
 } from "./libTree";
 import { useLibPointerDnd } from "./useLibPointerDnd";
+import {
+  useLibraryMutations,
+  type ScriptCreateOpts,
+} from "./useLibraryMutations";
+import { libraryEmptyForBrowse, libraryEmptyForScope } from "./libraryEmpty";
 
 export type WorkspaceLibraryProps = {
   activeKey: string | null;
@@ -85,6 +89,7 @@ export type WorkspaceLibraryProps = {
     newName: string,
   ) => void;
   onItemDeleted?: (kind: AutomationRow["kind"], id: string) => void;
+  onOpenSettings?: (section?: SettingsSection) => void;
 };
 
 function buildFolderMenuItems(
@@ -93,9 +98,9 @@ function buildFolderMenuItems(
   actions: {
     renameFolder: (folder: AutomationFolderOption) => void;
     createFolder: (parentId: string | null) => void;
-    createKindInFolder: (
+    createItem: (
       kind: AutomationRow["kind"],
-      folder: AutomationFolderOption,
+      folderId: string | null,
     ) => void;
     deleteFolder: (folder: AutomationFolderOption) => void;
   },
@@ -116,19 +121,19 @@ function buildFolderMenuItems(
       id: "new-macro-in",
       label: t("automations.create.macro"),
       icon: <Workflow size={14} />,
-      onSelect: () => void actions.createKindInFolder("macro", folder),
+      onSelect: () => void actions.createItem("macro", folder.id),
     },
     {
       id: "new-clicker-in",
       label: t("automations.create.clicker"),
       icon: <MousePointer2 size={14} />,
-      onSelect: () => void actions.createKindInFolder("clicker", folder),
+      onSelect: () => void actions.createItem("clicker", folder.id),
     },
     {
       id: "new-script-in",
       label: t("automations.create.script"),
       icon: <Code2 size={14} />,
-      onSelect: () => void actions.createKindInFolder("script", folder),
+      onSelect: () => void actions.createItem("script", folder.id),
     },
     { id: "sep-f", label: "", separator: true },
     {
@@ -150,62 +155,140 @@ export function WorkspaceLibrary({
   confirmTrash = true,
   confirmDeleteFolder = true,
   onOpen,
-  onCreateMacro,
-  onCreateClicker,
-  onCreateScript,
+  onCreateMacro: _onCreateMacro,
+  onCreateClicker: _onCreateClicker,
+  onCreateScript: _onCreateScript,
   onRefresh,
   onItemRenamed,
   onItemDeleted,
+  onOpenSettings,
 }: WorkspaceLibraryProps) {
   const t = useT();
   const toast = useToast();
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [scope, setScope] = useState<LibScope>("all");
   const [kindFilter, setKindFilter] = useState<AutomationKindFilter>("all");
+
+  useEffect(() => {
+    function onKey(e: globalThis.KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "f") return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   /** Folders start collapsed; ids present here are expanded. */
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [focusKey, setFocusKey] = useState<string | null>(null);
   const [ctxItems, setCtxItems] = useState<MenuItemDef[]>([]);
   const ctxMenu = useContextMenuState();
   const foldersRef = useRef<AutomationFolderOption[]>([]);
+  const rowsRef = useRef<AutomationRow[]>([]);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [draftFolder, setDraftFolder] = useState<{
+    parentId: string | null;
+  } | null>(null);
+  const [draftRemountKey, setDraftRemountKey] = useState(0);
+  const [draftItem, setDraftItem] = useState<{
+    kind: AutomationRow["kind"];
+    folderId: string | null;
+    scriptOpts?: ScriptCreateOpts;
+  } | null>(null);
+  const [draftItemRemountKey, setDraftItemRemountKey] = useState(0);
   const moveRowRef = useRef<
-    (row: AutomationRow, folder: AutomationFolderOption | null) => Promise<void>
+    (
+      row: AutomationRow,
+      folder: AutomationFolderOption | null,
+      beforeId?: string | null,
+      beforeKind?: AutomationRow["kind"] | null,
+    ) => Promise<void>
+  >(async () => {});
+  const moveFolderRef = useRef<
+    (
+      folder: AutomationFolderOption,
+      parentId: string | null,
+      beforeFolderId: string | null,
+    ) => Promise<void>
   >(async () => {});
 
-  const { allRows, folders, loading, refresh, recentOrder } =
-    useUnifiedAutomations({
-      dirtyMacroId,
-      dirtyClickerId,
-      dirtyScriptId,
-      refreshKey,
-      query,
-      filter: "all",
-      kindFilter,
-      recentListMax,
-      active: true,
-    });
+  const {
+    allRows,
+    folders,
+    loading,
+    refresh,
+    captureSnapshot,
+    applyLocalMove,
+    replaceAutomationsSnapshot,
+  } = useUnifiedAutomations({
+    dirtyMacroId,
+    dirtyClickerId,
+    dirtyScriptId,
+    refreshKey,
+    query,
+    filter: "all",
+    kindFilter,
+    recentListMax,
+    active: true,
+  });
   foldersRef.current = folders;
+  rowsRef.current = allRows;
 
   const bump = useCallback(() => {
     void refresh({ silent: true });
     onRefresh?.();
   }, [onRefresh, refresh]);
 
-  const { dropTarget, draggingKey, dragGhost, onItemPointerDown, openRow } =
-    useLibPointerDnd({
+  const {
+    dropTarget,
+    dropIndicator,
+    draggingKey,
+    dragGhost,
+    setDragCursorNode,
+    onItemPointerDown,
+    onFolderPointerDown,
+    openRow: openRowFromDnd,
+    shouldSuppressClick,
+  } = useLibPointerDnd({
       foldersRef,
-      onMove: (row, folder) => moveRowRef.current(row, folder),
+      rowsRef,
+      onMoveItem: (row, folder, beforeId, beforeKind) =>
+        moveRowRef.current(row, folder, beforeId, beforeKind),
+      onMoveFolder: (folder, parentId, beforeFolderId) =>
+        moveFolderRef.current(folder, parentId, beforeFolderId),
       onOpen,
     });
 
+  const openRow = useCallback(
+    (row: AutomationRow) => {
+      setFocusKey(rowDomKey(row));
+      openRowFromDnd(row);
+    },
+    [openRowFromDnd],
+  );
+
+  useEffect(() => {
+    if (draggingKey) {
+      setEditingKey(null);
+      setDraftFolder(null);
+      setDraftItem(null);
+    }
+  }, [draggingKey]);
+
   const toggleExpanded = useCallback((id: string) => {
+    if (shouldSuppressClick()) return;
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }, []);
+  }, [shouldSuppressClick]);
 
   const q = query.trim().toLowerCase();
   const matchQuery = useCallback(
@@ -223,27 +306,18 @@ export function WorkspaceLibrary({
     [activeBrowse],
   );
 
-  const recentRows = useMemo(
-    () => sortRowsByRecentOrder(activeBrowse, recentOrder),
-    [activeBrowse, recentOrder],
-  );
-
-  const treeSource = useMemo(
-    () => allRows.filter((r) => !r.trashed),
-    [allRows],
-  );
 
   const { folders: folderTree, unfiled: unfiledRows } = useMemo(
     () =>
       buildLibTree(
         folders,
-        treeSource.filter(
+        allRows.filter(
           (r) => kindFilter === "all" || r.kind === kindFilter,
         ),
         matchQuery,
         Boolean(q),
       ),
-    [folders, kindFilter, matchQuery, q, treeSource],
+    [folders, kindFilter, matchQuery, q, allRows],
   );
 
   const isNodeOpen = useCallback(
@@ -258,137 +332,164 @@ export function WorkspaceLibrary({
     () => favorites.filter(matchQuery),
     [favorites, matchQuery],
   );
-  const recentVisible = useMemo(
-    () => recentRows.filter(matchQuery),
-    [matchQuery, recentRows],
-  );
-
   const navEntries = useMemo(
     () =>
       buildNavigationEntries({
         scope,
         favVisible,
-        recentVisible,
         folderTree,
         unfiledRows,
         isNodeOpen,
       }),
-    [favVisible, folderTree, isNodeOpen, recentVisible, scope, unfiledRows],
+    [favVisible, folderTree, isNodeOpen, scope, unfiledRows],
   );
 
-  async function createFolder(parentId: string | null) {
-    const name = await promptAction({
-      title: t("automations.confirm.createFolderTitle"),
-      defaultValue: "",
-      confirmLabel: t("automations.confirm.createFolderConfirm"),
-      placeholder: t("automations.confirm.createFolderPlaceholder"),
-    });
-    if (!name?.trim()) return;
-    try {
-      await invoke("create_library_folder_cmd", {
-        kind: "macro",
-        name: name.trim(),
-        parentId,
-      });
-      toast.success(
-        t("automations.toast.folderCreated", { name: name.trim() }),
-      );
-      bump();
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
-    }
-  }
+  const {
+    commitCreateFolder,
+    commitCreateItem,
+    promptScriptCreateOpts,
+    startFolderRename,
+    applyFolderRename,
+    renameFolder,
+    deleteFolder,
+    startRowRename,
+    applyRowRename,
+    renameRow,
+    duplicateRow,
+    toggleFavorite,
+    setLocked,
+    deleteRow,
+    moveRow,
+    moveFolder,
+    launchRow,
+    revealRow,
+    convertRow,
+  } = useLibraryMutations({
+    t,
+    toast,
+    bump,
+    onOpen,
+    onRefresh,
+    onItemRenamed,
+    onItemDeleted,
+    confirmTrash,
+    confirmDeleteFolder,
+    captureSnapshot,
+    applyLocalMove,
+    replaceAutomationsSnapshot,
+    setEditingKey,
+  });
+  moveRowRef.current = moveRow;
+  moveFolderRef.current = moveFolder;
 
-  async function createKindInFolder(
-    kind: AutomationRow["kind"],
-    folder: AutomationFolderOption,
-  ) {
-    try {
-      if (kind === "macro") {
-        const doc = await invoke<{ name: string }>("create_saved_macro", {
-          name: null,
-        });
-        await invoke("move_library_item_cmd", {
-          kind: "macro",
-          id: doc.name,
-          folderId: folder.id,
-          beforeId: null,
-        });
-        bump();
-        toast.success(t("shell.macroCreated"));
-        onOpen(stubRow("macro", doc.name, doc.name, folder));
-        return;
-      }
-      if (kind === "clicker") {
-        const name = `Preset ${Date.now().toString(36)}`;
-        await invoke("save_clicker_preset", {
-          name,
-          config: DEFAULT_CLICKER,
-        });
-        await invoke("move_library_item_cmd", {
-          kind: "clicker",
-          id: name,
-          folderId: folder.id,
-          beforeId: null,
-        });
-        bump();
-        toast.success(t("shell.clickerCreated"));
-        onOpen(stubRow("clicker", name, name, folder));
-        return;
-      }
-      const outcome = await confirmChoice({
-        title: t("scripts.create.title"),
-        message: t("scripts.create.message"),
-        confirmLabel: t("scripts.create.runnable"),
-        discardLabel: t("scripts.create.module"),
-        cancelLabel: t("common.cancel"),
+  const clearDraftFolder = useCallback(() => {
+    setDraftFolder(null);
+    setEditingKey((key) => (key === DRAFT_FOLDER_KEY ? null : key));
+  }, []);
+
+  const clearDraftItem = useCallback(() => {
+    setDraftItem(null);
+    setEditingKey((key) => (key === DRAFT_ITEM_KEY ? null : key));
+  }, []);
+
+  const startCreateFolder = useCallback((parentId: string | null) => {
+    setDraftItem(null);
+    if (parentId) {
+      setExpanded((prev) => {
+        if (prev.has(parentId)) return prev;
+        const next = new Set(prev);
+        next.add(parentId);
+        return next;
       });
-      if (outcome === "cancel") return;
-      const isModule = outcome === "discard";
-      const language = await askScriptLanguage({
-        title: t("scripts.create.languageTitle"),
-        message: t("scripts.create.languageMessage"),
-        javascriptLabel: t("scripts.language.javascript"),
-        typescriptLabel: t("scripts.language.typescript"),
-        cancelLabel: t("common.cancel"),
-      });
-      if (!language) return;
-      const id = newScriptId();
-      const name = t("shell.newScriptName");
-      const doc: ScriptDoc = {
-        id,
-        name,
-        source: defaultScriptSource(language, isModule),
-        language,
-        isModule,
-        allowNetwork: false,
-        allowClipboard: false,
-        allowFs: false,
-        allowMacroControl: false,
-        allowInput: false,
-        allowProcess: false,
-        paramValues: {},
-      };
-      await invoke("save_script_cmd", { doc });
-      await invoke("move_library_item_cmd", {
-        kind: "script",
-        id,
-        folderId: folder.id,
-        beforeId: null,
-      });
-      bump();
-      toast.success(t("shell.scriptCreated"));
-      onOpen(stubRow("script", id, name, folder));
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
     }
-  }
+    setDraftFolder({ parentId });
+    setDraftRemountKey((n) => n + 1);
+    setEditingKey(DRAFT_FOLDER_KEY);
+    setFocusKey(DRAFT_FOLDER_KEY);
+  }, []);
+
+  const startCreateItem = useCallback(
+    async (kind: AutomationRow["kind"], folderId: string | null) => {
+      let scriptOpts: ScriptCreateOpts | undefined;
+      if (kind === "script") {
+        const opts = await promptScriptCreateOpts();
+        if (!opts) return;
+        scriptOpts = opts;
+      }
+      setDraftFolder(null);
+      if (folderId) {
+        setExpanded((prev) => {
+          if (prev.has(folderId)) return prev;
+          const next = new Set(prev);
+          next.add(folderId);
+          return next;
+        });
+      }
+      setDraftItem({ kind, folderId, scriptOpts });
+      setDraftItemRemountKey((n) => n + 1);
+      setEditingKey(DRAFT_ITEM_KEY);
+      setFocusKey(DRAFT_ITEM_KEY);
+    },
+    [promptScriptCreateOpts],
+  );
+
+  const onCommitDraftFolder = useCallback(
+    async (raw: string) => {
+      if (!draftFolder) return;
+      const name = raw.trim();
+      if (!name) {
+        clearDraftFolder();
+        return;
+      }
+      const ok = await commitCreateFolder(draftFolder.parentId, name);
+      if (ok) {
+        clearDraftFolder();
+        return;
+      }
+      setEditingKey(DRAFT_FOLDER_KEY);
+      setDraftRemountKey((n) => n + 1);
+    },
+    [clearDraftFolder, commitCreateFolder, draftFolder],
+  );
+
+  const onCommitDraftItem = useCallback(
+    async (raw: string) => {
+      if (!draftItem) return;
+      const name = raw.trim();
+      if (!name) {
+        clearDraftItem();
+        return;
+      }
+      const ok = await commitCreateItem(
+        draftItem.kind,
+        name,
+        draftItem.folderId,
+        draftItem.scriptOpts,
+      );
+      if (ok) {
+        clearDraftItem();
+        return;
+      }
+      setEditingKey(DRAFT_ITEM_KEY);
+      setDraftItemRemountKey((n) => n + 1);
+    },
+    [clearDraftItem, commitCreateItem, draftItem],
+  );
 
   const focusedFolder = useMemo(() => {
     if (!focusKey?.startsWith("folder:")) return null;
     const id = focusKey.slice("folder:".length);
+    if (id === "__draft__") return null;
     return folders.find((f) => f.id === id) ?? null;
   }, [focusKey, folders]);
+
+  const draftAriaLabel = t("automations.confirm.createFolderTitle");
+  const draftItemAriaLabel =
+    draftItem?.kind === "clicker"
+      ? t("automations.create.clicker")
+      : draftItem?.kind === "script"
+        ? t("automations.create.script")
+        : t("automations.create.macro");
 
   const createMenuItems: MenuItemDef[] = [
     {
@@ -397,304 +498,31 @@ export function WorkspaceLibrary({
         ? t("automations.folder.createChild")
         : t("automations.folder.create"),
       icon: <Folder size={14} />,
-      onSelect: () => void createFolder(focusedFolder?.id ?? null),
+      onSelect: () => startCreateFolder(focusedFolder?.id ?? null),
     },
     { id: "sep-create", label: "", separator: true },
     {
       id: "macro",
       label: t("automations.create.macro"),
       icon: <Workflow size={14} />,
-      onSelect: focusedFolder
-        ? () => void createKindInFolder("macro", focusedFolder)
-        : onCreateMacro,
+      onSelect: () =>
+        void startCreateItem("macro", focusedFolder?.id ?? null),
     },
     {
       id: "clicker",
       label: t("automations.create.clicker"),
       icon: <MousePointer2 size={14} />,
-      onSelect: focusedFolder
-        ? () => void createKindInFolder("clicker", focusedFolder)
-        : onCreateClicker,
+      onSelect: () =>
+        void startCreateItem("clicker", focusedFolder?.id ?? null),
     },
     {
       id: "script",
       label: t("automations.create.script"),
       icon: <Code2 size={14} />,
-      onSelect: focusedFolder
-        ? () => void createKindInFolder("script", focusedFolder)
-        : onCreateScript,
+      onSelect: () =>
+        void startCreateItem("script", focusedFolder?.id ?? null),
     },
   ];
-
-  async function renameFolder(folder: AutomationFolderOption) {
-    const next = await promptAction({
-      title: t("automations.confirm.renameFolderTitle"),
-      defaultValue: folder.name,
-      confirmLabel: t("automations.confirm.renameFolderConfirm"),
-      placeholder: t("automations.confirm.renameFolderPlaceholder"),
-    });
-    if (!next?.trim() || next.trim() === folder.name) return;
-    try {
-      await invoke("rename_library_folder_cmd", {
-        kind: "macro",
-        id: folder.id,
-        name: next.trim(),
-      });
-      toast.success(
-        t("automations.toast.folderRenamed", { name: next.trim() }),
-      );
-      bump();
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
-    }
-  }
-
-  async function deleteFolder(folder: AutomationFolderOption) {
-    if (confirmDeleteFolder) {
-      const ok = await confirmAction({
-        title: t("automations.confirm.deleteFolderTitle"),
-        message: t("automations.confirm.deleteFolderMessage", {
-          name: folder.name,
-        }),
-        confirmLabel: t("automations.confirm.deleteConfirm"),
-        danger: true,
-      });
-      if (!ok) return;
-    }
-    try {
-      await invoke("delete_library_folder_cmd", {
-        kind: "macro",
-        id: folder.id,
-      });
-      toast.success(
-        t("automations.toast.folderDeleted", { name: folder.name }),
-      );
-      bump();
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
-    }
-  }
-
-  async function renameRow(row: AutomationRow) {
-    if (row.locked) return;
-    const next = await promptAction({
-      title: t("automations.confirm.renameTitle"),
-      defaultValue: row.name,
-      confirmLabel: t("automations.confirm.renameConfirm"),
-      placeholder: t("automations.confirm.renamePlaceholder"),
-    });
-    if (!next?.trim() || next.trim() === row.name) return;
-    const to = next.trim();
-    try {
-      if (row.kind === "macro") {
-        const doc = await invoke<{ name: string }>("rename_saved_macro", {
-          from: row.id,
-          to,
-        });
-        onItemRenamed?.(row.kind, row.id, doc.name);
-        toast.success(t("automations.toast.renamed", { name: doc.name }));
-      } else if (row.kind === "clicker") {
-        const preset = await invoke<{ name: string }>("rename_clicker_preset", {
-          from: row.id,
-          to,
-        });
-        onItemRenamed?.(row.kind, row.id, preset.name);
-        toast.success(t("automations.toast.renamed", { name: preset.name }));
-      } else {
-        const src = await invoke<{ id: string; name: string; source: string }>(
-          "load_script_cmd",
-          { id: row.id },
-        );
-        await invoke("save_script_cmd", { doc: { ...src, name: to } });
-        onItemRenamed?.(row.kind, row.id, to);
-        toast.success(t("automations.toast.renamed", { name: to }));
-      }
-      bump();
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
-    }
-  }
-
-  async function duplicateRow(row: AutomationRow) {
-    try {
-      if (row.kind === "macro") {
-        const copy = await invoke<{ name: string }>("duplicate_saved_macro", {
-          name: row.id,
-        });
-        bump();
-        toast.success(
-          t("automations.toast.duplicatedOne", { name: copy.name }),
-        );
-        onOpen({ ...row, id: copy.name, name: copy.name });
-      } else if (row.kind === "clicker") {
-        const copy = await invoke<{ name: string }>(
-          "duplicate_clicker_preset",
-          { name: row.id },
-        );
-        bump();
-        toast.success(
-          t("automations.toast.duplicatedOne", { name: copy.name }),
-        );
-        onOpen({ ...row, id: copy.name, name: copy.name });
-      } else {
-        const src = await invoke<{
-          id: string;
-          name: string;
-          source: string;
-          language?: string;
-        }>("load_script_cmd", { id: row.id });
-        const copy = {
-          ...src,
-          id: newScriptId(),
-          name: `${src.name} copy`,
-        };
-        await invoke("save_script_cmd", { doc: copy });
-        bump();
-        toast.success(
-          t("automations.toast.duplicatedOne", { name: copy.name }),
-        );
-        onOpen({ ...row, id: copy.id, name: copy.name });
-      }
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
-    }
-  }
-
-  async function toggleFavorite(row: AutomationRow) {
-    try {
-      await invoke("set_quick_favorite", {
-        kind: row.kind,
-        id: row.id,
-        favorite: !row.favorite,
-      });
-      bump();
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.favoriteFail")));
-    }
-  }
-
-  async function setLocked(row: AutomationRow, locked: boolean) {
-    try {
-      await invoke("set_library_item_locked_cmd", {
-        kind: row.kind,
-        id: row.id,
-        locked,
-      });
-      bump();
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
-    }
-  }
-
-  async function deleteRow(row: AutomationRow) {
-    if (row.locked) {
-      toast.error(t("automations.toast.unlockBeforeDelete"));
-      return;
-    }
-    if (confirmTrash) {
-      const ok = await confirmAction({
-        title: t("automations.confirm.deleteTitle"),
-        message: t("automations.confirm.deleteOne", { name: row.name }),
-        confirmLabel: t("automations.confirm.deleteConfirm"),
-        danger: true,
-      });
-      if (!ok) return;
-    }
-    try {
-      if (row.kind === "macro") {
-        await invoke("delete_saved_macro", { name: row.id });
-      } else if (row.kind === "clicker") {
-        await invoke("delete_clicker_preset", { name: row.id });
-      } else {
-        await invoke("delete_script_cmd", { id: row.id });
-      }
-      toast.success(t("automations.toast.deleted"));
-      onItemDeleted?.(row.kind, row.id);
-      bump();
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.deleteFail")));
-    }
-  }
-
-  async function moveRow(
-    row: AutomationRow,
-    folder: AutomationFolderOption | null,
-  ) {
-    try {
-      await invoke("move_library_item_cmd", {
-        kind: row.kind,
-        id: row.id,
-        folderId: folder?.id ?? null,
-        beforeId: null,
-      });
-      toast.success(t("automations.toast.moved"));
-      bump();
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
-    }
-  }
-  moveRowRef.current = moveRow;
-
-  async function launchRow(row: AutomationRow) {
-    try {
-      if (row.kind === "macro") {
-        await invoke("launch_saved_macro", { name: row.id });
-      } else if (row.kind === "clicker") {
-        await invoke("launch_clicker_preset", { name: row.id });
-      } else {
-        if (row.isModule) {
-          toast.error(t("automations.toast.scriptModuleBlocked"));
-          return;
-        }
-        await invoke("run_script_session_cmd", { id: row.id });
-        toast.success(
-          t("automations.toast.scriptLaunched", { name: row.name }),
-        );
-      }
-      onRefresh?.();
-    } catch (e) {
-      toast.error(
-        errMessage(
-          e,
-          row.kind === "script"
-            ? t("automations.toast.scriptLaunchFail")
-            : t("automations.toast.moveFail"),
-        ),
-      );
-    }
-  }
-
-  async function revealRow(row: AutomationRow) {
-    try {
-      await invoke("reveal_library_entry", { kind: row.kind, name: row.id });
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.revealFail")));
-    }
-  }
-
-  async function convertRow(row: AutomationRow, toKind: AutomationRow["kind"]) {
-    try {
-      const outcome = await runLibraryConvert({
-        fromKind: row.kind,
-        id: row.id,
-        toKind,
-        name: row.name,
-        t,
-      });
-      if (!outcome) return;
-      bump();
-      if (outcome.openAfter) {
-        onOpen({
-          ...row,
-          kind: toKind,
-          id: outcome.result.newId,
-          name: outcome.result.newName,
-        });
-      }
-    } catch (e) {
-      toast.error(errMessage(e, t("automations.toast.moveFail")));
-    }
-  }
 
 
   function openItemMenu(e: MouseEvent, row: AutomationRow) {
@@ -703,21 +531,15 @@ export function WorkspaceLibrary({
     const items = buildAutomationRowMenuItems(row, t, {
       onOpen: () => onOpen(row),
       onLaunch: () => void launchRow(row),
-      onRename: row.trashed ? undefined : () => void renameRow(row),
-      onDuplicate: row.trashed ? undefined : () => void duplicateRow(row),
-      onToggleFavorite: row.trashed
-        ? undefined
-        : () => void toggleFavorite(row),
-      onLock: row.trashed ? undefined : () => void setLocked(row, true),
-      onUnlock: row.trashed ? undefined : () => void setLocked(row, false),
+      onRename: () => void renameRow(row),
+      onDuplicate: () => void duplicateRow(row),
+      onToggleFavorite: () => void toggleFavorite(row),
+      onLock: () => void setLocked(row, true),
+      onUnlock: () => void setLocked(row, false),
       onReveal: () => void revealRow(row),
       moveFolders: folders,
-      onMoveToFolder: row.trashed
-        ? undefined
-        : (folder) => void moveRow(row, folder),
-      onConvertTo: row.trashed
-        ? undefined
-        : (toKind) => void convertRow(row, toKind),
+      onMoveToFolder: (folder) => void moveRow(row, folder),
+      onConvertTo: (toKind) => void convertRow(row, toKind),
       onDelete: () => void deleteRow(row),
       icons: automationRowMenuIcons(),
     });
@@ -731,13 +553,29 @@ export function WorkspaceLibrary({
     setCtxItems(
       buildFolderMenuItems(folder, t, {
         renameFolder,
-        createFolder,
-        createKindInFolder,
+        createFolder: startCreateFolder,
+        createItem: (kind, folderId) => void startCreateItem(kind, folderId),
         deleteFolder,
       }),
     );
     ctxMenu.openFromEvent(e);
   }
+
+  const treeHandlers: LibTreeFolderHandlers = {
+    onToggle: toggleExpanded,
+    onFolderContextMenu: openFolderMenu,
+    onFolderPointerDown,
+    onStartFolderRename: startFolderRename,
+    onCommitFolderRename: applyFolderRename,
+    onCancelRename: () => setEditingKey(null),
+    onFocusFolder: (f) => setFocusKey(folderNavKey(f.id)),
+    onOpenItem: openRow,
+    onItemContextMenu: openItemMenu,
+    onItemPointerDown,
+    onStartItemRename: startRowRename,
+    onCommitItemRename: applyRowRename,
+    onFocusItem: (r) => setFocusKey(rowDomKey(r)),
+  };
 
   function openEmptyMenu(e: MouseEvent) {
     e.preventDefault();
@@ -752,7 +590,7 @@ export function WorkspaceLibrary({
   }
 
   function selectScope(next: Exclude<LibScope, "all">) {
-    setScope(next);
+    setScope((cur) => (cur === next ? "all" : next));
     setKindFilter("all");
   }
 
@@ -774,7 +612,18 @@ export function WorkspaceLibrary({
     });
   }
 
+  function resolveNavKey(): string | null {
+    if (focusKey) return focusKey;
+    const activeEl = document.activeElement;
+    if (activeEl instanceof HTMLElement) {
+      const fromDom = activeEl.closest("[data-nav-key]")?.getAttribute("data-nav-key");
+      if (fromDom) return fromDom;
+    }
+    return activeKey;
+  }
+
   function onTreeKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (editingKey) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
       moveFocus(1);
@@ -785,9 +634,11 @@ export function WorkspaceLibrary({
       moveFocus(-1);
       return;
     }
-    if (!focusKey) return;
-    const entry = navEntries.find((n) => n.key === focusKey);
+    const navKey = resolveNavKey();
+    if (!navKey) return;
+    const entry = navEntries.find((n) => n.key === navKey);
     if (!entry) return;
+    if (navKey !== focusKey) setFocusKey(navKey);
     if (e.key === "ArrowRight" && entry.type === "folder") {
       e.preventDefault();
       if (!isNodeOpen(entry.node)) toggleExpanded(entry.node.id);
@@ -806,8 +657,8 @@ export function WorkspaceLibrary({
     }
     if (e.key === "F2") {
       e.preventDefault();
-      if (entry.type === "folder") void renameFolder(entry.node.folder);
-      else if (!entry.row.locked) void renameRow(entry.row);
+      if (entry.type === "folder") startFolderRename(entry.node.folder);
+      else if (!entry.row.locked) startRowRename(entry.row);
       return;
     }
     if (e.key === "Delete" || e.key === "Backspace") {
@@ -817,55 +668,65 @@ export function WorkspaceLibrary({
     }
   }
 
-  const kindStrip: {
-    id: AutomationKindFilter;
-    label: string;
-    icon: ReactNode;
-  }[] = [
+  type FilterChip =
+    | { id: "kind"; kind: AutomationKindFilter; label: string; icon: ReactNode }
+    | { id: "scope"; scope: Exclude<LibScope, "all">; label: string; icon: ReactNode };
+
+  const filterChips: FilterChip[] = [
     {
-      id: "all",
+      id: "kind",
+      kind: "all",
       label: t("automations.filter.kindAll"),
       icon: <LayoutGrid size={16} aria-hidden />,
     },
     {
-      id: "macro",
+      id: "kind",
+      kind: "macro",
       label: t("automations.filter.kindMacro"),
       icon: <Workflow size={16} aria-hidden />,
     },
     {
-      id: "clicker",
+      id: "kind",
+      kind: "clicker",
       label: t("automations.filter.kindClicker"),
       icon: <MousePointer2 size={16} aria-hidden />,
     },
     {
-      id: "script",
+      id: "kind",
+      kind: "script",
       label: t("automations.filter.kindScript"),
       icon: <Code2 size={16} aria-hidden />,
     },
-  ];
-
-  const scopeStrip: {
-    id: Exclude<LibScope, "all">;
-    label: string;
-    icon: ReactNode;
-  }[] = [
     {
-      id: "favorites",
+      id: "scope",
+      scope: "favorites",
       label: t("automations.filter.favorites"),
       icon: <Star size={16} aria-hidden />,
     },
-    {
-      id: "recent",
-      label: t("automations.filter.recent"),
-      icon: <Clock size={16} aria-hidden />,
-    },
   ];
+
+  const emptyForScopeList = () =>
+    libraryEmptyForScope({
+      t,
+      query,
+      scope,
+      onClearSearch: () => setQuery(""),
+      onSeeAll: () => selectKind("all"),
+    });
+
+  const emptyForBrowse = () =>
+    libraryEmptyForBrowse({
+      t,
+      query,
+      kindFilter,
+      allRowsLength: allRows.length,
+      onClearSearch: () => setQuery(""),
+      onClearKind: () => selectKind("all"),
+    });
 
   function renderItemList(list: AutomationRow[]) {
     if (list.length === 0) {
-      return (
-        <p className="caster-lib-empty">{t("automations.empty.noResultsLead")}</p>
-      );
+      return emptyForScopeList();
     }
     return list.map((row) => (
       <BoundLibItem
@@ -874,9 +735,15 @@ export function WorkspaceLibrary({
         activeKey={activeKey}
         focusKey={focusKey}
         draggingKey={draggingKey}
+        dropIndicator={dropIndicator}
+        editingKey={editingKey}
         onOpen={openRow}
         onContextMenu={openItemMenu}
         onPointerDown={onItemPointerDown}
+        onStartRename={startRowRename}
+        onCommitRename={applyRowRename}
+        onCancelRename={() => setEditingKey(null)}
+        onFocusRow={(r) => setFocusKey(rowDomKey(r))}
       />
     ));
   }
@@ -888,75 +755,18 @@ export function WorkspaceLibrary({
         draggingKey && "is-lib-dragging",
       )}
     >
+      <header className="caster-lib-brand">
+        <span className="caster-lib-brand-mark" aria-hidden>
+          C
+        </span>
+        <span className="caster-lib-brand-name">Caster</span>
+      </header>
+
       <div className="caster-lib-chrome">
-        <div
-          className="caster-lib-kind-strip"
-          role="group"
-          aria-label={t("automations.filter.aria")}
-        >
-          {kindStrip.map((k) => {
-            const isAll = k.id === "all";
-            const active = scope === "all" && kindFilter === k.id;
-            return (
-              <Tooltip key={k.id} content={k.label} side="bottom">
-                <button
-                  type="button"
-                  className={cx(
-                    "caster-lib-chip",
-                    isAll && "caster-lib-chip--label",
-                    active && "is-active",
-                  )}
-                  aria-pressed={active}
-                  aria-label={k.label}
-                  onClick={() => selectKind(k.id)}
-                >
-                  {isAll ? (
-                    <span className="caster-lib-chip-label">All</span>
-                  ) : (
-                    k.icon
-                  )}
-                </button>
-              </Tooltip>
-            );
-          })}
-          {scopeStrip.map((item) => {
-            const active = scope === item.id;
-            return (
-              <Tooltip key={item.id} content={item.label} side="bottom">
-                <button
-                  type="button"
-                  className={cx("caster-lib-chip", active && "is-active")}
-                  aria-pressed={active}
-                  aria-label={item.label}
-                  onClick={() => selectScope(item.id)}
-                >
-                  {item.icon}
-                </button>
-              </Tooltip>
-            );
-          })}
-        </div>
-
-        <div className="caster-lib-folders-band">
-          <span className="caster-lib-folders-title">
-            {t("automations.folder.manageLabel")}
-          </span>
-          <div className="caster-lib-folders-actions">
-            <DropdownMenu
-              label={t("automations.create.label")}
-              ariaLabel={t("automations.create.aria")}
-              align="end"
-              triggerClassName="caster-lib-chip caster-lib-chip--accent"
-              items={createMenuItems}
-            >
-              <Plus size={14} aria-hidden strokeWidth={2.5} />
-            </DropdownMenu>
-          </div>
-        </div>
-
         <label className="caster-lib-search caster-lib-search--full">
           <Search size={12} aria-hidden className="caster-lib-search-icon" />
           <input
+            ref={searchInputRef}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -978,8 +788,60 @@ export function WorkspaceLibrary({
             >
               <X size={12} aria-hidden />
             </button>
-          ) : null}
+          ) : (
+            <kbd className="caster-lib-search-hint" aria-hidden>
+              Ctrl+F
+            </kbd>
+          )}
         </label>
+
+        <div
+          className="caster-lib-kind-strip"
+          role="group"
+          aria-label={t("automations.filter.kindAria")}
+        >
+          {filterChips.map((chip) => {
+            const active =
+              chip.id === "kind"
+                ? scope === "all" && kindFilter === chip.kind
+                : scope === chip.scope;
+            const key =
+              chip.id === "kind" ? `kind:${chip.kind}` : `scope:${chip.scope}`;
+            return (
+              <Tooltip key={key} content={chip.label} side="bottom">
+                <button
+                  type="button"
+                  className={cx("caster-lib-chip", active && "is-active")}
+                  aria-pressed={active}
+                  aria-label={chip.label}
+                  onClick={() => {
+                    if (chip.id === "kind") selectKind(chip.kind);
+                    else selectScope(chip.scope);
+                  }}
+                >
+                  {chip.icon}
+                </button>
+              </Tooltip>
+            );
+          })}
+        </div>
+
+        {scope === "all" ? (
+          <div className="caster-lib-folders-band caster-lib-folders-band--slim">
+            <span className="caster-lib-folders-title">
+              {t("automations.folder.manageLabel")}
+            </span>
+            <DropdownMenu
+              label={t("automations.create.label")}
+              ariaLabel={t("automations.create.aria")}
+              align="end"
+              triggerClassName="caster-lib-chip caster-lib-chip--ghost"
+              items={createMenuItems}
+            >
+              <Plus size={15} aria-hidden strokeWidth={1.75} />
+            </DropdownMenu>
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -991,62 +853,106 @@ export function WorkspaceLibrary({
         onContextMenu={scope === "all" ? openEmptyMenu : undefined}
         onKeyDown={onTreeKeyDown}
       >
-        {scope === "favorites" ? (
-          renderItemList(favVisible)
-        ) : scope === "recent" ? (
-          renderItemList(recentVisible)
-        ) : folderTree.length === 0 && unfiledRows.length === 0 ? (
-          <p className="caster-lib-empty">{t("automations.empty.noResultsLead")}</p>
-        ) : (
-          <div className="caster-lib-tree-root">
-            {folderTree.map((node) => (
-              <LibTreeFolder
-                key={node.id}
-                node={node}
-                title={node.folder.name}
-                open={isNodeOpen(node)}
-                dropTarget={dropTarget}
-                activeKey={activeKey}
-                focusKey={focusKey}
-                draggingKey={draggingKey}
-                isNodeOpen={isNodeOpen}
-                onToggle={toggleExpanded}
-                onFolderContextMenu={openFolderMenu}
-                onOpenItem={openRow}
-                onItemContextMenu={openItemMenu}
-                onItemPointerDown={onItemPointerDown}
-              />
-            ))}
-            {unfiledRows.length > 0 || draggingKey ? (
-              <div
-                className={cx(
-                  "caster-lib-unfiled",
-                  dropTarget === UNFILED_ID && "is-drop-target",
-                  draggingKey && unfiledRows.length === 0 && "is-drop-lane",
-                )}
-                data-folder-drop-id={UNFILED_ID}
-              >
-                {unfiledRows.length === 0 && draggingKey ? (
-                  <div className="caster-lib-unfiled-hint" aria-hidden>
-                    {t("automations.row.noFolder")}
-                  </div>
-                ) : null}
-                {unfiledRows.map((row) => (
-                  <BoundLibItem
-                    key={`${row.kind}:${row.id}`}
-                    row={row}
-                    activeKey={activeKey}
-                    focusKey={focusKey}
-                    draggingKey={draggingKey}
-                    onOpen={openRow}
-                    onContextMenu={openItemMenu}
-                    onPointerDown={onItemPointerDown}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </div>
-        )}
+        <div className="caster-lib-tree-root">
+          {scope === "favorites" ? (
+            renderItemList(favVisible)
+          ) : folderTree.length === 0 &&
+            unfiledRows.length === 0 &&
+            !draftFolder &&
+            !draftItem ? (
+            emptyForBrowse()
+          ) : (
+            <>
+              {folderTree.map((node) => (
+                <LibTreeFolder
+                  key={node.id}
+                  node={node}
+                  title={node.folder.name}
+                  open={isNodeOpen(node)}
+                  dropTarget={dropTarget}
+                  dropIndicator={dropIndicator}
+                  activeKey={activeKey}
+                  focusKey={focusKey}
+                  draggingKey={draggingKey}
+                  editingKey={editingKey}
+                  isNodeOpen={isNodeOpen}
+                  handlers={treeHandlers}
+                  draftFolder={draftFolder}
+                  draftNavKey={DRAFT_FOLDER_KEY}
+                  draftAriaLabel={draftAriaLabel}
+                  draftRemountKey={draftRemountKey}
+                  onCommitDraft={(name) => void onCommitDraftFolder(name)}
+                  onCancelDraft={clearDraftFolder}
+                  draftItem={draftItem}
+                  draftItemNavKey={DRAFT_ITEM_KEY}
+                  draftItemAriaLabel={draftItemAriaLabel}
+                  draftItemRemountKey={draftItemRemountKey}
+                  onCommitDraftItem={(name) => void onCommitDraftItem(name)}
+                  onCancelDraftItem={clearDraftItem}
+                />
+              ))}
+              {draftFolder?.parentId === null ? (
+                <LibDraftFolderRow
+                  navKey={DRAFT_FOLDER_KEY}
+                  focused={focusKey === DRAFT_FOLDER_KEY}
+                  ariaLabel={draftAriaLabel}
+                  remountKey={draftRemountKey}
+                  onCommit={(name) => void onCommitDraftFolder(name)}
+                  onCancel={clearDraftFolder}
+                />
+              ) : null}
+              {unfiledRows.length > 0 ||
+              draggingKey ||
+              draftItem?.folderId === null ? (
+                <div
+                  className={cx(
+                    "caster-lib-unfiled",
+                    dropTarget === UNFILED_ID && "is-drop-target",
+                    draggingKey && unfiledRows.length === 0 && "is-drop-lane",
+                  )}
+                  data-folder-drop-id={UNFILED_ID}
+                >
+                  {unfiledRows.length === 0 &&
+                  draggingKey &&
+                  draftItem?.folderId !== null ? (
+                    <div className="caster-lib-unfiled-hint" aria-hidden>
+                      {t("automations.row.noFolder")}
+                    </div>
+                  ) : null}
+                  {unfiledRows.map((row) => (
+                    <BoundLibItem
+                      key={`${row.kind}:${row.id}`}
+                      row={row}
+                      activeKey={activeKey}
+                      focusKey={focusKey}
+                      draggingKey={draggingKey}
+                      dropIndicator={dropIndicator}
+                      editingKey={editingKey}
+                      onOpen={openRow}
+                      onContextMenu={openItemMenu}
+                      onPointerDown={onItemPointerDown}
+                      onStartRename={startRowRename}
+                      onCommitRename={applyRowRename}
+                      onCancelRename={() => setEditingKey(null)}
+                      onFocusRow={(r) => setFocusKey(rowDomKey(r))}
+                    />
+                  ))}
+                  {draftItem?.folderId === null ? (
+                    <LibDraftItemRow
+                      kind={draftItem.kind}
+                      navKey={DRAFT_ITEM_KEY}
+                      focused={focusKey === DRAFT_ITEM_KEY}
+                      ariaLabel={draftItemAriaLabel}
+                      remountKey={draftItemRemountKey}
+                      onCommit={(name) => void onCommitDraftItem(name)}
+                      onCancel={clearDraftItem}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
 
       <ContextMenu
@@ -1061,17 +967,50 @@ export function WorkspaceLibrary({
         ariaLabel={t("shell.library.aria")}
       />
 
-      {dragGhost ? (
-        <div
-          className="caster-lib-drag-ghost"
-          style={{
-            transform: `translate(${dragGhost.x + 12}px, ${dragGhost.y + 12}px)`,
-          }}
-          aria-hidden
-        >
-          {dragGhost.name}
+      {dragGhost
+        ? createPortal(
+            <div
+              ref={setDragCursorNode}
+              className="caster-lib-drag-cursor"
+              aria-hidden
+            >
+              {dragGhost.type === "folder" ? (
+                <Folder size={14} aria-hidden />
+              ) : (
+                <KindIcon kind={dragGhost.kind} />
+              )}
+            </div>,
+            document.body,
+          )
+        : null}
+
+      <footer className="caster-lib-footer">
+        <div className="caster-lib-footer-user">
+          <span className="caster-lib-footer-avatar" aria-hidden>
+            {t("shell.account.name").charAt(0).toUpperCase()}
+          </span>
+          <span className="caster-lib-footer-user-text">
+            <span className="caster-lib-footer-user-name">
+              {t("shell.account.name")}
+            </span>
+            <span className="caster-lib-footer-user-meta">
+              {t("shell.brandTagline")}
+            </span>
+          </span>
+          {onOpenSettings ? (
+            <Tooltip content={t("shell.navSettings")} side="top">
+              <button
+                type="button"
+                className="caster-lib-footer-settings"
+                aria-label={t("shell.navSettings")}
+                onClick={() => onOpenSettings("application")}
+              >
+                <Settings size={15} aria-hidden strokeWidth={1.75} />
+              </button>
+            </Tooltip>
+          ) : null}
         </div>
-      ) : null}
+      </footer>
     </div>
   );
 }

@@ -1269,8 +1269,7 @@ impl AppState {
         let mut context = Vec::new();
         for name in names {
             if let Some(idx) = index.as_ref() {
-                if crate::library_index::is_trashed_for(idx, crate::library_index::LibraryKind::Macro, &name)
-                    || !crate::library_index::entry_meta_for(
+                if !crate::library_index::entry_meta_for(
                         idx,
                         crate::library_index::LibraryKind::Macro,
                         &name,
@@ -1529,11 +1528,7 @@ impl AppState {
         let mut context = Vec::new();
         for name in names {
             if let Some(idx) = index.as_ref() {
-                if crate::library_index::is_trashed_for(
-                    idx,
-                    crate::library_index::LibraryKind::Clicker,
-                    &name,
-                ) || !crate::library_index::entry_meta_for(
+                if !crate::library_index::entry_meta_for(
                     idx,
                     crate::library_index::LibraryKind::Clicker,
                     &name,
@@ -1628,11 +1623,7 @@ impl AppState {
         for doc in docs {
             let name = doc.id.clone();
             if let Some(idx) = index.as_ref() {
-                if crate::library_index::is_trashed_for(
-                    idx,
-                    crate::library_index::LibraryKind::Script,
-                    &name,
-                ) || !crate::library_index::entry_meta_for(
+                if !crate::library_index::entry_meta_for(
                     idx,
                     crate::library_index::LibraryKind::Script,
                     &name,

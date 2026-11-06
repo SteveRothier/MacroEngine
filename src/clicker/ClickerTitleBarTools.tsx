@@ -560,17 +560,20 @@ export function ClickerTitleBarTools({
           </div>
           <span className="caster-toolbar-sep" aria-hidden />
           <div className="caster-toolbar-group">
-            <Tooltip content={hotkeyHint}>
-              <button
-                type="button"
-                className="caster-titlebar-btn caster-btn caster-btn-primary"
-                disabled={editor.running}
-                aria-label={t("clicker.toolbar.start")}
-                onClick={() => void editor.onStart()}
-              >
-                {t("clicker.toolbar.start")}
-              </button>
-            </Tooltip>
+            {!editor.running ? (
+              <Tooltip content={hotkeyHint}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-btn-run"
+                  disabled={editor.running}
+                  aria-label={t("clicker.toolbar.start")}
+                  onClick={() => void editor.onStart()}
+                >
+                  <Play size={14} aria-hidden />
+                  <span>{t("shell.exec.run")}</span>
+                </button>
+              </Tooltip>
+            ) : null}
             {editor.running ? (
               <span className="caster-clicker-runtime" aria-live="polite">
                 <span>
@@ -628,7 +631,7 @@ export function ClickerTitleBarTools({
               >
                 <button
                   type="button"
-                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  className="caster-titlebar-btn caster-btn-ghost"
                   aria-label={
                     sessionPaused
                       ? t("clicker.toolbar.resume")
@@ -643,20 +646,24 @@ export function ClickerTitleBarTools({
                   ) : (
                     <Pause size={14} aria-hidden />
                   )}
+                  <span>
+                    {sessionPaused
+                      ? t("shell.exec.resume")
+                      : t("shell.exec.pause")}
+                  </span>
                 </button>
               </Tooltip>
             ) : null}
-            <Tooltip content={t("clicker.toolbar.stop")}>
-              <button
-                type="button"
-                className="caster-titlebar-btn caster-titlebar-icon-btn caster-titlebar-icon-btn-danger"
-                disabled={!editor.running}
-                aria-label={t("clicker.toolbar.stop")}
-                onClick={() => void editor.onStop()}
-              >
-                <Square size={14} aria-hidden />
-              </button>
-            </Tooltip>
+            <button
+              type="button"
+              className="caster-titlebar-btn caster-btn-ghost"
+              disabled={!editor.running}
+              aria-label={t("clicker.toolbar.stop")}
+              onClick={() => void editor.onStop()}
+            >
+              <Square size={14} aria-hidden />
+              <span>{t("shell.exec.stop")}</span>
+            </button>
           </div>
           <span className="caster-toolbar-sep" aria-hidden />
           <div className="caster-toolbar-group">

@@ -1,10 +1,40 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { confirmAction } from "../../ui";
-import { useToast } from "../../ui/shell";
+import {
+  ActionPickerMenu,
+  InspectorPanel,
+  InspectorSection,
+  useToast,
+} from "../../ui/shell";
+import {
+  Clock,
+  GitBranch,
+  Keyboard,
+  LayoutTemplate,
+  MousePointerClick,
+  Play,
+  Plus,
+  Variable,
+  Workflow,
+} from "lucide-react";
 import { ActionList } from "../ActionList";
+import { ActionProps } from "../ActionProps";
+import { ControlFlowAdvancedProps } from "../ControlFlowAdvancedProps";
+import {
+  actionLead,
+  actionTitle,
+  actionTone,
+} from "../actionLabels";
 import { buildActionAddMenu, makeAction } from "../actionFactory";
 import { MacroMetaBar, MacroMetaTools } from "../MacroMetaBar";
 import {
@@ -69,6 +99,10 @@ type Props = {
   onOpenScript?: (scriptId: string, label?: string) => void;
   /** Open global process filter settings (Sécurité). */
   onOpenProcessSettings?: () => void;
+  /** Open the shared run journal dock. */
+  onOpenJournal?: () => void;
+  /** Discreet error/warn badge on the Journal tab. */
+  journalHasErrors?: boolean;
   /** When false (keep-mounted but hidden), ignore global shortcuts / titlebar. */
   active?: boolean;
   automationPrefs?: AutomationPrefs;
@@ -114,6 +148,8 @@ export function MacroEditorView({
   engineState,
   onOpenScript,
   onOpenProcessSettings,
+  onOpenJournal,
+  journalHasErrors = false,
   active = true,
   automationPrefs: automationPrefsProp,
   confirmationsPrefs: confirmationsPrefsProp,
@@ -164,6 +200,127 @@ export function MacroEditorView({
   selectedPathRef.current = selectedPath;
 
   const editorLocked = locked || recording;
+  const selectedAction = useMemo(
+    () => (selectedPath ? getAtPath(doc.actions, selectedPath) : null),
+    [doc.actions, selectedPath],
+  );
+  type EditorTab = "actions" | "params" | "variables" | "journal";
+  const [editorTab, setEditorTab] = useState<EditorTab>("actions");
+  const [propsOpen, setPropsOpen] = useState(() => {
+    try {
+      return localStorage.getItem("caster-macro-props-open") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [propsWidth, setPropsWidth] = useState(() => {
+    try {
+      const n = Number(localStorage.getItem("caster-macro-props-w"));
+      if (Number.isFinite(n)) return Math.max(280, Math.min(320, Math.round(n)));
+    } catch {
+      /* ignore */
+    }
+    return 300;
+  });
+  const propsWidthRef = useRef(propsWidth);
+  propsWidthRef.current = propsWidth;
+  const propsDragRef = useRef<{ startX: number; startW: number } | null>(null);
+
+  const persistPropsOpen = useCallback((open: boolean) => {
+    setPropsOpen(open);
+    try {
+      localStorage.setItem("caster-macro-props-open", open ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const propsAutoClosedRef = useRef(false);
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth < 900 && propsOpen && !propsAutoClosedRef.current) {
+        propsAutoClosedRef.current = true;
+        persistPropsOpen(false);
+      }
+    };
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [propsOpen, persistPropsOpen]);
+
+  const onPropsResizePointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      propsDragRef.current = {
+        startX: e.clientX,
+        startW: propsWidthRef.current,
+      };
+    },
+    [],
+  );
+
+  const onPropsResizePointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = propsDragRef.current;
+      if (!drag) return;
+      const next = Math.max(
+        280,
+        Math.min(320, Math.round(drag.startW + (drag.startX - e.clientX))),
+      );
+      propsWidthRef.current = next;
+      setPropsWidth(next);
+    },
+    [],
+  );
+
+  const onPropsResizePointerUp = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!propsDragRef.current) return;
+      propsDragRef.current = null;
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      try {
+        localStorage.setItem(
+          "caster-macro-props-w",
+          String(propsWidthRef.current),
+        );
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
+
+  const usedVariables = useMemo(() => {
+    const names = new Set<string>();
+    const walk = (actions: MacroAction[]) => {
+      for (const a of actions) {
+        if (a.type === "var.set" || a.type === "clipboard.get") {
+          names.add(a.name);
+        }
+        if (a.type === "http.request") {
+          if (a.statusVar) names.add(a.statusVar);
+          if (a.bodyVar) names.add(a.bodyVar);
+        }
+        if (a.type === "json.path") {
+          names.add(a.sourceVar);
+          names.add(a.destVar);
+        }
+        if (a.type === "script.run" && a.resultVar) names.add(a.resultVar);
+        if (a.type === "control.if") {
+          walk(a.then);
+          if (a.else) walk(a.else);
+        }
+        if (a.type === "control.while") walk(a.body);
+      }
+    };
+    walk(doc.actions);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [doc.actions]);
 
   useEffect(() => {
     setAutomationPrefs(mergeAutomationPrefs(automationPrefsProp));
@@ -596,6 +753,24 @@ export function MacroEditorView({
     }
   }, [onStatus, t, toast]);
 
+  const onPauseSession = useCallback(async () => {
+    try {
+      const st = await invoke<EngineStatus>("pause_macro");
+      onStatus(st);
+    } catch (e) {
+      toast.error(errMessage(e, t("macros.toast.resumeFailed")));
+    }
+  }, [onStatus, t, toast]);
+
+  const onResumeSession = useCallback(async () => {
+    try {
+      const st = await invoke<EngineStatus>("resume_macro");
+      onStatus(st);
+    } catch (e) {
+      toast.error(errMessage(e, t("macros.toast.resumeFailed")));
+    }
+  }, [onStatus, t, toast]);
+
   const onRunFrom = useCallback(
     async (path: ActionPath) => {
       if (recording) return;
@@ -1025,11 +1200,14 @@ export function MacroEditorView({
       onImport={() => void onImportMacro()}
       onExport={() => void onExportMacro()}
       loading={loading}
+      dirty={dirty}
       engineState={engineState}
       recording={recording}
       recordPaused={recordPaused}
       recordCount={recordCount}
       onPlay={() => void onPlay()}
+      onPause={() => void onPauseSession()}
+      onResume={() => void onResumeSession()}
       onStop={() => void onStopSession()}
       onPlayFrom={
         selectedPath && !recording
@@ -1102,6 +1280,13 @@ export function MacroEditorView({
     { active },
   );
 
+  const editorTabs: { id: EditorTab; label: string }[] = [
+    { id: "actions", label: t("macros.editorTabs.actions") },
+    { id: "params", label: t("macros.editorTabs.params") },
+    { id: "variables", label: t("macros.editorTabs.variables") },
+    { id: "journal", label: t("macros.editorTabs.journal") },
+  ];
+
   return (
     <div
       className="caster-page caster-macro-editor"
@@ -1111,98 +1296,327 @@ export function MacroEditorView({
       <div className="caster-editor-layout">
         <div className="caster-seq-panel">
           <div
-            className="caster-seq-scroll"
-            onClick={(e) => {
-              const el = e.target as HTMLElement;
-              if (
-                el.closest(
-                  ".action-list-item, .action-list-bulk, .action-list-empty, .action-list-shell, .caster-action-picker-root, .caster-dropdown-menu-root, .caster-menu-popover, .caster-context-menu, button, a, input, select, textarea, label, [role='button']",
-                )
-              ) {
-                return;
-              }
-              setSelectedPath(null);
-            }}
-            onContextMenu={
-              editorLocked
-                ? undefined
-                : (e) => {
-                    const t = e.target as HTMLElement;
-                    if (t.closest(".action-list-item")) return;
-                    if (t.closest(".caster-context-menu")) return;
-                    // Let ActionList handle empty/list background; still block browser menu on padding
-                    if (!t.closest(".action-list")) {
-                      e.preventDefault();
-                    }
-                  }
-            }
+            className="caster-editor-inner-tabs"
+            role="tablist"
+            aria-label={t("macros.editorTabs.actions")}
           >
-            {!hydrated ? (
-              <div
-                className="caster-seq-loading"
-                aria-busy="true"
-                aria-live="polite"
-              />
-            ) : (
-              <ActionList
-                actions={doc.actions}
-                selectedPath={selectedPath}
-                activePath={activePath}
-                readOnly={editorLocked}
-                confirmDeleteAction={confirmationsPrefs.deleteAction}
-                onSelect={setSelectedPath}
-                onReorder={(from, to) => {
-                  const next = reorderAtPath(doc.actions, from, to);
-                  if (next) updateDoc({ ...doc, actions: next });
+            {editorTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={editorTab === tab.id}
+                className={cx(
+                  "caster-editor-inner-tab",
+                  editorTab === tab.id && "is-active",
+                )}
+                onClick={() => {
+                  if (tab.id === "journal") {
+                    onOpenJournal?.();
+                    setEditorTab("actions");
+                    return;
+                  }
+                  setEditorTab(tab.id);
                 }}
-                onRemove={onRemove}
-                onRemoveMany={onRemoveMany}
-                onDuplicate={onDuplicate}
-                onDuplicateMany={onDuplicateMany}
-                onMove={onMove}
-                onMoveMany={onMoveMany}
-                onRunFrom={
-                  recording ? undefined : (path) => void onRunFrom(path)
-                }
-                onInsertBefore={onInsertBefore}
-                onInsertAfter={onInsertAfter}
-                onPasteAfter={onPasteAfter}
-                onAddKind={editorLocked ? undefined : addAction}
-                onOpenAddMenu={
-                  editorLocked ? undefined : () => setAddMenuOpen(true)
-                }
-                onEmptyAdd={editorLocked ? undefined : () => addAction("mouse.click")}
-                addMenuItems={
-                  editorLocked ? undefined : buildActionAddMenu(addAction, t)
-                }
-                addMenuOpen={addMenuOpen}
-                onAddMenuOpenChange={setAddMenuOpen}
-                onStartRecord={
-                  editorLocked || recording
-                    ? undefined
-                    : () => void onStartRecord()
-                }
-                onApplyPreset={
-                  editorLocked ? undefined : (name) => void onApplyPreset(name)
-                }
-                onClearSelection={() => setSelectedPath(null)}
-                onUndo={editorLocked ? undefined : undo}
-                onRedo={editorLocked ? undefined : redo}
-                canUndo={canUndo}
-                canRedo={canRedo}
-                onChangeAction={(path, a) =>
-                  updateDoc({
-                    ...doc,
-                    actions: updateAtPath(doc.actions, path, a),
-                  })
-                }
-                onAddToBranch={editorLocked ? undefined : addToBranchAt}
-                onOpenScript={onOpenScript}
-              />
-            )}
+              >
+                {tab.label}
+                {tab.id === "journal" && journalHasErrors ? (
+                  <span
+                    className="caster-editor-inner-tab-badge"
+                    aria-label={t("macros.editorTabs.journalErrors")}
+                  />
+                ) : null}
+              </button>
+            ))}
           </div>
+          {editorTab === "actions" ? (
+            <>
+              <div className="caster-actions-toolbar">
+                <span className="caster-actions-count">
+                  {doc.actions.length === 1
+                    ? t("macros.menu.list.stepsCountOne")
+                    : t("macros.menu.list.stepsCount", {
+                        n: doc.actions.length,
+                      })}
+                </span>
+                <div className="caster-actions-toolbar-end">
+                  {!editorLocked ? (
+                    <ActionPickerMenu
+                      label={t("macros.toolbar.add")}
+                      disabled={loading}
+                      items={buildActionAddMenu(addAction, t)}
+                      open={addMenuOpen}
+                      onOpenChange={setAddMenuOpen}
+                      triggerClassName="caster-btn caster-btn-ghost caster-actions-toolbar-btn"
+                      triggerContent={<Plus size={14} aria-hidden />}
+                    />
+                  ) : null}
+                  <button
+                    type="button"
+                    className="caster-btn caster-btn-ghost caster-actions-toolbar-btn"
+                    title={t("macros.menu.list.headAction")}
+                    aria-label={t("macros.menu.list.headAction")}
+                    onClick={() => {
+                      document
+                        .querySelector<HTMLElement>(".action-list")
+                        ?.focus({ preventScroll: false });
+                    }}
+                  >
+                    <LayoutTemplate size={14} aria-hidden />
+                  </button>
+                </div>
+              </div>
+            <div
+              className="caster-seq-scroll"
+              onClick={(e) => {
+                const el = e.target as HTMLElement;
+                if (
+                  el.closest(
+                    ".action-list-item, .action-list-bulk, .action-list-empty, .action-list-shell, .caster-action-picker-root, .caster-dropdown-menu-root, .caster-menu-popover, .caster-context-menu, button, a, input, select, textarea, label, [role='button']",
+                  )
+                ) {
+                  return;
+                }
+                setSelectedPath(null);
+              }}
+              onContextMenu={
+                editorLocked
+                  ? undefined
+                  : (e) => {
+                      const el = e.target as HTMLElement;
+                      if (el.closest(".action-list-item")) return;
+                      if (el.closest(".caster-context-menu")) return;
+                      if (!el.closest(".action-list")) {
+                        e.preventDefault();
+                      }
+                    }
+              }
+            >
+              {!hydrated ? (
+                <div
+                  className="caster-seq-loading"
+                  aria-busy="true"
+                  aria-live="polite"
+                />
+              ) : (
+                <ActionList
+                  actions={doc.actions}
+                  selectedPath={selectedPath}
+                  activePath={activePath}
+                  readOnly={editorLocked}
+                  confirmDeleteAction={confirmationsPrefs.deleteAction}
+                  onSelect={(path) => {
+                    setSelectedPath(path);
+                    persistPropsOpen(true);
+                  }}
+                  onReorder={(from, to) => {
+                    const next = reorderAtPath(doc.actions, from, to);
+                    if (next) updateDoc({ ...doc, actions: next });
+                  }}
+                  onRemove={onRemove}
+                  onRemoveMany={onRemoveMany}
+                  onDuplicate={onDuplicate}
+                  onDuplicateMany={onDuplicateMany}
+                  onMove={onMove}
+                  onMoveMany={onMoveMany}
+                  onRunFrom={
+                    recording ? undefined : (path) => void onRunFrom(path)
+                  }
+                  onInsertBefore={onInsertBefore}
+                  onInsertAfter={onInsertAfter}
+                  onPasteAfter={onPasteAfter}
+                  onAddKind={editorLocked ? undefined : addAction}
+                  onOpenAddMenu={
+                    editorLocked ? undefined : () => setAddMenuOpen(true)
+                  }
+                  onEmptyAdd={
+                    editorLocked ? undefined : () => addAction("mouse.click")
+                  }
+                  addMenuItems={
+                    editorLocked ? undefined : buildActionAddMenu(addAction, t)
+                  }
+                  addMenuOpen={addMenuOpen}
+                  onAddMenuOpenChange={setAddMenuOpen}
+                  onStartRecord={
+                    editorLocked || recording
+                      ? undefined
+                      : () => void onStartRecord()
+                  }
+                  onApplyPreset={
+                    editorLocked ? undefined : (name) => void onApplyPreset(name)
+                  }
+                  onClearSelection={() => setSelectedPath(null)}
+                  onUndo={editorLocked ? undefined : undo}
+                  onRedo={editorLocked ? undefined : redo}
+                  canUndo={canUndo}
+                  canRedo={canRedo}
+                  onChangeAction={(path, a) =>
+                    updateDoc({
+                      ...doc,
+                      actions: updateAtPath(doc.actions, path, a),
+                    })
+                  }
+                  onAddToBranch={editorLocked ? undefined : addToBranchAt}
+                  onOpenScript={onOpenScript}
+                />
+              )}
+            </div>
+            </>
+          ) : null}
+          {editorTab === "params" ? (
+            <div className="caster-macro-tab-pane">
+              <div className="caster-macro-tab-pane-tools">
+                <MacroMetaTools
+                  doc={doc}
+                  macroId={macroId}
+                  locked={editorLocked || loading}
+                  onChange={updateDoc}
+                  onError={(msg: string) => toast.error(msg)}
+                />
+              </div>
+            </div>
+          ) : null}
+          {editorTab === "variables" ? (
+            <div className="caster-macro-tab-pane">
+              {usedVariables.length === 0 ? (
+                <div className="caster-macro-tab-empty">
+                  <strong>{t("macros.editorTabs.variablesEmpty")}</strong>
+                  <p>{t("macros.editorTabs.variablesLead")}</p>
+                </div>
+              ) : (
+                <ul className="caster-macro-var-list">
+                  {usedVariables.map((name) => (
+                    <li key={name}>
+                      <code>{name}</code>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : null}
         </div>
+        {propsOpen ? (
+          <div
+            className="caster-inspector-shell"
+            style={{ width: propsWidth }}
+          >
+            <div
+              className="caster-inspector-splitter"
+              role="separator"
+              aria-orientation="vertical"
+              onPointerDown={onPropsResizePointerDown}
+              onPointerMove={onPropsResizePointerMove}
+              onPointerUp={onPropsResizePointerUp}
+              onPointerCancel={onPropsResizePointerUp}
+            />
+            <InspectorPanel
+              title={t("macros.inspector.title")}
+              onClose={() => persistPropsOpen(false)}
+              closeLabel={t("common.close")}
+            >
+              {selectedAction ? (
+                <>
+                  <div className="caster-inspector-hero">
+                    <span
+                      className="caster-inspector-hero-icon"
+                      data-tone={actionTone(selectedAction.type)}
+                      aria-hidden
+                    >
+                      {(() => {
+                        const tone = actionTone(selectedAction.type);
+                        if (tone === "mouse")
+                          return <MousePointerClick size={22} />;
+                        if (tone === "wait") return <Clock size={22} />;
+                        if (tone === "key") return <Keyboard size={22} />;
+                        if (tone === "logic") return <GitBranch size={22} />;
+                        if (tone === "data") return <Variable size={22} />;
+                        if (tone === "system") return <Workflow size={22} />;
+                        return <Play size={22} />;
+                      })()}
+                    </span>
+                    <div className="caster-inspector-hero-text">
+                      <strong>{actionTitle(selectedAction.type, t)}</strong>
+                      <p>{actionLead(selectedAction.type, t)}</p>
+                    </div>
+                  </div>
+                  <InspectorSection title={t("macros.inspector.params")}>
+                    <ActionProps
+                      action={selectedAction}
+                      disabled={editorLocked}
+                      onChange={(a) => {
+                        if (!selectedPath) return;
+                        updateDoc({
+                          ...doc,
+                          actions: updateAtPath(
+                            doc.actions,
+                            selectedPath,
+                            a,
+                          ),
+                        });
+                      }}
+                      onOpenScript={onOpenScript}
+                    />
+                  </InspectorSection>
+                  <InspectorSection
+                    title={t("macros.inspector.options")}
+                    defaultOpen={false}
+                  >
+                    <p className="caster-inspector-section-hint">
+                      {t("macros.inspector.optionsLead")}
+                    </p>
+                  </InspectorSection>
+                  <InspectorSection
+                    title={t("macros.inspector.advanced")}
+                    defaultOpen={false}
+                  >
+                    {selectedAction.type === "control.while" ||
+                    selectedAction.type === "control.if" ? (
+                      <ControlFlowAdvancedProps
+                        action={selectedAction}
+                        disabled={editorLocked}
+                        onChange={(a) => {
+                          if (!selectedPath) return;
+                          updateDoc({
+                            ...doc,
+                            actions: updateAtPath(
+                              doc.actions,
+                              selectedPath,
+                              a,
+                            ),
+                          });
+                        }}
+                      />
+                    ) : (
+                      <p className="caster-inspector-section-hint">
+                        {t("macros.inspector.advancedLead")}
+                      </p>
+                    )}
+                  </InspectorSection>
+                </>
+              ) : (
+                <div className="caster-macro-tab-empty">
+                  <strong>{t("macros.inspector.empty")}</strong>
+                  <p>{t("macros.inspector.emptyLead")}</p>
+                </div>
+              )}
+            </InspectorPanel>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="caster-inspector-rail"
+            onClick={() => persistPropsOpen(true)}
+            aria-label={t("macros.inspector.open")}
+            title={t("macros.inspector.open")}
+          >
+            {t("macros.inspector.short")}
+          </button>
+        )}
       </div>
     </div>
   );
+}
+
+function cx(...parts: Array<string | false | null | undefined>): string {
+  return parts.filter(Boolean).join(" ");
 }

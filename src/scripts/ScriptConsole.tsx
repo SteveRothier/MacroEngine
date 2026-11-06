@@ -51,9 +51,12 @@ function storageKey(scriptId: string, suffix: string) {
 
 function readCollapsed(scriptId: string): boolean {
   try {
-    return localStorage.getItem(storageKey(scriptId, "consoleCollapsed")) === "1";
+    const raw = localStorage.getItem(storageKey(scriptId, "consoleCollapsed"));
+    // Default collapsed (mock). Explicit "0" keeps it open.
+    if (raw == null) return true;
+    return raw === "1";
   } catch {
-    return false;
+    return true;
   }
 }
 

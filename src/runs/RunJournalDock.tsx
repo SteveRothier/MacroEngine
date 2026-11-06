@@ -1,7 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
-import { ClipboardCopy, Download, Trash2, X } from "lucide-react";
+import {
+  ChevronDown,
+  ClipboardCopy,
+  Download,
+  Terminal,
+  Trash2,
+} from "lucide-react";
 import { EmptyState, useToast } from "../ui/shell";
 import { useT } from "../i18n";
 import type { JournalLine } from "./useEngineLog";
@@ -16,6 +28,29 @@ type Props = {
   /** Optional short CTA when empty (P19G). */
   emptyCta?: { label: string; onClick: () => void };
 };
+
+const JOURNAL_H_KEY = "caster-journal-h";
+const JOURNAL_H_DEFAULT = 200;
+const JOURNAL_H_MIN = 120;
+
+function journalHMax(): number {
+  if (typeof window === "undefined") return 320;
+  return Math.max(JOURNAL_H_MIN + 40, Math.round(window.innerHeight * 0.4));
+}
+
+function clampJournalH(h: number): number {
+  return Math.max(JOURNAL_H_MIN, Math.min(journalHMax(), Math.round(h)));
+}
+
+function readJournalH(): number {
+  try {
+    const n = Number(localStorage.getItem(JOURNAL_H_KEY));
+    if (Number.isFinite(n)) return clampJournalH(n);
+  } catch {
+    /* ignore */
+  }
+  return JOURNAL_H_DEFAULT;
+}
 
 function matchesFilter(line: JournalLine, filter: Filter): boolean {
   if (filter === "all") return true;
@@ -41,9 +76,13 @@ export function RunJournalDock({
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   const [follow, setFollow] = useState(true);
+  const [height, setHeight] = useState(readJournalH);
   const bodyRef = useRef<HTMLDivElement>(null);
   const followRef = useRef(follow);
   followRef.current = follow;
+  const heightRef = useRef(height);
+  heightRef.current = height;
+  const dragRef = useRef<{ startY: number; startH: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -62,6 +101,44 @@ export function RunJournalDock({
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [lines, open, follow, filter, query]);
+
+  const onResizePointerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      dragRef.current = { startY: e.clientY, startH: heightRef.current };
+    },
+    [],
+  );
+
+  const onResizePointerMove = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const next = clampJournalH(drag.startH + (drag.startY - e.clientY));
+      heightRef.current = next;
+      setHeight(next);
+    },
+    [],
+  );
+
+  const onResizePointerUp = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!dragRef.current) return;
+      dragRef.current = null;
+      try {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+      try {
+        localStorage.setItem(JOURNAL_H_KEY, String(heightRef.current));
+      } catch {
+        /* ignore */
+      }
+    },
+    [],
+  );
 
   if (!open) return null;
 
@@ -108,9 +185,49 @@ export function RunJournalDock({
   };
 
   return (
-    <div className="caster-journal-overlay" role="region" aria-label={t("runs.aria")}>
+    <div
+      className="caster-journal-dock"
+      role="region"
+      aria-label={t("runs.aria")}
+      style={{ ["--caster-journal-h" as string]: `${height}px` }}
+    >
+      <div
+        className="caster-journal-splitter"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-valuemin={JOURNAL_H_MIN}
+        aria-valuemax={journalHMax()}
+        aria-valuenow={height}
+        onPointerDown={onResizePointerDown}
+        onPointerMove={onResizePointerMove}
+        onPointerUp={onResizePointerUp}
+        onPointerCancel={onResizePointerUp}
+      />
       <div className="caster-journal-head">
-        <span className="caster-journal-title">{t("runs.title")}</span>
+        <div className="caster-journal-head-primary">
+          <button
+            type="button"
+            className="caster-journal-title-btn"
+            onClick={() => onOpenChange(false)}
+            title={t("runs.close")}
+            aria-label={t("runs.close")}
+          >
+            <Terminal size={14} aria-hidden />
+            <span className="caster-journal-title">{t("runs.title")}</span>
+            <ChevronDown size={14} aria-hidden className="caster-journal-collapse" />
+          </button>
+          <div className="caster-journal-head-actions">
+            <button
+              type="button"
+              className="caster-btn caster-btn-ghost"
+              title={t("runs.clear")}
+              onClick={onClear}
+            >
+              <Trash2 size={12} />
+              <span>{t("runs.clear")}</span>
+            </button>
+          </div>
+        </div>
         <div className="caster-journal-filters">
           <div
             className="caster-segmented caster-journal-filter-segmented"
@@ -133,6 +250,7 @@ export function RunJournalDock({
                 className={[
                   "caster-segmented-btn",
                   filter === f ? "active" : "",
+                  f === "errors" ? "caster-journal-filter--errors" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
@@ -183,22 +301,6 @@ export function RunJournalDock({
             onClick={saveFiltered}
           >
             <Download size={12} />
-          </button>
-          <button
-            type="button"
-            className="caster-btn caster-btn-ghost"
-            title={t("runs.clear")}
-            onClick={onClear}
-          >
-            <Trash2 size={12} />
-          </button>
-          <button
-            type="button"
-            className="caster-btn caster-btn-ghost"
-            title={t("runs.close")}
-            onClick={() => onOpenChange(false)}
-          >
-            <X size={14} />
           </button>
         </div>
       </div>

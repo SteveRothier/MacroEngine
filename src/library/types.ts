@@ -15,7 +15,6 @@ export type LibraryItemDto = {
   locked: boolean;
   enabled?: boolean;
   icon?: string | null;
-  trashed: boolean;
   updatedAt: number;
   meta?: string | null;
   sortOrder?: number;
@@ -24,11 +23,10 @@ export type LibraryItemDto = {
 export type LibraryIndexDto = {
   folders: LibraryFolder[];
   items: LibraryItemDto[];
-  trash: string[];
 };
 
 /** System virtual folders */
-export type LibraryFilterId = "__all" | "__favorites" | "__trash" | string;
+export type LibraryFilterId = "__all" | "__favorites" | string;
 
 export type LibraryItemView = {
   id: string;
@@ -36,7 +34,6 @@ export type LibraryItemView = {
   locked: boolean;
   folderId: string | null;
   favorite: boolean;
-  trashed: boolean;
   meta?: string;
   active?: boolean;
   dirty?: boolean;

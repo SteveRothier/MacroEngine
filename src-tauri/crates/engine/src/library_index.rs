@@ -1,4 +1,4 @@
-//! Virtual library manifest (folders, lock, trash) for macros and clicker presets.
+//! Virtual library manifest (folders, lock) for macros and clicker presets.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -81,9 +81,6 @@ pub struct LibraryEntryMeta {
     pub icon: Option<String>,
     #[serde(default)]
     pub sort_order: i32,
-    /// Unix seconds when moved to trash (for auto-purge).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub trashed_at: Option<u64>,
 }
 
 fn default_enabled() -> bool {
@@ -98,7 +95,6 @@ impl Default for LibraryEntryMeta {
             enabled: true,
             icon: None,
             sort_order: 0,
-            trashed_at: None,
         }
     }
 }
@@ -110,7 +106,6 @@ pub struct LibraryIndex {
     /// Shared folders for macros and clickers (unified since version 2).
     pub folders: Vec<LibraryFolder>,
     pub entries: HashMap<String, HashMap<String, LibraryEntryMeta>>,
-    pub trash: HashMap<String, Vec<String>>,
 }
 
 impl Default for LibraryIndex {
@@ -122,11 +117,6 @@ impl Default for LibraryIndex {
                 ("macro".into(), HashMap::new()),
                 ("clicker".into(), HashMap::new()),
                 ("script".into(), HashMap::new()),
-            ]),
-            trash: HashMap::from([
-                ("macro".into(), Vec::new()),
-                ("clicker".into(), Vec::new()),
-                ("script".into(), Vec::new()),
             ]),
         }
     }
@@ -144,7 +134,6 @@ pub struct LibraryItemDto {
     pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
-    pub trashed: bool,
     pub updated_at: u64,
     pub meta: Option<String>,
     #[serde(default)]
@@ -156,7 +145,6 @@ pub struct LibraryItemDto {
 pub struct LibraryIndexDto {
     pub folders: Vec<LibraryFolder>,
     pub items: Vec<LibraryItemDto>,
-    pub trash: Vec<String>,
 }
 
 pub fn library_path(config_dir: &Path) -> PathBuf {
@@ -170,10 +158,12 @@ pub fn load_index(config_dir: &Path) -> Result<LibraryIndex, LibraryIndexError> 
     }
     let raw = fs::read_to_string(&path)?;
     let value: serde_json::Value = serde_json::from_str(&raw)?;
-    let (mut idx, dirty) = index_from_value(value)?;
+    let (mut idx, mut dirty, legacy_trash) = index_from_value(value)?;
     for key in ["macro", "clicker", "script"] {
         idx.entries.entry(key.into()).or_default();
-        idx.trash.entry(key.into()).or_default();
+    }
+    if migrate_legacy_trash(config_dir, &mut idx, &legacy_trash) {
+        dirty = true;
     }
     if dirty {
         save_index(config_dir, &idx)?;
@@ -181,11 +171,46 @@ pub fn load_index(config_dir: &Path) -> Result<LibraryIndex, LibraryIndexError> 
     Ok(idx)
 }
 
+/// One-shot migration: the soft-trash feature was removed, so any item still listed in a
+/// legacy `trash` map of `library.json` is hard-deleted (disk + index entry).
+/// Returns `true` when the index was changed (or a legacy `trash` key must be dropped).
+fn migrate_legacy_trash(
+    config_dir: &Path,
+    idx: &mut LibraryIndex,
+    legacy_trash: &HashMap<String, Vec<String>>,
+) -> bool {
+    let mut changed = false;
+    for (key, ids) in legacy_trash {
+        let Ok(kind) = LibraryKind::parse(key) else {
+            continue;
+        };
+        for id in ids {
+            match kind {
+                LibraryKind::Macro => {
+                    let _ = delete_macro(config_dir, id);
+                }
+                LibraryKind::Clicker => {
+                    let _ = delete_preset(config_dir, id);
+                }
+                LibraryKind::Script => {
+                    let _ = delete_script(config_dir, id);
+                }
+            }
+            if let Some(entries) = idx.entries.get_mut(kind.as_str()) {
+                entries.remove(id);
+            }
+            changed = true;
+        }
+    }
+    changed
+}
+
 /// Parse library.json, migrating v1 per-kind folders into a unified list when needed.
-/// Returns `(index, dirty)` — dirty means the on-disk file should be rewritten.
+/// Returns `(index, dirty, legacy_trash)` — dirty means the on-disk file should be rewritten;
+/// `legacy_trash` holds ids from the removed soft-trash map (to be hard-deleted once).
 fn index_from_value(
     value: serde_json::Value,
-) -> Result<(LibraryIndex, bool), LibraryIndexError> {
+) -> Result<(LibraryIndex, bool, HashMap<String, Vec<String>>), LibraryIndexError> {
     let version = value
         .get("version")
         .and_then(|v| v.as_u64())
@@ -196,11 +221,11 @@ fn index_from_value(
         .map(serde_json::from_value)
         .transpose()?
         .unwrap_or_default();
-    let trash: HashMap<String, Vec<String>> = value
+    let has_legacy_trash_key = value.get("trash").is_some();
+    let legacy_trash: HashMap<String, Vec<String>> = value
         .get("trash")
         .cloned()
-        .map(serde_json::from_value)
-        .transpose()?
+        .and_then(|v| serde_json::from_value(v).ok())
         .unwrap_or_default();
     let folders_val = value.get("folders").cloned().unwrap_or(serde_json::Value::Null);
 
@@ -210,13 +235,12 @@ fn index_from_value(
             version: version.max(2),
             folders,
             entries,
-            trash,
         };
-        let dirty = version < 2;
-        if dirty {
+        let dirty = version < 2 || has_legacy_trash_key;
+        if version < 2 {
             idx.version = 2;
         }
-        return Ok((idx, dirty));
+        return Ok((idx, dirty, legacy_trash));
     }
 
     // v1: folders keyed by kind
@@ -233,9 +257,9 @@ fn index_from_value(
             version: 2,
             folders,
             entries,
-            trash,
         },
         true,
+        legacy_trash,
     ))
 }
 
@@ -335,19 +359,8 @@ fn entry_meta(index: &LibraryIndex, kind: LibraryKind, id: &str) -> LibraryEntry
         .unwrap_or_default()
 }
 
-fn is_trashed(index: &LibraryIndex, kind: LibraryKind, id: &str) -> bool {
-    index
-        .trash
-        .get(kind_key(kind))
-        .is_some_and(|t| t.iter().any(|x| x == id))
-}
-
 pub fn entry_meta_for(index: &LibraryIndex, kind: LibraryKind, id: &str) -> LibraryEntryMeta {
     entry_meta(index, kind, id)
-}
-
-pub fn is_trashed_for(index: &LibraryIndex, kind: LibraryKind, id: &str) -> bool {
-    is_trashed(index, kind, id)
 }
 
 pub fn enrich_macro_summaries(
@@ -360,7 +373,6 @@ pub fn enrich_macro_summaries(
         s.folder_id = meta.folder_id;
         s.locked = meta.locked;
     }
-    summaries.retain(|s| !is_trashed(&index, LibraryKind::Macro, &s.name));
     Ok(())
 }
 
@@ -390,9 +402,6 @@ fn prune_orphans(index: &mut LibraryIndex, config_dir: &Path) -> Result<(), Libr
         if let Some(entries) = index.entries.get_mut(key) {
             entries.retain(|id, _| disk_set.contains(id));
         }
-        if let Some(trash) = index.trash.get_mut(key) {
-            trash.retain(|id| disk_set.contains(id));
-        }
     }
     Ok(())
 }
@@ -402,7 +411,7 @@ pub fn get_library_index(
     kind: LibraryKind,
 ) -> Result<LibraryIndexDto, LibraryIndexError> {
     let index = prepare_library_index(config_dir)?;
-    build_dto(&index, config_dir, kind, None, None, false, None)
+    build_dto(&index, config_dir, kind, None, None, None)
 }
 
 /// Load index, prune orphans, persist once — reuse for multi-kind Accueil queries.
@@ -417,7 +426,6 @@ pub fn prepare_library_index(config_dir: &Path) -> Result<LibraryIndex, LibraryI
 pub struct ListLibraryQuery {
     pub folder_id: Option<String>,
     pub query: Option<String>,
-    pub include_trash: bool,
     pub favorites_only: bool,
     pub favorite_ids: Vec<String>,
 }
@@ -444,7 +452,6 @@ pub fn list_library_items_from_index(
         kind,
         q.folder_id.as_deref(),
         q.query.as_deref(),
-        q.include_trash,
         script_names,
     )
     .map(|mut dto| {
@@ -462,7 +469,6 @@ fn build_dto(
     kind: LibraryKind,
     folder_filter: Option<&str>,
     query: Option<&str>,
-    include_trash: bool,
     script_names_hint: Option<&HashMap<String, String>>,
 ) -> Result<LibraryIndexDto, LibraryIndexError> {
     let key = kind_key(kind);
@@ -473,7 +479,6 @@ fn build_dto(
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
             .then_with(|| a.id.cmp(&b.id))
     });
-    let trash = index.trash.get(key).cloned().unwrap_or_default();
     let q_lower = query.map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty());
 
     let mut items = Vec::new();
@@ -493,23 +498,10 @@ fn build_dto(
         &owned_names
     };
     for id in list_disk_ids(config_dir, kind)? {
-        let trashed = is_trashed(index, kind, &id);
-        if trashed && !include_trash {
-            continue;
-        }
-        if !trashed && include_trash {
-            continue;
-        }
         let meta = entry_meta(index, kind, &id);
         if let Some(fid) = folder_filter {
-            if fid == "__trash" {
-                if !trashed {
-                    continue;
-                }
-            } else if fid != "__all" && fid != "__favorites" {
-                if meta.folder_id.as_deref() != Some(fid) {
-                    continue;
-                }
+            if fid != "__all" && fid != "__favorites" && meta.folder_id.as_deref() != Some(fid) {
+                continue;
             }
         }
         let name = script_names
@@ -530,7 +522,6 @@ fn build_dto(
             locked: meta.locked,
             enabled: meta.enabled,
             icon: meta.icon.clone(),
-            trashed,
             updated_at,
             meta: None,
             sort_order: meta.sort_order,
@@ -541,11 +532,7 @@ fn build_dto(
             .cmp(&b.sort_order)
             .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
-    Ok(LibraryIndexDto {
-        folders,
-        items,
-        trash,
-    })
+    Ok(LibraryIndexDto { folders, items })
 }
 
 fn new_folder_id() -> String {
@@ -787,22 +774,57 @@ pub fn move_library_item(
     id: String,
     folder_id: Option<String>,
     before_id: Option<String>,
+    before_kind: Option<LibraryKind>,
 ) -> Result<(), LibraryIndexError> {
     let disk_ids = list_disk_ids(config_dir, kind)?;
     disk_ids
         .iter()
         .find(|x| **x == id)
         .ok_or_else(|| LibraryIndexError::Other(format!("élément introuvable: {id}")))?;
-    if let Some(ref bid) = before_id {
-        if bid == &id {
+
+    let resolved_before_kind = if let Some(ref bid) = before_id {
+        if before_kind == Some(kind) && bid == &id {
             return Ok(());
         }
-        if !disk_ids.iter().any(|x| x == bid) {
-            return Err(LibraryIndexError::Other(format!(
-                "élément cible introuvable: {bid}"
-            )));
+        match before_kind {
+            Some(bk) => {
+                let before_disk = list_disk_ids(config_dir, bk)?;
+                if !before_disk.iter().any(|x| x == bid) {
+                    return Err(LibraryIndexError::Other(format!(
+                        "élément cible introuvable: {bid}"
+                    )));
+                }
+                Some(bk)
+            }
+            None => {
+                // Legacy / Accueil: prefer same-kind, else any kind on disk.
+                if disk_ids.iter().any(|x| x == bid) {
+                    if bid == &id {
+                        return Ok(());
+                    }
+                    Some(kind)
+                } else {
+                    let mut found = None;
+                    for k in [LibraryKind::Macro, LibraryKind::Clicker, LibraryKind::Script] {
+                        if k == kind {
+                            continue;
+                        }
+                        let ids = list_disk_ids(config_dir, k)?;
+                        if ids.iter().any(|x| x == bid) {
+                            found = Some(k);
+                            break;
+                        }
+                    }
+                    Some(found.ok_or_else(|| {
+                        LibraryIndexError::Other(format!("élément cible introuvable: {bid}"))
+                    })?)
+                }
+            }
         }
-    }
+    } else {
+        None
+    };
+
     if let Some(ref fid) = folder_id {
         let index = load_index(config_dir)?;
         if !index.folders.iter().any(|f| f.id == *fid) {
@@ -811,45 +833,54 @@ pub fn move_library_item(
     }
 
     let mut index = load_index(config_dir)?;
-    let key = kind_key(kind);
 
-    // Sibling ids in the target folder (non-trashed), current order.
-    let trash: HashSet<String> = index
-        .trash
-        .get(key)
-        .cloned()
-        .unwrap_or_default()
-        .into_iter()
-        .collect();
-    let mut siblings: Vec<String> = disk_ids
-        .into_iter()
-        .filter(|sid| !trash.contains(sid))
-        .filter(|sid| {
-            let meta = entry_meta(&index, kind, sid);
-            meta.folder_id == folder_id
-        })
-        .collect();
+    // Mixed-kind siblings in the target folder (shared visual order).
+    #[derive(Clone, PartialEq, Eq)]
+    struct SiblingRef {
+        kind: LibraryKind,
+        id: String,
+    }
+
+    let mut siblings: Vec<SiblingRef> = Vec::new();
+    for k in [LibraryKind::Macro, LibraryKind::Clicker, LibraryKind::Script] {
+        for sid in list_disk_ids(config_dir, k)? {
+            let meta = entry_meta(&index, k, &sid);
+            if meta.folder_id == folder_id {
+                siblings.push(SiblingRef { kind: k, id: sid });
+            }
+        }
+    }
     siblings.sort_by(|a, b| {
-        let ma = entry_meta(&index, kind, a);
-        let mb = entry_meta(&index, kind, b);
+        let ma = entry_meta(&index, a.kind, &a.id);
+        let mb = entry_meta(&index, b.kind, &b.id);
         ma.sort_order
             .cmp(&mb.sort_order)
-            .then_with(|| a.to_lowercase().cmp(&b.to_lowercase()))
+            .then_with(|| a.id.to_lowercase().cmp(&b.id.to_lowercase()))
+            .then_with(|| a.kind.as_str().cmp(b.kind.as_str()))
     });
-    siblings.retain(|sid| sid != &id);
+    siblings.retain(|s| !(s.kind == kind && s.id == id));
 
-    let insert_at = match &before_id {
-        Some(bid) => siblings.iter().position(|s| s == bid).unwrap_or(siblings.len()),
-        None => siblings.len(),
+    let insert_at = match (&before_id, resolved_before_kind) {
+        (Some(bid), Some(bk)) => siblings
+            .iter()
+            .position(|s| s.kind == bk && s.id == *bid)
+            .unwrap_or(siblings.len()),
+        _ => siblings.len(),
     };
-    siblings.insert(insert_at, id.clone());
+    siblings.insert(
+        insert_at,
+        SiblingRef {
+            kind,
+            id: id.clone(),
+        },
+    );
 
-    // Apply folder + contiguous sort_order for all siblings in target.
-    for (i, sid) in siblings.iter().enumerate() {
-        let mut meta = entry_meta(&index, kind, sid);
+    // Apply folder + contiguous sort_order across all kinds in the target.
+    for (i, s) in siblings.iter().enumerate() {
+        let mut meta = entry_meta(&index, s.kind, &s.id);
         meta.folder_id = folder_id.clone();
         meta.sort_order = i as i32;
-        set_entry(&mut index, kind, sid, meta);
+        set_entry(&mut index, s.kind, &s.id, meta);
     }
 
     save_index(config_dir, &index)?;
@@ -876,9 +907,6 @@ pub fn set_library_item_locked(
 
 pub fn is_enabled(config_dir: &Path, kind: LibraryKind, id: &str) -> Result<bool, LibraryIndexError> {
     let index = load_index(config_dir)?;
-    if is_trashed(&index, kind, id) {
-        return Ok(false);
-    }
     Ok(entry_meta(&index, kind, id).enabled)
 }
 
@@ -925,139 +953,6 @@ pub fn set_library_item_icon(
     Ok(())
 }
 
-pub fn trash_library_item(
-    config_dir: &Path,
-    kind: LibraryKind,
-    id: String,
-) -> Result<(), LibraryIndexError> {
-    list_disk_ids(config_dir, kind)?
-        .iter()
-        .find(|x| **x == id)
-        .ok_or_else(|| LibraryIndexError::Other(format!("élément introuvable: {id}")))?;
-    let mut index = load_index(config_dir)?;
-    let trash = index.trash.entry(kind_key(kind).to_string()).or_default();
-    if !trash.iter().any(|x| x == &id) {
-        trash.push(id.clone());
-    }
-    let mut meta = entry_meta(&index, kind, &id);
-    meta.trashed_at = Some(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0),
-    );
-    set_entry(&mut index, kind, &id, meta);
-    save_index(config_dir, &index)?;
-    Ok(())
-}
-
-/// Permanently delete every trashed library item (disk + index).
-pub fn purge_library_trash(config_dir: &Path) -> Result<usize, LibraryIndexError> {
-    purge_library_trash_older_than(config_dir, 0)
-}
-
-/// Count trash entries that would be purged by [`purge_library_trash_older_than`].
-pub fn count_library_trash_older_than(
-    config_dir: &Path,
-    days: u32,
-) -> Result<usize, LibraryIndexError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let cutoff = if days == 0 {
-        None
-    } else {
-        Some(now.saturating_sub(u64::from(days) * 86_400))
-    };
-    let index = load_index(config_dir)?;
-    let mut n = 0usize;
-    for kind in [LibraryKind::Macro, LibraryKind::Clicker, LibraryKind::Script] {
-        let key = kind_key(kind).to_string();
-        let ids = index.trash.get(&key).cloned().unwrap_or_default();
-        for id in ids {
-            let meta = entry_meta(&index, kind, &id);
-            let age_ok = match cutoff {
-                None => true,
-                Some(c) => meta.trashed_at.map(|t| t <= c).unwrap_or(false),
-            };
-            if age_ok {
-                n += 1;
-            }
-        }
-    }
-    Ok(n)
-}
-
-/// Purge trash entries older than `days`. When `days == 0`, purge all trash.
-pub fn purge_library_trash_older_than(
-    config_dir: &Path,
-    days: u32,
-) -> Result<usize, LibraryIndexError> {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let cutoff = if days == 0 {
-        None
-    } else {
-        Some(now.saturating_sub(u64::from(days) * 86_400))
-    };
-    let mut index = load_index(config_dir)?;
-    let mut n = 0usize;
-    for kind in [LibraryKind::Macro, LibraryKind::Clicker, LibraryKind::Script] {
-        let key = kind_key(kind).to_string();
-        let ids = index.trash.get(&key).cloned().unwrap_or_default();
-        let mut kept = Vec::new();
-        for id in ids {
-            let meta = entry_meta(&index, kind, &id);
-            let age_ok = match cutoff {
-                None => true,
-                Some(c) => meta.trashed_at.map(|t| t <= c).unwrap_or(false),
-            };
-            if !age_ok {
-                kept.push(id);
-                continue;
-            }
-            match kind {
-                LibraryKind::Macro => {
-                    let _ = delete_macro(config_dir, &id);
-                }
-                LibraryKind::Clicker => {
-                    let _ = delete_preset(config_dir, &id);
-                }
-                LibraryKind::Script => {
-                    let _ = delete_script(config_dir, &id);
-                }
-            }
-            if let Some(entries) = index.entries.get_mut(&key) {
-                entries.remove(&id);
-            }
-            n += 1;
-        }
-        if let Some(trash) = index.trash.get_mut(&key) {
-            *trash = kept;
-        }
-    }
-    save_index(config_dir, &index)?;
-    Ok(n)
-}
-
-pub fn restore_library_item(
-    config_dir: &Path,
-    kind: LibraryKind,
-    id: String,
-) -> Result<(), LibraryIndexError> {
-    let mut index = load_index(config_dir)?;
-    let trash = index.trash.entry(kind_key(kind).to_string()).or_default();
-    trash.retain(|x| x != &id);
-    let mut meta = entry_meta(&index, kind, &id);
-    meta.trashed_at = None;
-    set_entry(&mut index, kind, &id, meta);
-    save_index(config_dir, &index)?;
-    Ok(())
-}
-
 pub fn rename_library_entry_key(
     config_dir: &Path,
     kind: LibraryKind,
@@ -1069,13 +964,6 @@ pub fn rename_library_entry_key(
     if let Some(entries) = index.entries.get_mut(key) {
         if let Some(meta) = entries.remove(from) {
             entries.insert(to.to_string(), meta);
-        }
-    }
-    if let Some(trash) = index.trash.get_mut(key) {
-        for slot in trash.iter_mut() {
-            if slot == from {
-                *slot = to.to_string();
-            }
         }
     }
     save_index(config_dir, &index)?;
@@ -1091,9 +979,6 @@ pub fn remove_library_entry(
     let key = kind_key(kind);
     if let Some(entries) = index.entries.get_mut(key) {
         entries.remove(id);
-    }
-    if let Some(trash) = index.trash.get_mut(key) {
-        trash.retain(|x| x != id);
     }
     save_index(config_dir, &index)?;
     Ok(())
@@ -1133,7 +1018,7 @@ mod tests {
     }
 
     #[test]
-    fn folder_move_lock_trash() {
+    fn folder_move_lock() {
         let dir = temp_dir();
         create_macro(&dir, Some("Demo")).unwrap();
         let folder = create_library_folder(&dir, LibraryKind::Macro, "Scripts".into(), None).unwrap();
@@ -1143,23 +1028,43 @@ mod tests {
             "Demo".into(),
             Some(folder.id.clone()),
             None,
+            None,
         )
             .unwrap();
         set_library_item_locked(&dir, LibraryKind::Macro, "Demo".into(), true).unwrap();
         assert!(is_locked(&dir, LibraryKind::Macro, "Demo").unwrap());
-        trash_library_item(&dir, LibraryKind::Macro, "Demo".into()).unwrap();
-        let dto = list_library_items(
-            &dir,
-            LibraryKind::Macro,
-            ListLibraryQuery {
-                include_trash: true,
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let dto = list_library_items(&dir, LibraryKind::Macro, ListLibraryQuery::default())
+            .unwrap();
         assert_eq!(dto.items.len(), 1);
-        assert!(dto.items[0].trashed);
-        restore_library_item(&dir, LibraryKind::Macro, "Demo".into()).unwrap();
+        assert!(dto.items[0].locked);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn legacy_trash_is_hard_deleted_on_load() {
+        let dir = temp_dir();
+        create_macro(&dir, Some("Keep")).unwrap();
+        create_macro(&dir, Some("Gone")).unwrap();
+        let path = library_path(&dir);
+        let raw = r#"{
+          "version": 2,
+          "folders": [],
+          "entries": {
+            "macro": {"Gone": {"locked": false, "sortOrder": 0, "trashedAt": 1}}
+          },
+          "trash": {"macro": ["Gone"], "clicker": [], "script": []}
+        }"#;
+        fs::write(&path, raw).unwrap();
+        let idx = load_index(&dir).unwrap();
+        assert!(!idx.entries["macro"].contains_key("Gone"));
+        assert!(!macros_dir(&dir).join("Gone.json").exists());
+        assert!(macros_dir(&dir).join("Keep.json").exists());
+        let saved: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(saved.get("trash").is_none());
+        let dto = get_library_index(&dir, LibraryKind::Macro).unwrap();
+        assert_eq!(dto.items.len(), 1);
+        assert_eq!(dto.items[0].id, "Keep");
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -1177,6 +1082,7 @@ mod tests {
             "A".into(),
             Some(folder.id.clone()),
             None,
+            None,
         )
         .unwrap();
         move_library_item(
@@ -1185,6 +1091,7 @@ mod tests {
             "B".into(),
             Some(folder.id.clone()),
             None,
+            None,
         )
         .unwrap();
         move_library_item(
@@ -1192,6 +1099,7 @@ mod tests {
             LibraryKind::Macro,
             "C".into(),
             Some(folder.id.clone()),
+            None,
             None,
         )
         .unwrap();
@@ -1201,6 +1109,7 @@ mod tests {
             "C".into(),
             Some(folder.id.clone()),
             Some("A".into()),
+            None,
         )
         .unwrap();
         let dto = get_library_index(&dir, LibraryKind::Macro).unwrap();
@@ -1215,6 +1124,56 @@ mod tests {
     }
 
     #[test]
+    fn reorder_clicker_before_macro_in_folder() {
+        use crate::clicker::ClickerConfig;
+        use crate::clicker_presets::save_preset;
+        let dir = temp_dir();
+        create_macro(&dir, Some("Albion Market")).unwrap();
+        save_preset(&dir, "Clicker max", &ClickerConfig::default()).unwrap();
+        let folder =
+            create_library_folder(&dir, LibraryKind::Macro, "Albion".into(), None).unwrap();
+        move_library_item(
+            &dir,
+            LibraryKind::Macro,
+            "Albion Market".into(),
+            Some(folder.id.clone()),
+            None,
+            None,
+        )
+        .unwrap();
+        move_library_item(
+            &dir,
+            LibraryKind::Clicker,
+            "Clicker max".into(),
+            Some(folder.id.clone()),
+            Some("Albion Market".into()),
+            Some(LibraryKind::Macro),
+        )
+        .unwrap();
+        let macro_dto = get_library_index(&dir, LibraryKind::Macro).unwrap();
+        let clicker_dto = get_library_index(&dir, LibraryKind::Clicker).unwrap();
+        let macro_item = macro_dto
+            .items
+            .iter()
+            .find(|i| i.id == "Albion Market")
+            .unwrap();
+        let clicker_item = clicker_dto
+            .items
+            .iter()
+            .find(|i| i.id == "Clicker max")
+            .unwrap();
+        assert_eq!(macro_item.folder_id.as_deref(), Some(folder.id.as_str()));
+        assert_eq!(clicker_item.folder_id.as_deref(), Some(folder.id.as_str()));
+        assert!(
+            clicker_item.sort_order < macro_item.sort_order,
+            "clicker should sort before macro (got clicker={} macro={})",
+            clicker_item.sort_order,
+            macro_item.sort_order
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn delete_library_folder_unassigns_items() {
         let dir = temp_dir();
         create_macro(&dir, Some("Demo")).unwrap();
@@ -1225,6 +1184,7 @@ mod tests {
             LibraryKind::Macro,
             "Demo".into(),
             Some(folder.id.clone()),
+            None,
             None,
         )
         .unwrap();
@@ -1251,6 +1211,7 @@ mod tests {
             LibraryKind::Macro,
             "M1".into(),
             Some(folder.id.clone()),
+            None,
             None,
         )
         .unwrap();
@@ -1291,6 +1252,7 @@ mod tests {
             LibraryKind::Script,
             "s1".into(),
             Some(folder.id.clone()),
+            None,
             None,
         )
         .unwrap();
@@ -1335,43 +1297,6 @@ mod tests {
         let saved: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert!(saved["folders"].is_array());
-        let _ = fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn purge_trash_by_age() {
-        let dir = temp_dir();
-        create_macro(&dir, Some("OldTrash")).unwrap();
-        create_macro(&dir, Some("FreshTrash")).unwrap();
-        create_macro(&dir, Some("NoStamp")).unwrap();
-        trash_library_item(&dir, LibraryKind::Macro, "OldTrash".into()).unwrap();
-        trash_library_item(&dir, LibraryKind::Macro, "FreshTrash".into()).unwrap();
-        trash_library_item(&dir, LibraryKind::Macro, "NoStamp".into()).unwrap();
-
-        let mut index = load_index(&dir).unwrap();
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        index.entries.get_mut("macro").unwrap().get_mut("OldTrash").unwrap().trashed_at =
-            Some(now.saturating_sub(10 * 86_400));
-        index.entries.get_mut("macro").unwrap().get_mut("FreshTrash").unwrap().trashed_at =
-            Some(now);
-        index.entries.get_mut("macro").unwrap().get_mut("NoStamp").unwrap().trashed_at = None;
-        save_index(&dir, &index).unwrap();
-
-        let n = purge_library_trash_older_than(&dir, 7).unwrap();
-        assert_eq!(n, 1, "only OldTrash should be purged");
-        let after = load_index(&dir).unwrap();
-        let trash = after.trash.get("macro").cloned().unwrap_or_default();
-        assert!(!trash.iter().any(|id| id == "OldTrash"));
-        assert!(trash.iter().any(|id| id == "FreshTrash"));
-        assert!(trash.iter().any(|id| id == "NoStamp"));
-
-        let n0 = purge_library_trash_older_than(&dir, 0).unwrap();
-        assert_eq!(n0, 2, "days=0 purges remaining trash");
-        let emptied = load_index(&dir).unwrap();
-        assert!(emptied.trash.get("macro").map(|t| t.is_empty()).unwrap_or(true));
         let _ = fs::remove_dir_all(&dir);
     }
 

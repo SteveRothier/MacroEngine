@@ -12,7 +12,6 @@ import type {
   AppearancePrefs,
   AutomationPrefs,
   ConfirmationsPrefs,
-  MaintenancePrefs,
   ScriptsPrefs,
   ShellPrefs,
 } from "../settings/settingsTypes";
@@ -21,7 +20,6 @@ import {
   mergeAppearancePrefs,
   mergeAutomationPrefs,
   mergeConfirmationsPrefs,
-  mergeMaintenancePrefs,
   mergeScriptsPrefs,
   mergeShellPrefs,
 } from "../settings/settingsTypes";
@@ -46,7 +44,6 @@ export type PersistBundle = {
   confirmations?: Partial<ConfirmationsPrefs>;
   scripts?: Partial<ScriptsPrefs>;
   appearance?: Partial<AppearancePrefs>;
-  maintenance?: Partial<MaintenancePrefs>;
 };
 
 function mergeSettings(current: AppSettings, bundle: PersistBundle): AppSettings {
@@ -90,10 +87,6 @@ function mergeSettings(current: AppSettings, bundle: PersistBundle): AppSettings
     appearance: mergeAppearancePrefs({
       ...current.appearance,
       ...bundle.appearance,
-    }),
-    maintenance: mergeMaintenancePrefs({
-      ...current.maintenance,
-      ...bundle.maintenance,
     }),
     hotkeys: current.hotkeys,
   };

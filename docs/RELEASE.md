@@ -3,9 +3,9 @@
 ## Phase 27
 
 - Workspace Linear : **bibliothèque latérale** + éditeur (plus de page Accueil)
-- Tokens Linear (IBM Plex, accent `#2F6FED`, surfaces `#0C0C0C` / `#171719`)
-- Play / Stop dans les titlebars éditeurs (plus de barre d’exécution bas) ; onglets docs seuls
-- Suppression définitive depuis le panneau (plus de filtre Corbeille UI) ; `+` crée dans le dossier focusé
+- Charte **Lavender** (`#A99ACB` défaut, accents blue/teal swapables via CSS vars) ; library resize 190–360 ; status bar
+- Exécuter / Pause / Arrêter titlebars ; dock Propriétés macro ; console script repliée par défaut
+- Suppression définitive depuis le panneau ; `+` crée dans le dossier focusé
 
 ## Phase 26
 

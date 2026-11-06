@@ -6,6 +6,7 @@ import { newScriptId } from "../scripts/newScriptId";
 import {
   type EngineStatus,
   type HotkeyBindings,
+  vkLabel,
 } from "../macros/types";
 import {
   mergeAccueilPrefs,
@@ -28,11 +29,13 @@ import { useZoneFeedbackToasts } from "../clicker/useZoneFeedbackToasts";
 import { usePixelFeedbackToasts } from "../clicker/usePixelFeedbackToasts";
 import {
   AppShell,
+  StatusBar,
   ToastProvider,
   useToast,
   WindowTitleBar,
   type BarContextAction,
   type DocumentTabItem,
+  type StatusBarState,
   type TabContextAction,
 } from "../ui/shell";
 import { TitleBarProvider, useTitleBarContext } from "../ui/shell/TitleBarContext";
@@ -108,6 +111,7 @@ function EditorSuspenseFallback() {
 
 const JOURNAL_OPEN_KEY = "caster-journal-open";
 const LEGACY_JOURNAL_OPEN_KEY = "v2-journal-open";
+const LIBRARY_WIDTH_KEY = "caster-library-width";
 
 function readJournalOpen(): boolean {
   try {
@@ -121,6 +125,25 @@ function readJournalOpen(): boolean {
   } catch {
     return false;
   }
+}
+
+function readLibraryWidth(): number {
+  try {
+    const raw = localStorage.getItem(LIBRARY_WIDTH_KEY);
+    const n = raw ? Number(raw) : 250;
+    if (!Number.isFinite(n)) return 250;
+    return Math.max(190, Math.min(360, Math.round(n)));
+  } catch {
+    return 250;
+  }
+}
+
+function formatSessionTimer(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
 const DEFAULT_HOTKEYS: HotkeyBindings = {
@@ -216,8 +239,19 @@ function MainAppInner({
   useZoneFeedbackToasts();
   usePixelFeedbackToasts();
   const [journalOpen, setJournalOpen] = useState(readJournalOpen);
+  const [libraryWidth, setLibraryWidth] = useState(readLibraryWidth);
+  const [sessionElapsedMs, setSessionElapsedMs] = useState(0);
+  const sessionStartedAt = useRef<number | null>(null);
 
   const running = status.state === "running" || status.state === "paused";
+  const statusBarState: StatusBarState =
+    status.state === "running"
+      ? "running"
+      : status.state === "paused"
+        ? "paused"
+        : status.state === "error"
+          ? "error"
+          : "idle";
   const activeDoc = activeDocTab(workspace);
   const settingsActive = workspace.shellView.type === "settings";
 
@@ -230,6 +264,40 @@ function MainAppInner({
   const [docRemountKeys, setDocRemountKeys] = useState<Record<string, number>>(
     {},
   );
+
+  useEffect(() => {
+    if (status.state === "running") {
+      if (sessionStartedAt.current == null) {
+        sessionStartedAt.current = Date.now();
+      }
+      const tick = () => {
+        const start = sessionStartedAt.current ?? Date.now();
+        setSessionElapsedMs(Date.now() - start);
+      };
+      tick();
+      const id = window.setInterval(tick, 1000);
+      return () => window.clearInterval(id);
+    }
+    if (status.state === "paused") {
+      return;
+    }
+    sessionStartedAt.current = null;
+    setSessionElapsedMs(0);
+  }, [status.state]);
+
+  const onLibraryWidthChange = useCallback((w: number) => {
+    setLibraryWidth(w);
+    try {
+      localStorage.setItem(LIBRARY_WIDTH_KEY, String(w));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const journalHasErrors = useMemo(() => {
+    const recent = journalLines.slice(-16);
+    return recent.some((l) => l.level === "error" || l.level === "warn");
+  }, [journalLines]);
 
   const onThemeChange = useCallback((next: ThemeMode) => {
     setTheme(next);
@@ -795,8 +863,12 @@ function MainAppInner({
 
     const emptyPane = showEmpty ? (
       <div className="caster-stage-empty">
-        <h2>{t("shell.library.emptyTitle")}</h2>
-        <p>{t("shell.library.emptyLead")}</p>
+        <h2 className="caster-stage-empty-title">
+          {t("shell.library.emptyTitle")}
+        </h2>
+        <p className="caster-stage-empty-lead">
+          {t("shell.library.emptyLead")}
+        </p>
         <div className="caster-stage-empty-actions">
           <button
             type="button"
@@ -847,6 +919,11 @@ function MainAppInner({
               onStatus={setStatus}
               onOpenScript={(id, label) => openDoc("script", id, label ?? id)}
               onOpenProcessSettings={() => goSettings("security")}
+              onOpenJournal={() => {
+                setJournalOpen(true);
+                void persistShell({ journalOpen: true });
+              }}
+              journalHasErrors={journalHasErrors}
             />
           );
         }
@@ -929,9 +1006,46 @@ function MainAppInner({
     <>
       <AppShell
         density={appearancePrefs.density}
-        accent={appearancePrefs.accent === "default" ? "blue" : appearancePrefs.accent}
+        accent={
+          appearancePrefs.accent === "default"
+            ? "lavender"
+            : appearancePrefs.accent
+        }
         fontScale={appearancePrefs.fontScale}
         reduceMotion={appearancePrefs.reduceMotion}
+        libraryWidth={libraryWidth}
+        onLibraryWidthChange={onLibraryWidthChange}
+        statusBar={
+          <StatusBar
+            state={statusBarState}
+            message={status.sessionName ?? status.message ?? null}
+            hotkeyHint={`${vkLabel(hotkeys.macroVk)} · ${t("shell.exec.run")}`}
+            timerLabel={
+              running || sessionElapsedMs > 0
+                ? formatSessionTimer(sessionElapsedMs)
+                : "00:00:00"
+            }
+          />
+        }
+        console={
+          <RunJournalDock
+            lines={journalLines}
+            onClear={clearJournal}
+            open={journalOpen}
+            onOpenChange={(open) => {
+              setJournalOpen(open);
+              void persistShell({ journalOpen: open });
+            }}
+            emptyCta={{
+              label: t("runs.emptyCta"),
+              onClick: () => {
+                setJournalOpen(false);
+                void persistShell({ journalOpen: false });
+                setWorkspace((ws) => selectEmpty(ws));
+              },
+            }}
+          />
+        }
         library={
           <WorkspaceLibrary
             activeKey={activeLibKey}
@@ -956,6 +1070,10 @@ function MainAppInner({
             onCreateClicker={() => void onCreateClicker()}
             onCreateScript={() => void onCreateScript()}
             onRefresh={bumpRefresh}
+            onOpenSettings={(section) => {
+              prefetchEditor("settings");
+              goSettings(section ?? "application");
+            }}
             onItemRenamed={(kind, id, newName) => {
               setWorkspace((ws) => {
                 const tab = ws.tabs.find(
@@ -1014,23 +1132,6 @@ function MainAppInner({
       >
         {stage}
       </AppShell>
-      <RunJournalDock
-        lines={journalLines}
-        onClear={clearJournal}
-        open={journalOpen}
-        onOpenChange={(open) => {
-          setJournalOpen(open);
-          void persistShell({ journalOpen: open });
-        }}
-        emptyCta={{
-          label: t("runs.emptyCta"),
-          onClick: () => {
-            setJournalOpen(false);
-            void persistShell({ journalOpen: false });
-            setWorkspace((ws) => selectEmpty(ws));
-          },
-        }}
-      />
       <ConfirmHost />
       <PromptHost />
       <ScriptLanguageHost />

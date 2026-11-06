@@ -121,7 +121,7 @@ fn assign_folder(
     if folder_id.is_none() {
         return Ok(());
     }
-    move_library_item(config_dir, kind, id.to_string(), folder_id, None)
+    move_library_item(config_dir, kind, id.to_string(), folder_id, None, None)
         .map_err(|e| ConvertError::Message(e.to_string()))
 }
 
@@ -1275,6 +1275,7 @@ mod tests {
             param_values: Default::default(),
             process_filter: Default::default(),
             local_process_filter: Default::default(),
+            trigger: crate::schema::Trigger::Manual,
         };
         save_script(&dir, &doc).unwrap();
         let r = convert_library_item(
@@ -1584,6 +1585,7 @@ mod tests {
             param_values: Default::default(),
             process_filter: Default::default(),
             local_process_filter: Default::default(),
+            trigger: crate::schema::Trigger::Manual,
         };
         save_script(&dir, &doc).unwrap();
         let r = convert_library_item(

@@ -1,6 +1,6 @@
 # Guide utilisateur — Caster
 
-Caster est une application Windows locale : autoclicker, séquenceur de macros et scripts JavaScript/TypeScript. Le workspace combine une **bibliothèque latérale** et un **éditeur** (onglets).
+Caster est une application Windows locale : autoclicker, séquenceur de macros et scripts JavaScript/TypeScript. Le workspace combine une **bibliothèque latérale** et un **éditeur** (onglets). Thème sombre Lavender par défaut (accent modifiable dans Paramètres → Apparence).
 
 ## Bibliothèque
 

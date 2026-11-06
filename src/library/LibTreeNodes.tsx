@@ -1,5 +1,18 @@
-import type { MouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { Code2, Folder, FolderOpen, MousePointer2, Star, Workflow } from "lucide-react";
+import {
+  useEffect,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import {
+  Code2,
+  Folder,
+  FolderOpen,
+  MousePointer2,
+  Star,
+  Workflow,
+} from "lucide-react";
 import type {
   AutomationFolderOption,
   AutomationRow,
@@ -21,24 +34,194 @@ export function KindIcon({ kind }: { kind: AutomationRow["kind"] }) {
   );
 }
 
+/** In-place rename: same DOM/CSS as `.caster-lib-nav-label` (no input chrome). */
+export function LibRenameInput({
+  initial,
+  ariaLabel,
+  onCommit,
+  onCancel,
+}: {
+  initial: string;
+  ariaLabel?: string;
+  onCommit: (next: string) => void;
+  onCancel: () => void;
+}) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const doneRef = useRef(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }, []);
+
+  function finish(commit: boolean) {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    const next = (ref.current?.textContent ?? "").replace(/\u00a0/g, " ");
+    if (commit) onCommit(next);
+    else onCancel();
+  }
+
+  return (
+    <span
+      ref={ref}
+      className="caster-lib-nav-label"
+      role="textbox"
+      aria-label={ariaLabel ?? initial}
+      contentEditable
+      suppressContentEditableWarning
+      spellCheck={false}
+      onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onKeyDown={(e: ReactKeyboardEvent<HTMLSpanElement>) => {
+        e.stopPropagation();
+        if (e.key === "Enter") {
+          e.preventDefault();
+          finish(true);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          finish(false);
+        }
+      }}
+      onPaste={(e) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData("text/plain").replace(/\s+/g, " ");
+        document.execCommand("insertText", false, text);
+      }}
+      onBlur={() => finish(true)}
+    >
+      {initial}
+    </span>
+  );
+}
+
+/** Temporary folder row while naming a new folder (no DnD / context menu). */
+export function LibDraftFolderRow({
+  navKey,
+  focused,
+  ariaLabel,
+  remountKey,
+  onCommit,
+  onCancel,
+}: {
+  navKey: string;
+  focused: boolean;
+  ariaLabel: string;
+  remountKey: number;
+  onCommit: (next: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="caster-lib-tree-node" data-folder-draft="">
+      <div
+        role="treeitem"
+        tabIndex={-1}
+        data-nav-key={navKey}
+        className={cx(
+          "caster-lib-nav-row",
+          "caster-lib-nav-row--folder",
+          "is-editing",
+          focused && "is-focused",
+        )}
+        aria-label={ariaLabel}
+        aria-selected={focused || undefined}
+      >
+        <span className="caster-lib-tree-twist" aria-hidden />
+        <Folder size={15} aria-hidden className="caster-lib-folder-icon" />
+        <LibRenameInput
+          key={remountKey}
+          initial=""
+          ariaLabel={ariaLabel}
+          onCommit={onCommit}
+          onCancel={onCancel}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Temporary item row while naming a new automation (no DnD / context menu). */
+export function LibDraftItemRow({
+  kind,
+  navKey,
+  focused,
+  ariaLabel,
+  remountKey,
+  onCommit,
+  onCancel,
+}: {
+  kind: AutomationRow["kind"];
+  navKey: string;
+  focused: boolean;
+  ariaLabel: string;
+  remountKey: number;
+  onCommit: (next: string) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      role="treeitem"
+      tabIndex={-1}
+      data-nav-key={navKey}
+      data-item-draft=""
+      className={cx(
+        "caster-lib-nav-row",
+        "caster-lib-item",
+        "is-editing",
+        focused && "is-focused",
+      )}
+      aria-label={ariaLabel}
+      aria-selected={focused || undefined}
+    >
+      <KindIcon kind={kind} />
+      <LibRenameInput
+        key={remountKey}
+        initial=""
+        ariaLabel={ariaLabel}
+        onCommit={onCommit}
+        onCancel={onCancel}
+      />
+    </div>
+  );
+}
+
 export function LibItem({
   row,
   active,
   focused,
   dragging,
   canDrag,
+  dropEdge,
+  editing,
   onOpen,
   onContextMenu,
   onPointerDown,
+  onStartRename,
+  onCommitRename,
+  onCancelRename,
+  onFocusRow,
 }: {
   row: AutomationRow;
   active: boolean;
   focused?: boolean;
   dragging?: boolean;
   canDrag?: boolean;
+  dropEdge?: "before" | "after" | null;
+  editing?: boolean;
   onOpen: () => void;
   onContextMenu: (e: MouseEvent) => void;
   onPointerDown?: (e: ReactPointerEvent) => void;
+  onStartRename?: () => void;
+  onCommitRename?: (next: string) => void;
+  onCancelRename?: () => void;
+  onFocusRow?: () => void;
 }) {
   return (
     <button
@@ -51,28 +234,49 @@ export function LibItem({
         "caster-lib-item",
         canDrag && "is-draggable",
         active && "is-active",
-        focused && "is-focused",
+        focused && !editing && "is-focused",
         dragging && "is-dragging",
-        row.favorite && "is-favorite",
-        row.trashed && "is-trashed",
+        editing && "is-editing",
+        dropEdge === "before" && "is-drop-before",
+        dropEdge === "after" && "is-drop-after",
       )}
       aria-current={active ? "true" : undefined}
       aria-selected={focused || undefined}
       data-nav-key={rowDomKey(row)}
-      onPointerDown={onPointerDown}
+      onFocus={onFocusRow}
+      onPointerDown={editing ? undefined : onPointerDown}
       onDragStart={(e) => e.preventDefault()}
-      onClick={onOpen}
-      onDoubleClick={onOpen}
+      onClick={(e) => {
+        if (editing) {
+          e.preventDefault();
+          return;
+        }
+        onOpen();
+      }}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!row.locked) onStartRename?.();
+      }}
       onContextMenu={onContextMenu}
     >
       <KindIcon kind={row.kind} />
-      <span className="caster-lib-nav-label">{row.name}</span>
-      {row.favorite && !row.trashed ? (
+      {editing && onCommitRename && onCancelRename ? (
+        <LibRenameInput
+          initial={row.name}
+          onCommit={onCommitRename}
+          onCancel={onCancelRename}
+        />
+      ) : (
+        <span className="caster-lib-nav-label">{row.name}</span>
+      )}
+      {row.favorite && !editing ? (
         <Star
-          size={11}
+          size={12}
           className="caster-lib-item-fav"
           aria-hidden
           fill="currentColor"
+          strokeWidth={1.5}
         />
       ) : null}
     </button>
@@ -85,20 +289,34 @@ export function BoundLibItem({
   activeKey,
   focusKey,
   draggingKey,
+  dropIndicator,
+  editingKey,
   onOpen,
   onContextMenu,
   onPointerDown,
+  onStartRename,
+  onCommitRename,
+  onCancelRename,
+  onFocusRow,
 }: {
   row: AutomationRow;
   activeKey: string | null;
   focusKey: string | null;
   draggingKey: string | null;
+  dropIndicator?: { key: string; edge: "before" | "after" } | null;
+  editingKey?: string | null;
   onOpen: (row: AutomationRow) => void;
   onContextMenu: (e: MouseEvent, row: AutomationRow) => void;
   onPointerDown: (row: AutomationRow, e: ReactPointerEvent) => void;
+  onStartRename?: (row: AutomationRow) => void;
+  onCommitRename?: (row: AutomationRow, next: string) => void;
+  onCancelRename?: () => void;
+  onFocusRow?: (row: AutomationRow) => void;
 }) {
   const key = rowDomKey(row);
-  const canDrag = !row.trashed && !row.locked;
+  const canDrag = true;
+  const dropEdge =
+    dropIndicator?.key === key ? dropIndicator.edge : null;
   return (
     <LibItem
       row={row}
@@ -106,75 +324,174 @@ export function BoundLibItem({
       focused={focusKey === key}
       dragging={draggingKey === key}
       canDrag={canDrag}
+      dropEdge={dropEdge}
+      editing={editingKey === key}
       onOpen={() => onOpen(row)}
       onContextMenu={(e) => onContextMenu(e, row)}
       onPointerDown={canDrag ? (e) => onPointerDown(row, e) : undefined}
+      onStartRename={
+        onStartRename ? () => onStartRename(row) : undefined
+      }
+      onCommitRename={
+        onCommitRename ? (next) => onCommitRename(row, next) : undefined
+      }
+      onCancelRename={onCancelRename}
+      onFocusRow={onFocusRow ? () => onFocusRow(row) : undefined}
     />
   );
 }
+
+export type LibTreeFolderHandlers = {
+  onToggle: (id: string) => void;
+  onFolderContextMenu?: (e: MouseEvent, folder: AutomationFolderOption) => void;
+  onFolderPointerDown?: (
+    folder: AutomationFolderOption,
+    e: ReactPointerEvent,
+  ) => void;
+  onStartFolderRename?: (folder: AutomationFolderOption) => void;
+  onCommitFolderRename?: (
+    folder: AutomationFolderOption,
+    next: string,
+  ) => void;
+  onCancelRename?: () => void;
+  onFocusFolder?: (folder: AutomationFolderOption) => void;
+  onOpenItem: (row: AutomationRow) => void;
+  onItemContextMenu: (e: MouseEvent, row: AutomationRow) => void;
+  onItemPointerDown: (row: AutomationRow, e: ReactPointerEvent) => void;
+  onStartItemRename?: (row: AutomationRow) => void;
+  onCommitItemRename?: (row: AutomationRow, next: string) => void;
+  onFocusItem?: (row: AutomationRow) => void;
+};
 
 export function LibTreeFolder({
   node,
   title,
   open,
   dropTarget,
+  dropIndicator,
   activeKey,
   focusKey,
   draggingKey,
+  editingKey,
   isNodeOpen,
-  onToggle,
-  onFolderContextMenu,
-  onOpenItem,
-  onItemContextMenu,
-  onItemPointerDown,
+  handlers,
+  draftFolder,
+  draftNavKey,
+  draftAriaLabel,
+  draftRemountKey,
+  onCommitDraft,
+  onCancelDraft,
+  draftItem,
+  draftItemNavKey,
+  draftItemAriaLabel,
+  draftItemRemountKey,
+  onCommitDraftItem,
+  onCancelDraftItem,
 }: {
   node: LibTreeNode;
   title: string;
   open: boolean;
   dropTarget: string | null;
+  dropIndicator?: { key: string; edge: "before" | "after" } | null;
   activeKey: string | null;
   focusKey: string | null;
   draggingKey: string | null;
+  editingKey?: string | null;
   isNodeOpen: (n: LibTreeNode) => boolean;
-  onToggle: (id: string) => void;
-  onFolderContextMenu?: (e: MouseEvent, folder: AutomationFolderOption) => void;
-  onOpenItem: (row: AutomationRow) => void;
-  onItemContextMenu: (e: MouseEvent, row: AutomationRow) => void;
-  onItemPointerDown: (row: AutomationRow, e: ReactPointerEvent) => void;
+  handlers: LibTreeFolderHandlers;
+  draftFolder?: { parentId: string | null } | null;
+  draftNavKey?: string;
+  draftAriaLabel?: string;
+  draftRemountKey?: number;
+  onCommitDraft?: (next: string) => void;
+  onCancelDraft?: () => void;
+  draftItem?: { folderId: string | null; kind: AutomationRow["kind"] } | null;
+  draftItemNavKey?: string;
+  draftItemAriaLabel?: string;
+  draftItemRemountKey?: number;
+  onCommitDraftItem?: (next: string) => void;
+  onCancelDraftItem?: () => void;
 }) {
+  const {
+    onToggle,
+    onFolderContextMenu,
+    onFolderPointerDown,
+    onStartFolderRename,
+    onCommitFolderRename,
+    onCancelRename,
+    onFocusFolder,
+    onOpenItem,
+    onItemContextMenu,
+    onItemPointerDown,
+    onStartItemRename,
+    onCommitItemRename,
+    onFocusItem,
+  } = handlers;
   const FolderGlyph = open ? FolderOpen : Folder;
   const dropId = node.folder.id;
   const dropActive = dropTarget === dropId;
   const navKey = folderNavKey(node.id);
-  const count = node.items.length;
+  const editing = editingKey === navKey;
+  const dragging = draggingKey === navKey;
+  const dropEdge =
+    dropIndicator?.key === navKey ? dropIndicator.edge : null;
 
   return (
-    <div
-      className={cx("caster-lib-tree-node", dropActive && "is-drop-target")}
-      data-folder-drop-id={dropId}
-    >
+    <div className="caster-lib-tree-node" data-folder-drop-id={dropId}>
       <button
         type="button"
         tabIndex={-1}
         data-nav-key={navKey}
+        draggable={false}
         className={cx(
           "caster-lib-nav-row",
           "caster-lib-nav-row--folder",
-          focusKey === navKey && "is-focused",
+          "is-draggable",
+          dropActive && "is-drop-target",
+          focusKey === navKey && !editing && "is-focused",
+          dragging && "is-dragging",
+          editing && "is-editing",
+          dropEdge === "before" && "is-drop-before",
+          dropEdge === "after" && "is-drop-after",
         )}
-        onClick={() => onToggle(node.id)}
+        onFocus={() => onFocusFolder?.(node.folder)}
+        onPointerDown={
+          editing
+            ? undefined
+            : onFolderPointerDown
+              ? (e) => onFolderPointerDown(node.folder, e)
+              : undefined
+        }
+        onDragStart={(e) => e.preventDefault()}
+        onClick={() => {
+          if (editing) return;
+          onToggle(node.id);
+        }}
+        onDoubleClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onStartFolderRename?.(node.folder);
+        }}
         onContextMenu={(e) => onFolderContextMenu?.(e, node.folder)}
         aria-expanded={open}
         aria-controls={`lib-tree-${node.id}`}
         aria-selected={focusKey === navKey || undefined}
-        aria-label={count > 0 ? `${title} (${count})` : title}
+        aria-label={title}
       >
         <span
           className={cx("caster-lib-tree-twist", open && "is-open")}
           aria-hidden
         />
         <FolderGlyph size={15} aria-hidden className="caster-lib-folder-icon" />
-        <span className="caster-lib-nav-label">{title}</span>
+        {editing && onCommitFolderRename && onCancelRename ? (
+          <LibRenameInput
+            initial={node.folder.name}
+            onCommit={(next) => onCommitFolderRename(node.folder, next)}
+            onCancel={onCancelRename}
+          />
+        ) : (
+          <span className="caster-lib-nav-label">{title}</span>
+        )}
       </button>
       {open ? (
         <div
@@ -189,17 +506,42 @@ export function LibTreeFolder({
               title={child.folder.name}
               open={isNodeOpen(child)}
               dropTarget={dropTarget}
+              dropIndicator={dropIndicator}
               activeKey={activeKey}
               focusKey={focusKey}
               draggingKey={draggingKey}
+              editingKey={editingKey}
               isNodeOpen={isNodeOpen}
-              onToggle={onToggle}
-              onFolderContextMenu={onFolderContextMenu}
-              onOpenItem={onOpenItem}
-              onItemContextMenu={onItemContextMenu}
-              onItemPointerDown={onItemPointerDown}
+              handlers={handlers}
+              draftFolder={draftFolder}
+              draftNavKey={draftNavKey}
+              draftAriaLabel={draftAriaLabel}
+              draftRemountKey={draftRemountKey}
+              onCommitDraft={onCommitDraft}
+              onCancelDraft={onCancelDraft}
+              draftItem={draftItem}
+              draftItemNavKey={draftItemNavKey}
+              draftItemAriaLabel={draftItemAriaLabel}
+              draftItemRemountKey={draftItemRemountKey}
+              onCommitDraftItem={onCommitDraftItem}
+              onCancelDraftItem={onCancelDraftItem}
             />
           ))}
+          {draftFolder &&
+          draftFolder.parentId === node.id &&
+          draftNavKey &&
+          draftAriaLabel &&
+          onCommitDraft &&
+          onCancelDraft ? (
+            <LibDraftFolderRow
+              navKey={draftNavKey}
+              focused={focusKey === draftNavKey}
+              ariaLabel={draftAriaLabel}
+              remountKey={draftRemountKey ?? 0}
+              onCommit={onCommitDraft}
+              onCancel={onCancelDraft}
+            />
+          ) : null}
           {node.items.map((row) => (
             <BoundLibItem
               key={rowDomKey(row)}
@@ -207,11 +549,33 @@ export function LibTreeFolder({
               activeKey={activeKey}
               focusKey={focusKey}
               draggingKey={draggingKey}
+              dropIndicator={dropIndicator}
+              editingKey={editingKey}
               onOpen={onOpenItem}
               onContextMenu={onItemContextMenu}
               onPointerDown={onItemPointerDown}
+              onStartRename={onStartItemRename}
+              onCommitRename={onCommitItemRename}
+              onCancelRename={onCancelRename}
+              onFocusRow={onFocusItem}
             />
           ))}
+          {draftItem &&
+          draftItem.folderId === node.id &&
+          draftItemNavKey &&
+          draftItemAriaLabel &&
+          onCommitDraftItem &&
+          onCancelDraftItem ? (
+            <LibDraftItemRow
+              kind={draftItem.kind}
+              navKey={draftItemNavKey}
+              focused={focusKey === draftItemNavKey}
+              ariaLabel={draftItemAriaLabel}
+              remountKey={draftItemRemountKey ?? 0}
+              onCommit={onCommitDraftItem}
+              onCancel={onCancelDraftItem}
+            />
+          ) : null}
         </div>
       ) : null}
     </div>

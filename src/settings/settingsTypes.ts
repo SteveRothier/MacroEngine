@@ -2,13 +2,9 @@ import type { UiLocalePref } from "../i18n/locales";
 
 /** Nested app preference groups (mirrored from engine `AppSettings`). */
 
-export type AccueilSortBy = "order" | "name" | "type" | "status" | "lastRun";
-export type AccueilSortDir = "asc" | "desc";
-export type AccueilFilter = "all" | "favorites" | "recent";
-export type AccueilLayout = "media" | "legacy";
 export type StartupView = "home" | "lastDocument";
 export type UiDensity = "comfortable" | "compact";
-export type AccentTheme = "default" | "blue" | "teal";
+export type AccentTheme = "lavender" | "default" | "blue" | "teal";
 export type UiLocale = UiLocalePref;
 
 export type WindowBounds = {
@@ -18,23 +14,19 @@ export type WindowBounds = {
   height: number;
 };
 
+/** Library confirmations + visibility prefs (legacy name `accueil`). */
 export type AccueilPrefs = {
-  defaultSortBy: AccueilSortBy;
-  defaultSortDir: AccueilSortDir;
-  defaultFilter: AccueilFilter;
   rememberCollapsedSections: boolean;
   openOnSingleClick: boolean;
   confirmTrash: boolean;
   confirmDeleteFolder: boolean;
   showScriptsInAll: boolean;
-  /** When false, script modules are hidden from Accueil lists. */
+  /** When false, script modules are hidden from library lists. */
   showModulesInAll: boolean;
-  /** Script languages hidden from Accueil (`javascript`, `typescript`). */
+  /** Script languages hidden from library (`javascript`, `typescript`). */
   hideScriptLanguages: string[];
   syncLibrarySortOnReorder: boolean;
   dragThresholdPx: number;
-  /** Accueil list presentation (`media` = identity rows; `legacy` = denser grid). */
-  accueilLayout: AccueilLayout;
 };
 
 export type ShellPrefs = {
@@ -71,7 +63,6 @@ export type AutomationPrefs = {
 export type ConfirmationsPrefs = {
   deleteAction: boolean;
   closeDirtyTab: boolean;
-  purgeTrash: boolean;
   resetClicker: boolean;
 };
 
@@ -88,14 +79,7 @@ export type AppearancePrefs = {
   accent: AccentTheme;
 };
 
-export type MaintenancePrefs = {
-  autoPurgeTrashDays: number;
-};
-
 export const DEFAULT_ACCUEIL_PREFS: AccueilPrefs = {
-  defaultSortBy: "order",
-  defaultSortDir: "asc",
-  defaultFilter: "all",
   rememberCollapsedSections: true,
   openOnSingleClick: true,
   confirmTrash: true,
@@ -105,7 +89,6 @@ export const DEFAULT_ACCUEIL_PREFS: AccueilPrefs = {
   hideScriptLanguages: [],
   syncLibrarySortOnReorder: true,
   dragThresholdPx: 6,
-  accueilLayout: "media",
 };
 
 export const DEFAULT_SHELL_PREFS: ShellPrefs = {
@@ -140,7 +123,6 @@ export const DEFAULT_AUTOMATION_PREFS: AutomationPrefs = {
 export const DEFAULT_CONFIRMATIONS_PREFS: ConfirmationsPrefs = {
   deleteAction: true,
   closeDirtyTab: true,
-  purgeTrash: true,
   resetClicker: true,
 };
 
@@ -154,27 +136,26 @@ export const DEFAULT_APPEARANCE_PREFS: AppearancePrefs = {
   density: "comfortable",
   reduceMotion: false,
   fontScale: 1,
-  accent: "default",
-};
-
-export const DEFAULT_MAINTENANCE_PREFS: MaintenancePrefs = {
-  autoPurgeTrashDays: 0,
+  accent: "lavender",
 };
 
 export function mergeAccueilPrefs(
   partial?: Partial<AccueilPrefs> | null,
 ): AccueilPrefs {
   const merged = { ...DEFAULT_ACCUEIL_PREFS, ...partial };
-  // Legacy: "scripts" filter pill removed from Accueil.
-  if ((merged.defaultFilter as string) === "scripts") {
-    merged.defaultFilter = "all";
-  }
-  // Purged FE field (still may exist in older settings.json / Rust).
-  delete (merged as AccueilPrefs & { doubleClickDelayMs?: number })
-    .doubleClickDelayMs;
-  if (merged.accueilLayout !== "media" && merged.accueilLayout !== "legacy") {
-    merged.accueilLayout = "media";
-  }
+  // Drop legacy Accueil-only fields still present in older settings.json.
+  const legacy = merged as AccueilPrefs & {
+    doubleClickDelayMs?: number;
+    defaultSortBy?: unknown;
+    defaultSortDir?: unknown;
+    defaultFilter?: unknown;
+    accueilLayout?: unknown;
+  };
+  delete legacy.doubleClickDelayMs;
+  delete legacy.defaultSortBy;
+  delete legacy.defaultSortDir;
+  delete legacy.defaultFilter;
+  delete legacy.accueilLayout;
   return merged;
 }
 
@@ -211,7 +192,10 @@ export function mergeAutomationPrefs(
 export function mergeConfirmationsPrefs(
   partial?: Partial<ConfirmationsPrefs> | null,
 ): ConfirmationsPrefs {
-  return { ...DEFAULT_CONFIRMATIONS_PREFS, ...partial };
+  const merged = { ...DEFAULT_CONFIRMATIONS_PREFS, ...partial };
+  // Drop legacy purgeTrash (soft-trash removed).
+  delete (merged as ConfirmationsPrefs & { purgeTrash?: unknown }).purgeTrash;
+  return merged;
 }
 
 export function mergeScriptsPrefs(
@@ -230,11 +214,15 @@ export function mergeScriptsPrefs(
 export function mergeAppearancePrefs(
   partial?: Partial<AppearancePrefs> | null,
 ): AppearancePrefs {
-  return { ...DEFAULT_APPEARANCE_PREFS, ...partial };
-}
-
-export function mergeMaintenancePrefs(
-  partial?: Partial<MaintenancePrefs> | null,
-): MaintenancePrefs {
-  return { ...DEFAULT_MAINTENANCE_PREFS, ...partial };
+  const merged = { ...DEFAULT_APPEARANCE_PREFS, ...partial };
+  const accent = merged.accent as string;
+  if (
+    accent !== "lavender" &&
+    accent !== "default" &&
+    accent !== "blue" &&
+    accent !== "teal"
+  ) {
+    merged.accent = "lavender";
+  }
+  return merged;
 }

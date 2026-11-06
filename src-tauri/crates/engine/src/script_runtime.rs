@@ -1676,6 +1676,7 @@ mod tests {
             param_values: Default::default(),
             process_filter: Default::default(),
             local_process_filter: Default::default(),
+            trigger: crate::schema::Trigger::Manual,
         }
     }
 

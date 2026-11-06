@@ -186,13 +186,6 @@ export const ACCUEIL_NOTES: readonly ClickerBacklogItem[] = [
       "macro↔clicker best-effort (ClickPoint[] / séquence, warnings soft). Script→clicker via macro intermédiaire. Tokens/warnings convert i18n côté FE.",
     priority: 7,
   },
-  {
-    id: "accueil-trash",
-    title: "Corbeille Accueil",
-    summary:
-      "Bouton Vider + empty state ; confirmations.purgeTrash. Purge auto au boot par âge (Settings) + UI jours / preview count (purge_library_trash_older_than).",
-    priority: 8,
-  },
 ] as const;
 
 /** Settings, shell, journal, macros/scripts DX. */
@@ -208,7 +201,7 @@ export const SETTINGS_SHELL_NOTES: readonly ClickerBacklogItem[] = [
     id: "confirmations-dialogs",
     title: "Confirmations",
     summary:
-      "Skip dialogs selon prefs : deleteAction, closeDirtyTab, purgeTrash, resetClicker, confirmTrash, confirmDeleteFolder, confirmLaunchFromHome, confirmStopSession.",
+      "Skip dialogs selon prefs : deleteAction, closeDirtyTab, resetClicker, confirmTrash, confirmDeleteFolder, confirmLaunchFromHome, confirmStopSession.",
     priority: 2,
   },
   {

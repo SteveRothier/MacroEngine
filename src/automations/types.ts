@@ -34,8 +34,6 @@ export type AutomationRow = {
   previewActionCount?: number;
   /** Library index order within kind+folder. */
   sortOrder?: number;
-  /** True when the item is in the library trash. */
-  trashed?: boolean;
   /** Active script permissions (Accueil badge). */
   permLabels?: string[];
   /** Script marked as library module (not runnable from Accueil). */
@@ -68,7 +66,7 @@ export type DisplayOptions = {
   sortDir: "asc" | "desc";
 };
 
-export type AutomationFilter = "all" | "favorites" | "recent" | "trash";
+export type AutomationFilter = "all" | "favorites" | "recent";
 
 /** Accueil secondary filter: restrict by library kind. */
 export type AutomationKindFilter = "all" | "macro" | "clicker" | "script";
@@ -91,7 +89,6 @@ export type FilterCounts = {
   all: number;
   favorites: number;
   recent: number;
-  trash: number;
   macro: number;
   clicker: number;
   script: number;

@@ -47,7 +47,7 @@ export function applyHotkeyConflicts(
   const reserved = reservedChords(hotkeys);
   const byChord = new Map<HotkeyChordKey, ChordOwner[]>();
   for (const r of rows) {
-    if (r.trashed || r.enabled === false) continue;
+    if (r.enabled === false) continue;
     const ch = chords.get(`${r.kind}:${r.id}`);
     if (!ch) continue;
     const list = byChord.get(ch) ?? [];
@@ -56,7 +56,7 @@ export function applyHotkeyConflicts(
   }
   return rows.map((r) => {
     const ch = chords.get(`${r.kind}:${r.id}`);
-    if (!ch || r.trashed) return { ...r, conflictWith: null };
+    if (!ch) return { ...r, conflictWith: null };
     if (reserved.has(ch)) {
       return {
         ...r,

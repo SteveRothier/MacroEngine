@@ -11,21 +11,20 @@ use caster_engine::{
     import_macro_from_path, import_preset_from_path, import_script_from_path, list_library_items,
     list_library_items_from_index, list_macro_summaries, list_macros, list_preset_summaries,
     list_presets, list_script_summaries, list_scripts, load_macro, load_preset, load_quick_access,
-    load_script, load_settings, load_accueil_order, list_visible_process_exe_entries,
+    load_script, load_settings, list_visible_process_exe_entries,
     list_visible_process_exes, macro_to_json,
     move_library_item, overlay_bands, overlay_markers_fixed, overlay_markers_points,
     parse_macro_json, prepare_library_index, prune_orphans,
-    purge_library_trash, purge_library_trash_older_than, count_library_trash_older_than,
     remove_library_entry, rename_library_entry_key, rename_library_folder,
-    reorder_library_folders, rename_macro, rename_preset, restore_library_item, save_macro_checked, save_preset,
-    set_library_folder_parent, save_preset_with_trigger, save_quick_access, save_script, save_settings, save_accueil_order,
+    reorder_library_folders, rename_macro, rename_preset, save_macro_checked, save_preset,
+    set_library_folder_parent, save_preset_with_trigger, save_quick_access, save_script, save_settings,
     set_favorite, set_library_item_enabled, set_library_item_icon, set_library_item_locked,
-    trash_library_item, normalize_app_settings, AccueilPrefs,
+    normalize_app_settings, AccueilPrefs,
     AppearancePrefs, AppSettings, AppState, AutomationPrefs, ClickPoint, ClickerConfig,
     ClickerMetrics,
     ClickerPreset, ClickerPresetSummary, ConfirmationsPrefs, ConvertMode, ConvertResult, DrawnRect,
     EngineEvent, EngineState, HotkeyBindings, LibraryFolder, LibraryIndexDto, LibraryKind,
-    ListLibraryQuery, LogLevel, MacroDocument, MacroSummary, MaintenancePrefs, NativeZoneOverlay, PickedPoint,
+    ListLibraryQuery, LogLevel, MacroDocument, MacroSummary, NativeZoneOverlay, PickedPoint,
     ProcessFilter, ProcessFilterPreset, QuickAccess, QuickKind, RecordOptions, ScreenGeom, ScreenGeomDto, ScriptDoc,
     ScriptLanguage, ScriptSourceDiagnostic, ScriptSummary, ScriptsPrefs, ShellPrefs, StopZone,
     ThemeMode, Trigger, UiLocale, WindowBounds, check_script_source, clamp_overlay_opacity,
@@ -75,7 +74,6 @@ struct UiPrefs {
     confirmations: ConfirmationsPrefs,
     scripts: ScriptsPrefs,
     appearance: AppearancePrefs,
-    maintenance: MaintenancePrefs,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -85,7 +83,6 @@ struct AppPathsDto {
     settings_path: String,
     log_dir: String,
     version: String,
-    accueil_order_path: String,
     library_path: String,
     quick_access_path: String,
     /// `store` (MSIX), `direct` (NSIS), or `dev`.
@@ -553,7 +550,6 @@ fn list_library_items_cmd(
     kind: String,
     folder_id: Option<String>,
     query: Option<String>,
-    include_trash: Option<bool>,
     favorites_only: Option<bool>,
     favorite_ids: Option<Vec<String>>,
 ) -> Result<LibraryIndexDto, String> {
@@ -564,7 +560,6 @@ fn list_library_items_cmd(
         ListLibraryQuery {
             folder_id,
             query,
-            include_trash: include_trash.unwrap_or(false),
             favorites_only: favorites_only.unwrap_or(false),
             favorite_ids: favorite_ids.unwrap_or_default(),
         },
@@ -628,10 +623,15 @@ fn move_library_item_cmd(
     id: String,
     folder_id: Option<String>,
     before_id: Option<String>,
+    before_kind: Option<String>,
 ) -> Result<(), String> {
     let kind = LibraryKind::parse(&kind).map_err(|e| e.to_string())?;
-    assert_not_locked(&dir.0, kind, &id).map_err(|e| e.to_string())?;
-    move_library_item(&dir.0, kind, id, folder_id, before_id).map_err(|e| e.to_string())
+    let before_kind = match before_kind.as_deref() {
+        None => None,
+        Some(s) => Some(LibraryKind::parse(s).map_err(|e| e.to_string())?),
+    };
+    // Folder filing / reorder stays allowed while locked (edit/delete still blocked).
+    move_library_item(&dir.0, kind, id, folder_id, before_id, before_kind).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -737,27 +737,6 @@ fn import_script_path(
 }
 
 #[tauri::command]
-fn trash_library_item_cmd(
-    dir: State<'_, SettingsDir>,
-    kind: String,
-    id: String,
-) -> Result<(), String> {
-    let kind = LibraryKind::parse(&kind).map_err(|e| e.to_string())?;
-    assert_not_locked(&dir.0, kind, &id).map_err(|e| e.to_string())?;
-    trash_library_item(&dir.0, kind, id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn restore_library_item_cmd(
-    dir: State<'_, SettingsDir>,
-    kind: String,
-    id: String,
-) -> Result<(), String> {
-    let kind = LibraryKind::parse(&kind).map_err(|e| e.to_string())?;
-    restore_library_item(&dir.0, kind, id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 fn list_clicker_library(dir: State<'_, SettingsDir>) -> Result<Vec<ClickerPresetSummary>, String> {
     list_preset_summaries(&dir.0).map_err(|e| e.to_string())
 }
@@ -859,16 +838,6 @@ fn get_quick_access(dir: State<'_, SettingsDir>) -> Result<QuickAccess, String> 
     Ok(qa)
 }
 
-#[tauri::command]
-fn get_accueil_order_cmd(dir: State<'_, SettingsDir>) -> Result<Vec<String>, String> {
-    load_accueil_order(&dir.0).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn set_accueil_order_cmd(dir: State<'_, SettingsDir>, keys: Vec<String>) -> Result<(), String> {
-    save_accueil_order(&dir.0, &keys).map_err(|e| e.to_string())
-}
-
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct AutomationsHomeDto {
@@ -890,7 +859,6 @@ fn get_automations_home_cmd(
     let empty_q = ListLibraryQuery {
         folder_id: None,
         query: None,
-        include_trash: false,
         favorites_only: false,
         favorite_ids: Vec::new(),
     };
@@ -900,7 +868,7 @@ fn get_automations_home_cmd(
         .iter()
         .map(|s| (s.id.clone(), s.name.clone()))
         .collect();
-    let mut macros = list_library_items_from_index(
+    let macros = list_library_items_from_index(
         &index,
         &dir.0,
         LibraryKind::Macro,
@@ -908,7 +876,7 @@ fn get_automations_home_cmd(
         None,
     )
     .map_err(|e| e.to_string())?;
-    let mut clickers = list_library_items_from_index(
+    let clickers = list_library_items_from_index(
         &index,
         &dir.0,
         LibraryKind::Clicker,
@@ -916,39 +884,14 @@ fn get_automations_home_cmd(
         None,
     )
     .map_err(|e| e.to_string())?;
-    let mut scripts_library = list_library_items_from_index(
+    let scripts_library = list_library_items_from_index(
         &index,
         &dir.0,
         LibraryKind::Script,
-        empty_q.clone(),
+        empty_q,
         Some(&script_names),
     )
     .map_err(|e| e.to_string())?;
-    let trash_q = ListLibraryQuery {
-        include_trash: true,
-        ..empty_q
-    };
-    macros.items.extend(
-        list_library_items_from_index(&index, &dir.0, LibraryKind::Macro, trash_q.clone(), None)
-            .map_err(|e| e.to_string())?
-            .items,
-    );
-    clickers.items.extend(
-        list_library_items_from_index(&index, &dir.0, LibraryKind::Clicker, trash_q.clone(), None)
-            .map_err(|e| e.to_string())?
-            .items,
-    );
-    scripts_library.items.extend(
-        list_library_items_from_index(
-            &index,
-            &dir.0,
-            LibraryKind::Script,
-            trash_q,
-            Some(&script_names),
-        )
-        .map_err(|e| e.to_string())?
-        .items,
-    );
     let macro_summaries = enrich_macro_summaries_cmd(&dir.0)?;
     let clicker_summaries = list_preset_summaries(&dir.0).map_err(|e| e.to_string())?;
     let mut qa = load_quick_access(&dir.0).map_err(|e| e.to_string())?;
@@ -1288,7 +1231,6 @@ fn prefs_to_settings(engine: &AppState, p: &UiPrefs) -> AppSettings {
         confirmations: p.confirmations.clone(),
         scripts: p.scripts.clone(),
         appearance: p.appearance.clone(),
-        maintenance: p.maintenance.clone(),
     };
     normalize_app_settings(&mut s);
     s
@@ -1313,7 +1255,6 @@ fn apply_prefs(p: &mut UiPrefs, settings: &AppSettings) {
     p.confirmations = settings.confirmations.clone();
     p.scripts = settings.scripts.clone();
     p.appearance = settings.appearance.clone();
-    p.maintenance = settings.maintenance.clone();
 }
 
 fn apply_overlay_opacity(app: &AppHandle, opacity: f32) {
@@ -1730,11 +1671,6 @@ fn get_paths(app: AppHandle, dir: State<'_, SettingsDir>) -> Result<AppPathsDto,
         settings_path: settings_path(&dir.0).to_string_lossy().into_owned(),
         log_dir: log_dir.to_string_lossy().into_owned(),
         version: env!("CARGO_PKG_VERSION").into(),
-        accueil_order_path: dir
-            .0
-            .join("accueil-order.json")
-            .to_string_lossy()
-            .into_owned(),
         library_path: dir.0.join("library.json").to_string_lossy().into_owned(),
         quick_access_path: dir
             .0
@@ -1751,11 +1687,6 @@ fn open_url(app: AppHandle, url: String) -> Result<(), String> {
     app.opener()
         .open_url(url, None::<&str>)
         .map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn reset_accueil_order_cmd(dir: State<'_, SettingsDir>) -> Result<(), String> {
-    save_accueil_order(&dir.0, &[]).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1806,27 +1737,6 @@ fn reveal_library_entry(
     {
         open_path(path.to_string_lossy().into_owned())
     }
-}
-
-#[tauri::command]
-fn purge_library_trash_cmd(dir: State<'_, SettingsDir>) -> Result<usize, String> {
-    purge_library_trash(&dir.0).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn count_library_trash_older_than_cmd(
-    dir: State<'_, SettingsDir>,
-    days: u32,
-) -> Result<usize, String> {
-    count_library_trash_older_than(&dir.0, days).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn purge_library_trash_older_than_cmd(
-    dir: State<'_, SettingsDir>,
-    days: u32,
-) -> Result<usize, String> {
-    purge_library_trash_older_than(&dir.0, days).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -3049,7 +2959,6 @@ pub fn run() {
             confirmations: ConfirmationsPrefs::default(),
             scripts: ScriptsPrefs::default(),
             appearance: AppearancePrefs::default(),
-            maintenance: MaintenancePrefs::default(),
         }))
         .manage(Mutex::new(ZoneOverlaySnap::default()))
         .manage(Mutex::new(TargetOverlaySnap::default()))
@@ -3066,12 +2975,6 @@ pub fn run() {
                 .map_err(|e| format!("config dir: {e}"))?;
             std::fs::create_dir_all(&config_dir)?;
             let settings = load_settings(&config_dir).unwrap_or_default();
-            if settings.maintenance.auto_purge_trash_days > 0 {
-                let _ = purge_library_trash_older_than(
-                    &config_dir,
-                    settings.maintenance.auto_purge_trash_days,
-                );
-            }
             engine.set_clicker_config(settings.clicker.clone());
             engine.set_hotkey_bindings(settings.hotkeys.clone());
             engine.set_process_filter(settings.process_filter.clone());
@@ -3353,9 +3256,6 @@ pub fn run() {
             open_url,
             open_path,
             reveal_library_entry,
-            purge_library_trash_cmd,
-            count_library_trash_older_than_cmd,
-            purge_library_trash_older_than_cmd,
             list_scripts_cmd,
             load_script_cmd,
             save_script_cmd,
@@ -3402,9 +3302,6 @@ pub fn run() {
             load_clicker_preset,
             delete_clicker_preset,
             get_quick_access,
-            get_accueil_order_cmd,
-            set_accueil_order_cmd,
-            reset_accueil_order_cmd,
             get_automations_home_cmd,
             list_process_exes,
             list_process_exe_entries,
@@ -3441,8 +3338,6 @@ pub fn run() {
             import_library_macro_path,
             export_script_path,
             import_script_path,
-            trash_library_item_cmd,
-            restore_library_item_cmd,
             list_clicker_library,
             rename_clicker_preset,
             duplicate_clicker_preset,

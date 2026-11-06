@@ -373,8 +373,6 @@ pub struct ConfirmationsPrefs {
     #[serde(default = "default_true")]
     pub close_dirty_tab: bool,
     #[serde(default = "default_true")]
-    pub purge_trash: bool,
-    #[serde(default = "default_true")]
     pub reset_clicker: bool,
 }
 
@@ -383,7 +381,6 @@ impl Default for ConfirmationsPrefs {
         Self {
             delete_action: true,
             close_dirty_tab: true,
-            purge_trash: true,
             reset_clicker: true,
         }
     }
@@ -451,22 +448,6 @@ impl Default for AppearancePrefs {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct MaintenancePrefs {
-    /// 0 = off. Hint only in UI (no OS cron in this lot).
-    #[serde(default)]
-    pub auto_purge_trash_days: u32,
-}
-
-impl Default for MaintenancePrefs {
-    fn default() -> Self {
-        Self {
-            auto_purge_trash_days: 0,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -513,8 +494,6 @@ pub struct AppSettings {
     pub scripts: ScriptsPrefs,
     #[serde(default)]
     pub appearance: AppearancePrefs,
-    #[serde(default)]
-    pub maintenance: MaintenancePrefs,
 }
 
 impl Default for AppSettings {
@@ -540,7 +519,6 @@ impl Default for AppSettings {
             confirmations: ConfirmationsPrefs::default(),
             scripts: ScriptsPrefs::default(),
             appearance: AppearancePrefs::default(),
-            maintenance: MaintenancePrefs::default(),
         }
     }
 }
@@ -663,14 +641,12 @@ mod tests {
             obj.remove("confirmations");
             obj.remove("scripts");
             obj.remove("appearance");
-            obj.remove("maintenance");
         }
         fs::write(&path, serde_json::to_string(&legacy).unwrap()).unwrap();
         let loaded = load_settings(&dir).unwrap();
         assert_eq!(loaded.accueil.default_sort_by, AccueilSortBy::Order);
         assert!(loaded.shell.confirm_quit_if_running);
         assert!(loaded.shell.toast_on_finish);
-        assert!(loaded.confirmations.purge_trash);
         assert_eq!(loaded.appearance.density, UiDensity::Comfortable);
         assert_eq!(loaded.scripts.default_timeout_ms, 0);
         let _ = fs::remove_dir_all(dir);
@@ -693,7 +669,6 @@ mod tests {
         s.appearance.density = UiDensity::Compact;
         s.appearance.accent = AccentTheme::Teal;
         s.appearance.font_scale = 1.1;
-        s.maintenance.auto_purge_trash_days = 30;
         save_settings(&dir, &s).unwrap();
         let loaded = load_settings(&dir).unwrap();
         assert!(loaded.accueil.open_on_single_click);
@@ -703,7 +678,6 @@ mod tests {
         assert_eq!(loaded.appearance.density, UiDensity::Compact);
         assert_eq!(loaded.appearance.accent, AccentTheme::Teal);
         assert!((loaded.appearance.font_scale - 1.1).abs() < f32::EPSILON);
-        assert_eq!(loaded.maintenance.auto_purge_trash_days, 30);
         let _ = fs::remove_dir_all(dir);
     }
 

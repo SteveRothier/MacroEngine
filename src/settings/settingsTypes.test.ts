@@ -4,14 +4,12 @@ import {
   DEFAULT_APPEARANCE_PREFS,
   DEFAULT_AUTOMATION_PREFS,
   DEFAULT_CONFIRMATIONS_PREFS,
-  DEFAULT_MAINTENANCE_PREFS,
   DEFAULT_SCRIPTS_PREFS,
   DEFAULT_SHELL_PREFS,
   mergeAccueilPrefs,
   mergeAppearancePrefs,
   mergeAutomationPrefs,
   mergeConfirmationsPrefs,
-  mergeMaintenancePrefs,
   mergeScriptsPrefs,
   mergeShellPrefs,
 } from "./settingsTypes";
@@ -44,7 +42,7 @@ describe("settingsTypes defaults", () => {
     expect(mergeAutomationPrefs({}).autoSaveBeforeRun).toBe(
       DEFAULT_AUTOMATION_PREFS.autoSaveBeforeRun,
     );
-    expect(mergeConfirmationsPrefs({ purgeTrash: false }).purgeTrash).toBe(
+    expect(mergeConfirmationsPrefs({ deleteAction: false }).deleteAction).toBe(
       false,
     );
     expect(mergeConfirmationsPrefs(null).closeDirtyTab).toBe(
@@ -52,7 +50,7 @@ describe("settingsTypes defaults", () => {
     );
   });
 
-  it("merge scripts appearance maintenance", () => {
+  it("merge scripts appearance", () => {
     expect(mergeScriptsPrefs({}).showPermBadgesOnHome).toBe(
       DEFAULT_SCRIPTS_PREFS.showPermBadgesOnHome,
     );
@@ -62,9 +60,5 @@ describe("settingsTypes defaults", () => {
     expect(mergeAppearancePrefs(undefined).accent).toBe(
       DEFAULT_APPEARANCE_PREFS.accent,
     );
-    expect(mergeMaintenancePrefs({ autoPurgeTrashDays: 14 })).toEqual({
-      ...DEFAULT_MAINTENANCE_PREFS,
-      autoPurgeTrashDays: 14,
-    });
   });
 });

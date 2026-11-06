@@ -152,6 +152,94 @@ export function actionTone(type: MacroAction["type"]): string {
   }
 }
 
+/** Short category pill label for Linear action rows (mock). */
+export function actionCategoryPill(
+  type: MacroAction["type"],
+  t: TFunction,
+): string {
+  switch (actionTone(type)) {
+    case "mouse":
+      return t("macros.action.pill.mouse");
+    case "wait":
+      return t("macros.action.pill.wait");
+    case "key":
+      return t("macros.action.pill.key");
+    case "logic":
+      return t("macros.action.pill.logic");
+    case "data":
+      return t("macros.action.pill.data");
+    case "system":
+      return t("macros.action.pill.system");
+    case "run":
+      return t("macros.action.pill.run");
+    default:
+      return t("macros.action.pill.run");
+  }
+}
+
+/** Primary value column for Linear rows (coords, ms, …). */
+export function actionValue(action: MacroAction, t: TFunction): string {
+  switch (action.type) {
+    case "mouse.click":
+    case "mouse.down":
+    case "mouse.up":
+      if (action.x != null && action.y != null) return `${action.x}, ${action.y}`;
+      return t("macros.action.detail.cursor");
+    case "mouse.move":
+      return `${action.x}, ${action.y}`;
+    case "delay":
+      return `${action.ms} ms`;
+    default:
+      return actionDetail(action, t);
+  }
+}
+
+/** Short lead for the properties hero panel. */
+export function actionLead(
+  type: MacroAction["type"],
+  t: TFunction,
+): string {
+  switch (actionTone(type)) {
+    case "mouse":
+      return t("macros.action.lead.mouse");
+    case "wait":
+      return t("macros.action.lead.wait");
+    case "key":
+      return t("macros.action.lead.key");
+    case "logic":
+      return t("macros.action.lead.logic");
+    case "data":
+      return t("macros.action.lead.data");
+    case "system":
+      return t("macros.action.lead.system");
+    case "run":
+      return t("macros.action.lead.run");
+    default:
+      return t("macros.inspector.emptyLead");
+  }
+}
+
+/** Mid-column description for Linear rows. */
+export function actionRowDescription(
+  list: MacroAction[],
+  index: number,
+  t: TFunction,
+): string {
+  const action = list[index];
+  if (!action) return "";
+  if (action.type === "delay") return t("macros.action.desc.wait");
+  if (
+    action.type === "mouse.click" ||
+    action.type === "mouse.down" ||
+    action.type === "mouse.up"
+  ) {
+    if (action.button === "right") return t("macros.action.desc.clickRight");
+    if (action.button === "middle") return t("macros.action.desc.clickMiddle");
+    return t("macros.action.desc.clickLeft");
+  }
+  return actionTitleInList(list, index, t);
+}
+
 export function branchLabel(
   branch: "then" | "else" | "body",
   t: TFunction,

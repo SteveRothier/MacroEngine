@@ -32,7 +32,6 @@ import {
   mergeAppearancePrefs,
   mergeAutomationPrefs,
   mergeConfirmationsPrefs,
-  mergeMaintenancePrefs,
   mergeScriptsPrefs,
   mergeShellPrefs,
   type AccueilPrefs,
@@ -40,7 +39,6 @@ import {
   type AppearancePrefs,
   type AutomationPrefs,
   type ConfirmationsPrefs,
-  type MaintenancePrefs,
   type ScriptsPrefs,
   type ShellPrefs,
   type StartupView,
@@ -163,8 +161,6 @@ export function SettingsView({
   const [closeToTray, setCloseToTray] = useState(false);
   const [minimizeHidesToTray, setMinimizeHidesToTray] = useState(false);
   const [startWithWindows, setStartWithWindows] = useState(false);
-  const [purgeOlderDays, setPurgeOlderDays] = useState(30);
-  const [purgeOlderPreview, setPurgeOlderPreview] = useState<number | null>(null);
   const [shell, setShell] = useState<ShellPrefs>(() => mergeShellPrefs());
   const [automation, setAutomation] = useState<AutomationPrefs>(() =>
     mergeAutomationPrefs(),
@@ -176,9 +172,6 @@ export function SettingsView({
   );
   const [confirmations, setConfirmations] = useState<ConfirmationsPrefs>(() =>
     mergeConfirmationsPrefs(),
-  );
-  const [maintenance, setMaintenance] = useState<MaintenancePrefs>(() =>
-    mergeMaintenancePrefs(),
   );
   const [foregroundExe, setForegroundExe] = useState<string | null>(null);
   const [displays, setDisplays] = useState<DisplayDto[]>([]);
@@ -224,7 +217,6 @@ export function SettingsView({
       const cf = mergeConfirmationsPrefs(s.confirmations);
       setConfirmations(cf);
       onConfirmationsPrefsChange?.(cf);
-      setMaintenance(mergeMaintenancePrefs(s.maintenance));
     });
     refreshDisplays();
     void invoke<AppPaths>("get_paths")
@@ -277,7 +269,6 @@ export function SettingsView({
       accueil?: AccueilPrefs;
       appearance?: AppearancePrefs;
       confirmations?: ConfirmationsPrefs;
-      maintenance?: MaintenancePrefs;
     }) => {
       const current = await loadSettings();
       if (!current) return;
@@ -304,7 +295,6 @@ export function SettingsView({
         accueil: partial.accueil,
         appearance: partial.appearance,
         confirmations: partial.confirmations,
-        maintenance: partial.maintenance,
       });
     },
     [loadSettings, saveBundle, theme, processFilterPresets],
@@ -350,12 +340,6 @@ export function SettingsView({
     setConfirmations(next);
     onConfirmationsPrefsChange?.(next);
     void persist({ confirmations: next });
-  };
-
-  const persistMaintenancePrefs = (patch: Partial<MaintenancePrefs>) => {
-    const next = mergeMaintenancePrefs({ ...maintenance, ...patch });
-    setMaintenance(next);
-    void persist({ maintenance: next });
   };
 
   const setTheme = (t: ThemeMode) => {
@@ -487,65 +471,6 @@ export function SettingsView({
       toast.success(t("settings.data.libraryImportOk"));
     } catch {
       toast.error(t("settings.data.libraryImportFail"));
-    }
-  };
-
-  const purgeTrash = async () => {
-    if (confirmations.purgeTrash) {
-      const ok = await confirmChoice({
-        title: t("settings.data.purgeTitle"),
-        message: t("settings.data.purgeMessage"),
-        confirmLabel: t("settings.data.purge"),
-        cancelLabel: t("common.cancel"),
-        danger: true,
-      });
-      if (ok !== "confirm") return;
-    }
-    try {
-      const n = await invoke<number>("purge_library_trash_cmd");
-      toast.success(n > 0 ? t("settings.data.purgeOk", { n }) : t("settings.data.purgeEmpty"));
-      setPurgeOlderPreview(null);
-    } catch {
-      toast.error(t("settings.data.purgeFail"));
-    }
-  };
-
-  const refreshPurgeOlderPreview = async (days: number) => {
-    try {
-      const n = await invoke<number>("count_library_trash_older_than_cmd", {
-        days,
-      });
-      setPurgeOlderPreview(n);
-    } catch {
-      setPurgeOlderPreview(null);
-    }
-  };
-
-  const purgeTrashOlder = async () => {
-    const days = Math.max(0, Math.floor(purgeOlderDays));
-    if (confirmations.purgeTrash) {
-      const ok = await confirmChoice({
-        title: t("settings.data.purgeOlderTitle"),
-        message: t("settings.data.purgeOlderMessage", {
-          days,
-          n: purgeOlderPreview ?? "…",
-        }),
-        confirmLabel: t("settings.data.purgeOlder"),
-        cancelLabel: t("common.cancel"),
-        danger: true,
-      });
-      if (ok !== "confirm") return;
-    }
-    try {
-      const n = await invoke<number>("purge_library_trash_older_than_cmd", {
-        days,
-      });
-      toast.success(
-        n > 0 ? t("settings.data.purgeOk", { n }) : t("settings.data.purgeEmpty"),
-      );
-      setPurgeOlderPreview(0);
-    } catch {
-      toast.error(t("settings.data.purgeFail"));
     }
   };
 
@@ -1101,59 +1026,6 @@ export function SettingsView({
                       />
                     </div>
                   </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.application.defaultSortBy")}</span>
-                      <p>{t("settings.application.defaultSortByHint")}</p>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <Select
-                        className="caster-select"
-                        value={accueil.defaultSortBy}
-                        ariaLabel={t("settings.application.defaultSortBy")}
-                        options={[
-                          { value: "order", label: t("automations.columns.order") },
-                          { value: "name", label: t("automations.columns.name") },
-                          { value: "type", label: t("automations.columns.type") },
-                          { value: "status", label: t("automations.columns.status") },
-                          { value: "lastRun", label: t("automations.columns.lastRun") },
-                        ]}
-                        onChange={(v) =>
-                          persistAccueilPrefs({
-                            defaultSortBy: v as AccueilPrefs["defaultSortBy"],
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.application.defaultSortDir")}</span>
-                      <p>{t("settings.application.defaultSortDirHint")}</p>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <Select
-                        className="caster-select"
-                        value={accueil.defaultSortDir}
-                        ariaLabel={t("settings.application.defaultSortDir")}
-                        options={[
-                          {
-                            value: "asc",
-                            label: t("settings.application.sortDirAsc"),
-                          },
-                          {
-                            value: "desc",
-                            label: t("settings.application.sortDirDesc"),
-                          },
-                        ]}
-                        onChange={(v) =>
-                          persistAccueilPrefs({
-                            defaultSortDir: v as AccueilPrefs["defaultSortDir"],
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
                 </SettingsGroup>
                 <SettingsGroup title={t("settings.application.groupConfirmations")}>
                   <div className="caster-settings-row">
@@ -1182,21 +1054,6 @@ export function SettingsView({
                         ariaLabel={t("settings.application.confirmCloseDirtyTab")}
                         onChange={(checked) =>
                           persistConfirmationsPrefs({ closeDirtyTab: checked })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.application.confirmPurgeTrash")}</span>
-                      <p>{t("settings.application.confirmPurgeTrashHint")}</p>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <SettingsToggle
-                        checked={confirmations.purgeTrash}
-                        ariaLabel={t("settings.application.confirmPurgeTrash")}
-                        onChange={(checked) =>
-                          persistConfirmationsPrefs({ purgeTrash: checked })
                         }
                       />
                     </div>
@@ -1310,12 +1167,16 @@ export function SettingsView({
                     <div className="caster-settings-row-control">
                       <Select
                         className="caster-select"
-                        value={appearance.accent}
+                        value={
+                          appearance.accent === "default"
+                            ? "lavender"
+                            : appearance.accent
+                        }
                         ariaLabel={t("settings.application.accent")}
                         options={[
                           {
-                            value: "default",
-                            label: t("settings.application.accentDefault"),
+                            value: "lavender",
+                            label: t("settings.application.accentLavender"),
                           },
                           {
                             value: "blue",
@@ -1635,80 +1496,6 @@ export function SettingsView({
                       >
                         {t("settings.data.libraryImport")}
                       </button>
-                    </div>
-                  </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.data.purgeTrash")}</span>
-                      <p>{t("settings.data.purgeTrashHint")}</p>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <button
-                        type="button"
-                        className="caster-btn caster-btn-danger-ghost"
-                        onClick={() => void purgeTrash()}
-                      >
-                        {t("settings.data.purge")}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.data.purgeOlder")}</span>
-                      <p>
-                        {t("settings.data.purgeOlderHint")}
-                        {purgeOlderPreview != null
-                          ? ` ${t("settings.data.purgeOlderPreview", {
-                              n: purgeOlderPreview,
-                            })}`
-                          : ""}
-                      </p>
-                    </div>
-                    <div className="caster-settings-row-control caster-settings-row-control--stack">
-                      <WheelNumberInput
-                        min={0}
-                        max={365}
-                        value={purgeOlderDays}
-                        aria-label={t("settings.data.purgeOlder")}
-                        onValueChange={(n) => {
-                          setPurgeOlderDays(n);
-                          void refreshPurgeOlderPreview(n);
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="caster-btn caster-btn-ghost"
-                        onClick={() => void refreshPurgeOlderPreview(purgeOlderDays)}
-                      >
-                        {t("settings.data.purgeOlderCount")}
-                      </button>
-                      <button
-                        type="button"
-                        className="caster-btn caster-btn-danger-ghost"
-                        onClick={() => void purgeTrashOlder()}
-                      >
-                        {t("settings.data.purgeOlder")}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="caster-settings-row">
-                    <div className="caster-settings-row-label">
-                      <span>{t("settings.data.autoPurge")}</span>
-                      <p>{t("settings.data.autoPurgeHint")}</p>
-                    </div>
-                    <div className="caster-settings-row-control">
-                      <WheelNumberInput
-                        min={0}
-                        max={365}
-                        value={maintenance.autoPurgeTrashDays}
-                        aria-label={t("settings.data.autoPurge")}
-                        onValueChange={(n) =>
-                          persistMaintenancePrefs({ autoPurgeTrashDays: n })
-                        }
-                      />
-                      <span className="caster-settings-suffix">
-                        {t("settings.data.autoPurgeUnit")}
-                      </span>
                     </div>
                   </div>
                   <div className="caster-settings-row">
