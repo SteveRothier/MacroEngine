@@ -629,6 +629,8 @@ body.is-lib-dragging * {
   flex-direction: column;
   min-width: 0;
   gap: 1px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 32px;
 }
 
 .caster-lib-unfiled {
@@ -728,6 +730,11 @@ body.is-lib-dragging * {
 .caster-lib-nav-row.is-active .caster-lib-item-fav,
 .caster-lib-nav-row:hover .caster-lib-item-fav {
   opacity: 1;
+}
+
+.caster-lib-item {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 28px;
 }
 
 .caster-lib-kind {

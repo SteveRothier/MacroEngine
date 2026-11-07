@@ -70,6 +70,18 @@ export function libraryEmptyForScope({
       />
     );
   }
+  if (scope === "recent") {
+    return (
+      <LibraryEmpty
+        title={t("automations.empty.noRecentTitle")}
+        lead={t("automations.empty.noRecentLead")}
+        action={{
+          label: t("automations.empty.seeAll"),
+          onClick: onSeeAll,
+        }}
+      />
+    );
+  }
   return (
     <LibraryEmpty
       title={t("automations.empty.noResultsTitle")}

@@ -5,7 +5,7 @@ import type {
 } from "../automations/types";
 import { rowKey as orderRowKey } from "../automations/relativeTime";
 
-export type LibScope = "all" | "favorites";
+export type LibScope = "all" | "favorites" | "recent";
 
 export type LibTreeNode = {
   id: string;
@@ -188,13 +188,28 @@ export function sortRowsByRecentOrder(
 export function buildNavigationEntries(opts: {
   scope: LibScope;
   favVisible: AutomationRow[];
+  recentVisible?: AutomationRow[];
   folderTree: LibTreeNode[];
   unfiledRows: AutomationRow[];
   isNodeOpen: (n: LibTreeNode) => boolean;
 }): NavEntry[] {
-  const { scope, favVisible, folderTree, unfiledRows, isNodeOpen } = opts;
+  const {
+    scope,
+    favVisible,
+    recentVisible = [],
+    folderTree,
+    unfiledRows,
+    isNodeOpen,
+  } = opts;
   if (scope === "favorites") {
     return favVisible.map((row) => ({
+      type: "item" as const,
+      key: rowDomKey(row),
+      row,
+    }));
+  }
+  if (scope === "recent") {
+    return recentVisible.map((row) => ({
       type: "item" as const,
       key: rowDomKey(row),
       row,

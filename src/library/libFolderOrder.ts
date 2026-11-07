@@ -20,6 +20,25 @@ export function folderDepth(
   return depth;
 }
 
+/** Parent → … → root ancestors of `folderId` (closest parent first). */
+export function folderAncestorIds(
+  folders: AutomationFolderOption[],
+  folderId: string | null,
+): string[] {
+  const out: string[] = [];
+  let cur = folderId;
+  let guard = 0;
+  while (cur) {
+    const parent = folders.find((f) => f.id === cur)?.parentId ?? null;
+    if (!parent) break;
+    out.push(parent);
+    cur = parent;
+    guard += 1;
+    if (guard > 32) break;
+  }
+  return out;
+}
+
 /** Deepest descendant depth below `folderId` (leaf → 0). */
 export function folderSubtreeHeight(
   folders: AutomationFolderOption[],

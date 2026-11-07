@@ -11,6 +11,7 @@
 } from "react";
 import { createPortal } from "react-dom";
 import {
+  Clock,
   Code2,
   ExternalLink,
   Folder,
@@ -64,10 +65,16 @@ import {
   folderNavKey,
   matchesLibraryQuery,
   rowDomKey,
+  sortRowsByRecentOrder,
   UNFILED_ID,
   type LibScope,
   type LibTreeNode,
 } from "./libTree";
+import { folderAncestorIds } from "./libFolderOrder";
+import {
+  loadExpandedFolderIds,
+  saveExpandedFolderIds,
+} from "./libExpandedPersist";
 import { useLibPointerDnd } from "./useLibPointerDnd";
 import {
   useLibraryMutations,
@@ -198,8 +205,8 @@ export function WorkspaceLibrary({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  /** Folders start collapsed; ids present here are expanded. */
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  /** Folders start collapsed; ids present here are expanded (persisted). */
+  const [expanded, setExpanded] = useState<Set<string>>(loadExpandedFolderIds);
   const [focusKey, setFocusKey] = useState<string | null>(null);
   /** Multi-selection (items only), values are `rowDomKey`. */
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
@@ -269,6 +276,7 @@ export function WorkspaceLibrary({
     captureSnapshot,
     applyLocalMove,
     replaceAutomationsSnapshot,
+    recentOrder,
   } = useUnifiedAutomations({
     dirtyMacroId,
     dirtyClickerId,
@@ -282,6 +290,25 @@ export function WorkspaceLibrary({
   });
   foldersRef.current = folders;
   rowsRef.current = allRows;
+
+  useEffect(() => {
+    saveExpandedFolderIds(expanded);
+  }, [expanded]);
+
+  /** Drop expanded ids for folders that no longer exist (skip until folders load). */
+  useEffect(() => {
+    if (folders.length === 0) return;
+    const valid = new Set(folders.map((f) => f.id));
+    setExpanded((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (valid.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [folders]);
 
   const bump = useCallback(() => {
     void refresh({ silent: true });
@@ -377,17 +404,62 @@ export function WorkspaceLibrary({
     () => favorites.filter(matchQuery),
     [favorites, matchQuery],
   );
+  const recentVisible = useMemo(
+    () => sortRowsByRecentOrder(activeBrowse, recentOrder).filter(matchQuery),
+    [activeBrowse, matchQuery, recentOrder],
+  );
   const navEntries = useMemo(
     () =>
       buildNavigationEntries({
         scope,
         favVisible,
+        recentVisible,
         folderTree,
         unfiledRows,
         isNodeOpen,
       }),
-    [favVisible, folderTree, isNodeOpen, scope, unfiledRows],
+    [favVisible, folderTree, isNodeOpen, recentVisible, scope, unfiledRows],
   );
+
+  /** Expand ancestors + scroll the active document into the tree. */
+  const syncedActiveKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!activeKey) {
+      syncedActiveKeyRef.current = null;
+      return;
+    }
+    if (syncedActiveKeyRef.current === activeKey) return;
+    syncedActiveKeyRef.current = activeKey;
+
+    const row = allRows.find((r) => rowDomKey(r) === activeKey);
+    if (row?.folderId) {
+      const toOpen = [
+        row.folderId,
+        ...folderAncestorIds(folders, row.folderId),
+      ];
+      setExpanded((prev) => {
+        let changed = false;
+        const next = new Set(prev);
+        for (const id of toOpen) {
+          if (!next.has(id)) {
+            next.add(id);
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+
+    const scrollToActive = () => {
+      const root = libRootRef.current;
+      if (!root || !activeKey) return;
+      const el = root.querySelector(
+        `[data-nav-key="${CSS.escape(activeKey)}"]`,
+      );
+      el?.scrollIntoView({ block: "nearest" });
+    };
+    requestAnimationFrame(() => requestAnimationFrame(scrollToActive));
+  }, [activeKey, allRows, folders]);
 
   const {
     commitCreateFolder,
@@ -889,6 +961,12 @@ export function WorkspaceLibrary({
       label: t("automations.filter.favorites"),
       icon: <Star size={16} aria-hidden />,
     },
+    {
+      id: "scope",
+      scope: "recent",
+      label: t("automations.filter.recent"),
+      icon: <Clock size={16} aria-hidden />,
+    },
   ];
 
   const emptyForScopeList = () =>
@@ -1060,6 +1138,8 @@ export function WorkspaceLibrary({
         <div className="caster-lib-tree-root">
           {scope === "favorites" ? (
             renderItemList(favVisible)
+          ) : scope === "recent" ? (
+            renderItemList(recentVisible)
           ) : folderTree.length === 0 &&
             unfiledRows.length === 0 &&
             !draftFolder &&
