@@ -15,7 +15,7 @@ import {
   InspectorSection,
   useToast,
 } from "../../ui/shell";
-import { Box, Zap } from "lucide-react";
+import { Box, SlidersHorizontal, Zap } from "lucide-react";
 import {
   ActionList,
   hasActionClipboard,
@@ -257,33 +257,6 @@ export function MacroEditorView({
     },
     [],
   );
-
-  const usedVariables = useMemo(() => {
-    const names = new Set<string>();
-    const walk = (actions: MacroAction[]) => {
-      for (const a of actions) {
-        if (a.type === "var.set" || a.type === "clipboard.get") {
-          names.add(a.name);
-        }
-        if (a.type === "http.request") {
-          if (a.statusVar) names.add(a.statusVar);
-          if (a.bodyVar) names.add(a.bodyVar);
-        }
-        if (a.type === "json.path") {
-          names.add(a.sourceVar);
-          names.add(a.destVar);
-        }
-        if (a.type === "script.run" && a.resultVar) names.add(a.resultVar);
-        if (a.type === "control.if") {
-          walk(a.then);
-          if (a.else) walk(a.else);
-        }
-        if (a.type === "control.while") walk(a.body);
-      }
-    };
-    walk(doc.actions);
-    return [...names].sort((a, b) => a.localeCompare(b));
-  }, [doc.actions]);
 
   useEffect(() => {
     setAutomationPrefs(mergeAutomationPrefs(automationPrefsProp));
@@ -1488,6 +1461,7 @@ export function MacroEditorView({
                   selectedAction.type === "control.if" ? (
                     <InspectorSection
                       title={t("macros.inspector.advanced")}
+                      icon={<SlidersHorizontal size={15} />}
                       defaultOpen={false}
                     >
                       <ControlFlowAdvancedProps
@@ -1518,7 +1492,6 @@ export function MacroEditorView({
                   doc={doc}
                   macroId={macroId}
                   locked={editorLocked || loading}
-                  usedVariables={usedVariables}
                   onChange={updateDoc}
                   onError={(msg) => toast.error(msg)}
                   processFilter={globalProcessFilter}

@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { FileCode2 } from "lucide-react";
+import {
+  Crosshair,
+  Database,
+  FileCode2,
+  Globe,
+  Keyboard,
+  Settings2,
+  SlidersHorizontal,
+  Target,
+  Timer,
+} from "lucide-react";
 import { Segmented } from "../ui";
 import {
   DropdownMenu,
@@ -311,7 +321,10 @@ export function ActionProps({
   if (action.type === "mouse.click") {
     return (
       <>
-        <InspectorSection title={t("macros.inspector.position")}>
+        <InspectorSection
+          title={t("macros.inspector.position")}
+          icon={<Crosshair size={15} />}
+        >
           <div className="props-grid action-props">
             <PointFields
               x={action.x}
@@ -323,7 +336,10 @@ export function ActionProps({
             />
           </div>
         </InspectorSection>
-        <InspectorSection title={t("macros.inspector.options")}>
+        <InspectorSection
+          title={t("macros.inspector.options")}
+          icon={<Settings2 size={15} />}
+        >
           <div className="props-grid action-props">
             <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
               <span>{t("macros.params.button")}</span>
@@ -341,7 +357,10 @@ export function ActionProps({
 
   if (action.type === "mouse.move") {
     return (
-      <InspectorSection title={t("macros.inspector.position")}>
+      <InspectorSection
+          title={t("macros.inspector.position")}
+          icon={<Crosshair size={15} />}
+        >
         <div className="props-grid action-props">
           <PointFields
             x={action.x}
@@ -364,7 +383,10 @@ export function ActionProps({
     const kind = action.type;
     return (
       <>
-        <InspectorSection title={t("macros.inspector.position")}>
+        <InspectorSection
+          title={t("macros.inspector.position")}
+          icon={<Crosshair size={15} />}
+        >
           <div className="props-grid action-props">
             <PointFields
               x={action.x}
@@ -375,7 +397,10 @@ export function ActionProps({
             />
           </div>
         </InspectorSection>
-        <InspectorSection title={t("macros.inspector.options")}>
+        <InspectorSection
+          title={t("macros.inspector.options")}
+          icon={<Settings2 size={15} />}
+        >
           <div className="props-grid action-props">
             <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
               <span>{t("macros.params.button")}</span>
@@ -399,7 +424,10 @@ export function ActionProps({
   if (action.type === "mouse.wheel") {
     return (
       <>
-        <InspectorSection title={t("macros.inspector.options")}>
+        <InspectorSection
+          title={t("macros.inspector.options")}
+          icon={<Settings2 size={15} />}
+        >
           <div className="props-grid">
             <label className="caster-field">
               <span>{t("macros.params.wheelDelta")}</span>
@@ -411,7 +439,10 @@ export function ActionProps({
             </label>
           </div>
         </InspectorSection>
-        <InspectorSection title={t("macros.inspector.position")}>
+        <InspectorSection
+          title={t("macros.inspector.position")}
+          icon={<Crosshair size={15} />}
+        >
           <div className="props-grid">
             <PointFields
               x={action.x}
@@ -428,7 +459,10 @@ export function ActionProps({
 
   if (action.type === "delay") {
     return (
-      <InspectorSection title={t("macros.inspector.execution")}>
+      <InspectorSection
+        title={t("macros.inspector.execution")}
+        icon={<Timer size={15} />}
+      >
         <label className="caster-field">
           <span>{t("macros.params.durationMs")}</span>
           <WheelNumberInput
@@ -445,7 +479,10 @@ export function ActionProps({
   if (action.type === "http.request") {
     return (
       <>
-        <InspectorSection title={t("macros.inspector.request")}>
+        <InspectorSection
+          title={t("macros.inspector.request")}
+          icon={<Globe size={15} />}
+        >
           <div className="props-grid">
             <label className="caster-field">
               <span>{t("macros.params.httpMethod")}</span>
@@ -566,7 +603,10 @@ export function ActionProps({
             </div>
           </div>
         </InspectorSection>
-        <InspectorSection title={t("macros.inspector.response")}>
+        <InspectorSection
+          title={t("macros.inspector.response")}
+          icon={<SlidersHorizontal size={15} />}
+        >
           <div className="props-grid">
             <label className="caster-field">
               <span>{t("macros.params.httpTimeout")}</span>
@@ -626,7 +666,10 @@ export function ActionProps({
 
   if (action.type === "json.path") {
     return (
-      <InspectorSection title={t("macros.inspector.data")}>
+      <InspectorSection
+        title={t("macros.inspector.data")}
+        icon={<Database size={15} />}
+      >
         <div className="props-grid">
           <label className="caster-field">
             <span>{t("macros.params.jsonSourceVar")}</span>
@@ -675,7 +718,10 @@ export function ActionProps({
 
   if (action.type === "macro.run") {
     return (
-      <InspectorSection title={t("macros.inspector.target")}>
+      <InspectorSection
+        title={t("macros.inspector.target")}
+        icon={<Target size={15} />}
+      >
         <LibraryIdPickerProps
           kind="macro"
           label={t("macros.params.macroId")}
@@ -691,7 +737,10 @@ export function ActionProps({
 
   if (action.type === "clicker.start") {
     return (
-      <InspectorSection title={t("macros.inspector.target")}>
+      <InspectorSection
+        title={t("macros.inspector.target")}
+        icon={<Target size={15} />}
+      >
         <LibraryIdPickerProps
           kind="clicker"
           label={t("macros.params.clickerPresetId")}
@@ -718,7 +767,10 @@ export function ActionProps({
           ? t("macros.menu.add.keyUp")
           : t("macros.params.key");
     return (
-      <InspectorSection title={t("macros.inspector.key")}>
+      <InspectorSection
+        title={t("macros.inspector.key")}
+        icon={<Keyboard size={15} />}
+      >
         <div className="props-grid">
           <label className="caster-field">
             <span>
@@ -807,7 +859,10 @@ export function ActionProps({
 
   if (action.type === "clipboard.set") {
     return (
-      <InspectorSection title={t("macros.inspector.data")}>
+      <InspectorSection
+        title={t("macros.inspector.data")}
+        icon={<Database size={15} />}
+      >
         <label className="caster-field">
           <span>{t("macros.params.clipboardText")}</span>
           <input
@@ -824,7 +879,10 @@ export function ActionProps({
 
   if (action.type === "clipboard.get") {
     return (
-      <InspectorSection title={t("macros.inspector.data")}>
+      <InspectorSection
+        title={t("macros.inspector.data")}
+        icon={<Database size={15} />}
+      >
         <label className="caster-field">
           <span>{t("macros.params.operandVar")}</span>
           <input
@@ -841,7 +899,10 @@ export function ActionProps({
 
   if (action.type === "var.set") {
     return (
-      <InspectorSection title={t("macros.inspector.data")}>
+      <InspectorSection
+        title={t("macros.inspector.data")}
+        icon={<Database size={15} />}
+      >
         <div className="props-grid">
           <label className="caster-field">
             <span>{t("macros.params.varName")}</span>
@@ -877,7 +938,10 @@ export function ActionProps({
   }
 
   return (
-    <InspectorSection title={t("macros.inspector.execution")}>
+    <InspectorSection
+        title={t("macros.inspector.execution")}
+        icon={<Timer size={15} />}
+      >
       <div className="props-grid">
         <label className="caster-field">
           <span>{t("macros.params.processCommand")}</span>

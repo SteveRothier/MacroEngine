@@ -75,17 +75,26 @@ export function InspectorPanel({
 
 export function InspectorSection({
   title,
+  icon,
   children,
   defaultOpen = true,
 }: {
   title: string;
+  icon?: ReactNode;
   children: ReactNode;
   defaultOpen?: boolean;
 }) {
   return (
     <details className="caster-inspector-section" open={defaultOpen}>
       <summary>
-        <span className="caster-inspector-section-title">{title}</span>
+        <span className="caster-inspector-section-label">
+          {icon ? (
+            <span className="caster-inspector-section-icon" aria-hidden>
+              {icon}
+            </span>
+          ) : null}
+          <span className="caster-inspector-section-title">{title}</span>
+        </span>
         <ChevronDown
           size={14}
           aria-hidden

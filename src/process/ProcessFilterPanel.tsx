@@ -184,20 +184,22 @@ export function ProcessFilterPanel({
           ))}
         </div>
 
-        {mode !== "local" ? (
+        {!embedded && mode !== "local" ? (
           <p className="caster-process-filter-panel-summary">{summary}</p>
         ) : null}
 
-        {mode === "off" ? (
+        {!embedded && mode === "off" ? (
           <p className="caster-process-filter-panel-hint">
             {t("common.process.offHint")}
           </p>
         ) : null}
         {mode === "inherit" ? (
           <>
-            <p className="caster-process-filter-panel-hint">
-              {t("common.process.inheritHint")}
-            </p>
+            {!embedded ? (
+              <p className="caster-process-filter-panel-hint">
+                {t("common.process.inheritHint")}
+              </p>
+            ) : null}
             <div className="caster-process-filter-panel-head-actions">
               {onGlobalFilterChange ? (
                 <button

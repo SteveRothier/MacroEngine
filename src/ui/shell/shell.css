@@ -2476,11 +2476,11 @@ button.caster-titlebar-btn.caster-btn-ghost.caster-btn-ghost--icon,
 .caster-inspector-head.is-mode-only {
   display: flex;
   grid-template-columns: none;
-  padding: 8px 10px;
+  padding: 10px;
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--caster-bg-secondary);
+  background: var(--caster-bg-app);
 }
 
 .caster-inspector-head-start {
@@ -2705,6 +2705,13 @@ button.caster-titlebar-btn.caster-btn-ghost.caster-btn-ghost--icon,
   text-transform: none;
   letter-spacing: 0;
   font-weight: 400;
+}
+
+.caster-macro-settings-exec {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 .caster-macro-settings-inf-label {
@@ -3062,6 +3069,27 @@ button.caster-titlebar-btn.caster-btn-ghost.caster-btn-ghost--icon,
   display: none;
 }
 
+.caster-inspector-section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.caster-inspector-section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--caster-accent);
+  opacity: 0.92;
+}
+
+.caster-inspector-section-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
 .caster-inspector-section-title {
   min-width: 0;
 }
@@ -3077,7 +3105,32 @@ button.caster-titlebar-btn.caster-btn-ghost.caster-btn-ghost--icon,
 }
 
 .caster-inspector-section-body {
-  padding: 0 12px 12px;
+  padding: 6px 12px 12px;
+}
+
+/* Étape props densité alignée Macro */
+.caster-inspector-section-body .action-props,
+.caster-inspector-section-body .props-grid {
+  gap: 8px;
+}
+
+.caster-inspector-section-body .caster-field {
+  gap: 6px;
+}
+
+.caster-inspector-section-body .caster-field > span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--caster-text-muted);
+}
+
+.caster-inspector-section-body .hint {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--caster-text-muted);
 }
 
 .caster-cmd-overlay {
@@ -3362,23 +3415,38 @@ button.caster-titlebar-btn.caster-btn-ghost.caster-btn-ghost--icon,
 
 /* Bridge legacy form controls to caster tokens inside the shell */
 .caster-root .ui-switch {
-  height: 14px;
-  min-height: 14px;
-  border-radius: var(--caster-radius-sm);
-  background: var(--caster-bg-input);
-  border-color: var(--caster-border-strong);
+  width: 30px;
+  height: 17px;
+  min-height: 17px;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--caster-text-primary) 18%, var(--caster-bg-app));
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--caster-border-subtle) 80%, transparent);
   transition:
     background var(--caster-dur-fast) var(--caster-ease),
-    border-color var(--caster-dur-fast) var(--caster-ease),
     box-shadow var(--caster-dur-fast) var(--caster-ease);
 }
 .caster-root .ui-switch.on {
-  background: var(--caster-status-healthy-bg);
-  border-color: var(--caster-status-healthy);
+  background: var(--caster-accent);
+  box-shadow: 0 0 0 1px
+    color-mix(in srgb, var(--caster-accent) 35%, transparent);
 }
 .caster-root .ui-switch:focus-visible {
   outline: none;
   box-shadow: var(--caster-focus-ring);
+}
+.caster-root .ui-switch-thumb {
+  top: 2px;
+  left: 2px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.caster-root .ui-switch.on .ui-switch-thumb {
+  transform: translateX(13px);
 }
 .caster-root .ui-segment {
   background: var(--caster-bg-input);
@@ -4587,6 +4655,7 @@ button.caster-titlebar-btn.caster-btn-ghost.caster-btn-ghost--icon,
   align-items: center;
   gap: 8px;
   height: var(--caster-status-bar-h, 26px);
+  min-height: var(--caster-status-bar-h, 26px);
   padding: 0 8px 0 4px;
   box-sizing: border-box;
   font-size: var(--caster-text-xs);
@@ -4594,6 +4663,10 @@ button.caster-titlebar-btn.caster-btn-ghost.caster-btn-ghost--icon,
   border-top: 1px solid var(--caster-border-subtle);
   background: var(--caster-bg-secondary);
   flex-shrink: 0;
+}
+
+.caster-console-host:has(.caster-journal-dock.is-collapsed) {
+  border-top-color: var(--caster-border-subtle);
 }
 
 .caster-journal-dock.is-open .caster-journal-footer {
@@ -6330,14 +6403,25 @@ button.caster-select-trigger.action-cell-select {
 .action-props-pick-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  height: 28px;
-  min-height: 28px;
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
   padding: 0 10px;
   flex-shrink: 0;
   border: 1px solid var(--caster-border-subtle);
   border-radius: var(--caster-radius-sm);
   background: var(--caster-bg-app);
+}
+
+.caster-inspector-section-body .action-props-xy-row {
+  width: 100%;
+}
+
+.caster-inspector-section-body .action-props-xy-input {
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .action-props-pick-btn.is-capturing {

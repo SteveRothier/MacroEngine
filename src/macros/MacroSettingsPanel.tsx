@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Infinity, Keyboard } from "lucide-react";
+import {
+  Infinity,
+  Keyboard,
+  AlignLeft,
+  Repeat,
+  Settings2,
+  Shield,
+} from "lucide-react";
 import { Segmented, Switch } from "../ui";
 import { InspectorSection } from "../ui/shell";
 import { useT } from "../i18n";
@@ -55,7 +62,6 @@ export type MacroSettingsPanelProps = {
   doc: MacroDocument;
   macroId: string;
   locked: boolean;
-  usedVariables: string[];
   onChange: (next: MacroDocument) => void;
   onError: (message: string) => void;
   processFilter: ProcessFilter;
@@ -73,7 +79,6 @@ export function MacroSettingsPanel({
   doc,
   macroId,
   locked,
-  usedVariables,
   onChange,
   onError,
   processFilter,
@@ -174,76 +179,68 @@ export function MacroSettingsPanel({
 
   return (
     <div className="caster-macro-settings">
-      <InspectorSection title={t("macros.settings.description")}>
-        <div className="caster-field">
-          <p className="caster-macro-settings-field-hint">
-            {t("macros.settings.descriptionHint")}
-          </p>
-          <textarea
-            className="caster-macro-settings-description"
-            rows={3}
-            disabled={locked}
-            spellCheck={false}
-            autoCorrect="off"
-            autoCapitalize="off"
-            value={doc.description ?? ""}
-            placeholder={t("macros.settings.descriptionPlaceholder")}
-            aria-label={t("macros.settings.description")}
-            onChange={(e) =>
-              onChange({ ...doc, description: e.target.value })
-            }
-          />
-        </div>
+      <InspectorSection
+        title={t("macros.settings.description")}
+        icon={<AlignLeft size={15} />}
+      >
+        <textarea
+          className="caster-macro-settings-description"
+          rows={3}
+          disabled={locked}
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          value={doc.description ?? ""}
+          placeholder={t("macros.settings.descriptionPlaceholder")}
+          aria-label={t("macros.settings.description")}
+          onChange={(e) => onChange({ ...doc, description: e.target.value })}
+        />
       </InspectorSection>
 
-      <InspectorSection title={t("macros.settings.trigger")}>
-        <div className="caster-field">
-          <span>{t("macros.toolbar.metaHotkey")}</span>
-          <p className="caster-macro-settings-field-hint">
-            {t("macros.settings.hotkeyHint")}
-          </p>
-          <button
-            ref={hotkeyBtnRef}
-            type="button"
-            className={[
-              "caster-macro-settings-hotkey",
-              capturing ? "is-capturing" : "",
-              !triggerLabel && !capturing ? "is-empty" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            disabled={locked}
-            aria-label={
-              capturing
-                ? t("macros.params.hotkeyCapturing")
-                : triggerLabel
-                  ? t("macros.params.hotkeyValue", { label: triggerLabel })
-                  : t("macros.params.hotkeySet")
-            }
-            onClick={() => setCapturing((v) => !v)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              if (locked) return;
-              setCapturing(false);
-              onChange({ ...doc, trigger: { type: "manual" } });
-            }}
-          >
-            <Keyboard size={14} aria-hidden />
-            <span>
-              {capturing
-                ? t("macros.params.hotkeyCapturing")
-                : (triggerLabel ?? t("macros.toolbar.metaHotkeyNone"))}
-            </span>
-          </button>
-        </div>
+      <InspectorSection
+        title={t("macros.settings.trigger")}
+        icon={<Keyboard size={15} />}
+      >
+        <button
+          ref={hotkeyBtnRef}
+          type="button"
+          className={[
+            "caster-macro-settings-hotkey",
+            capturing ? "is-capturing" : "",
+            !triggerLabel && !capturing ? "is-empty" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          disabled={locked}
+          aria-label={
+            capturing
+              ? t("macros.params.hotkeyCapturing")
+              : triggerLabel
+                ? t("macros.params.hotkeyValue", { label: triggerLabel })
+                : t("macros.params.hotkeySet")
+          }
+          onClick={() => setCapturing((v) => !v)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            if (locked) return;
+            setCapturing(false);
+            onChange({ ...doc, trigger: { type: "manual" } });
+          }}
+        >
+          <Keyboard size={14} aria-hidden />
+          <span>
+            {capturing
+              ? t("macros.params.hotkeyCapturing")
+              : (triggerLabel ?? t("macros.toolbar.metaHotkeyNone"))}
+          </span>
+        </button>
       </InspectorSection>
 
-      <InspectorSection title={t("macros.settings.execution")}>
-        <div className="caster-field">
-          <span>{t("macros.toolbar.repeatAria")}</span>
-          <p className="caster-macro-settings-field-hint">
-            {t("macros.settings.repeatHint")}
-          </p>
+      <InspectorSection
+        title={t("macros.settings.execution")}
+        icon={<Repeat size={15} />}
+      >
+        <div className="caster-macro-settings-exec">
           <Segmented
             ariaLabel={t("macros.toolbar.repeatAria")}
             value={repeatMode}
@@ -286,7 +283,10 @@ export function MacroSettingsPanel({
         </div>
       </InspectorSection>
 
-      <InspectorSection title={t("macros.settings.process")}>
+      <InspectorSection
+        title={t("macros.settings.process")}
+        icon={<Settings2 size={15} />}
+      >
         <div className="caster-macro-settings-process">
           <ProcessFilterPanel
             embedded
@@ -304,7 +304,10 @@ export function MacroSettingsPanel({
         </div>
       </InspectorSection>
 
-      <InspectorSection title={t("macros.permissions.label")}>
+      <InspectorSection
+        title={t("macros.permissions.label")}
+        icon={<Shield size={15} />}
+      >
         <div className="caster-macro-settings-perms">
           <label className="caster-macro-settings-perm-row">
             <span className="caster-macro-settings-perm-text">
@@ -345,22 +348,6 @@ export function MacroSettingsPanel({
             />
           </label>
         </div>
-      </InspectorSection>
-
-      <InspectorSection title={t("macros.editorTabs.variables")}>
-        {usedVariables.length === 0 ? (
-          <p className="caster-macro-settings-field-hint">
-            {t("macros.editorTabs.variablesLead")}
-          </p>
-        ) : (
-          <ul className="caster-macro-var-list caster-macro-var-list--settings">
-            {usedVariables.map((name) => (
-              <li key={name}>
-                <code>{name}</code>
-              </li>
-            ))}
-          </ul>
-        )}
       </InspectorSection>
     </div>
   );
