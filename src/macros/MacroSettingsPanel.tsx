@@ -1,14 +1,12 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronRight, Infinity, Keyboard, Repeat, X } from "lucide-react";
-import { Switch } from "../ui";
+import { Infinity, Keyboard } from "lucide-react";
+import { Segmented, Switch } from "../ui";
+import { InspectorSection } from "../ui/shell";
 import { useT } from "../i18n";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
 import {
   ProcessFilterPanel,
-  processFilterModeLabel,
-  processFilterScopeSummary,
   type ProcessFilter,
   type ProcessFilterPreset,
   type ProcessFilterScopeMode,
@@ -53,43 +51,6 @@ function triggerConflictsWithReserved(
   return false;
 }
 
-function SettingsBlock({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="caster-macro-settings-block">
-      <h3 className="caster-macro-settings-block-title">{title}</h3>
-      <div className="caster-macro-settings-block-body">{children}</div>
-    </section>
-  );
-}
-
-function SettingsRow({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="caster-macro-settings-row">
-      <div className="caster-macro-settings-row-text">
-        <span className="caster-macro-settings-row-label">{label}</span>
-        {hint ? (
-          <span className="caster-macro-settings-row-hint">{hint}</span>
-        ) : null}
-      </div>
-      <div className="caster-macro-settings-row-control">{children}</div>
-    </div>
-  );
-}
-
 export type MacroSettingsPanelProps = {
   doc: MacroDocument;
   macroId: string;
@@ -127,33 +88,24 @@ export function MacroSettingsPanel({
 }: MacroSettingsPanelProps) {
   const t = useT();
   const [capturing, setCapturing] = useState(false);
-  const [repeatFocused, setRepeatFocused] = useState(false);
-  const [processOpen, setProcessOpen] = useState(false);
   const docRef = useRef(doc);
   docRef.current = doc;
   const lastRepeatRef = useRef(Math.max(1, doc.repeatCount || 1));
   const hotkeyBtnRef = useRef<HTMLButtonElement>(null);
-  const processDialogId = useId();
 
   const continuous = doc.repeatCount === 0;
-  const showInfinity = continuous && !repeatFocused;
+  const repeatMode = continuous ? "infinite" : "count";
 
   useEffect(() => {
     if (doc.repeatCount > 0) lastRepeatRef.current = doc.repeatCount;
   }, [doc.repeatCount]);
+
   const triggerLabel =
     doc.trigger &&
     typeof doc.trigger === "object" &&
     doc.trigger.type === "hotkey"
       ? triggerHotkeyLabel(doc.trigger)
       : null;
-  const processModeLabel = processFilterModeLabel(processFilterMode, t);
-  const processDetail = processFilterScopeSummary(
-    processFilterMode,
-    processFilter,
-    localProcessFilter,
-    t,
-  );
 
   useEffect(() => {
     if (!capturing || locked) return;
@@ -220,141 +172,36 @@ export function MacroSettingsPanel({
       window.removeEventListener("pointerdown", onPointerDown, true);
   }, [capturing]);
 
-  useEffect(() => {
-    if (!processOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        setProcessOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [processOpen]);
-
-  const processSheet =
-    processOpen && typeof document !== "undefined"
-      ? createPortal(
-          <div
-            className="caster-dialog-overlay"
-            role="presentation"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setProcessOpen(false);
-            }}
-          >
-            <div
-              className="caster-dialog caster-macro-process-sheet"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={processDialogId}
-            >
-              <div className="caster-macro-process-sheet-head">
-                <h2 id={processDialogId} className="caster-dialog-title">
-                  {t("macros.settings.process")}
-                </h2>
-                <button
-                  type="button"
-                  className="caster-titlebar-btn caster-titlebar-icon-btn"
-                  aria-label={t("common.close")}
-                  onClick={() => setProcessOpen(false)}
-                >
-                  <X size={14} aria-hidden />
-                </button>
-              </div>
-              <div className="caster-macro-process-sheet-body">
-                <ProcessFilterPanel
-                  filter={processFilter}
-                  mode={processFilterMode}
-                  onModeChange={onProcessFilterModeChange}
-                  localFilter={localProcessFilter}
-                  onLocalFilterChange={onLocalProcessFilterChange}
-                  disabled={locked}
-                  onOpenSettings={onOpenProcessSettings}
-                  onGlobalFilterChange={onGlobalProcessFilterChange}
-                  presets={processFilterPresets}
-                  onPresetsChange={onProcessFilterPresetsChange}
-                />
-              </div>
-            </div>
-          </div>,
-          document.body,
-        )
-      : null;
-
   return (
     <div className="caster-macro-settings">
-      <SettingsBlock title={t("macros.settings.execution")}>
-        <SettingsRow
-          label={t("macros.toolbar.repeatAria")}
-          hint={t("macros.settings.repeatHint")}
-        >
-          <div className="caster-macro-settings-repeat-combo">
-            <button
-              type="button"
-              className={[
-                "caster-macro-settings-infinity-btn",
-                continuous ? "is-active" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-              disabled={locked}
-              aria-pressed={continuous}
-              aria-label={t("macros.settings.continuous")}
-              title={t("macros.settings.continuous")}
-              onClick={() =>
-                onChange({
-                  ...doc,
-                  repeatCount: continuous ? lastRepeatRef.current : 0,
-                })
-              }
-            >
-              <Infinity size={14} aria-hidden />
-            </button>
-            <div
-              className={[
-                "caster-macro-settings-repeat",
-                continuous ? "is-continuous" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              <Repeat
-                size={14}
-                aria-hidden
-                className="caster-macro-settings-repeat-icon"
-              />
-              {showInfinity ? (
-                <span className="caster-macro-settings-infinity" aria-hidden>
-                  ∞
-                </span>
-              ) : null}
-              <WheelNumberInput
-                className={[
-                  "caster-macro-settings-input",
-                  showInfinity ? "is-infinity-hidden" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                min={0}
-                value={continuous ? 0 : doc.repeatCount}
-                disabled={locked}
-                aria-label={t("macros.toolbar.repeatAria")}
-                aria-hidden={showInfinity || undefined}
-                tabIndex={showInfinity ? -1 : undefined}
-                onFocus={() => setRepeatFocused(true)}
-                onBlur={() => setRepeatFocused(false)}
-                onValueChange={(n) => onChange({ ...doc, repeatCount: n })}
-              />
-            </div>
-          </div>
-        </SettingsRow>
-      </SettingsBlock>
+      <InspectorSection title={t("macros.settings.description")}>
+        <div className="caster-field">
+          <p className="caster-macro-settings-field-hint">
+            {t("macros.settings.descriptionHint")}
+          </p>
+          <textarea
+            className="caster-macro-settings-description"
+            rows={3}
+            disabled={locked}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            value={doc.description ?? ""}
+            placeholder={t("macros.settings.descriptionPlaceholder")}
+            aria-label={t("macros.settings.description")}
+            onChange={(e) =>
+              onChange({ ...doc, description: e.target.value })
+            }
+          />
+        </div>
+      </InspectorSection>
 
-      <SettingsBlock title={t("macros.settings.trigger")}>
-        <SettingsRow
-          label={t("macros.toolbar.metaHotkey")}
-          hint={t("macros.settings.hotkeyHint")}
-        >
+      <InspectorSection title={t("macros.settings.trigger")}>
+        <div className="caster-field">
+          <span>{t("macros.toolbar.metaHotkey")}</span>
+          <p className="caster-macro-settings-field-hint">
+            {t("macros.settings.hotkeyHint")}
+          </p>
           <button
             ref={hotkeyBtnRef}
             type="button"
@@ -388,40 +235,83 @@ export function MacroSettingsPanel({
                 : (triggerLabel ?? t("macros.toolbar.metaHotkeyNone"))}
             </span>
           </button>
-        </SettingsRow>
-      </SettingsBlock>
+        </div>
+      </InspectorSection>
 
-      <SettingsBlock title={t("macros.settings.process")}>
-        <button
-          type="button"
-          className="caster-macro-settings-process-summary"
-          disabled={locked}
-          aria-haspopup="dialog"
-          aria-expanded={processOpen}
-          aria-label={t("common.process.toolAria", {
-            mode: processModeLabel,
-            detail: processDetail,
-          })}
-          onClick={() => setProcessOpen(true)}
-        >
-          <span className="caster-macro-settings-process-mode">
-            {processModeLabel}
-          </span>
-          <span className="caster-macro-settings-process-detail">
-            {processDetail}
-          </span>
-          <ChevronRight
-            size={14}
-            aria-hidden
-            className="caster-macro-settings-process-chevron"
+      <InspectorSection title={t("macros.settings.execution")}>
+        <div className="caster-field">
+          <span>{t("macros.toolbar.repeatAria")}</span>
+          <p className="caster-macro-settings-field-hint">
+            {t("macros.settings.repeatHint")}
+          </p>
+          <Segmented
+            ariaLabel={t("macros.toolbar.repeatAria")}
+            value={repeatMode}
+            disabled={locked}
+            options={[
+              { value: "count", label: t("macros.settings.repeatCount") },
+              {
+                value: "infinite",
+                label: (
+                  <span className="caster-macro-settings-inf-label">
+                    <Infinity size={13} aria-hidden />
+                    {t("macros.settings.repeatInfinite")}
+                  </span>
+                ),
+              },
+            ]}
+            onChange={(mode) => {
+              if (mode === "infinite") {
+                onChange({ ...doc, repeatCount: 0 });
+                return;
+              }
+              onChange({
+                ...doc,
+                repeatCount: Math.max(1, lastRepeatRef.current),
+              });
+            }}
           />
-        </button>
-      </SettingsBlock>
+          {repeatMode === "count" ? (
+            <WheelNumberInput
+              className="caster-macro-settings-input"
+              min={1}
+              value={doc.repeatCount}
+              disabled={locked}
+              aria-label={t("macros.toolbar.repeatAria")}
+              onValueChange={(n) =>
+                onChange({ ...doc, repeatCount: Math.max(1, n) })
+              }
+            />
+          ) : null}
+        </div>
+      </InspectorSection>
 
-      <SettingsBlock title={t("macros.permissions.label")}>
-        <div className="caster-macro-settings-perm-grid">
-          <label className="caster-macro-settings-perm">
-            <span>{t("scripts.permissions.network")}</span>
+      <InspectorSection title={t("macros.settings.process")}>
+        <div className="caster-macro-settings-process">
+          <ProcessFilterPanel
+            embedded
+            filter={processFilter}
+            mode={processFilterMode}
+            onModeChange={onProcessFilterModeChange}
+            localFilter={localProcessFilter}
+            onLocalFilterChange={onLocalProcessFilterChange}
+            disabled={locked}
+            onOpenSettings={onOpenProcessSettings}
+            onGlobalFilterChange={onGlobalProcessFilterChange}
+            presets={processFilterPresets}
+            onPresetsChange={onProcessFilterPresetsChange}
+          />
+        </div>
+      </InspectorSection>
+
+      <InspectorSection title={t("macros.permissions.label")}>
+        <div className="caster-macro-settings-perms">
+          <label className="caster-macro-settings-perm-row">
+            <span className="caster-macro-settings-perm-text">
+              <span className="caster-macro-settings-perm-label">
+                {t("scripts.permissions.network")}
+              </span>
+            </span>
             <Switch
               checked={!!doc.allowNetwork}
               disabled={locked}
@@ -435,8 +325,12 @@ export function MacroSettingsPanel({
               }
             />
           </label>
-          <label className="caster-macro-settings-perm">
-            <span>{t("scripts.permissions.process")}</span>
+          <label className="caster-macro-settings-perm-row">
+            <span className="caster-macro-settings-perm-text">
+              <span className="caster-macro-settings-perm-label">
+                {t("scripts.permissions.process")}
+              </span>
+            </span>
             <Switch
               checked={!!doc.allowProcess}
               disabled={locked}
@@ -451,11 +345,11 @@ export function MacroSettingsPanel({
             />
           </label>
         </div>
-      </SettingsBlock>
+      </InspectorSection>
 
-      <SettingsBlock title={t("macros.editorTabs.variables")}>
+      <InspectorSection title={t("macros.editorTabs.variables")}>
         {usedVariables.length === 0 ? (
-          <p className="caster-macro-settings-empty">
+          <p className="caster-macro-settings-field-hint">
             {t("macros.editorTabs.variablesLead")}
           </p>
         ) : (
@@ -467,9 +361,7 @@ export function MacroSettingsPanel({
             ))}
           </ul>
         )}
-      </SettingsBlock>
-
-      {processSheet}
+      </InspectorSection>
     </div>
   );
 }

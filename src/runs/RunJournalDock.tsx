@@ -11,10 +11,10 @@ import {
   ChevronDown,
   ClipboardCopy,
   Download,
-  Terminal,
   Trash2,
 } from "lucide-react";
 import { EmptyState, useToast } from "../ui/shell";
+import type { StatusBarState } from "../ui/shell";
 import { useT } from "../i18n";
 import type { JournalLine } from "./useEngineLog";
 
@@ -27,6 +27,11 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   /** Optional short CTA when empty (P19G). */
   emptyCta?: { label: string; onClick: () => void };
+  /** Engine status for the persistent footer strip. */
+  statusState?: StatusBarState;
+  hotkeyHint?: string | null;
+  timerLabel?: string | null;
+  message?: string | null;
 };
 
 const JOURNAL_H_KEY = "caster-journal-h";
@@ -70,6 +75,10 @@ export function RunJournalDock({
   open,
   onOpenChange,
   emptyCta,
+  statusState = "idle",
+  hotkeyHint,
+  timerLabel,
+  message,
 }: Props) {
   const t = useT();
   const toast = useToast();
@@ -140,8 +149,6 @@ export function RunJournalDock({
     [],
   );
 
-  if (!open) return null;
-
   const filterLabels: Record<Filter, string> = {
     all: t("runs.filterAll"),
     macro: t("runs.filterMacros"),
@@ -184,173 +191,241 @@ export function RunJournalDock({
     })();
   };
 
+  const statusAria =
+    statusState === "running"
+      ? t("shell.exec.running")
+      : statusState === "paused"
+        ? t("shell.exec.paused")
+        : statusState === "error"
+          ? t("shell.errorTitle")
+          : t("shell.exec.ready");
+
+  const dotClass =
+    statusState === "running"
+      ? "is-running"
+      : statusState === "paused"
+        ? "is-paused"
+        : statusState === "error"
+          ? "is-error"
+          : "is-ready";
+
   return (
     <div
-      className="caster-journal-dock"
+      className={[
+        "caster-journal-dock",
+        open ? "is-open" : "is-collapsed",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       role="region"
       aria-label={t("runs.aria")}
-      style={{ ["--caster-journal-h" as string]: `${height}px` }}
+      style={
+        open
+          ? { ["--caster-journal-h" as string]: `${height}px` }
+          : undefined
+      }
     >
-      <div
-        className="caster-journal-splitter"
-        role="separator"
-        aria-orientation="horizontal"
-        aria-valuemin={JOURNAL_H_MIN}
-        aria-valuemax={journalHMax()}
-        aria-valuenow={height}
-        onPointerDown={onResizePointerDown}
-        onPointerMove={onResizePointerMove}
-        onPointerUp={onResizePointerUp}
-        onPointerCancel={onResizePointerUp}
-      />
-      <div className="caster-journal-head">
-        <div className="caster-journal-head-primary">
-          <button
-            type="button"
-            className="caster-journal-title-btn"
-            onClick={() => onOpenChange(false)}
-            title={t("runs.close")}
-            aria-label={t("runs.close")}
-          >
-            <Terminal size={14} aria-hidden />
-            <span className="caster-journal-title">{t("runs.title")}</span>
-            <ChevronDown size={14} aria-hidden className="caster-journal-collapse" />
-          </button>
-          <div className="caster-journal-head-actions">
-            <button
-              type="button"
-              className="caster-btn caster-btn-ghost"
-              title={t("runs.clear")}
-              onClick={onClear}
-            >
-              <Trash2 size={12} />
-              <span>{t("runs.clear")}</span>
-            </button>
-          </div>
-        </div>
-        <div className="caster-journal-filters">
+      {open ? (
+        <>
           <div
-            className="caster-segmented caster-journal-filter-segmented"
-            role="group"
-            aria-label={t("runs.filterAria")}
-          >
-            {(
-              [
-                "all",
-                "macro",
-                "clicker",
-                "script",
-                "system",
-                "errors",
-              ] as Filter[]
-            ).map((f) => (
-              <button
-                key={f}
-                type="button"
-                className={[
-                  "caster-segmented-btn",
-                  filter === f ? "active" : "",
-                  f === "errors" ? "caster-journal-filter--errors" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                onClick={() => setFilter(f)}
-              >
-                {filterLabels[f]}
-              </button>
-            ))}
-          </div>
-          <input
-            type="search"
-            className="caster-search-inline caster-journal-search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("runs.searchPlaceholder")}
-            aria-label={t("runs.searchAria")}
+            className="caster-journal-splitter"
+            role="separator"
+            aria-orientation="horizontal"
+            aria-valuemin={JOURNAL_H_MIN}
+            aria-valuemax={journalHMax()}
+            aria-valuenow={height}
+            onPointerDown={onResizePointerDown}
+            onPointerMove={onResizePointerMove}
+            onPointerUp={onResizePointerUp}
+            onPointerCancel={onResizePointerUp}
           />
-          <button
-            type="button"
-            className={[
-              "caster-btn caster-btn-ghost",
-              follow ? "is-active" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            title={t("runs.followTitle")}
-            aria-pressed={follow}
-            onClick={() => setFollow((v) => !v)}
-          >
-            {t("runs.follow")}
-          </button>
-          <button
-            type="button"
-            className="caster-btn caster-btn-ghost"
-            title={t("runs.exportTitle")}
-            aria-label={t("runs.export")}
-            disabled={filtered.length === 0}
-            onClick={copyFiltered}
-          >
-            <ClipboardCopy size={12} />
-          </button>
-          <button
-            type="button"
-            className="caster-btn caster-btn-ghost"
-            title={t("runs.exportFileTitle")}
-            aria-label={t("runs.exportFile")}
-            disabled={filtered.length === 0}
-            onClick={saveFiltered}
-          >
-            <Download size={12} />
-          </button>
-        </div>
-      </div>
-      <div
-        className="caster-journal-body"
-        ref={bodyRef}
-        onScroll={() => {
-          const el = bodyRef.current;
-          if (!el) return;
-          const atBottom =
-            el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-          if (!atBottom && followRef.current) setFollow(false);
-          else if (atBottom && !followRef.current) setFollow(true);
-        }}
-      >
-        {filtered.length === 0 ? (
-          <EmptyState
-            title={t("runs.emptyTitle")}
-            lead={t("runs.emptyLead")}
-            actions={
-              emptyCta ? (
+          <div className="caster-journal-panel">
+            <div className="caster-journal-head">
+              <div className="caster-journal-head-primary">
+                <div className="caster-journal-head-actions">
+                  <button
+                    type="button"
+                    className="caster-btn caster-btn-ghost"
+                    title={t("runs.clear")}
+                    onClick={onClear}
+                  >
+                    <Trash2 size={12} />
+                    <span>{t("runs.clear")}</span>
+                  </button>
+                </div>
+              </div>
+              <div className="caster-journal-filters">
+                <div
+                  className="caster-segmented caster-journal-filter-segmented"
+                  role="group"
+                  aria-label={t("runs.filterAria")}
+                >
+                  {(
+                    [
+                      "all",
+                      "macro",
+                      "clicker",
+                      "script",
+                      "system",
+                      "errors",
+                    ] as Filter[]
+                  ).map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      className={[
+                        "caster-segmented-btn",
+                        filter === f ? "active" : "",
+                        f === "errors" ? "caster-journal-filter--errors" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => setFilter(f)}
+                    >
+                      {filterLabels[f]}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="search"
+                  className="caster-search-inline caster-journal-search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("runs.searchPlaceholder")}
+                  aria-label={t("runs.searchAria")}
+                />
+                <button
+                  type="button"
+                  className={[
+                    "caster-btn caster-btn-ghost",
+                    follow ? "is-active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  title={t("runs.followTitle")}
+                  aria-pressed={follow}
+                  onClick={() => setFollow((v) => !v)}
+                >
+                  {t("runs.follow")}
+                </button>
                 <button
                   type="button"
                   className="caster-btn caster-btn-ghost"
-                  onClick={emptyCta.onClick}
+                  title={t("runs.exportTitle")}
+                  aria-label={t("runs.export")}
+                  disabled={filtered.length === 0}
+                  onClick={copyFiltered}
                 >
-                  {emptyCta.label}
+                  <ClipboardCopy size={12} />
                 </button>
-              ) : undefined
-            }
-          />
-        ) : (
-          filtered.map((line, i) => (
-            <div
-              key={`${i}-${line.level}-${line.text.slice(0, 20)}`}
-              className={[
-                "caster-journal-line",
-                /macro/i.test(line.text) ? "caster-journal-line--macro" : "",
-                /clicker/i.test(line.text) ? "caster-journal-line--clicker" : "",
-                /script/i.test(line.text) ? "caster-journal-line--script" : "",
-                line.level === "error" ? "caster-journal-line--error" : "",
-                line.level === "warn" ? "caster-journal-line--warn" : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              {line.text}
+                <button
+                  type="button"
+                  className="caster-btn caster-btn-ghost"
+                  title={t("runs.exportFileTitle")}
+                  aria-label={t("runs.exportFile")}
+                  disabled={filtered.length === 0}
+                  onClick={saveFiltered}
+                >
+                  <Download size={12} />
+                </button>
+              </div>
             </div>
-          ))
-        )}
+            <div
+              className="caster-journal-body"
+              ref={bodyRef}
+              onScroll={() => {
+                const el = bodyRef.current;
+                if (!el) return;
+                const atBottom =
+                  el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+                if (!atBottom && followRef.current) setFollow(false);
+                else if (atBottom && !followRef.current) setFollow(true);
+              }}
+            >
+              {filtered.length === 0 ? (
+                <EmptyState
+                  title={t("runs.emptyTitle")}
+                  lead={t("runs.emptyLead")}
+                  actions={
+                    emptyCta ? (
+                      <button
+                        type="button"
+                        className="caster-btn caster-btn-ghost"
+                        onClick={emptyCta.onClick}
+                      >
+                        {emptyCta.label}
+                      </button>
+                    ) : undefined
+                  }
+                />
+              ) : (
+                filtered.map((line, i) => (
+                  <div
+                    key={`${i}-${line.level}-${line.text.slice(0, 20)}`}
+                    className={[
+                      "caster-journal-line",
+                      /macro/i.test(line.text)
+                        ? "caster-journal-line--macro"
+                        : "",
+                      /clicker/i.test(line.text)
+                        ? "caster-journal-line--clicker"
+                        : "",
+                      /script/i.test(line.text)
+                        ? "caster-journal-line--script"
+                        : "",
+                      line.level === "error" ? "caster-journal-line--error" : "",
+                      line.level === "warn" ? "caster-journal-line--warn" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {line.text}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      <div
+        className="caster-journal-footer"
+        role="status"
+        aria-live="polite"
+        aria-label={statusAria}
+      >
+        <button
+          type="button"
+          className="caster-journal-footer-toggle"
+          aria-expanded={open}
+          onClick={() => onOpenChange(!open)}
+        >
+          <ChevronDown
+            size={14}
+            aria-hidden
+            className={[
+              "caster-journal-footer-chevron",
+              open ? "is-open" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          />
+          <span
+            className={`caster-status-bar-dot ${dotClass}`}
+            aria-hidden
+          />
+          <span className="caster-journal-footer-title">{t("runs.title")}</span>
+          {message ? (
+            <span className="caster-journal-footer-message">{message}</span>
+          ) : null}
+        </button>
+        <span className="caster-status-bar-spacer" />
+        {hotkeyHint ? (
+          <span className="caster-status-bar-meta">{hotkeyHint}</span>
+        ) : null}
+        {timerLabel ? (
+          <span className="caster-status-bar-timer">{timerLabel}</span>
+        ) : null}
       </div>
     </div>
   );

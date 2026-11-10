@@ -2685,6 +2685,7 @@ mod tests {
         app.set_macro(MacroDocument {
             schema_version: SCHEMA_VERSION_CURRENT,
             name: "t".into(),
+            description: String::new(),
             trigger: Trigger::Manual,
             repeat_count: 1,
             process_filter: MacroProcessFilterMode::default(),
@@ -2723,6 +2724,7 @@ mod tests {
         app.set_macro(MacroDocument {
             schema_version: SCHEMA_VERSION_CURRENT,
             name: "t".into(),
+            description: String::new(),
             trigger: Trigger::Manual,
             repeat_count: 1,
             process_filter: MacroProcessFilterMode::default(),
@@ -2773,6 +2775,7 @@ mod tests {
         app.set_macro(MacroDocument {
             schema_version: SCHEMA_VERSION_CURRENT,
             name: "t".into(),
+            description: String::new(),
             trigger: Trigger::Manual,
             repeat_count: 1,
             process_filter: MacroProcessFilterMode::default(),

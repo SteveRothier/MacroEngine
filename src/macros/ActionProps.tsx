@@ -2,7 +2,13 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { FileCode2 } from "lucide-react";
 import { Segmented } from "../ui";
-import { DropdownMenu, Select, Tooltip, useToast } from "../ui/shell";
+import {
+  DropdownMenu,
+  InspectorSection,
+  Select,
+  Tooltip,
+  useToast,
+} from "../ui/shell";
 import type { DropdownEntry } from "../ui/shell";
 import { WheelNumberInput } from "../ui/WheelNumberInput";
 import {
@@ -23,12 +29,84 @@ import {
 import { useT, type TFunction } from "../i18n";
 import { actionTitle } from "./actionLabels";
 
-function mouseButtonOpts(t: TFunction) {
-  return [
-    { value: "left", label: t("macros.action.button.left") },
-    { value: "right", label: t("macros.action.button.right") },
-    { value: "middle", label: t("macros.action.button.middle") },
-  ];
+type MouseButton = "left" | "middle" | "right";
+
+function MouseButtonGlyph({ which }: { which: MouseButton }) {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      aria-hidden
+      className="action-props-mouse-glyph"
+    >
+      <rect
+        x="4"
+        y="1.5"
+        width="8"
+        height="13"
+        rx="3.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+      />
+      <path
+        d="M8 1.5v5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.25"
+      />
+      {which === "left" ? (
+        <path d="M4 1.5h4v5H4.8A2.3 2.3 0 0 1 4 4.2V1.5z" fill="currentColor" />
+      ) : null}
+      {which === "right" ? (
+        <path d="M8 1.5h4v2.7A2.3 2.3 0 0 1 11.2 6.5H8V1.5z" fill="currentColor" />
+      ) : null}
+      {which === "middle" ? (
+        <rect x="7.15" y="2.6" width="1.7" height="3.4" rx="0.85" fill="currentColor" />
+      ) : null}
+    </svg>
+  );
+}
+
+function mouseButtonSegmentLabel(which: MouseButton, t: TFunction): ReactNode {
+  const text =
+    which === "left"
+      ? t("macros.action.button.left")
+      : which === "middle"
+        ? t("macros.action.button.middle")
+        : t("macros.action.button.right");
+  return (
+    <span className="action-props-mouse-seg-label">
+      <MouseButtonGlyph which={which} />
+      {text}
+    </span>
+  );
+}
+
+function MouseButtonSegmented({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: MouseButton;
+  disabled?: boolean;
+  onChange: (value: MouseButton) => void;
+}) {
+  const t = useT();
+  return (
+    <Segmented
+      ariaLabel={t("macros.params.button")}
+      value={value}
+      disabled={disabled}
+      options={[
+        { value: "left", label: mouseButtonSegmentLabel("left", t) },
+        { value: "middle", label: mouseButtonSegmentLabel("middle", t) },
+        { value: "right", label: mouseButtonSegmentLabel("right", t) },
+      ]}
+      onChange={onChange}
+    />
+  );
 }
 
 const HTTP_METHOD_OPTS = [
@@ -152,42 +230,34 @@ function PointFields({
                 }
               }}
             />
-            {pickButton}
+            {mode === "cursor" ? pickButton : null}
           </div>
-        </div>
-        {mode === "cursor" ? (
-          hint ? (
-            <p className="hint" style={{ gridColumn: "1 / -1" }}>
-              {hint}
-            </p>
-          ) : null
-        ) : (
-          <>
-            <label className="caster-field">
-              <span>{t("macros.params.coordX")}</span>
+          {mode === "position" ? (
+            <div className="action-props-xy-row">
               <WheelNumberInput
+                className="action-props-xy-input"
                 disabled={disabled || picking}
                 value={x ?? ""}
+                aria-label={t("macros.params.coordX")}
                 onValueChange={(n) => onChangeXY(n, y ?? null)}
                 onEmptyChange={() => onChangeXY(null, y ?? null)}
               />
-            </label>
-            <label className="caster-field">
-              <span>{t("macros.params.coordY")}</span>
+              <span className="action-props-xy-sep" aria-hidden>
+                ×
+              </span>
               <WheelNumberInput
+                className="action-props-xy-input"
                 disabled={disabled || picking}
                 value={y ?? ""}
+                aria-label={t("macros.params.coordY")}
                 onValueChange={(n) => onChangeXY(x ?? null, n)}
                 onEmptyChange={() => onChangeXY(x ?? null, null)}
               />
-            </label>
-            {hint ? (
-              <p className="hint" style={{ gridColumn: "1 / -1" }}>
-                {hint}
-              </p>
-            ) : null}
-          </>
-        )}
+              {pickButton}
+            </div>
+          ) : null}
+          {hint ? <p className="hint">{hint}</p> : null}
+        </div>
       </>
     );
   }
@@ -195,28 +265,33 @@ function PointFields({
   return (
     <>
       {banner}
-      <label className="caster-field">
-        <span>{t("macros.params.coordX")}</span>
-        <WheelNumberInput
-          disabled={disabled || picking}
-          value={x ?? ""}
-          onValueChange={(n) => onChangeXY(n, y ?? 0)}
-        />
-      </label>
-      <label className="caster-field">
-        <span>{t("macros.params.coordY")}</span>
-        <WheelNumberInput
-          disabled={disabled || picking}
-          value={y ?? ""}
-          onValueChange={(n) => onChangeXY(x ?? 0, n)}
-        />
-      </label>
-      <div style={{ gridColumn: "1 / -1" }}>{pickButton}</div>
-      {hint ? (
-        <p className="hint" style={{ gridColumn: "1 / -1" }}>
-          {hint}
-        </p>
-      ) : null}
+      <div
+        className="caster-field action-props-xy-field"
+        style={{ gridColumn: "1 / -1" }}
+      >
+        <span>{t("macros.params.position")}</span>
+        <div className="action-props-xy-row">
+          <WheelNumberInput
+            className="action-props-xy-input"
+            disabled={disabled || picking}
+            value={x ?? ""}
+            aria-label={t("macros.params.coordX")}
+            onValueChange={(n) => onChangeXY(n, y ?? 0)}
+          />
+          <span className="action-props-xy-sep" aria-hidden>
+            ×
+          </span>
+          <WheelNumberInput
+            className="action-props-xy-input"
+            disabled={disabled || picking}
+            value={y ?? ""}
+            aria-label={t("macros.params.coordY")}
+            onValueChange={(n) => onChangeXY(x ?? 0, n)}
+          />
+          {pickButton}
+        </div>
+        {hint ? <p className="hint">{hint}</p> : null}
+      </div>
     </>
   );
 }
@@ -235,321 +310,355 @@ export function ActionProps({
 
   if (action.type === "mouse.click") {
     return (
-      <div className="props-grid">
-        <label className="caster-field">
-          <span>{t("macros.params.button")}</span>
-          <Select
-            className="caster-select"
-            value={action.button ?? "left"}
-            disabled={disabled}
-            options={mouseButtonOpts(t)}
-            onChange={(v) =>
-              onChange({
-                ...action,
-                button: v as "left" | "right" | "middle",
-              })
-            }
-          />
-        </label>
-        <PointFields
-          x={action.x}
-          y={action.y}
-          optional
-          disabled={disabled}
-          onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
-          hint={t("macros.params.clickAtCursorHint")}
-        />
-      </div>
+      <>
+        <InspectorSection title={t("macros.inspector.position")}>
+          <div className="props-grid action-props">
+            <PointFields
+              x={action.x}
+              y={action.y}
+              optional
+              disabled={disabled}
+              onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
+              hint={t("macros.params.clickAtCursorHint")}
+            />
+          </div>
+        </InspectorSection>
+        <InspectorSection title={t("macros.inspector.options")}>
+          <div className="props-grid action-props">
+            <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
+              <span>{t("macros.params.button")}</span>
+              <MouseButtonSegmented
+                value={(action.button ?? "left") as MouseButton}
+                disabled={disabled}
+                onChange={(button) => onChange({ ...action, button })}
+              />
+            </div>
+          </div>
+        </InspectorSection>
+      </>
     );
   }
 
   if (action.type === "mouse.move") {
     return (
-      <div className="props-grid">
-        <PointFields
-          x={action.x}
-          y={action.y}
-          disabled={disabled}
-          onChangeXY={(nx, ny) =>
-            onChange({
-              ...action,
-              x: nx ?? action.x,
-              y: ny ?? action.y,
-            })
-          }
-        />
-      </div>
+      <InspectorSection title={t("macros.inspector.position")}>
+        <div className="props-grid action-props">
+          <PointFields
+            x={action.x}
+            y={action.y}
+            disabled={disabled}
+            onChangeXY={(nx, ny) =>
+              onChange({
+                ...action,
+                x: nx ?? action.x,
+                y: ny ?? action.y,
+              })
+            }
+          />
+        </div>
+      </InspectorSection>
     );
   }
 
   if (action.type === "mouse.down" || action.type === "mouse.up") {
     const kind = action.type;
     return (
-      <div className="props-grid">
-        <label className="caster-field">
-          <span>{t("macros.params.button")}</span>
-          <Select
-            className="caster-select"
-            value={action.button ?? "left"}
-            disabled={disabled}
-            options={mouseButtonOpts(t)}
-            onChange={(v) =>
-              onChange({
-                ...action,
-                button: v as "left" | "right" | "middle",
-              })
-            }
-          />
-        </label>
-        <PointFields
-          x={action.x}
-          y={action.y}
-          optional
-          disabled={disabled}
-          onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
-        />
-        <p className="hint" style={{ gridColumn: "1 / -1" }}>
-          {kind === "mouse.down"
-            ? t("macros.params.mouseDownHint")
-            : t("macros.params.mouseUpHint")}
-        </p>
-      </div>
+      <>
+        <InspectorSection title={t("macros.inspector.position")}>
+          <div className="props-grid action-props">
+            <PointFields
+              x={action.x}
+              y={action.y}
+              optional
+              disabled={disabled}
+              onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
+            />
+          </div>
+        </InspectorSection>
+        <InspectorSection title={t("macros.inspector.options")}>
+          <div className="props-grid action-props">
+            <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
+              <span>{t("macros.params.button")}</span>
+              <MouseButtonSegmented
+                value={(action.button ?? "left") as MouseButton}
+                disabled={disabled}
+                onChange={(button) => onChange({ ...action, button })}
+              />
+            </div>
+            <p className="hint" style={{ gridColumn: "1 / -1" }}>
+              {kind === "mouse.down"
+                ? t("macros.params.mouseDownHint")
+                : t("macros.params.mouseUpHint")}
+            </p>
+          </div>
+        </InspectorSection>
+      </>
     );
   }
 
   if (action.type === "mouse.wheel") {
     return (
-      <div className="props-grid">
-        <label className="caster-field">
-          <span>{t("macros.params.wheelDelta")}</span>
-          <WheelNumberInput
-            disabled={disabled}
-            value={action.delta}
-            onValueChange={(n) => onChange({ ...action, delta: n })}
-          />
-        </label>
-        <PointFields
-          x={action.x}
-          y={action.y}
-          optional
-          disabled={disabled}
-          onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
-        />
-      </div>
+      <>
+        <InspectorSection title={t("macros.inspector.options")}>
+          <div className="props-grid">
+            <label className="caster-field">
+              <span>{t("macros.params.wheelDelta")}</span>
+              <WheelNumberInput
+                disabled={disabled}
+                value={action.delta}
+                onValueChange={(n) => onChange({ ...action, delta: n })}
+              />
+            </label>
+          </div>
+        </InspectorSection>
+        <InspectorSection title={t("macros.inspector.position")}>
+          <div className="props-grid">
+            <PointFields
+              x={action.x}
+              y={action.y}
+              optional
+              disabled={disabled}
+              onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
+            />
+          </div>
+        </InspectorSection>
+      </>
     );
   }
 
   if (action.type === "delay") {
     return (
-      <label className="caster-field">
-        <span>{t("macros.params.durationMs")}</span>
-        <WheelNumberInput
-          min={0}
-          disabled={disabled}
-          value={action.ms}
-          onValueChange={(n) => onChange({ ...action, ms: n })}
-        />
-      </label>
+      <InspectorSection title={t("macros.inspector.execution")}>
+        <label className="caster-field">
+          <span>{t("macros.params.durationMs")}</span>
+          <WheelNumberInput
+            min={0}
+            disabled={disabled}
+            value={action.ms}
+            onValueChange={(n) => onChange({ ...action, ms: n })}
+          />
+        </label>
+      </InspectorSection>
     );
   }
 
   if (action.type === "http.request") {
     return (
-      <div className="props-grid">
-        <label className="caster-field">
-          <span>{t("macros.params.httpMethod")}</span>
-          <Select
-            className="caster-select"
-            value={action.method ?? "GET"}
-            disabled={disabled}
-            options={HTTP_METHOD_OPTS}
-            onChange={(method) => onChange({ ...action, method })}
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.httpUrl")}</span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={action.url}
-            onChange={(e) => onChange({ ...action, url: e.target.value })}
-          />
-        </label>
-        <label className="caster-field" style={{ gridColumn: "1 / -1" }}>
-          <span>{t("macros.params.httpBody")}</span>
-          <textarea
-            rows={4}
-            disabled={disabled}
-            value={action.body ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...action,
-                body: e.target.value === "" ? null : e.target.value,
-              })
-            }
-            style={{ fontFamily: "ui-monospace, Consolas, monospace", width: "100%" }}
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.httpTimeout")}</span>
-          <WheelNumberInput
-            min={0}
-            disabled={disabled}
-            value={action.timeoutMs ?? 10000}
-            onValueChange={(n) => onChange({ ...action, timeoutMs: n })}
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.httpFailOn4xx")}</span>
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={!!action.failOnStatus}
-            onChange={(e) =>
-              onChange({ ...action, failOnStatus: e.target.checked })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.httpStatusVar")}</span>
-          <input
-            type="text"
-            disabled={disabled}
-            placeholder="status"
-            value={action.statusVar ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...action,
-                statusVar: e.target.value === "" ? null : e.target.value,
-              })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.httpBodyVar")}</span>
-          <input
-            type="text"
-            disabled={disabled}
-            placeholder="body"
-            value={action.bodyVar ?? ""}
-            onChange={(e) =>
-              onChange({
-                ...action,
-                bodyVar: e.target.value === "" ? null : e.target.value,
-              })
-            }
-          />
-        </label>
-        <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
-          <span>{t("macros.params.httpHeaders")}</span>
-          {(action.headers ?? []).map((h, i) => (
-            <div key={i} className="props-grid" style={{ marginTop: 6 }}>
+      <>
+        <InspectorSection title={t("macros.inspector.request")}>
+          <div className="props-grid">
+            <label className="caster-field">
+              <span>{t("macros.params.httpMethod")}</span>
+              <Select
+                className="caster-select"
+                value={action.method ?? "GET"}
+                disabled={disabled}
+                options={HTTP_METHOD_OPTS}
+                onChange={(method) => onChange({ ...action, method })}
+              />
+            </label>
+            <label className="caster-field">
+              <span>{t("macros.params.httpUrl")}</span>
               <input
                 type="text"
                 disabled={disabled}
-                placeholder={t("macros.params.httpHeaderName")}
-                value={h.name}
-                onChange={(e) => {
-                  const headers = [...(action.headers ?? [])];
-                  headers[i] = { ...headers[i], name: e.target.value };
-                  onChange({ ...action, headers });
+                value={action.url}
+                onChange={(e) => onChange({ ...action, url: e.target.value })}
+              />
+            </label>
+            <label className="caster-field" style={{ gridColumn: "1 / -1" }}>
+              <span>{t("macros.params.httpBody")}</span>
+              <textarea
+                rows={4}
+                disabled={disabled}
+                value={action.body ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...action,
+                    body: e.target.value === "" ? null : e.target.value,
+                  })
+                }
+                style={{
+                  fontFamily: "ui-monospace, Consolas, monospace",
+                  width: "100%",
                 }}
               />
-              <input
-                type="text"
-                disabled={disabled}
-                placeholder={t("macros.params.httpHeaderValue")}
-                value={h.value}
-                onChange={(e) => {
-                  const headers = [...(action.headers ?? [])];
-                  headers[i] = { ...headers[i], value: e.target.value };
-                  onChange({ ...action, headers });
-                }}
-              />
-              <button
-                type="button"
-                className="ghost"
-                disabled={disabled}
-                onClick={() => {
-                  const headers = (action.headers ?? []).filter((_, j) => j !== i);
-                  onChange({ ...action, headers });
-                }}
-              >
-                {t("macros.params.httpRemoveHeader")}
-              </button>
+            </label>
+            <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
+              <span>{t("macros.params.httpHeaders")}</span>
+              {(action.headers ?? []).map((h, i) => (
+                <div key={i} className="props-grid" style={{ marginTop: 6 }}>
+                  <input
+                    type="text"
+                    disabled={disabled}
+                    placeholder={t("macros.params.httpHeaderName")}
+                    value={h.name}
+                    onChange={(e) => {
+                      const headers = [...(action.headers ?? [])];
+                      headers[i] = { ...headers[i], name: e.target.value };
+                      onChange({ ...action, headers });
+                    }}
+                  />
+                  <input
+                    type="text"
+                    disabled={disabled}
+                    placeholder={t("macros.params.httpHeaderValue")}
+                    value={h.value}
+                    onChange={(e) => {
+                      const headers = [...(action.headers ?? [])];
+                      headers[i] = { ...headers[i], value: e.target.value };
+                      onChange({ ...action, headers });
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={disabled}
+                    onClick={() => {
+                      const headers = (action.headers ?? []).filter(
+                        (_, j) => j !== i,
+                      );
+                      onChange({ ...action, headers });
+                    }}
+                  >
+                    {t("macros.params.httpRemoveHeader")}
+                  </button>
+                </div>
+              ))}
+              <div className="actions wrap" style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={disabled}
+                  onClick={() =>
+                    onChange({
+                      ...action,
+                      headers: [
+                        ...(action.headers ?? []),
+                        { name: "", value: "" },
+                      ],
+                    })
+                  }
+                >
+                  {t("macros.params.httpAddHeader")}
+                </button>
+                <button
+                  type="button"
+                  className="ghost"
+                  disabled={disabled}
+                  onClick={() => {
+                    const headers = [...(action.headers ?? [])];
+                    const idx = headers.findIndex(
+                      (h) => h.name.toLowerCase() === "authorization",
+                    );
+                    const bearer = {
+                      name: "Authorization",
+                      value: "Bearer {{token}}",
+                    };
+                    if (idx >= 0) headers[idx] = bearer;
+                    else headers.push(bearer);
+                    onChange({ ...action, headers });
+                  }}
+                >
+                  {t("macros.params.httpAddBearer")}
+                </button>
+              </div>
             </div>
-          ))}
-          <div className="actions wrap" style={{ marginTop: 8 }}>
-            <button
-              type="button"
-              className="ghost"
-              disabled={disabled}
-              onClick={() =>
-                onChange({
-                  ...action,
-                  headers: [...(action.headers ?? []), { name: "", value: "" }],
-                })
-              }
-            >
-              {t("macros.params.httpAddHeader")}
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              disabled={disabled}
-              onClick={() => {
-                const headers = [...(action.headers ?? [])];
-                const idx = headers.findIndex(
-                  (h) => h.name.toLowerCase() === "authorization",
-                );
-                const bearer = {
-                  name: "Authorization",
-                  value: "Bearer {{token}}",
-                };
-                if (idx >= 0) headers[idx] = bearer;
-                else headers.push(bearer);
-                onChange({ ...action, headers });
-              }}
-            >
-              {t("macros.params.httpAddBearer")}
-            </button>
           </div>
-        </div>
-      </div>
+        </InspectorSection>
+        <InspectorSection title={t("macros.inspector.response")}>
+          <div className="props-grid">
+            <label className="caster-field">
+              <span>{t("macros.params.httpTimeout")}</span>
+              <WheelNumberInput
+                min={0}
+                disabled={disabled}
+                value={action.timeoutMs ?? 10000}
+                onValueChange={(n) => onChange({ ...action, timeoutMs: n })}
+              />
+            </label>
+            <label className="caster-field">
+              <span>{t("macros.params.httpFailOn4xx")}</span>
+              <input
+                type="checkbox"
+                disabled={disabled}
+                checked={!!action.failOnStatus}
+                onChange={(e) =>
+                  onChange({ ...action, failOnStatus: e.target.checked })
+                }
+              />
+            </label>
+            <label className="caster-field">
+              <span>{t("macros.params.httpStatusVar")}</span>
+              <input
+                type="text"
+                disabled={disabled}
+                placeholder="status"
+                value={action.statusVar ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...action,
+                    statusVar: e.target.value === "" ? null : e.target.value,
+                  })
+                }
+              />
+            </label>
+            <label className="caster-field">
+              <span>{t("macros.params.httpBodyVar")}</span>
+              <input
+                type="text"
+                disabled={disabled}
+                placeholder="body"
+                value={action.bodyVar ?? ""}
+                onChange={(e) =>
+                  onChange({
+                    ...action,
+                    bodyVar: e.target.value === "" ? null : e.target.value,
+                  })
+                }
+              />
+            </label>
+          </div>
+        </InspectorSection>
+      </>
     );
   }
 
   if (action.type === "json.path") {
     return (
-      <div className="props-grid">
-        <label className="caster-field">
-          <span>{t("macros.params.jsonSourceVar")}</span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={action.sourceVar}
-            onChange={(e) => onChange({ ...action, sourceVar: e.target.value })}
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.jsonPath")}</span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={action.path}
-            onChange={(e) => onChange({ ...action, path: e.target.value })}
-          />
-        </label>
-        <label className="caster-field">
-          <span>{t("macros.params.jsonDestVar")}</span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={action.destVar}
-            onChange={(e) => onChange({ ...action, destVar: e.target.value })}
-          />
-        </label>
-      </div>
+      <InspectorSection title={t("macros.inspector.data")}>
+        <div className="props-grid">
+          <label className="caster-field">
+            <span>{t("macros.params.jsonSourceVar")}</span>
+            <input
+              type="text"
+              disabled={disabled}
+              value={action.sourceVar}
+              onChange={(e) =>
+                onChange({ ...action, sourceVar: e.target.value })
+              }
+            />
+          </label>
+          <label className="caster-field">
+            <span>{t("macros.params.jsonPath")}</span>
+            <input
+              type="text"
+              disabled={disabled}
+              value={action.path}
+              onChange={(e) => onChange({ ...action, path: e.target.value })}
+            />
+          </label>
+          <label className="caster-field">
+            <span>{t("macros.params.jsonDestVar")}</span>
+            <input
+              type="text"
+              disabled={disabled}
+              value={action.destVar}
+              onChange={(e) => onChange({ ...action, destVar: e.target.value })}
+            />
+          </label>
+        </div>
+      </InspectorSection>
     );
   }
 
@@ -566,29 +675,33 @@ export function ActionProps({
 
   if (action.type === "macro.run") {
     return (
-      <LibraryIdPickerProps
-        kind="macro"
-        label={t("macros.params.macroId")}
-        tip={t("macros.params.macroRunTip")}
-        value={action.macroId}
-        disabled={disabled}
-        emptyLabel={t("macros.library.scriptSourceChoose")}
-        onChange={(macroId) => onChange({ ...action, macroId })}
-      />
+      <InspectorSection title={t("macros.inspector.target")}>
+        <LibraryIdPickerProps
+          kind="macro"
+          label={t("macros.params.macroId")}
+          tip={t("macros.params.macroRunTip")}
+          value={action.macroId}
+          disabled={disabled}
+          emptyLabel={t("macros.library.scriptSourceChoose")}
+          onChange={(macroId) => onChange({ ...action, macroId })}
+        />
+      </InspectorSection>
     );
   }
 
   if (action.type === "clicker.start") {
     return (
-      <LibraryIdPickerProps
-        kind="clicker"
-        label={t("macros.params.clickerPresetId")}
-        tip={t("macros.params.clickerStartTip")}
-        value={action.presetId}
-        disabled={disabled}
-        emptyLabel={t("macros.library.scriptSourceChoose")}
-        onChange={(presetId) => onChange({ ...action, presetId })}
-      />
+      <InspectorSection title={t("macros.inspector.target")}>
+        <LibraryIdPickerProps
+          kind="clicker"
+          label={t("macros.params.clickerPresetId")}
+          tip={t("macros.params.clickerStartTip")}
+          value={action.presetId}
+          disabled={disabled}
+          emptyLabel={t("macros.library.scriptSourceChoose")}
+          onChange={(presetId) => onChange({ ...action, presetId })}
+        />
+      </InspectorSection>
     );
   }
 
@@ -605,140 +718,157 @@ export function ActionProps({
           ? t("macros.menu.add.keyUp")
           : t("macros.params.key");
     return (
-      <div className="props-grid">
-        <label className="caster-field">
-          <span>
-            {keyTitle} {t("macros.params.keyVarOk")}
-          </span>
-          <input
-            type="text"
+      <InspectorSection title={t("macros.inspector.key")}>
+        <div className="props-grid">
+          <label className="caster-field">
+            <span>
+              {keyTitle} {t("macros.params.keyVarOk")}
+            </span>
+            <input
+              type="text"
+              disabled={disabled}
+              value={action.key}
+              onChange={(e) => onChange({ ...action, key: e.target.value })}
+            />
+          </label>
+          <label className="caster-field">
+            <span>Ctrl</span>
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={!!mods.ctrl}
+              onChange={(e) =>
+                onChange({
+                  ...action,
+                  mods: { ...mods, ctrl: e.target.checked },
+                })
+              }
+            />
+          </label>
+          <label className="caster-field">
+            <span>Alt</span>
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={!!mods.alt}
+              onChange={(e) =>
+                onChange({
+                  ...action,
+                  mods: { ...mods, alt: e.target.checked },
+                })
+              }
+            />
+          </label>
+          <label className="caster-field">
+            <span>Shift</span>
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={!!mods.shift}
+              onChange={(e) =>
+                onChange({
+                  ...action,
+                  mods: { ...mods, shift: e.target.checked },
+                })
+              }
+            />
+          </label>
+          <button
+            type="button"
+            className="ghost"
             disabled={disabled}
-            value={action.key}
-            onChange={(e) => onChange({ ...action, key: e.target.value })}
-          />
-        </label>
-        <label className="caster-field">
-          <span>Ctrl</span>
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={!!mods.ctrl}
-            onChange={(e) =>
-              onChange({ ...action, mods: { ...mods, ctrl: e.target.checked } })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>Alt</span>
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={!!mods.alt}
-            onChange={(e) =>
-              onChange({ ...action, mods: { ...mods, alt: e.target.checked } })
-            }
-          />
-        </label>
-        <label className="caster-field">
-          <span>Shift</span>
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={!!mods.shift}
-            onChange={(e) =>
-              onChange({ ...action, mods: { ...mods, shift: e.target.checked } })
-            }
-          />
-        </label>
-        <button
-          type="button"
-          className="ghost"
-          disabled={disabled}
-          onClick={() => {
-            const onKey = (e: KeyboardEvent) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.removeEventListener("keydown", onKey, true);
-              if (e.key === "Escape") return;
-              const label =
-                e.key.length === 1 ? e.key.toUpperCase() : e.key;
-              onChange({
-                ...action,
-                key: label,
-                mods: {
-                  ctrl: e.ctrlKey,
-                  alt: e.altKey,
-                  shift: e.shiftKey,
-                },
-              });
-            };
-            window.addEventListener("keydown", onKey, true);
-          }}
-        >
-          {t("macros.params.captureKey")}
-        </button>
-      </div>
+            onClick={() => {
+              const onKey = (e: KeyboardEvent) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.removeEventListener("keydown", onKey, true);
+                if (e.key === "Escape") return;
+                const label =
+                  e.key.length === 1 ? e.key.toUpperCase() : e.key;
+                onChange({
+                  ...action,
+                  key: label,
+                  mods: {
+                    ctrl: e.ctrlKey,
+                    alt: e.altKey,
+                    shift: e.shiftKey,
+                  },
+                });
+              };
+              window.addEventListener("keydown", onKey, true);
+            }}
+          >
+            {t("macros.params.captureKey")}
+          </button>
+        </div>
+      </InspectorSection>
     );
   }
 
   if (action.type === "clipboard.set") {
     return (
-      <label className="caster-field">
-        <span>{t("macros.params.clipboardText")}</span>
-        <input
-          type="text"
-          disabled={disabled}
-          value={action.text}
-          onChange={(e) => onChange({ ...action, text: e.target.value })}
-        />
-        <p className="hint">{t("macros.params.clipboardSetHint")}</p>
-      </label>
+      <InspectorSection title={t("macros.inspector.data")}>
+        <label className="caster-field">
+          <span>{t("macros.params.clipboardText")}</span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={action.text}
+            onChange={(e) => onChange({ ...action, text: e.target.value })}
+          />
+          <p className="hint">{t("macros.params.clipboardSetHint")}</p>
+        </label>
+      </InspectorSection>
     );
   }
 
   if (action.type === "clipboard.get") {
     return (
-      <label className="caster-field">
-        <span>{t("macros.params.operandVar")}</span>
-        <input
-          type="text"
-          disabled={disabled}
-          value={action.name}
-          onChange={(e) => onChange({ ...action, name: e.target.value })}
-        />
-        <p className="hint">{t("macros.params.clipboardGetHint")}</p>
-      </label>
-    );
-  }
-
-  if (action.type === "var.set") {
-    return (
-      <div className="props-grid">
+      <InspectorSection title={t("macros.inspector.data")}>
         <label className="caster-field">
-          <span>{t("macros.params.varName")}</span>
+          <span>{t("macros.params.operandVar")}</span>
           <input
             type="text"
             disabled={disabled}
             value={action.name}
             onChange={(e) => onChange({ ...action, name: e.target.value })}
           />
+          <p className="hint">{t("macros.params.clipboardGetHint")}</p>
         </label>
-        <label className="caster-field">
-          <span>{t("macros.params.varValue")}</span>
-          <input
-            type="text"
-            disabled={disabled}
-            value={
-              typeof action.value === "string"
-                ? action.value
-                : String(action.value)
-            }
-            onChange={(e) =>
-              onChange({ ...action, value: parseLit(e.target.value) })
-            }
-          />
-        </label>
-      </div>
+      </InspectorSection>
+    );
+  }
+
+  if (action.type === "var.set") {
+    return (
+      <InspectorSection title={t("macros.inspector.data")}>
+        <div className="props-grid">
+          <label className="caster-field">
+            <span>{t("macros.params.varName")}</span>
+            <input
+              type="text"
+              disabled={disabled}
+              value={action.name}
+              onChange={(e) => onChange({ ...action, name: e.target.value })}
+            />
+          </label>
+          <label className="caster-field">
+            <span>{t("macros.params.varValue")}</span>
+            <input
+              type="text"
+              disabled={disabled}
+              value={
+                typeof action.value === "string"
+                  ? action.value
+                  : String(action.value)
+              }
+              onChange={(e) =>
+                onChange({ ...action, value: parseLit(e.target.value) })
+              }
+            />
+          </label>
+        </div>
+      </InspectorSection>
     );
   }
 
@@ -747,31 +877,35 @@ export function ActionProps({
   }
 
   return (
-    <div className="props-grid">
-      <label className="caster-field">
-        <span>{t("macros.params.processCommand")}</span>
-        <input
-          type="text"
-          disabled={disabled}
-          value={action.command}
-          onChange={(e) => onChange({ ...action, command: e.target.value })}
-        />
-      </label>
-      <label className="caster-field">
-        <span>{t("macros.params.processArgs")}</span>
-        <input
-          type="text"
-          disabled={disabled}
-          value={(action.args ?? []).join(" ")}
-          onChange={(e) =>
-            onChange({
-              ...action,
-              args: e.target.value.trim() ? e.target.value.trim().split(/\s+/) : [],
-            })
-          }
-        />
-      </label>
-    </div>
+    <InspectorSection title={t("macros.inspector.execution")}>
+      <div className="props-grid">
+        <label className="caster-field">
+          <span>{t("macros.params.processCommand")}</span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={action.command}
+            onChange={(e) => onChange({ ...action, command: e.target.value })}
+          />
+        </label>
+        <label className="caster-field">
+          <span>{t("macros.params.processArgs")}</span>
+          <input
+            type="text"
+            disabled={disabled}
+            value={(action.args ?? []).join(" ")}
+            onChange={(e) =>
+              onChange({
+                ...action,
+                args: e.target.value.trim()
+                  ? e.target.value.trim().split(/\s+/)
+                  : [],
+              })
+            }
+          />
+        </label>
+      </div>
+    </InspectorSection>
   );
 }
 

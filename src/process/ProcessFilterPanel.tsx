@@ -136,22 +136,42 @@ export function ProcessFilterPanel({
           </div>
         ) : null}
         <div
-          className="caster-segmented caster-segmented--wide"
+          className={[
+            embedded ? "ui-segmented" : "caster-segmented caster-segmented--wide",
+            embedded ? "caster-process-filter-mode-seg" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           role="group"
           aria-label={t("common.process.modeAria")}
         >
           {(
             [
-              ["inherit", t("common.process.modeInherit")],
-              ["off", t("common.process.modeOff")],
-              ["local", t("common.process.modeLocal")],
+              [
+                "inherit",
+                embedded
+                  ? t("common.process.modeInheritShort")
+                  : t("common.process.modeInherit"),
+              ],
+              [
+                "off",
+                embedded
+                  ? t("common.process.modeOffShort")
+                  : t("common.process.modeOff"),
+              ],
+              [
+                "local",
+                embedded
+                  ? t("common.process.modeLocalShort")
+                  : t("common.process.modeLocal"),
+              ],
             ] as const
           ).map(([value, label]) => (
             <button
               key={value}
               type="button"
               className={[
-                "caster-segmented-btn",
+                embedded ? "ui-segment" : "caster-segmented-btn",
                 mode === value ? "active" : "",
               ]
                 .filter(Boolean)

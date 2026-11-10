@@ -30,7 +30,6 @@ import { useZoneFeedbackToasts } from "../clicker/useZoneFeedbackToasts";
 import { usePixelFeedbackToasts } from "../clicker/usePixelFeedbackToasts";
 import {
   AppShell,
-  StatusBar,
   ToastProvider,
   useToast,
   WindowTitleBar,
@@ -787,18 +786,6 @@ function MainAppInner({
         reduceMotion={appearancePrefs.reduceMotion}
         libraryWidth={libraryWidth}
         onLibraryWidthChange={onLibraryWidthChange}
-        statusBar={
-          <StatusBar
-            state={statusBarState}
-            message={status.sessionName ?? status.message ?? null}
-            hotkeyHint={`${vkLabel(hotkeys.macroVk)} · ${t("shell.exec.run")}`}
-            timerLabel={
-              running || sessionElapsedMs > 0
-                ? formatSessionTimer(sessionElapsedMs)
-                : "00:00:00"
-            }
-          />
-        }
         console={
           <RunJournalDock
             lines={journalLines}
@@ -808,6 +795,14 @@ function MainAppInner({
               setJournalOpen(open);
               void persistShell({ journalOpen: open });
             }}
+            statusState={statusBarState}
+            message={status.sessionName ?? status.message ?? null}
+            hotkeyHint={`${vkLabel(hotkeys.macroVk)} · ${t("shell.exec.run")}`}
+            timerLabel={
+              running || sessionElapsedMs > 0
+                ? formatSessionTimer(sessionElapsedMs)
+                : "00:00:00"
+            }
             emptyCta={{
               label: t("runs.emptyCta"),
               onClick: () => {

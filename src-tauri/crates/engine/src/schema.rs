@@ -20,6 +20,9 @@ pub const SCHEMA_VERSION_V1: u32 = 1;
 pub struct MacroDocument {
     pub schema_version: u32,
     pub name: String,
+    /// Optional free-text description shown in the macro inspector.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
     pub trigger: Trigger,
     /// How many times to run the action list. `0` = until cancelled.
     #[serde(default = "default_repeat")]
@@ -382,6 +385,7 @@ impl MacroDocument {
         Self {
             schema_version: SCHEMA_VERSION_CURRENT,
             name: name.into(),
+            description: String::new(),
             trigger: Trigger::Manual,
             repeat_count: 1,
             process_filter: MacroProcessFilterMode::default(),

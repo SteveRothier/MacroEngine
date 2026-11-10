@@ -15,15 +15,7 @@ import {
   InspectorSection,
   useToast,
 } from "../../ui/shell";
-import {
-  Clock,
-  GitBranch,
-  Keyboard,
-  MousePointerClick,
-  Play,
-  Variable,
-  Workflow,
-} from "lucide-react";
+import { Box, Zap } from "lucide-react";
 import {
   ActionList,
   hasActionClipboard,
@@ -33,11 +25,6 @@ import {
 } from "../ActionList";
 import { ActionProps } from "../ActionProps";
 import { ControlFlowAdvancedProps } from "../ControlFlowAdvancedProps";
-import {
-  actionLead,
-  actionTitle,
-  actionTone,
-} from "../actionLabels";
 import { buildActionAddMenu, makeAction } from "../actionFactory";
 import { MacroMetaBar } from "../MacroMetaBar";
 import { MacroSettingsPanel } from "../MacroSettingsPanel";
@@ -1441,86 +1428,62 @@ export function MacroEditorView({
               onPointerCancel={onPropsResizePointerUp}
             />
             <InspectorPanel
-              title={
-                inspectorMode === "macro"
-                  ? t("macros.settings.title")
-                  : t("macros.inspector.title")
+              title={false}
+              ariaLabel={t("macros.settings.modeAria")}
+              trailing={
+                <div
+                  className="ui-segmented caster-inspector-mode-seg"
+                  role="tablist"
+                  aria-label={t("macros.settings.modeAria")}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={inspectorMode === "step"}
+                    className={cx(
+                      "ui-segment",
+                      inspectorMode === "step" && "active",
+                    )}
+                    disabled={!selectedAction}
+                    onClick={() => setInspectorMode("step")}
+                  >
+                    <Zap size={13} aria-hidden />
+                    {t("macros.settings.modeStep")}
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={inspectorMode === "macro"}
+                    className={cx(
+                      "ui-segment",
+                      inspectorMode === "macro" && "active",
+                    )}
+                    onClick={() => setInspectorMode("macro")}
+                  >
+                    <Box size={13} aria-hidden />
+                    {t("macros.settings.modeMacro")}
+                  </button>
+                </div>
               }
             >
-              <div
-                className="caster-inspector-mode-seg"
-                role="tablist"
-                aria-label={t("macros.settings.modeAria")}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={inspectorMode === "step"}
-                  className={cx(
-                    "caster-inspector-mode-btn",
-                    inspectorMode === "step" && "is-active",
-                  )}
-                  disabled={!selectedAction}
-                  onClick={() => setInspectorMode("step")}
-                >
-                  {t("macros.settings.modeStep")}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={inspectorMode === "macro"}
-                  className={cx(
-                    "caster-inspector-mode-btn",
-                    inspectorMode === "macro" && "is-active",
-                  )}
-                  onClick={() => setInspectorMode("macro")}
-                >
-                  {t("macros.settings.modeMacro")}
-                </button>
-              </div>
               {inspectorMode === "step" && selectedAction ? (
                 <>
-                  <div className="caster-inspector-hero">
-                    <span
-                      className="caster-inspector-hero-icon"
-                      data-tone={actionTone(selectedAction.type)}
-                      aria-hidden
-                    >
-                      {(() => {
-                        const tone = actionTone(selectedAction.type);
-                        if (tone === "mouse")
-                          return <MousePointerClick size={22} />;
-                        if (tone === "wait") return <Clock size={22} />;
-                        if (tone === "key") return <Keyboard size={22} />;
-                        if (tone === "logic") return <GitBranch size={22} />;
-                        if (tone === "data") return <Variable size={22} />;
-                        if (tone === "system") return <Workflow size={22} />;
-                        return <Play size={22} />;
-                      })()}
-                    </span>
-                    <div className="caster-inspector-hero-text">
-                      <strong>{actionTitle(selectedAction.type, t)}</strong>
-                      <p>{actionLead(selectedAction.type, t)}</p>
-                    </div>
-                  </div>
-                  <InspectorSection title={t("macros.inspector.params")}>
-                    <ActionProps
-                      action={selectedAction}
-                      disabled={editorLocked}
-                      onChange={(a) => {
-                        if (!selectedPath) return;
-                        updateDoc({
-                          ...doc,
-                          actions: updateAtPath(
-                            doc.actions,
-                            selectedPath,
-                            a,
-                          ),
-                        });
-                      }}
-                      onOpenScript={onOpenScript}
-                    />
-                  </InspectorSection>
+                  <ActionProps
+                    action={selectedAction}
+                    disabled={editorLocked}
+                    onChange={(a) => {
+                      if (!selectedPath) return;
+                      updateDoc({
+                        ...doc,
+                        actions: updateAtPath(
+                          doc.actions,
+                          selectedPath,
+                          a,
+                        ),
+                      });
+                    }}
+                    onOpenScript={onOpenScript}
+                  />
                   {selectedAction.type === "control.while" ||
                   selectedAction.type === "control.if" ? (
                     <InspectorSection

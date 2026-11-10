@@ -289,6 +289,8 @@ export type MacroAction =
 export type MacroDocument = {
   schemaVersion: number;
   name: string;
+  /** Optional free-text description (inspector). */
+  description?: string;
   trigger: MacroTrigger;
   repeatCount: number;
   processFilter?: "inherit" | "off" | "local";

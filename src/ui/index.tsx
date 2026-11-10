@@ -49,7 +49,7 @@ export function Badge({ children, className = "" }: BadgeProps) {
 
 type SegmentedOption<T extends string> = {
   value: T;
-  label: string;
+  label: ReactNode;
 };
 
 type SegmentedProps<T extends string> = {
