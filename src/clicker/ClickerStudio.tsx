@@ -80,9 +80,11 @@ export function ClickerStudio({
       hotkeys={hotkeys}
       onSavedAsNew={onSavedAsNew}
       onOpenProcessSettings={onOpenProcessSettings}
-      meta={<ClickerMetaBar editor={editor} />}
     />,
-    { active },
+    {
+      active,
+      chrome: <ClickerMetaBar editor={editor} />,
+    },
   );
 
   const onTabKeyDown = (ev: KeyboardEvent<HTMLDivElement>) => {

@@ -16,19 +16,19 @@
   --caster-text-lg: 16px;
   --caster-text-xl: 18px;
 
-  /* Surfaces — Lavender premium (flat panels + global wash tip) */
-  --caster-bg-app: #101014;
-  --caster-bg-wash: #211c2a;
-  --caster-bg-secondary: #131318;
-  --caster-bg-elevated: #19191f;
-  --caster-bg-canvas: #101014;
-  --caster-bg-input: #19191f;
-  --caster-bg-interactive: #19191f;
-  --caster-bg-active: #292432;
-  --caster-bg-hover: color-mix(in srgb, #a99acb 8%, #19191f);
+  /* Surfaces — Linear flat dark (lavender accent only) */
+  --caster-bg-app: #0c0c0e;
+  --caster-bg-wash: #0c0c0e;
+  --caster-bg-secondary: #101012;
+  --caster-bg-elevated: #141416;
+  --caster-bg-canvas: #0c0c0e;
+  --caster-bg-input: #141416;
+  --caster-bg-interactive: #141416;
+  --caster-bg-active: #1c1c20;
+  --caster-bg-hover: color-mix(in srgb, #ffffff 4%, #141416);
 
-  --caster-border-subtle: #292831;
-  --caster-border-strong: #292831;
+  --caster-border-subtle: #1e1e22;
+  --caster-border-strong: #2a2a30;
 
   --caster-text-primary: #eceaf1;
   --caster-text-secondary: #aaa7b4;
@@ -78,42 +78,42 @@
   --caster-type-clicker-bg: color-mix(in srgb, #78b89a 14%, transparent);
 
   --caster-radius-sm: 4px;
-  --caster-radius-md: 6px;
-  --caster-radius-lg: 8px;
-  --caster-radius-panel: 8px;
-  --caster-shadow-float: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --caster-radius-md: 5px;
+  --caster-radius-lg: 6px;
+  --caster-radius-panel: 6px;
+  --caster-shadow-float: 0 4px 16px rgba(0, 0, 0, 0.35);
 
   --caster-sidebar-w: 250px;
   --caster-sidebar-collapsed: 0px;
   --caster-library-w: 250px;
   --caster-library-min: 190px;
   --caster-library-max: 360px;
-  --caster-exec-bar-h: 34px;
-  --caster-status-bar-h: 28px;
-  --caster-titlebar-h: 34px;
-  --caster-tab-h: 30px;
+  --caster-exec-bar-h: 32px;
+  --caster-status-bar-h: 26px;
+  --caster-titlebar-h: 40px;
+  --caster-tab-h: 28px;
   --caster-tab-min-w: 72px;
   --caster-tab-abs-min-w: 36px;
   --caster-tab-max-w: 160px;
   --caster-tab-compact-w: 56px;
-  --caster-editor-toolbar-h: 32px;
+  --caster-editor-toolbar-h: 40px;
   --caster-inspector-w: 300px;
   --caster-journal-h: 200px;
   --caster-settings-pane-max: 680px;
-  --caster-control-h: 32px;
-  --caster-row-h: 34px;
+  --caster-control-h: 28px;
+  --caster-row-h: 32px;
 
   --caster-space-1: 4px;
   --caster-space-2: 8px;
-  --caster-space-3: 12px;
-  --caster-space-4: 16px;
-  --caster-space-5: 24px;
-  --caster-space-6: 32px;
+  --caster-space-3: 10px;
+  --caster-space-4: 14px;
+  --caster-space-5: 20px;
+  --caster-space-6: 28px;
 
   --caster-scrollbar-size: 6px;
-  --caster-scrollbar-track: #101014;
-  --caster-scrollbar-thumb: #3a3944;
-  --caster-scrollbar-thumb-hover: #55535e;
+  --caster-scrollbar-track: #0c0c0e;
+  --caster-scrollbar-thumb: #2e2e34;
+  --caster-scrollbar-thumb-hover: #484850;
 }
 
 [data-theme="light"] .caster-root,

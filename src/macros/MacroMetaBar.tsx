@@ -1,65 +1,23 @@
-import { useEffect, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { Keyboard, Repeat } from "lucide-react";
-import { useT } from "../i18n";
-import { WheelNumberInput } from "../ui/WheelNumberInput";
-import { Tooltip } from "../ui/shell";
 import {
-  eventToVk,
-  hotkeyTriggerMatches,
-  triggerHotkeyLabel,
-  type HotkeyBindings,
-  type KeyMods,
-  type MacroDocument,
-  type MacroTrigger,
-} from "./types";
+  useLayoutEffect,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
+import { Pencil } from "lucide-react";
+import { useT } from "../i18n";
+import { Tooltip } from "../ui/shell";
+import type { MacroDocument } from "./types";
 
-type LibRow = {
-  name: string;
-  triggerKey?: string | null;
-  triggerMods?: KeyMods | null;
-};
-
-type SharedProps = {
+type NameProps = {
   doc: MacroDocument;
   locked: boolean;
   onChange: (next: MacroDocument) => void;
-};
-
-type NameProps = SharedProps & {
   onNameCommit?: (name: string) => void;
 };
 
-type ToolsProps = SharedProps & {
-  macroId: string;
-  onError: (message: string) => void;
-};
-
-function captureMods(e: KeyboardEvent): KeyMods {
-  return {
-    ctrl: e.ctrlKey || e.metaKey,
-    alt: e.altKey,
-    shift: e.shiftKey,
-  };
-}
-
-function triggerConflictsWithReserved(
-  vk: number,
-  mods: KeyMods,
-  reserved: HotkeyBindings,
-): boolean {
-  if (vk === reserved.macroVk || vk === reserved.emergencyVk) return true;
-  if (vk === reserved.actionVk) {
-    return (
-      !!mods.ctrl === !!reserved.actionCtrl &&
-      !!mods.alt === !!reserved.actionAlt &&
-      !!mods.shift === !!reserved.actionShift
-    );
-  }
-  return false;
-}
-
-/** Name field only — lives in toolbar start. */
+/** Name — in-place rename; same DOM when editing to avoid layout jump. */
 export function MacroMetaBar({
   doc,
   locked,
@@ -67,208 +25,122 @@ export function MacroMetaBar({
   onNameCommit,
 }: NameProps) {
   const t = useT();
-  return (
-    <div className="caster-macro-meta">
-      <label className="caster-macro-meta-row caster-macro-meta-row--name">
-        <span className="sr-only">{t("macros.toolbar.metaName")}</span>
-        <input
-          className="caster-macro-meta-input caster-macro-meta-input--name"
-          value={doc.name}
-          disabled={locked}
-          aria-label={t("macros.toolbar.metaName")}
-          onChange={(e) => onChange({ ...doc, name: e.target.value })}
-          onBlur={(e) => onNameCommit?.(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
-        />
-      </label>
-    </div>
-  );
-}
+  const [editing, setEditing] = useState(false);
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const doneRef = useRef(false);
 
-/** Repeat + hotkey chips — live next to Processus in toolbar end. */
-export function MacroMetaTools({
-  doc,
-  macroId,
-  locked,
-  onChange,
-  onError,
-}: ToolsProps) {
-  const t = useT();
-  const [capturing, setCapturing] = useState(false);
-  const docRef = useRef(doc);
-  docRef.current = doc;
-
-  const triggerLabel =
-    doc.trigger &&
-    typeof doc.trigger === "object" &&
-    doc.trigger.type === "hotkey"
-      ? triggerHotkeyLabel(doc.trigger)
-      : null;
+  useLayoutEffect(() => {
+    if (!editing) return;
+    const el = labelRef.current;
+    if (!el) return;
+    doneRef.current = false;
+    el.textContent = doc.name;
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }, [editing, doc.name]);
 
   useEffect(() => {
-    if (!capturing || locked) return;
-    const onKey = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === "Escape") {
-        setCapturing(false);
-        return;
-      }
-      const vk = eventToVk(e);
-      if (vk == null) return;
-      const mods = captureMods(e);
-      setCapturing(false);
-      void (async () => {
-        try {
-          const reserved = await invoke<HotkeyBindings>("get_hotkey_bindings");
-          if (triggerConflictsWithReserved(vk, mods, reserved)) {
-            onError(t("macros.toast.hotkeyReserved"));
-            return;
-          }
-          const lib = await invoke<LibRow[]>("list_macro_library");
-          const clash = lib.find((m) => {
-            if (m.name === macroId || !m.triggerKey) return false;
-            const otherVk = Number(m.triggerKey);
-            if (!Number.isFinite(otherVk)) return false;
-            const otherTrigger: MacroTrigger = {
-              type: "hotkey",
-              key: String(otherVk),
-              mods: m.triggerMods ?? undefined,
-            };
-            return hotkeyTriggerMatches(otherTrigger, vk, mods);
-          });
-          if (clash) {
-            onError(t("macros.toast.hotkeyClash", { name: clash.name }));
-            return;
-          }
-          onChange({
-            ...docRef.current,
-            trigger: { type: "hotkey", key: String(vk), mods },
-          });
-        } catch {
-          onError(t("macros.toast.hotkeySaveFailed"));
-        }
-      })();
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [capturing, locked, macroId, onChange, onError, t]);
-
-  useEffect(() => {
-    if (locked) setCapturing(false);
+    if (locked) setEditing(false);
   }, [locked]);
 
-  const repeatToolRef = useRef<HTMLDivElement>(null);
-  const hotkeyToolRef = useRef<HTMLDivElement>(null);
-  const repeatInputRef = useRef<HTMLInputElement>(null);
-  const hotkeyBtnRef = useRef<HTMLButtonElement>(null);
+  function startEditing() {
+    if (locked || editing) return;
+    setEditing(true);
+  }
 
-  useEffect(() => {
-    function onPointerDown(e: PointerEvent) {
-      const target = e.target as Node | null;
-      if (!target) return;
-      const inRepeat = repeatToolRef.current?.contains(target) ?? false;
-      const inHotkey = hotkeyToolRef.current?.contains(target) ?? false;
-      if (!inRepeat && document.activeElement === repeatInputRef.current) {
-        repeatInputRef.current?.blur();
-      }
-      if (!inHotkey && capturing) {
-        setCapturing(false);
-      }
+  function finish(commit: boolean) {
+    if (!editing || doneRef.current) return;
+    doneRef.current = true;
+    const raw = (labelRef.current?.textContent ?? "").replace(/\u00a0/g, " ");
+    const next = raw.trim();
+    if (!commit) {
+      if (labelRef.current) labelRef.current.textContent = doc.name;
+      setEditing(false);
+      return;
     }
-    window.addEventListener("pointerdown", onPointerDown, true);
-    return () =>
-      window.removeEventListener("pointerdown", onPointerDown, true);
-  }, [capturing]);
+    const name = next || doc.name;
+    if (labelRef.current) labelRef.current.textContent = name;
+    setEditing(false);
+    if (name !== doc.name) onChange({ ...doc, name });
+    onNameCommit?.(name);
+  }
 
   return (
-    <>
-      <Tooltip content={t("macros.toolbar.repeatTitle")}>
-        <div
-          ref={repeatToolRef}
-          className={[
-            "caster-macro-meta-tool",
-            locked ? "is-disabled" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          onMouseDown={(e) => {
-            if (locked) return;
-            if (e.target === repeatInputRef.current) return;
-            e.preventDefault();
-            repeatInputRef.current?.focus();
-          }}
+    <div
+      className={[
+        "caster-macro-meta",
+        editing ? "caster-macro-meta--editing" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div className="caster-macro-meta-row caster-macro-meta-row--name">
+        <span
+          className="caster-macro-meta-name-btn"
+          title={editing ? undefined : doc.name}
+          aria-label={t("macros.toolbar.metaNameAria")}
+          onDoubleClick={startEditing}
         >
-          <Repeat
-            className="caster-macro-meta-tool-icon"
-            size={14}
-            aria-hidden
-          />
-          <WheelNumberInput
-            ref={repeatInputRef}
-            className="caster-macro-meta-tool-field caster-macro-meta-tool-field--repeat"
-            min={0}
-            value={doc.repeatCount}
-            disabled={locked}
-            aria-label={t("macros.toolbar.repeatAria")}
-            onValueChange={(n) => onChange({ ...doc, repeatCount: n })}
-          />
-        </div>
-      </Tooltip>
-      <Tooltip content={t("macros.toolbar.metaHotkeyTitle")}>
-        <div
-          ref={hotkeyToolRef}
-          className={[
-            "caster-macro-meta-tool",
-            "caster-macro-meta-tool--hotkey",
-            capturing ? "is-capturing" : "",
-            locked ? "is-disabled" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          onMouseDown={(e) => {
-            if (locked) return;
-            if (e.target === hotkeyBtnRef.current) return;
-            e.preventDefault();
-            hotkeyBtnRef.current?.click();
-          }}
-        >
-          <Keyboard
-            className="caster-macro-meta-tool-icon"
-            size={14}
-            aria-hidden
-          />
-          <button
-            ref={hotkeyBtnRef}
-            type="button"
-            className="caster-macro-meta-tool-field caster-macro-meta-tool-field--hotkey"
-            disabled={locked}
-            aria-label={
-              capturing
-                ? t("macros.params.hotkeyCapturing")
-                : triggerLabel
-                  ? t("macros.params.hotkeyValue", { label: triggerLabel })
-                  : t("macros.params.hotkeySet")
-            }
-            onClick={() => setCapturing((v) => !v)}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              if (locked) return;
-              setCapturing(false);
-              onChange({ ...doc, trigger: { type: "manual" } });
+          <span
+            ref={labelRef}
+            className="caster-macro-meta-name-label"
+            role={editing ? "textbox" : undefined}
+            aria-label={editing ? t("macros.toolbar.metaName") : undefined}
+            contentEditable={editing && !locked}
+            suppressContentEditableWarning
+            spellCheck={false}
+            onClick={(e) => {
+              if (editing) e.stopPropagation();
             }}
+            onDoubleClick={(e) => {
+              if (editing) e.stopPropagation();
+            }}
+            onPointerDown={(e) => {
+              if (editing) e.stopPropagation();
+            }}
+            onKeyDown={(e: ReactKeyboardEvent<HTMLSpanElement>) => {
+              if (!editing) return;
+              e.stopPropagation();
+              if (e.key === "Enter") {
+                e.preventDefault();
+                finish(true);
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                finish(false);
+              }
+            }}
+            onPaste={(e) => {
+              if (!editing) return;
+              e.preventDefault();
+              const text = e.clipboardData
+                .getData("text/plain")
+                .replace(/\s+/g, " ");
+              document.execCommand("insertText", false, text);
+            }}
+            onBlur={() => finish(true)}
           >
-            {capturing
-              ? "…"
-              : (triggerLabel ?? t("macros.toolbar.metaHotkeyNone"))}
-          </button>
-        </div>
-      </Tooltip>
-    </>
+            {editing ? null : doc.name}
+          </span>
+        </span>
+        {!locked ? (
+          <Tooltip content={t("macros.toolbar.metaName")}>
+            <button
+              type="button"
+              className="caster-macro-meta-name-edit"
+              tabIndex={editing ? -1 : 0}
+              aria-hidden={editing || undefined}
+              aria-label={t("macros.toolbar.metaName")}
+              onClick={startEditing}
+            >
+              <Pencil size={13} aria-hidden strokeWidth={2} />
+            </button>
+          </Tooltip>
+        ) : null}
+      </div>
+    </div>
   );
 }

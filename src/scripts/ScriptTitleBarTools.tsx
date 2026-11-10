@@ -35,8 +35,9 @@ export type EngineBusyKind = "macro" | "clicker" | "record" | "script";
 
 type Props = {
   onBack?: () => void;
-  name: string;
-  onNameChange: (name: string) => void;
+  /** Kept for call-site compatibility; name lives in the chrome slot. */
+  name?: string;
+  onNameChange?: (name: string) => void;
   language: ScriptLanguage;
   onLanguageChange: (language: ScriptLanguage) => void;
   isModule: boolean;
@@ -86,8 +87,8 @@ function busyTooltip(kind: EngineBusyKind, t: TFunction): string {
 
 export function ScriptTitleBarTools({
   onBack,
-  name,
-  onNameChange,
+  name: _name,
+  onNameChange: _onNameChange,
   language,
   onLanguageChange,
   isModule,
@@ -278,17 +279,6 @@ export function ScriptTitleBarTools({
                 </button>
               </Tooltip>
             ) : null}
-            <input
-              className="caster-titlebar-name-input caster-titlebar-name-input--wide"
-              value={name}
-              disabled={editDisabled}
-              placeholder={t("scripts.toolbar.namePlaceholder")}
-              aria-label={t("scripts.toolbar.nameAria")}
-              onChange={(e) => onNameChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-            />
             {onConvertToMacro ? (
               <Tooltip content={t("scripts.toolbar.convertToMacroTitle")}>
                 <button

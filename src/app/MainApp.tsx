@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import type { ScriptDoc } from "../scripts/types";
-import { newScriptId } from "../scripts/newScriptId";
 import {
   type EngineStatus,
   type HotkeyBindings,
@@ -37,16 +35,13 @@ import {
   useToast,
   WindowTitleBar,
   type BarContextAction,
-  type DocumentTabItem,
   type StatusBarState,
-  type TabContextAction,
 } from "../ui/shell";
 import { TitleBarProvider, useTitleBarContext } from "../ui/shell/TitleBarContext";
 import {
   ConfirmHost,
   confirmAction,
   PromptHost,
-  promptAction,
   ScriptLanguageHost,
 } from "../ui";
 import { applyTheme, normalizeTheme, readStoredTheme, type ThemeMode } from "../theme";
@@ -65,24 +60,16 @@ import {
   activeDocTab,
   closeAllDocTabs,
   closeDocTab,
-  closeDocTabsToRight,
-  closeOtherDocTabs,
+  docTabId,
   loadWorkspace,
-  nextDocTabId,
   openDocTab,
   openSettings,
   persistWorkspace,
-  prevDocTabId,
   renameDocTab,
-  reorderDocTabs,
-  selectDocTab,
   selectEmpty,
   setTabDirty,
   setTabLabel,
-  sortTabsForDisplay,
   tabsClosedBy,
-  titleBarHighlightTabId,
-  toggleTabPin,
   type DocTabKind,
   type WorkspaceState,
 } from "./workspaces";
@@ -153,15 +140,6 @@ const DEFAULT_HOTKEYS: HotkeyBindings = {
   macroVk: 0x78,
   emergencyVk: 0x77,
 };
-
-function launchErr(e: unknown, fallback: string): string {
-  if (typeof e === "string" && e.trim()) return e;
-  if (e && typeof e === "object" && "message" in e) {
-    const m = (e as { message?: unknown }).message;
-    if (typeof m === "string" && m.trim()) return m;
-  }
-  return fallback;
-}
 
 function playFinishBeep() {
   try {
@@ -268,10 +246,6 @@ function MainAppInner({
     },
     [],
   );
-  const [docRemountKeys, setDocRemountKeys] = useState<Record<string, number>>(
-    {},
-  );
-
   useEffect(() => {
     if (status.state === "running") {
       if (sessionStartedAt.current == null) {
@@ -300,11 +274,6 @@ function MainAppInner({
       /* ignore */
     }
   }, []);
-
-  const journalHasErrors = useMemo(() => {
-    const recent = journalLines.slice(-16);
-    return recent.some((l) => l.level === "error" || l.level === "warn");
-  }, [journalLines]);
 
   const onThemeChange = useCallback((next: ThemeMode) => {
     setTheme(next);
@@ -459,8 +428,24 @@ function MainAppInner({
   );
 
   const openDoc = useCallback(
-    (kind: DocTabKind, resourceId: string, label?: string) => {
+    async (kind: DocTabKind, resourceId: string, label?: string) => {
       prefetchEditor(kind);
+      const nextId = docTabId(kind, resourceId);
+      const active = activeDocTab(workspace);
+      if (
+        active &&
+        active.id !== nextId &&
+        active.dirty &&
+        confirmationsPrefs.closeDirtyTab
+      ) {
+        const ok = await confirmAction({
+          title: t("shell.closeTitle"),
+          message: t("shell.closeDirty", { label: active.label }),
+          confirmLabel: t("shell.closeConfirm"),
+          danger: true,
+        });
+        if (!ok) return;
+      }
       setWorkspace((ws) => {
         const next = openDocTab(ws, kind, resourceId, label ?? resourceId);
         if (kind === "macro" || kind === "clicker" || kind === "script") {
@@ -475,7 +460,12 @@ function MainAppInner({
         return next;
       });
     },
-    [rememberLastRun],
+    [
+      confirmationsPrefs.closeDirtyTab,
+      rememberLastRun,
+      t,
+      workspace,
+    ],
   );
 
   const goSettings = useCallback((section: SettingsSection = "application") => {
@@ -483,26 +473,10 @@ function MainAppInner({
     setWorkspace((ws) => openSettings(ws, section));
   }, []);
 
-  const onTabSelect = useCallback((tabId: string) => {
-    const activeId =
-      workspace.shellView.type === "doc" ? workspace.shellView.tabId : null;
-    if (activeId === tabId) {
-      setDocRemountKeys((prev) => ({
-        ...prev,
-        [tabId]: (prev[tabId] ?? 0) + 1,
-      }));
-    }
-    setWorkspace((ws) => selectDocTab(ws, tabId));
-  }, [workspace.shellView]);
-
   const onTabClose = useCallback(
     async (tabId: string) => {
       const tab = workspace.tabs.find((t) => t.id === tabId);
       if (!tab) return;
-      if (tab.pinned) {
-        toast.info(t("shell.pinnedTab"));
-        return;
-      }
       if (tab.dirty && confirmationsPrefs.closeDirtyTab) {
         const ok = await confirmAction({
           title: t("shell.closeTitle"),
@@ -514,7 +488,7 @@ function MainAppInner({
       }
       setWorkspace((ws) => closeDocTab(ws, tabId));
     },
-    [confirmationsPrefs.closeDirtyTab, t, toast, workspace.tabs],
+    [confirmationsPrefs.closeDirtyTab, t, workspace.tabs],
   );
 
   const applyBatchTabClose = useCallback(
@@ -541,132 +515,6 @@ function MainAppInner({
       setWorkspace(apply);
     },
     [confirmationsPrefs.closeDirtyTab, t, workspace],
-  );
-
-  const onTabContextAction = useCallback(
-    async (tabId: string, action: TabContextAction) => {
-      const tab = workspace.tabs.find((t) => t.id === tabId);
-      if (!tab) return;
-      switch (action) {
-        case "close":
-          await onTabClose(tabId);
-          return;
-        case "closeOthers":
-          await applyBatchTabClose((ws) => closeOtherDocTabs(ws, tabId));
-          return;
-        case "closeToRight":
-          await applyBatchTabClose((ws) => closeDocTabsToRight(ws, tabId));
-          return;
-        case "pin":
-        case "unpin":
-          setWorkspace((ws) => toggleTabPin(ws, tabId));
-          return;
-        case "duplicate":
-          try {
-            if (tab.kind === "macro") {
-              const copy = await invoke<{ name: string }>("duplicate_saved_macro", {
-                name: tab.resourceId,
-              });
-              bumpRefresh();
-              toast.success(t("shell.macroDuplicated", { name: copy.name }));
-              openDoc("macro", copy.name);
-            } else if (tab.kind === "clicker") {
-              const copy = await invoke<{ name: string }>("duplicate_clicker_preset", {
-                name: tab.resourceId,
-              });
-              bumpRefresh();
-              toast.success(t("shell.presetDuplicated", { name: copy.name }));
-              openDoc("clicker", copy.name);
-            } else {
-              const src = await invoke<ScriptDoc>("load_script_cmd", {
-                id: tab.resourceId,
-              });
-              const copy: ScriptDoc = {
-                ...src,
-                id: newScriptId(),
-                name: `${src.name}${t("shell.copySuffix")}`,
-              };
-              await invoke("save_script_cmd", { doc: copy });
-              bumpRefresh();
-              toast.success(t("shell.scriptDuplicated", { name: copy.name }));
-              openDoc("script", copy.id, copy.name);
-            }
-          } catch (e) {
-            toast.error(launchErr(e, t("shell.duplicateFailed")));
-          }
-          return;
-        case "rename": {
-          if (tab.dirty) {
-            const ok = await confirmAction({
-              title: t("shell.renameTitle"),
-              message: t("shell.renameDirty", { label: tab.label }),
-              confirmLabel: t("shell.renameConfirm"),
-            });
-            if (!ok) return;
-          }
-          const nextName = await promptAction({
-            title: t("shell.renameTitle"),
-            defaultValue: tab.kind === "script" ? tab.label : tab.resourceId,
-            confirmLabel: t("shell.renameConfirm"),
-            placeholder: t("shell.renamePlaceholder"),
-          });
-          if (!nextName || nextName === tab.resourceId || nextName === tab.label) return;
-          try {
-            if (tab.kind === "macro") {
-              const doc = await invoke<{ name: string }>("rename_saved_macro", {
-                from: tab.resourceId,
-                to: nextName,
-              });
-              bumpRefresh();
-              setWorkspace((ws) => renameDocTab(ws, tabId, doc.name, doc.name));
-              toast.success(t("shell.macroRenamed", { name: doc.name }));
-            } else if (tab.kind === "clicker") {
-              const preset = await invoke<{ name: string }>("rename_clicker_preset", {
-                from: tab.resourceId,
-                to: nextName,
-              });
-              bumpRefresh();
-              setWorkspace((ws) => renameDocTab(ws, tabId, preset.name, preset.name));
-              toast.success(t("shell.presetRenamed", { name: preset.name }));
-            } else {
-              const src = await invoke<ScriptDoc>("load_script_cmd", {
-                id: tab.resourceId,
-              });
-              const updated = { ...src, name: nextName };
-              await invoke("save_script_cmd", { doc: updated });
-              bumpRefresh();
-              setWorkspace((ws) => setTabLabel(ws, tabId, nextName));
-              toast.success(t("shell.scriptRenamed", { name: nextName }));
-            }
-          } catch (e) {
-            toast.error(launchErr(e, t("shell.renameFailed")));
-          }
-          return;
-        }
-        case "reveal":
-          try {
-            if (tab.kind === "script") {
-              toast.info(t("shell.scriptsFolderHint"));
-              return;
-            }
-            await invoke("reveal_library_entry", {
-              kind: tab.kind,
-              name: tab.resourceId,
-            });
-          } catch (e) {
-            toast.error(launchErr(e, t("shell.openLocationFailed")));
-          }
-          return;
-      }
-    },
-    [applyBatchTabClose, bumpRefresh, onTabClose, openDoc, t, toast, workspace.tabs],
-  );
-
-  const onTabReorder = useCallback(
-    (fromTabId: string, insertBeforeTabId: string | null) => {
-      setWorkspace((ws) => reorderDocTabs(ws, fromTabId, insertBeforeTabId));
-    },
-    [],
   );
 
   const onActiveDocDirtyChange = useCallback(
@@ -738,38 +586,12 @@ function MainAppInner({
       if (e.key === "t" && !e.shiftKey) {
         e.preventDefault();
         void onCreateMacro();
-        return;
-      }
-
-      if (e.key === "Tab") {
-        if (workspace.tabs.length === 0) return;
-        e.preventDefault();
-        const currentId =
-          workspace.shellView.type === "doc" ? workspace.shellView.tabId : null;
-        const nextId = e.shiftKey
-          ? prevDocTabId(workspace, currentId)
-          : nextDocTabId(workspace, currentId);
-        if (nextId) {
-          setWorkspace((ws) => selectDocTab(ws, nextId));
-        }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCreateMacro, onTabClose, workspace]);
+  }, [onCreateMacro, onTabClose, workspace.shellView]);
 
-  const documentTabs = useMemo((): DocumentTabItem[] => {
-    return sortTabsForDisplay(workspace.tabs).map((tab) => ({
-      id: tab.id,
-      label: tab.label,
-      kind: tab.kind,
-      dirty: tab.dirty,
-      pinned: tab.pinned,
-      closable: !tab.pinned,
-    }));
-  }, [workspace.tabs]);
-
-  const tabBarActiveId = titleBarHighlightTabId(workspace);
   const showSettings = workspace.shellView.type === "settings";
   const showEmpty =
     !showSettings &&
@@ -849,12 +671,11 @@ function MainAppInner({
       const isVisible =
         workspace.shellView.type === "doc" &&
         workspace.shellView.tabId === tab.id;
-      const remount = docRemountKeys[tab.id] ?? 0;
       const editor = (() => {
         if (tab.kind === "macro") {
           return (
             <MacroEditorView
-              key={`${tab.id}:${remount}`}
+              key={tab.id}
               active={isVisible}
               macroId={tab.resourceId}
               onDirtyChange={onActiveDocDirtyChange}
@@ -864,23 +685,24 @@ function MainAppInner({
                 setWorkspace((ws) => renameDocTab(ws, tab.id, to, to));
                 bumpRefresh();
               }}
-              onOpenMacro={(id, label) => openDoc("macro", id, label ?? id)}
+              onOpenMacro={(id, label) => void openDoc("macro", id, label ?? id)}
               engineState={status.state}
               onStatus={setStatus}
-              onOpenScript={(id, label) => openDoc("script", id, label ?? id)}
+              onOpenScript={(id, label) =>
+                void openDoc("script", id, label ?? id)
+              }
               onOpenProcessSettings={() => goSettings("security")}
               onOpenJournal={() => {
                 setJournalOpen(true);
                 void persistShell({ journalOpen: true });
               }}
-              journalHasErrors={journalHasErrors}
             />
           );
         }
         if (tab.kind === "script") {
           return (
             <ScriptEditorView
-              key={`${tab.id}:${remount}`}
+              key={tab.id}
               active={isVisible}
               scriptId={tab.resourceId}
               onDirtyChange={onActiveDocDirtyChange}
@@ -890,14 +712,14 @@ function MainAppInner({
               onOpenSettings={() =>
                 setWorkspace((ws) => openSettings(ws, "application"))
               }
-              onOpenMacro={(id, label) => openDoc("macro", id, label ?? id)}
+              onOpenMacro={(id, label) => void openDoc("macro", id, label ?? id)}
               scriptsPrefs={scriptsPrefs}
             />
           );
         }
         return (
           <ClickerStudio
-            key={`${tab.id}:${remount}`}
+            key={tab.id}
             active={isVisible}
             presetId={tab.resourceId}
             status={status}
@@ -914,7 +736,7 @@ function MainAppInner({
             onOpenProcessSettings={() => goSettings("security")}
             onSavedAsNew={(id) => {
               bumpRefresh();
-              openDoc("clicker", id);
+              void openDoc("clicker", id);
             }}
           />
         );
@@ -1016,7 +838,7 @@ function MainAppInner({
             confirmTrash={accueilPrefs.confirmTrash}
             confirmDeleteFolder={accueilPrefs.confirmDeleteFolder}
             createRequest={libraryCreateRequest}
-            onOpen={(row) => openDoc(row.kind, row.id, row.name)}
+            onOpen={(row) => void openDoc(row.kind, row.id, row.name)}
             onRefresh={bumpRefresh}
             onOpenSettings={(section) => {
               prefetchEditor("settings");
@@ -1047,21 +869,8 @@ function MainAppInner({
         }
         titleBar={
           <WindowTitleBar
-            tabs={documentTabs}
-            activeTabId={tabBarActiveId}
-            onTabSelect={onTabSelect}
-            onTabClose={(id) => void onTabClose(id)}
-            onCreateMacro={() => void onCreateMacro()}
-            onCreateClicker={() => void onCreateClicker()}
-            onCreateScript={() => void onCreateScript()}
-            onOpenExisting={(kind, id, label) => openDoc(kind, id, label ?? id)}
             onPrefetchEditor={prefetchEditor}
-            onTabContextAction={(tabId, action) =>
-              void onTabContextAction(tabId, action)
-            }
             onBarContextAction={(action) => void onBarContextAction(action)}
-            onTabReorder={onTabReorder}
-            onPinnedCloseAttempt={() => toast.info(t("shell.pinnedTab"))}
             settingsActive={settingsActive}
             onSettingsClick={() => {
               prefetchEditor("settings");

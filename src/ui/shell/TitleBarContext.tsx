@@ -12,11 +12,15 @@ import { createPortal } from "react-dom";
 
 type TitleBarState = {
   pageTitle?: string;
+  /** Host in the window chrome for the document name. */
+  chromeHost: HTMLElement | null;
+  /** Host below the chrome for the editor toolbar. */
   subToolbarHost: HTMLElement | null;
 };
 
 type TitleBarDispatch = {
   setPageTitle: (title?: string) => void;
+  setChromeHost: (el: HTMLElement | null) => void;
   setSubToolbarHost: (el: HTMLElement | null) => void;
 };
 
@@ -25,11 +29,19 @@ const TitleBarDispatchContext = createContext<TitleBarDispatch | null>(null);
 
 export function TitleBarProvider({ children }: { children: ReactNode }) {
   const [pageTitle, setPageTitleState] = useState<string | undefined>();
+  const chromeHostRef = useRef<HTMLElement | null>(null);
   const subToolbarHostRef = useRef<HTMLElement | null>(null);
+  const [chromeReady, setChromeReady] = useState(false);
   const [subToolbarReady, setSubToolbarReady] = useState(false);
 
   const setPageTitle = useCallback((title?: string) => {
     setPageTitleState((prev) => (prev === title ? prev : title));
+  }, []);
+
+  const setChromeHost = useCallback((el: HTMLElement | null) => {
+    if (chromeHostRef.current === el) return;
+    chromeHostRef.current = el;
+    setChromeReady(el != null);
   }, []);
 
   const setSubToolbarHost = useCallback((el: HTMLElement | null) => {
@@ -41,14 +53,15 @@ export function TitleBarProvider({ children }: { children: ReactNode }) {
   const state = useMemo(
     () => ({
       pageTitle,
+      chromeHost: chromeReady ? chromeHostRef.current : null,
       subToolbarHost: subToolbarReady ? subToolbarHostRef.current : null,
     }),
-    [pageTitle, subToolbarReady],
+    [pageTitle, chromeReady, subToolbarReady],
   );
 
   const dispatch = useMemo(
-    () => ({ setPageTitle, setSubToolbarHost }),
-    [setPageTitle, setSubToolbarHost],
+    () => ({ setPageTitle, setChromeHost, setSubToolbarHost }),
+    [setPageTitle, setChromeHost, setSubToolbarHost],
   );
 
   return (
@@ -72,15 +85,16 @@ export function useTitleBarDispatch() {
 }
 
 /**
- * Titre titlebar + toolbar éditeur dans la barre secondaire (sous la titlebar).
+ * Titre page + chrome (nom) + toolbar éditeur portailés.
  * Pass `active: false` when the editor is keep-mounted but hidden.
  */
 export function useTitleBarSlot(
   pageTitle: string | undefined,
   toolbar: ReactNode,
-  opts?: { active?: boolean },
+  opts?: { active?: boolean; chrome?: ReactNode },
 ) {
   const active = opts?.active !== false;
+  const chrome = opts?.chrome;
   const dispatch = useContext(TitleBarDispatchContext);
   const state = useContext(TitleBarStateContext);
 
@@ -90,6 +104,16 @@ export function useTitleBarSlot(
     return () => dispatch.setPageTitle(undefined);
   }, [dispatch, pageTitle, active]);
 
-  if (!active || !state?.subToolbarHost) return null;
-  return createPortal(toolbar, state.subToolbarHost);
+  if (!active) return null;
+
+  return (
+    <>
+      {chrome != null && state?.chromeHost
+        ? createPortal(chrome, state.chromeHost)
+        : null}
+      {toolbar != null && state?.subToolbarHost
+        ? createPortal(toolbar, state.subToolbarHost)
+        : null}
+    </>
+  );
 }

@@ -96,18 +96,30 @@ export function initialWorkspace(): WorkspaceState {
   };
 }
 
+function singleOpenTab(
+  tabs: DocTab[],
+  preferId: string | null | undefined,
+): DocTab[] {
+  if (tabs.length <= 1) return tabs;
+  const keep =
+    (preferId && tabs.find((t) => t.id === preferId)) ||
+    tabs[tabs.length - 1]!;
+  return [{ ...keep, pinned: undefined }];
+}
+
 export function loadWorkspace(): WorkspaceState {
   try {
     const raw = readStorageRaw();
     if (!raw) return initialWorkspace();
     const data = JSON.parse(raw) as Persisted;
-    const tabs = Array.isArray(data.tabs) ? data.tabs.filter(isValidTab) : [];
+    let tabs = Array.isArray(data.tabs) ? data.tabs.filter(isValidTab) : [];
+    const preferId =
+      typeof data.activeTabId === "string" ? data.activeTabId : null;
+    tabs = singleOpenTab(tabs, preferId);
     if (data.shellView === "settings") {
       const returnTabId =
-        typeof data.activeTabId === "string" &&
-        data.activeTabId !== "home" &&
-        tabs.some((t) => t.id === data.activeTabId)
-          ? data.activeTabId
+        preferId && preferId !== "home" && tabs.some((t) => t.id === preferId)
+          ? preferId
           : tabs[0]?.id ?? null;
       return {
         tabs,
@@ -120,16 +132,16 @@ export function loadWorkspace(): WorkspaceState {
     }
     if (
       data.shellView === "doc" &&
-      data.activeTabId &&
-      tabs.some((t) => t.id === data.activeTabId)
+      preferId &&
+      tabs.some((t) => t.id === preferId)
     ) {
-      return { tabs, shellView: { type: "doc", tabId: data.activeTabId } };
+      return { tabs, shellView: { type: "doc", tabId: preferId } };
     }
     // Legacy home/library → empty (library is always visible as sidebar)
     if (tabs.length > 0) {
       return {
         tabs,
-        shellView: { type: "doc", tabId: tabs[tabs.length - 1]!.id },
+        shellView: { type: "doc", tabId: tabs[0]!.id },
       };
     }
     return { tabs, shellView: { type: "empty" } };
@@ -175,6 +187,7 @@ export function persistWorkspace(state: WorkspaceState): void {
   }
 }
 
+/** Single-document workspace: opening a doc replaces any other open tab. */
 export function openDocTab(
   state: WorkspaceState,
   kind: DocTabKind,
@@ -183,11 +196,11 @@ export function openDocTab(
 ): WorkspaceState {
   const id = docTabId(kind, resourceId);
   const exists = state.tabs.find((t) => t.id === id);
-  const tabs = exists
-    ? state.tabs
-    : [...state.tabs, { id, kind, resourceId, label, dirty: false }];
+  const tab: DocTab = exists
+    ? { ...exists, label, pinned: undefined }
+    : { id, kind, resourceId, label, dirty: false };
   return {
-    tabs,
+    tabs: [tab],
     shellView: { type: "doc", tabId: id },
   };
 }

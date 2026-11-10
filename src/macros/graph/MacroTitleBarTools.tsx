@@ -1,57 +1,48 @@
-import type { ReactNode } from "react";
 import { useMemo } from "react";
 import {
+  ArrowDown,
   ArrowLeft,
-  Check,
-  ChevronDown,
+  ArrowUp,
   Circle,
+  ClipboardPaste,
   Copy,
   Download,
-  Globe,
   Lock,
+  TestTube2,
   LockOpen,
-  MoreHorizontal,
   Pause,
   Play,
+  Plus,
   Redo2,
+  Scissors,
   Square,
-  Terminal,
+  Trash2,
   Undo2,
   Upload,
 } from "lucide-react";
 import { useT } from "../../i18n";
 import {
+  ActionPickerMenu,
   ContextMenu,
-  DropdownMenu,
   EditorToolbar,
   Tooltip,
   findMenuItem,
   useContextMenuState,
 } from "../../ui/shell";
-import type { DropdownEntry, MenuItemDef } from "../../ui/shell";
-import {
-  ProcessFilterTool,
-  type ProcessFilter,
-  type ProcessFilterScopeMode,
-} from "../../process";
+import type { ActionPickerEntry, MenuItemDef } from "../../ui/shell";
 
 type Props = {
   onBack?: () => void;
   locked: boolean;
   onLockChange?: (locked: boolean) => void;
-  onDuplicate?: () => void;
   onImport?: () => void;
   onExport?: () => void;
   loading?: boolean;
-  dirty?: boolean;
   engineState: string;
   recording: boolean;
   recordPaused: boolean;
   recordCount: number;
   onPlay: () => void;
-  /** When set, shows a secondary play-from-selection control. */
-  onPlayFrom?: () => void;
-  onPause?: () => void;
   onResume?: () => void;
   onStop?: () => void;
   onStartRecord: () => void;
@@ -62,45 +53,35 @@ type Props = {
   canRedo?: boolean;
   onUndo?: () => void;
   onRedo?: () => void;
-  /** Nom — toolbar start. */
-  meta?: ReactNode;
-  /** Répét. / raccourci — same group as Processus. */
-  metaTools?: ReactNode;
-  allowNetwork?: boolean;
-  allowProcess?: boolean;
-  onPermissionsChange?: (next: {
-    allowNetwork?: boolean;
-    allowProcess?: boolean;
-  }) => void;
-  processFilter: ProcessFilter;
-  processFilterMode: ProcessFilterScopeMode;
-  onProcessFilterModeChange: (mode: ProcessFilterScopeMode) => void;
-  localProcessFilter: ProcessFilter;
-  onLocalProcessFilterChange: (filter: ProcessFilter) => void;
-  onOpenProcessSettings?: () => void;
-  onGlobalProcessFilterChange?: (filter: ProcessFilter) => void;
-  processFilterPresets?: import("../../process").ProcessFilterPreset[];
-  onProcessFilterPresetsChange?: (
-    presets: import("../../process").ProcessFilterPreset[],
-  ) => void;
+  canCopySteps?: boolean;
+  canPasteSteps?: boolean;
+  canCutSteps?: boolean;
+  canDeleteSteps?: boolean;
+  canMoveUp?: boolean;
+  canMoveDown?: boolean;
+  onCopySteps?: () => void;
+  onPasteSteps?: () => void;
+  onCutSteps?: () => void;
+  onDeleteSteps?: () => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  addMenuItems?: ActionPickerEntry[];
+  dryRun?: boolean;
+  onDryRunChange?: (dryRun: boolean) => void;
 };
 
 export function MacroTitleBarTools({
   onBack,
   locked,
   onLockChange,
-  onDuplicate,
   onImport,
   onExport,
   loading = false,
-  dirty = false,
   engineState,
   recording,
   recordPaused,
-  recordCount,
+  recordCount: _recordCount,
   onPlay,
-  onPlayFrom,
-  onPause,
   onResume,
   onStop,
   onStartRecord,
@@ -111,28 +92,36 @@ export function MacroTitleBarTools({
   canRedo = false,
   onUndo,
   onRedo,
-  meta,
-  metaTools,
-  allowNetwork = false,
-  allowProcess = false,
-  onPermissionsChange,
-  processFilter,
-  processFilterMode,
-  onProcessFilterModeChange,
-  localProcessFilter,
-  onLocalProcessFilterChange,
-  onOpenProcessSettings,
-  onGlobalProcessFilterChange,
-  processFilterPresets,
-  onProcessFilterPresetsChange,
+  canCopySteps = false,
+  canPasteSteps = false,
+  canCutSteps = false,
+  canDeleteSteps = false,
+  canMoveUp = false,
+  canMoveDown = false,
+  onCopySteps,
+  onPasteSteps,
+  onCutSteps,
+  onDeleteSteps,
+  onMoveUp,
+  onMoveDown,
+  addMenuItems,
+  dryRun = false,
+  onDryRunChange,
 }: Props) {
   const t = useT();
   const toolbarCtx = useContextMenuState();
   const running = engineState === "running" || engineState === "paused";
   const busy = running || recording || loading;
   const mutateDisabled = locked || loading || busy;
+  const isResume = running && engineState === "paused" && Boolean(onResume);
+  const isStop = running && !isResume;
+  const runLabel = !running
+    ? t("shell.exec.run")
+    : isResume
+      ? t("shell.exec.resume")
+      : t("shell.exec.stop");
 
-  const moreItems: DropdownEntry[] = useMemo(
+  const contextItems: MenuItemDef[] = useMemo(
     () => [
       {
         id: "undo",
@@ -151,15 +140,6 @@ export function MacroTitleBarTools({
       { id: "sep-history", label: "", separator: true },
       ...(recording
         ? ([
-            {
-              id: "record-status",
-              label: recordPaused
-                ? t("macros.toolbar.recordStatusPaused", {
-                    count: recordCount,
-                  })
-                : t("macros.toolbar.recordStatus", { count: recordCount }),
-              groupHeader: true,
-            },
             recordPaused
               ? {
                   id: "resume-capture",
@@ -179,7 +159,7 @@ export function MacroTitleBarTools({
               icon: <Square size={14} />,
               onSelect: onStopRecord,
             },
-          ] satisfies DropdownEntry[])
+          ] satisfies MenuItemDef[])
         : ([
             {
               id: "capture",
@@ -188,28 +168,14 @@ export function MacroTitleBarTools({
               disabled: locked || busy,
               onSelect: onStartRecord,
             },
-          ] satisfies DropdownEntry[])),
-      { id: "sep-capture", label: "", separator: true },
-      ...(onLockChange
-        ? ([
-            {
-              id: "lock-toggle",
-              label: locked
-                ? t("macros.toolbar.unlockTitle")
-                : t("macros.toolbar.lockTitle"),
-              icon: locked ? <LockOpen size={14} /> : <Lock size={14} />,
-              disabled: loading,
-              onSelect: () => onLockChange(!locked),
-            },
-            { id: "sep-lock", label: "", separator: true },
-          ] satisfies DropdownEntry[])
-        : []),
+          ] satisfies MenuItemDef[])),
+      { id: "sep-ctx-run", label: "", separator: true },
       {
-        id: "duplicate",
-        label: t("macros.menu.ctx.duplicate"),
-        icon: <Copy size={14} />,
-        disabled: mutateDisabled || !onDuplicate,
-        onSelect: () => onDuplicate?.(),
+        id: "test",
+        label: t("macros.toolbar.test"),
+        icon: <Play size={14} />,
+        disabled: busy,
+        onSelect: onPlay,
       },
       { id: "sep-io", label: "", separator: true },
       {
@@ -226,83 +192,6 @@ export function MacroTitleBarTools({
         disabled: loading || busy || !onExport,
         onSelect: () => onExport?.(),
       },
-      ...(onOpenProcessSettings
-        ? ([
-            { id: "sep-process", label: "", separator: true },
-            {
-              id: "process-filter",
-              label: t("scripts.permissions.process"),
-              icon: <Terminal size={14} />,
-              onSelect: () => onOpenProcessSettings(),
-            },
-          ] satisfies DropdownEntry[])
-        : []),
-      ...(onPermissionsChange
-        ? ([
-            { id: "sep-perms", label: "", separator: true },
-            {
-              id: "perm-header",
-              label: t("macros.permissions.label"),
-              groupHeader: true,
-            },
-            {
-              id: "perm-network",
-              label: t("scripts.permissions.network"),
-              icon: allowNetwork ? <Check size={14} /> : <Globe size={14} />,
-              disabled: mutateDisabled,
-              onSelect: () =>
-                onPermissionsChange({ allowNetwork: !allowNetwork }),
-            },
-            {
-              id: "perm-process",
-              label: t("scripts.permissions.process"),
-              icon: allowProcess ? <Check size={14} /> : <Terminal size={14} />,
-              disabled: mutateDisabled,
-              onSelect: () =>
-                onPermissionsChange({ allowProcess: !allowProcess }),
-            },
-          ] satisfies DropdownEntry[])
-        : []),
-    ],
-    [
-      t,
-      locked,
-      busy,
-      canUndo,
-      onUndo,
-      canRedo,
-      onRedo,
-      recording,
-      recordPaused,
-      recordCount,
-      onResumeRecord,
-      onPauseRecord,
-      onStopRecord,
-      onStartRecord,
-      onLockChange,
-      loading,
-      mutateDisabled,
-      onDuplicate,
-      onImport,
-      onExport,
-      onOpenProcessSettings,
-      onPermissionsChange,
-      allowNetwork,
-      allowProcess,
-    ],
-  );
-
-  const contextItems: MenuItemDef[] = useMemo(
-    () => [
-      ...(moreItems as MenuItemDef[]),
-      { id: "sep-ctx-run", label: "", separator: true },
-      {
-        id: "test",
-        label: t("macros.toolbar.test"),
-        icon: <Play size={14} />,
-        disabled: busy,
-        onSelect: onPlay,
-      },
       ...(onBack
         ? [
             {
@@ -314,17 +203,38 @@ export function MacroTitleBarTools({
           ]
         : []),
     ],
-    [moreItems, t, busy, onPlay, onBack],
+    [
+      t,
+      locked,
+      busy,
+      loading,
+      mutateDisabled,
+      canUndo,
+      onUndo,
+      canRedo,
+      onRedo,
+      recording,
+      recordPaused,
+      onResumeRecord,
+      onPauseRecord,
+      onStopRecord,
+      onStartRecord,
+      onPlay,
+      onImport,
+      onExport,
+      onBack,
+    ],
   );
 
   return (
     <>
       <EditorToolbar
+        className="caster-editor-toolbar--macro"
         onContextMenu={toolbarCtx.openFromEvent}
         start={
           <>
             {onBack ? (
-              <Tooltip content={t("macros.toolbar.back")}>
+              <Tooltip side="bottom" content={t("macros.toolbar.back")}>
                 <button
                   type="button"
                   className="caster-titlebar-btn caster-titlebar-icon-btn"
@@ -335,131 +245,292 @@ export function MacroTitleBarTools({
                 </button>
               </Tooltip>
             ) : null}
-            {meta}
-            {dirty ? (
-              <span className="caster-dirty-pill">{t("shell.dirty")}</span>
+            <div className="caster-toolbar-group">
+              <Tooltip side="bottom" content={t("macros.toolbar.undoTitle")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={locked || busy || !canUndo || !onUndo}
+                  aria-label={t("macros.toolbar.undo")}
+                  onClick={() => onUndo?.()}
+                >
+                  <Undo2 size={14} aria-hidden />
+                </button>
+              </Tooltip>
+              <Tooltip side="bottom" content={t("macros.toolbar.redoTitle")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={locked || busy || !canRedo || !onRedo}
+                  aria-label={t("macros.toolbar.redo")}
+                  onClick={() => onRedo?.()}
+                >
+                  <Redo2 size={14} aria-hidden />
+                </button>
+              </Tooltip>
+            </div>
+            {addMenuItems ? (
+              <div className="caster-toolbar-group">
+                <Tooltip side="bottom" content={t("macros.toolbar.addTitle")}>
+                  <ActionPickerMenu
+                    label={t("macros.toolbar.addTitle")}
+                    disabled={mutateDisabled}
+                    items={addMenuItems}
+                    nativeTitle={false}
+                    triggerClassName="caster-titlebar-btn caster-titlebar-icon-btn"
+                    triggerContent={<Plus size={14} aria-hidden />}
+                  />
+                </Tooltip>
+              </div>
             ) : null}
+            <div className="caster-toolbar-group">
+              <Tooltip side="bottom" content={t("macros.toolbar.cutStepsTitle")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={locked || busy || !canCutSteps || !onCutSteps}
+                  aria-label={t("macros.toolbar.cutSteps")}
+                  onClick={() => onCutSteps?.()}
+                >
+                  <Scissors size={14} aria-hidden />
+                </button>
+              </Tooltip>
+              <Tooltip side="bottom" content={t("macros.toolbar.copyStepsTitle")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={locked || busy || !canCopySteps || !onCopySteps}
+                  aria-label={t("macros.toolbar.copySteps")}
+                  onClick={() => onCopySteps?.()}
+                >
+                  <Copy size={14} aria-hidden />
+                </button>
+              </Tooltip>
+              <Tooltip side="bottom" content={t("macros.toolbar.pasteStepsTitle")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={
+                    locked || busy || !canPasteSteps || !onPasteSteps
+                  }
+                  aria-label={t("macros.toolbar.pasteSteps")}
+                  onClick={() => onPasteSteps?.()}
+                >
+                  <ClipboardPaste size={14} aria-hidden />
+                </button>
+              </Tooltip>
+              <Tooltip side="bottom" content={t("macros.toolbar.deleteStepsTitle")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn caster-titlebar-icon-btn-danger"
+                  disabled={
+                    locked || busy || !canDeleteSteps || !onDeleteSteps
+                  }
+                  aria-label={t("macros.toolbar.deleteSteps")}
+                  onClick={() => onDeleteSteps?.()}
+                >
+                  <Trash2 size={14} aria-hidden />
+                </button>
+              </Tooltip>
+            </div>
+            <div className="caster-toolbar-group">
+              <Tooltip side="bottom" content={t("macros.toolbar.moveUpTitle")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={locked || busy || !canMoveUp || !onMoveUp}
+                  aria-label={t("macros.menu.ctx.moveUp")}
+                  onClick={() => onMoveUp?.()}
+                >
+                  <ArrowUp size={14} aria-hidden />
+                </button>
+              </Tooltip>
+              <Tooltip side="bottom" content={t("macros.toolbar.moveDownTitle")}>
+                <button
+                  type="button"
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={locked || busy || !canMoveDown || !onMoveDown}
+                  aria-label={t("macros.menu.ctx.moveDown")}
+                  onClick={() => onMoveDown?.()}
+                >
+                  <ArrowDown size={14} aria-hidden />
+                </button>
+              </Tooltip>
+            </div>
+            <div className="caster-toolbar-group">
+              {recording ? (
+                <>
+                  {recordPaused ? (
+                    <Tooltip side="bottom" content={t("macros.toolbar.resumeCaptureTitle")}>
+                      <button
+                        type="button"
+                        className="caster-titlebar-btn caster-titlebar-icon-btn is-recording"
+                        aria-label={t("macros.toolbar.resumeCapture")}
+                        onClick={onResumeRecord}
+                      >
+                        <Play size={14} aria-hidden />
+                      </button>
+                    </Tooltip>
+                  ) : (
+                    <Tooltip side="bottom" content={t("macros.toolbar.pauseCaptureTitle")}>
+                      <button
+                        type="button"
+                        className="caster-titlebar-btn caster-titlebar-icon-btn is-recording"
+                        aria-label={t("macros.toolbar.pauseCapture")}
+                        onClick={onPauseRecord}
+                      >
+                        <Pause size={14} aria-hidden />
+                      </button>
+                    </Tooltip>
+                  )}
+                  <Tooltip side="bottom" content={t("macros.toolbar.stopCaptureTitle")}>
+                    <button
+                      type="button"
+                      className="caster-titlebar-btn caster-titlebar-icon-btn is-recording"
+                      aria-label={t("macros.toolbar.stopCapture")}
+                      onClick={onStopRecord}
+                    >
+                      <Square size={14} aria-hidden />
+                    </button>
+                  </Tooltip>
+                </>
+              ) : (
+                <Tooltip side="bottom" content={t("macros.toolbar.captureTitle")}>
+                  <button
+                    type="button"
+                    className="caster-titlebar-btn caster-titlebar-icon-btn"
+                    disabled={locked || busy}
+                    aria-label={t("macros.toolbar.capture")}
+                    onClick={onStartRecord}
+                  >
+                    <Circle size={14} aria-hidden />
+                  </button>
+                </Tooltip>
+              )}
+            </div>
           </>
         }
         end={
           <>
             <div className="caster-toolbar-group">
-              {!running ? (
-                <div className="caster-titlebar-run-group">
-                  <button
-                    type="button"
-                    className="caster-titlebar-btn caster-btn-run"
-                    disabled={busy}
-                    onClick={onPlay}
-                  >
-                    <Play size={14} aria-hidden />
-                    <span>{t("shell.exec.run")}</span>
-                  </button>
-                  {onPlayFrom ? (
-                    <DropdownMenu
-                      label={t("macros.toolbar.playFrom")}
-                      ariaLabel={t("macros.toolbar.playFromTitle")}
-                      align="end"
-                      disabled={busy}
-                      triggerClassName="caster-titlebar-btn caster-titlebar-icon-btn caster-btn-run-chevron"
-                      items={[
-                        {
-                          id: "play-from",
-                          label: t("macros.toolbar.playFrom"),
-                          shortcut: t("macros.toolbar.playFromShortcut"),
-                          icon: <Play size={14} />,
-                          onSelect: onPlayFrom,
-                        },
-                      ]}
-                    >
-                      <ChevronDown size={12} aria-hidden />
-                    </DropdownMenu>
-                  ) : null}
-                </div>
-              ) : null}
-              {running && engineState === "paused" && onResume ? (
+              <Tooltip side="bottom" content={t("macros.menu.more.import")}>
                 <button
                   type="button"
-                  className="caster-titlebar-btn caster-btn-run"
-                  disabled={loading}
-                  onClick={onResume}
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={mutateDisabled || !onImport}
+                  aria-label={t("macros.menu.more.import")}
+                  onClick={() => onImport?.()}
                 >
-                  <Play size={14} aria-hidden />
-                  <span>{t("shell.exec.resume")}</span>
+                  <Upload size={14} aria-hidden />
                 </button>
-              ) : null}
-              {running && engineState !== "paused" && onPause ? (
+              </Tooltip>
+              <Tooltip side="bottom" content={t("macros.menu.more.export")}>
                 <button
                   type="button"
-                  className="caster-titlebar-btn caster-btn-ghost"
-                  disabled={loading}
-                  onClick={onPause}
+                  className="caster-titlebar-btn caster-titlebar-icon-btn"
+                  disabled={loading || busy || !onExport}
+                  aria-label={t("macros.menu.more.export")}
+                  onClick={() => onExport?.()}
                 >
-                  <Pause size={14} aria-hidden />
-                  <span>{t("shell.exec.pause")}</span>
+                  <Download size={14} aria-hidden />
                 </button>
-              ) : null}
-              {onStop ? (
+              </Tooltip>
+              <Tooltip
+                side="bottom"
+                content={
+                  locked
+                    ? t("macros.toolbar.unlockTitle")
+                    : t("macros.toolbar.lockTitle")
+                }
+              >
                 <button
                   type="button"
-                  className="caster-titlebar-btn caster-btn-ghost"
-                  disabled={!running || loading}
-                  onClick={onStop}
+                  className={[
+                    "caster-titlebar-btn",
+                    "caster-titlebar-icon-btn",
+                    locked ? "is-active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  disabled={loading || !onLockChange}
+                  aria-label={
+                    locked
+                      ? t("macros.toolbar.unlockTitle")
+                      : t("macros.toolbar.lockTitle")
+                  }
+                  aria-pressed={locked}
+                  onClick={() => onLockChange?.(!locked)}
                 >
-                  <Square size={14} aria-hidden />
-                  <span>{t("shell.exec.stop")}</span>
+                  {locked ? (
+                    <Lock size={14} aria-hidden />
+                  ) : (
+                    <LockOpen size={14} aria-hidden />
+                  )}
                 </button>
-              ) : null}
-              <span
+              </Tooltip>
+            </div>
+            <Tooltip side="bottom" content={t("macros.toolbar.dryRunTitle")}>
+              <button
+                type="button"
                 className={[
-                  "caster-run-status-pill",
-                  running ? "is-running" : "",
-                  engineState === "paused" ? "is-paused" : "",
+                  "caster-toolbar-dry-run",
+                  dryRun ? "is-on" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
-                role="status"
+                disabled={busy || !onDryRunChange}
+                aria-label={t("macros.toolbar.dryRun")}
+                aria-pressed={dryRun}
+                onClick={() => onDryRunChange?.(!dryRun)}
               >
-                <span className="caster-run-status-dot" aria-hidden />
-                {engineState === "paused"
-                  ? t("shell.exec.paused")
-                  : running
-                    ? t("shell.exec.running")
-                    : t("shell.exec.ready")}
-              </span>
-            </div>
-            <div className="caster-toolbar-group caster-toolbar-group--tools">
-              {metaTools}
-              <ProcessFilterTool
-                filter={processFilter}
-                mode={processFilterMode}
-                onModeChange={onProcessFilterModeChange}
-                localFilter={localProcessFilter}
-                onLocalFilterChange={onLocalProcessFilterChange}
-                disabled={locked}
-                onOpenSettings={onOpenProcessSettings}
-                onGlobalFilterChange={onGlobalProcessFilterChange}
-                presets={processFilterPresets}
-                onPresetsChange={onProcessFilterPresetsChange}
-              />
-            </div>
-            <div className="caster-toolbar-group">
-              <DropdownMenu
-                label={t("macros.toolbar.moreActions")}
-                ariaLabel={t("macros.toolbar.moreActions")}
-                align="end"
-                disabled={loading}
-                triggerClassName={[
-                  "caster-titlebar-btn",
-                  "caster-titlebar-icon-btn",
-                  locked ? "caster-clicker-lock" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                items={moreItems}
+                <TestTube2 size={14} aria-hidden />
+                <span className="caster-toolbar-dry-run-label">
+                  {t("macros.toolbar.dryRun")}
+                </span>
+              </button>
+            </Tooltip>
+            <div
+              className={[
+                "caster-titlebar-run-group",
+                "is-solo",
+                running ? "is-running" : "",
+                isStop ? "is-stop" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <button
+                type="button"
+                className="caster-titlebar-btn caster-btn-run caster-btn-run--solo"
+                disabled={
+                  !running
+                    ? recording || loading
+                    : loading || (isStop && !onStop)
+                }
+                aria-label={runLabel}
+                onClick={() => {
+                  if (!running) {
+                    onPlay();
+                    return;
+                  }
+                  if (isResume) {
+                    onResume?.();
+                    return;
+                  }
+                  onStop?.();
+                }}
               >
-                <MoreHorizontal size={16} aria-hidden />
-              </DropdownMenu>
+                <span className="caster-btn-run-face">
+                  <span className="caster-btn-run-icon">
+                    {isStop ? (
+                      <Square size={14} aria-hidden />
+                    ) : (
+                      <Play size={14} aria-hidden />
+                    )}
+                  </span>
+                  <span className="caster-btn-run-label">{runLabel}</span>
+                </span>
+              </button>
             </div>
           </>
         }

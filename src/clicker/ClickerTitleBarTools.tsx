@@ -58,8 +58,6 @@ type Props = {
   hotkeys: HotkeyBindings;
   /** Called with the new preset id after « Sauver comme nouveau preset ». */
   onSavedAsNew?: (id: string) => void;
-  /** Nom — toolbar start (same as macros). */
-  meta?: ReactNode;
   /** Raccourci chip — same group as Processus. */
   metaTools?: ReactNode;
   onOpenProcessSettings?: () => void;
@@ -77,7 +75,6 @@ export function ClickerTitleBarTools({
   onBack,
   hotkeys,
   onSavedAsNew,
-  meta,
   metaTools,
   onOpenProcessSettings,
 }: Props) {
@@ -394,21 +391,18 @@ export function ClickerTitleBarTools({
     <EditorToolbar
       onContextMenu={toolbarCtx.openFromEvent}
       start={
-        <>
-          {onBack ? (
-            <Tooltip content={t("clicker.toolbar.back")}>
-              <button
-                type="button"
-                className="caster-titlebar-btn caster-titlebar-icon-btn"
-                onClick={onBack}
-                aria-label={t("clicker.toolbar.back")}
-              >
-                <ArrowLeft size={14} aria-hidden />
-              </button>
-            </Tooltip>
-          ) : null}
-          {meta}
-        </>
+        onBack ? (
+          <Tooltip content={t("clicker.toolbar.back")}>
+            <button
+              type="button"
+              className="caster-titlebar-btn caster-titlebar-icon-btn"
+              onClick={onBack}
+              aria-label={t("clicker.toolbar.back")}
+            >
+              <ArrowLeft size={14} aria-hidden />
+            </button>
+          </Tooltip>
+        ) : undefined
       }
       end={
         <>

@@ -9,9 +9,8 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { confirmAction } from "../../ui";
+import { confirmAction, confirmChoice } from "../../ui";
 import {
-  ActionPickerMenu,
   InspectorPanel,
   InspectorSection,
   useToast,
@@ -20,14 +19,18 @@ import {
   Clock,
   GitBranch,
   Keyboard,
-  LayoutTemplate,
   MousePointerClick,
   Play,
-  Plus,
   Variable,
   Workflow,
 } from "lucide-react";
-import { ActionList } from "../ActionList";
+import {
+  ActionList,
+  hasActionClipboard,
+  peekActionClipboard,
+  subscribeActionClipboard,
+  writeActionClipboard,
+} from "../ActionList";
 import { ActionProps } from "../ActionProps";
 import { ControlFlowAdvancedProps } from "../ControlFlowAdvancedProps";
 import {
@@ -36,7 +39,8 @@ import {
   actionTone,
 } from "../actionLabels";
 import { buildActionAddMenu, makeAction } from "../actionFactory";
-import { MacroMetaBar, MacroMetaTools } from "../MacroMetaBar";
+import { MacroMetaBar } from "../MacroMetaBar";
+import { MacroSettingsPanel } from "../MacroSettingsPanel";
 import {
   appendChild,
   duplicateAtPath,
@@ -101,8 +105,6 @@ type Props = {
   onOpenProcessSettings?: () => void;
   /** Open the shared run journal dock. */
   onOpenJournal?: () => void;
-  /** Discreet error/warn badge on the Journal tab. */
-  journalHasErrors?: boolean;
   /** When false (keep-mounted but hidden), ignore global shortcuts / titlebar. */
   active?: boolean;
   automationPrefs?: AutomationPrefs;
@@ -149,7 +151,6 @@ export function MacroEditorView({
   onOpenScript,
   onOpenProcessSettings,
   onOpenJournal,
-  journalHasErrors = false,
   active = true,
   automationPrefs: automationPrefsProp,
   confirmationsPrefs: confirmationsPrefsProp,
@@ -171,6 +172,10 @@ export function MacroEditorView({
   const [locked, setLocked] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recordPaused, setRecordPaused] = useState(false);
+  const [dryRun, setDryRun] = useState(false);
+  const [clipboardTick, setClipboardTick] = useState(0);
+
+  useEffect(() => subscribeActionClipboard(() => setClipboardTick((n) => n + 1)), []);
   const [recordCount, setRecordCount] = useState(0);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -204,15 +209,8 @@ export function MacroEditorView({
     () => (selectedPath ? getAtPath(doc.actions, selectedPath) : null),
     [doc.actions, selectedPath],
   );
-  type EditorTab = "actions" | "params" | "variables" | "journal";
-  const [editorTab, setEditorTab] = useState<EditorTab>("actions");
-  const [propsOpen, setPropsOpen] = useState(() => {
-    try {
-      return localStorage.getItem("caster-macro-props-open") === "1";
-    } catch {
-      return false;
-    }
-  });
+  type InspectorMode = "step" | "macro";
+  const [inspectorMode, setInspectorMode] = useState<InspectorMode>("macro");
   const [propsWidth, setPropsWidth] = useState(() => {
     try {
       const n = Number(localStorage.getItem("caster-macro-props-w"));
@@ -225,28 +223,6 @@ export function MacroEditorView({
   const propsWidthRef = useRef(propsWidth);
   propsWidthRef.current = propsWidth;
   const propsDragRef = useRef<{ startX: number; startW: number } | null>(null);
-
-  const persistPropsOpen = useCallback((open: boolean) => {
-    setPropsOpen(open);
-    try {
-      localStorage.setItem("caster-macro-props-open", open ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const propsAutoClosedRef = useRef(false);
-  useEffect(() => {
-    const onResize = () => {
-      if (window.innerWidth < 900 && propsOpen && !propsAutoClosedRef.current) {
-        propsAutoClosedRef.current = true;
-        persistPropsOpen(false);
-      }
-    };
-    onResize();
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, [propsOpen, persistPropsOpen]);
 
   const onPropsResizePointerDown = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -722,15 +698,23 @@ export function MacroEditorView({
       }
       const st = await invoke<EngineStatus>("launch_saved_macro", {
         name: macroIdRef.current,
+        dryRun,
       });
       onStatus(st);
-      toast.success(t("macros.toast.testStarted"));
+      toast.success(
+        dryRun
+          ? t("macros.toast.dryRunStarted")
+          : t("macros.toast.testStarted"),
+      );
+      if (dryRun) onOpenJournal?.();
     } catch (e) {
       toast.error(errMessage(e, t("macros.toast.testFailed")));
     }
   }, [
     automationPrefs.autoSaveBeforeRun,
+    dryRun,
     flushAutosave,
+    onOpenJournal,
     onStatus,
     recording,
     t,
@@ -750,15 +734,6 @@ export function MacroEditorView({
       } catch (e) {
         toast.error(errMessage(e, t("shell.cannotStop")));
       }
-    }
-  }, [onStatus, t, toast]);
-
-  const onPauseSession = useCallback(async () => {
-    try {
-      const st = await invoke<EngineStatus>("pause_macro");
-      onStatus(st);
-    } catch (e) {
-      toast.error(errMessage(e, t("macros.toast.resumeFailed")));
     }
   }, [onStatus, t, toast]);
 
@@ -787,9 +762,15 @@ export function MacroEditorView({
         const st = await invoke<EngineStatus>("launch_saved_macro", {
           name: macroIdRef.current,
           fromPath: path,
+          dryRun,
         });
         onStatus(st);
-        toast.success(t("macros.toast.testFromStepStarted"));
+        toast.success(
+          dryRun
+            ? t("macros.toast.dryRunStarted")
+            : t("macros.toast.testFromStepStarted"),
+        );
+        if (dryRun) onOpenJournal?.();
       } catch (e) {
         const msg = errMessage(e, t("macros.toast.testFromStepFailed"));
         if (/from_path|hors limites|branche manquante/i.test(msg)) {
@@ -800,6 +781,8 @@ export function MacroEditorView({
       }
     },
     [
+      dryRun,
+      onOpenJournal,
       automationPrefs.autoSaveBeforeRun,
       automationPrefs.runFromRequiresSelection,
       flushAutosave,
@@ -842,14 +825,16 @@ export function MacroEditorView({
     try {
       let replace = false;
       if (docRef.current.actions.length > 0) {
-        const ok = await confirmAction({
+        const outcome = await confirmChoice({
           title: t("macros.confirm.recordModeTitle"),
           message: t("macros.confirm.recordModeMessage"),
           confirmLabel: t("macros.confirm.recordModeReplace"),
-          cancelLabel: t("macros.confirm.recordModeAppend"),
+          discardLabel: t("macros.confirm.recordModeAppend"),
+          cancelLabel: t("common.cancel"),
           danger: false,
         });
-        replace = ok;
+        if (outcome === "cancel") return;
+        replace = outcome === "confirm";
       }
       await flushAutosave();
       await invoke("set_macro", { doc: docRef.current });
@@ -1098,6 +1083,112 @@ export function MacroEditorView({
     [doc, editorLocked, updateDoc],
   );
 
+  const onCopySteps = useCallback(() => {
+    if (editorLocked) return;
+    if (!selectedPath) {
+      toast.info(t("macros.toolbar.copyStepsEmpty"));
+      return;
+    }
+    const src = getAtPath(doc.actions, selectedPath);
+    if (!src) {
+      toast.info(t("macros.toolbar.copyStepsEmpty"));
+      return;
+    }
+    writeActionClipboard([src]);
+    setClipboardTick((n) => n + 1);
+    toast.success(t("macros.toolbar.copyStepsDone"));
+  }, [doc.actions, editorLocked, selectedPath, t, toast]);
+
+  const onCutSteps = useCallback(() => {
+    if (editorLocked) return;
+    if (!selectedPath) {
+      toast.info(t("macros.toolbar.copyStepsEmpty"));
+      return;
+    }
+    const src = getAtPath(doc.actions, selectedPath);
+    if (!src) {
+      toast.info(t("macros.toolbar.copyStepsEmpty"));
+      return;
+    }
+    writeActionClipboard([src]);
+    setClipboardTick((n) => n + 1);
+    onRemove(selectedPath);
+    toast.success(t("macros.toolbar.cutStepsDone"));
+  }, [doc.actions, editorLocked, onRemove, selectedPath, t, toast]);
+
+  const onDeleteSteps = useCallback(async () => {
+    if (editorLocked || !selectedPath) return;
+    if (confirmationsPrefs.deleteAction) {
+      const ok = await confirmAction({
+        title: t("macros.confirm.deleteActionTitle"),
+        message: t("macros.confirm.deleteActionMessage"),
+        confirmLabel: t("automations.confirm.deleteConfirm"),
+        cancelLabel: t("common.cancel"),
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    onRemove(selectedPath);
+  }, [
+    confirmationsPrefs.deleteAction,
+    editorLocked,
+    onRemove,
+    selectedPath,
+    t,
+  ]);
+
+  const onMoveUp = useCallback(() => {
+    if (!selectedPath) return;
+    onMove(selectedPath, -1);
+  }, [onMove, selectedPath]);
+
+  const onMoveDown = useCallback(() => {
+    if (!selectedPath) return;
+    onMove(selectedPath, 1);
+  }, [onMove, selectedPath]);
+
+  const canMoveUp = useMemo(
+    () =>
+      Boolean(
+        selectedPath && moveInParent(doc.actions, selectedPath, -1) != null,
+      ),
+    [doc.actions, selectedPath],
+  );
+
+  const canMoveDown = useMemo(
+    () =>
+      Boolean(
+        selectedPath && moveInParent(doc.actions, selectedPath, 1) != null,
+      ),
+    [doc.actions, selectedPath],
+  );
+
+  const onPasteSteps = useCallback(() => {
+    if (editorLocked) return;
+    const clip = peekActionClipboard();
+    if (!clip?.length) {
+      toast.info(t("macros.toolbar.pasteStepsEmpty"));
+      return;
+    }
+    if (doc.actions.length === 0) {
+      updateDoc({ ...doc, actions: structuredClone(clip) });
+      setSelectedPath([0]);
+      toast.success(t("macros.toolbar.pasteStepsDone"));
+      return;
+    }
+    const anchor: ActionPath = selectedPath ?? [doc.actions.length - 1];
+    onPasteAfter(anchor, clip);
+    toast.success(t("macros.toolbar.pasteStepsDone"));
+  }, [
+    doc,
+    editorLocked,
+    onPasteAfter,
+    selectedPath,
+    t,
+    toast,
+    updateDoc,
+  ]);
+
   const [addMenuOpen, setAddMenuOpen] = useState(false);
 
   const restoreEngineMacro = useCallback(async () => {
@@ -1105,23 +1196,6 @@ export function MacroEditorView({
       name: macroIdRef.current,
     });
   }, []);
-
-  const onDuplicateMacro = useCallback(async () => {
-    if (lockedRef.current || recording) return;
-    try {
-      await flushAutosave();
-      const copy = await invoke<MacroDocument>("duplicate_saved_macro", {
-        name: macroIdRef.current,
-      });
-      await restoreEngineMacro();
-      toast.success(
-        t("automations.toast.macroDuplicated", { name: copy.name }),
-      );
-      onOpenMacro?.(copy.name, copy.name);
-    } catch (e) {
-      toast.error(errMessage(e, t("macros.toast.saveFailed")));
-    }
-  }, [flushAutosave, onOpenMacro, recording, restoreEngineMacro, t, toast]);
 
   const onExportMacro = useCallback(async () => {
     if (recording) return;
@@ -1196,24 +1270,16 @@ export function MacroEditorView({
           }
         })();
       }}
-      onDuplicate={() => void onDuplicateMacro()}
       onImport={() => void onImportMacro()}
       onExport={() => void onExportMacro()}
       loading={loading}
-      dirty={dirty}
       engineState={engineState}
       recording={recording}
       recordPaused={recordPaused}
       recordCount={recordCount}
       onPlay={() => void onPlay()}
-      onPause={() => void onPauseSession()}
       onResume={() => void onResumeSession()}
       onStop={() => void onStopSession()}
-      onPlayFrom={
-        selectedPath && !recording
-          ? () => void onRunFrom(selectedPath)
-          : undefined
-      }
       onStartRecord={() => void onStartRecord()}
       onPauseRecord={() => void onPauseRecord()}
       onResumeRecord={() => void onResumeRecord()}
@@ -1222,70 +1288,46 @@ export function MacroEditorView({
       canRedo={canRedo}
       onUndo={editorLocked ? undefined : undo}
       onRedo={editorLocked ? undefined : redo}
-      processFilter={globalProcessFilter}
-      processFilterMode={doc.processFilter ?? "inherit"}
-      onProcessFilterModeChange={(mode: ProcessFilterScopeMode) => {
-        const cur = docRef.current;
-        updateDoc({
-          ...cur,
-          processFilter: mode,
-          ...(mode === "local"
-            ? {
-                localProcessFilter: withLocalEnabled(
-                  cur.localProcessFilter ?? DEFAULT_PROCESS_FILTER,
-                ),
-              }
-            : {}),
-        });
+      canCopySteps={Boolean(selectedPath)}
+      canPasteSteps={clipboardTick >= 0 && hasActionClipboard()}
+      canCutSteps={Boolean(selectedPath)}
+      canDeleteSteps={Boolean(selectedPath)}
+      canMoveUp={canMoveUp}
+      canMoveDown={canMoveDown}
+      onCopySteps={onCopySteps}
+      onPasteSteps={onPasteSteps}
+      onCutSteps={onCutSteps}
+      onDeleteSteps={() => void onDeleteSteps()}
+      onMoveUp={onMoveUp}
+      onMoveDown={onMoveDown}
+      addMenuItems={buildActionAddMenu(addAction, t)}
+      dryRun={dryRun}
+      onDryRunChange={(next) => {
+        setDryRun(next);
+        toast.info(
+          next ? t("macros.toolbar.dryRunOn") : t("macros.toolbar.dryRunOff"),
+        );
       }}
-      localProcessFilter={doc.localProcessFilter ?? DEFAULT_PROCESS_FILTER}
-      onLocalProcessFilterChange={(localProcessFilter) =>
-        updateDoc({ ...docRef.current, localProcessFilter })
-      }
-      onOpenProcessSettings={onOpenProcessSettings}
-      onGlobalProcessFilterChange={(next) => {
-        void persistGlobalProcessFilter(next);
-      }}
-      processFilterPresets={processFilterPresets}
-      onProcessFilterPresetsChange={(next) => {
-        void persistProcessFilterPresets(next);
-      }}
-      meta={
-        <MacroMetaBar
-          doc={doc}
-          locked={editorLocked || loading}
-          onChange={updateDoc}
-          onNameCommit={(name) => void commitRename(name)}
-        />
-      }
-      allowNetwork={!!doc.allowNetwork}
-      allowProcess={!!doc.allowProcess}
-      onPermissionsChange={(partial) =>
-        updateDoc({
-          ...docRef.current,
-          schemaVersion: Math.max(docRef.current.schemaVersion, 9),
-          ...partial,
-        })
-      }
-      metaTools={
-        <MacroMetaTools
-          doc={doc}
-          macroId={macroId}
-          locked={editorLocked || loading}
-          onChange={updateDoc}
-          onError={(msg: string) => toast.error(msg)}
-        />
-      }
     />,
-    { active },
+    {
+      active,
+      chrome: (
+        <>
+          <MacroMetaBar
+            doc={doc}
+            locked={editorLocked || loading}
+            onChange={updateDoc}
+            onNameCommit={(name) => void commitRename(name)}
+          />
+          {dirty ? (
+            <span className="caster-dirty-pill caster-dirty-pill--compact">
+              {t("shell.dirty")}
+            </span>
+          ) : null}
+        </>
+      ),
+    },
   );
-
-  const editorTabs: { id: EditorTab; label: string }[] = [
-    { id: "actions", label: t("macros.editorTabs.actions") },
-    { id: "params", label: t("macros.editorTabs.params") },
-    { id: "variables", label: t("macros.editorTabs.variables") },
-    { id: "journal", label: t("macros.editorTabs.journal") },
-  ];
 
   return (
     <div
@@ -1295,77 +1337,6 @@ export function MacroEditorView({
       {titleBarPortal}
       <div className="caster-editor-layout">
         <div className="caster-seq-panel">
-          <div
-            className="caster-editor-inner-tabs"
-            role="tablist"
-            aria-label={t("macros.editorTabs.actions")}
-          >
-            {editorTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={editorTab === tab.id}
-                className={cx(
-                  "caster-editor-inner-tab",
-                  editorTab === tab.id && "is-active",
-                )}
-                onClick={() => {
-                  if (tab.id === "journal") {
-                    onOpenJournal?.();
-                    setEditorTab("actions");
-                    return;
-                  }
-                  setEditorTab(tab.id);
-                }}
-              >
-                {tab.label}
-                {tab.id === "journal" && journalHasErrors ? (
-                  <span
-                    className="caster-editor-inner-tab-badge"
-                    aria-label={t("macros.editorTabs.journalErrors")}
-                  />
-                ) : null}
-              </button>
-            ))}
-          </div>
-          {editorTab === "actions" ? (
-            <>
-              <div className="caster-actions-toolbar">
-                <span className="caster-actions-count">
-                  {doc.actions.length === 1
-                    ? t("macros.menu.list.stepsCountOne")
-                    : t("macros.menu.list.stepsCount", {
-                        n: doc.actions.length,
-                      })}
-                </span>
-                <div className="caster-actions-toolbar-end">
-                  {!editorLocked ? (
-                    <ActionPickerMenu
-                      label={t("macros.toolbar.add")}
-                      disabled={loading}
-                      items={buildActionAddMenu(addAction, t)}
-                      open={addMenuOpen}
-                      onOpenChange={setAddMenuOpen}
-                      triggerClassName="caster-btn caster-btn-ghost caster-actions-toolbar-btn"
-                      triggerContent={<Plus size={14} aria-hidden />}
-                    />
-                  ) : null}
-                  <button
-                    type="button"
-                    className="caster-btn caster-btn-ghost caster-actions-toolbar-btn"
-                    title={t("macros.menu.list.headAction")}
-                    aria-label={t("macros.menu.list.headAction")}
-                    onClick={() => {
-                      document
-                        .querySelector<HTMLElement>(".action-list")
-                        ?.focus({ preventScroll: false });
-                    }}
-                  >
-                    <LayoutTemplate size={14} aria-hidden />
-                  </button>
-                </div>
-              </div>
             <div
               className="caster-seq-scroll"
               onClick={(e) => {
@@ -1378,6 +1349,7 @@ export function MacroEditorView({
                   return;
                 }
                 setSelectedPath(null);
+                setInspectorMode("macro");
               }}
               onContextMenu={
                 editorLocked
@@ -1407,7 +1379,7 @@ export function MacroEditorView({
                   confirmDeleteAction={confirmationsPrefs.deleteAction}
                   onSelect={(path) => {
                     setSelectedPath(path);
-                    persistPropsOpen(true);
+                    setInspectorMode("step");
                   }}
                   onReorder={(from, to) => {
                     const next = reorderAtPath(doc.actions, from, to);
@@ -1425,27 +1397,20 @@ export function MacroEditorView({
                   onInsertBefore={onInsertBefore}
                   onInsertAfter={onInsertAfter}
                   onPasteAfter={onPasteAfter}
-                  onAddKind={editorLocked ? undefined : addAction}
-                  onOpenAddMenu={
-                    editorLocked ? undefined : () => setAddMenuOpen(true)
-                  }
-                  onEmptyAdd={
-                    editorLocked ? undefined : () => addAction("mouse.click")
-                  }
-                  addMenuItems={
-                    editorLocked ? undefined : buildActionAddMenu(addAction, t)
-                  }
+                  onAddKind={addAction}
+                  onOpenAddMenu={() => setAddMenuOpen(true)}
+                  onEmptyAdd={() => addAction("mouse.click")}
+                  addMenuItems={buildActionAddMenu(addAction, t)}
                   addMenuOpen={addMenuOpen}
                   onAddMenuOpenChange={setAddMenuOpen}
                   onStartRecord={
-                    editorLocked || recording
-                      ? undefined
-                      : () => void onStartRecord()
+                    recording ? undefined : () => void onStartRecord()
                   }
-                  onApplyPreset={
-                    editorLocked ? undefined : (name) => void onApplyPreset(name)
-                  }
-                  onClearSelection={() => setSelectedPath(null)}
+                  onApplyPreset={(name) => void onApplyPreset(name)}
+                  onClearSelection={() => {
+                    setSelectedPath(null);
+                    setInspectorMode("macro");
+                  }}
                   onUndo={editorLocked ? undefined : undo}
                   onRedo={editorLocked ? undefined : redo}
                   canUndo={canUndo}
@@ -1456,50 +1421,16 @@ export function MacroEditorView({
                       actions: updateAtPath(doc.actions, path, a),
                     })
                   }
-                  onAddToBranch={editorLocked ? undefined : addToBranchAt}
+                  onAddToBranch={addToBranchAt}
                   onOpenScript={onOpenScript}
                 />
               )}
             </div>
-            </>
-          ) : null}
-          {editorTab === "params" ? (
-            <div className="caster-macro-tab-pane">
-              <div className="caster-macro-tab-pane-tools">
-                <MacroMetaTools
-                  doc={doc}
-                  macroId={macroId}
-                  locked={editorLocked || loading}
-                  onChange={updateDoc}
-                  onError={(msg: string) => toast.error(msg)}
-                />
-              </div>
-            </div>
-          ) : null}
-          {editorTab === "variables" ? (
-            <div className="caster-macro-tab-pane">
-              {usedVariables.length === 0 ? (
-                <div className="caster-macro-tab-empty">
-                  <strong>{t("macros.editorTabs.variablesEmpty")}</strong>
-                  <p>{t("macros.editorTabs.variablesLead")}</p>
-                </div>
-              ) : (
-                <ul className="caster-macro-var-list">
-                  {usedVariables.map((name) => (
-                    <li key={name}>
-                      <code>{name}</code>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : null}
         </div>
-        {propsOpen ? (
-          <div
-            className="caster-inspector-shell"
-            style={{ width: propsWidth }}
-          >
+        <div
+          className="caster-inspector-shell"
+          style={{ width: propsWidth }}
+        >
             <div
               className="caster-inspector-splitter"
               role="separator"
@@ -1510,11 +1441,44 @@ export function MacroEditorView({
               onPointerCancel={onPropsResizePointerUp}
             />
             <InspectorPanel
-              title={t("macros.inspector.title")}
-              onClose={() => persistPropsOpen(false)}
-              closeLabel={t("common.close")}
+              title={
+                inspectorMode === "macro"
+                  ? t("macros.settings.title")
+                  : t("macros.inspector.title")
+              }
             >
-              {selectedAction ? (
+              <div
+                className="caster-inspector-mode-seg"
+                role="tablist"
+                aria-label={t("macros.settings.modeAria")}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={inspectorMode === "step"}
+                  className={cx(
+                    "caster-inspector-mode-btn",
+                    inspectorMode === "step" && "is-active",
+                  )}
+                  disabled={!selectedAction}
+                  onClick={() => setInspectorMode("step")}
+                >
+                  {t("macros.settings.modeStep")}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={inspectorMode === "macro"}
+                  className={cx(
+                    "caster-inspector-mode-btn",
+                    inspectorMode === "macro" && "is-active",
+                  )}
+                  onClick={() => setInspectorMode("macro")}
+                >
+                  {t("macros.settings.modeMacro")}
+                </button>
+              </div>
+              {inspectorMode === "step" && selectedAction ? (
                 <>
                   <div className="caster-inspector-hero">
                     <span
@@ -1557,20 +1521,12 @@ export function MacroEditorView({
                       onOpenScript={onOpenScript}
                     />
                   </InspectorSection>
-                  <InspectorSection
-                    title={t("macros.inspector.options")}
-                    defaultOpen={false}
-                  >
-                    <p className="caster-inspector-section-hint">
-                      {t("macros.inspector.optionsLead")}
-                    </p>
-                  </InspectorSection>
-                  <InspectorSection
-                    title={t("macros.inspector.advanced")}
-                    defaultOpen={false}
-                  >
-                    {selectedAction.type === "control.while" ||
-                    selectedAction.type === "control.if" ? (
+                  {selectedAction.type === "control.while" ||
+                  selectedAction.type === "control.if" ? (
+                    <InspectorSection
+                      title={t("macros.inspector.advanced")}
+                      defaultOpen={false}
+                    >
                       <ControlFlowAdvancedProps
                         action={selectedAction}
                         disabled={editorLocked}
@@ -1586,32 +1542,56 @@ export function MacroEditorView({
                           });
                         }}
                       />
-                    ) : (
-                      <p className="caster-inspector-section-hint">
-                        {t("macros.inspector.advancedLead")}
-                      </p>
-                    )}
-                  </InspectorSection>
+                    </InspectorSection>
+                  ) : null}
                 </>
-              ) : (
+              ) : inspectorMode === "step" && !selectedAction ? (
                 <div className="caster-macro-tab-empty">
                   <strong>{t("macros.inspector.empty")}</strong>
                   <p>{t("macros.inspector.emptyLead")}</p>
                 </div>
+              ) : (
+                <MacroSettingsPanel
+                  doc={doc}
+                  macroId={macroId}
+                  locked={editorLocked || loading}
+                  usedVariables={usedVariables}
+                  onChange={updateDoc}
+                  onError={(msg) => toast.error(msg)}
+                  processFilter={globalProcessFilter}
+                  processFilterMode={doc.processFilter ?? "inherit"}
+                  onProcessFilterModeChange={(mode: ProcessFilterScopeMode) => {
+                    const cur = docRef.current;
+                    updateDoc({
+                      ...cur,
+                      processFilter: mode,
+                      ...(mode === "local"
+                        ? {
+                            localProcessFilter: withLocalEnabled(
+                              cur.localProcessFilter ?? DEFAULT_PROCESS_FILTER,
+                            ),
+                          }
+                        : {}),
+                    });
+                  }}
+                  localProcessFilter={
+                    doc.localProcessFilter ?? DEFAULT_PROCESS_FILTER
+                  }
+                  onLocalProcessFilterChange={(localProcessFilter) =>
+                    updateDoc({ ...docRef.current, localProcessFilter })
+                  }
+                  onOpenProcessSettings={onOpenProcessSettings}
+                  onGlobalProcessFilterChange={(next) => {
+                    void persistGlobalProcessFilter(next);
+                  }}
+                  processFilterPresets={processFilterPresets}
+                  onProcessFilterPresetsChange={(next) => {
+                    void persistProcessFilterPresets(next);
+                  }}
+                />
               )}
             </InspectorPanel>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="caster-inspector-rail"
-            onClick={() => persistPropsOpen(true)}
-            aria-label={t("macros.inspector.open")}
-            title={t("macros.inspector.open")}
-          >
-            {t("macros.inspector.short")}
-          </button>
-        )}
+        </div>
       </div>
     </div>
   );

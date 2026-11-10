@@ -955,11 +955,13 @@ fn launch_saved_macro(
     engine: State<'_, AppState>,
     name: String,
     from_path: Option<Vec<usize>>,
+    dry_run: Option<bool>,
 ) -> Result<EngineStatusPayload, String> {
+    let dry = dry_run.unwrap_or(false);
     if let Some(path) = from_path.filter(|p| !p.is_empty()) {
-        engine.activate_macro_by_name_from_path(&dir.0, &name, path)?;
+        engine.activate_macro_by_name_from_path_opts(&dir.0, &name, path, dry)?;
     } else {
-        engine.activate_macro_by_name(&dir.0, &name)?;
+        engine.activate_macro_by_name_opts(&dir.0, &name, dry)?;
     }
     Ok(status_of(&engine, Some(format!("macro:{name}"))))
 }

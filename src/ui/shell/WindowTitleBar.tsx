@@ -1,35 +1,18 @@
-import { useMemo, useState, type MouseEvent } from "react";
+import { useCallback, useMemo, useState, type MouseEvent } from "react";
 import { ScrollText, Settings } from "lucide-react";
 import { useT } from "../../i18n";
 import { WindowControls } from "../WindowControls";
 import {
   buildBarContextItems,
-  DocumentTabBar,
   type BarContextAction,
-  type DocumentTabItem,
-  type TabContextAction,
 } from "./DocumentTabBar";
 import { ContextMenu } from "./ContextMenu";
+import { useTitleBarDispatch } from "./TitleBarContext";
 
 type Props = {
-  tabs: DocumentTabItem[];
-  activeTabId: string | null;
-  onTabSelect: (id: string) => void;
-  onTabClose?: (id: string) => void;
-  onCreateMacro?: () => void;
-  onCreateClicker?: () => void;
-  onCreateScript?: () => void;
-  onOpenExisting?: (
-    kind: "macro" | "clicker" | "script",
-    id: string,
-    label?: string,
-  ) => void;
   /** Prefetch lazy editor chunk (hover). */
   onPrefetchEditor?: (kind: "macro" | "clicker" | "script" | "settings") => void;
-  onTabContextAction?: (tabId: string, action: TabContextAction) => void;
   onBarContextAction?: (action: BarContextAction) => void;
-  onTabReorder?: (fromTabId: string, insertBeforeTabId: string | null) => void;
-  onPinnedCloseAttempt?: () => void;
   settingsActive?: boolean;
   onSettingsClick?: () => void;
   onJournalClick?: () => void;
@@ -37,27 +20,26 @@ type Props = {
 };
 
 export function WindowTitleBar({
-  tabs,
-  activeTabId,
-  onTabSelect,
-  onTabClose,
-  onCreateMacro,
-  onCreateClicker,
-  onCreateScript,
-  onOpenExisting,
   onPrefetchEditor,
-  onTabContextAction,
   onBarContextAction,
-  onTabReorder,
-  onPinnedCloseAttempt,
   settingsActive = false,
   onSettingsClick,
   onJournalClick,
   journalOpen,
 }: Props) {
   const t = useT();
-  const [dragMenu, setDragMenu] = useState<{ x: number; y: number } | null>(null);
+  const dispatch = useTitleBarDispatch();
+  const [dragMenu, setDragMenu] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const barItems = useMemo(() => buildBarContextItems(t), [t]);
+
+  const chromeHostRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      dispatch?.setChromeHost(el);
+    },
+    [dispatch],
+  );
 
   const openDragMenu = (e: MouseEvent) => {
     if (!onBarContextAction) return;
@@ -67,23 +49,10 @@ export function WindowTitleBar({
 
   return (
     <div className="caster-titlebar">
-      <div className="caster-titlebar-start">
-        <DocumentTabBar
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onSelect={onTabSelect}
-          onClose={onTabClose}
-          onCreateMacro={onCreateMacro}
-          onCreateClicker={onCreateClicker}
-          onCreateScript={onCreateScript}
-          onOpenExisting={onOpenExisting}
-          onPrefetchEditor={onPrefetchEditor}
-          onTabContextAction={onTabContextAction}
-          onBarContextAction={onBarContextAction}
-          onTabReorder={onTabReorder}
-          onPinnedCloseAttempt={onPinnedCloseAttempt}
-        />
-      </div>
+      <div
+        className="caster-titlebar-start caster-titlebar-chrome-host"
+        ref={chromeHostRef}
+      />
       <div
         className="caster-titlebar-drag"
         data-tauri-drag-region

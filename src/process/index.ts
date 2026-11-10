@@ -8,6 +8,8 @@ export {
 } from "./ProcessFilterPanel";
 export {
   ProcessFilterTool,
+  processFilterModeLabel,
+  processFilterScopeSummary,
   type ProcessFilterToolProps,
 } from "./ProcessFilterTool";
 export {

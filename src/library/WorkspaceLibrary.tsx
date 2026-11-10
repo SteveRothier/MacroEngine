@@ -1291,40 +1291,57 @@ export function WorkspaceLibrary({
             )}
           </span>
           <div className="caster-lib-selection-actions">
-            <button
-              type="button"
-              className="caster-lib-chip caster-lib-selection-btn caster-lib-selection-btn--label"
-              aria-label={
+            <Tooltip
+              content={
                 selectedRows.length > 1
                   ? t("automations.selection.openAll", {
                       count: Math.min(selectedRows.length, 12),
                     })
                   : t("automations.selection.open")
               }
-              onClick={openSelected}
+              side="top"
             >
-              <ExternalLink size={13} aria-hidden />
-              <span>{t("automations.selection.open")}</span>
-            </button>
-            <DropdownMenu
-              label={t("automations.selection.move")}
-              ariaLabel={t("automations.selection.folderAria")}
-              align="end"
-              triggerClassName="caster-lib-chip caster-lib-selection-btn caster-lib-selection-btn--label"
-              items={selectionMoveItems}
+              <button
+                type="button"
+                className="caster-lib-chip caster-lib-selection-btn"
+                aria-label={
+                  selectedRows.length > 1
+                    ? t("automations.selection.openAll", {
+                        count: Math.min(selectedRows.length, 12),
+                      })
+                    : t("automations.selection.open")
+                }
+                onClick={openSelected}
+              >
+                <ExternalLink size={13} aria-hidden />
+              </button>
+            </Tooltip>
+            <Tooltip content={t("automations.selection.move")} side="top">
+              <span className="caster-lib-selection-move">
+                <DropdownMenu
+                  label={t("automations.selection.move")}
+                  ariaLabel={t("automations.selection.folderAria")}
+                  align="end"
+                  triggerClassName="caster-lib-chip caster-lib-selection-btn"
+                  items={selectionMoveItems}
+                >
+                  <FolderInput size={13} aria-hidden />
+                </DropdownMenu>
+              </span>
+            </Tooltip>
+            <Tooltip
+              content={t("automations.confirm.deleteTitle")}
+              side="top"
             >
-              <FolderInput size={13} aria-hidden />
-              <span>{t("automations.selection.move")}</span>
-            </DropdownMenu>
-            <button
-              type="button"
-              className="caster-lib-chip caster-lib-selection-btn caster-lib-selection-btn--label is-danger"
-              aria-label={t("automations.confirm.deleteTitle")}
-              onClick={() => void deleteSelected()}
-            >
-              <Trash2 size={13} aria-hidden />
-              <span>{t("automations.confirm.deleteTitle")}</span>
-            </button>
+              <button
+                type="button"
+                className="caster-lib-chip caster-lib-selection-btn is-danger"
+                aria-label={t("automations.confirm.deleteTitle")}
+                onClick={() => void deleteSelected()}
+              >
+                <Trash2 size={13} aria-hidden />
+              </button>
+            </Tooltip>
             <Tooltip content={t("automations.selection.clear")} side="top">
               <button
                 type="button"

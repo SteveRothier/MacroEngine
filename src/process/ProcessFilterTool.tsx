@@ -46,7 +46,10 @@ function placePopover(
   return { top, left };
 }
 
-function modeShortLabel(mode: ProcessFilterScopeMode, t: TFunction) {
+export function processFilterModeLabel(
+  mode: ProcessFilterScopeMode,
+  t: TFunction,
+) {
   if (mode === "off") return t("common.process.modeOff");
   if (mode === "local") return t("common.process.modeLocal");
   return t("common.process.modeInherit");
@@ -67,7 +70,7 @@ function filterSummaryText(filter: ProcessFilter, t: TFunction): string {
     : t("common.process.denyList", { list: `${list}${extra}` });
 }
 
-function toolSummary(
+export function processFilterScopeSummary(
   mode: ProcessFilterScopeMode,
   filter: ProcessFilter,
   localFilter: ProcessFilter,
@@ -110,8 +113,8 @@ export function ProcessFilterTool({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
-  const modeLabel = modeShortLabel(mode, t);
-  const detail = toolSummary(mode, filter, localFilter, t);
+  const modeLabel = processFilterModeLabel(mode, t);
+  const detail = processFilterScopeSummary(mode, filter, localFilter, t);
   const activeFilter = useMemo(
     () => effectiveFilter(mode, filter, localFilter),
     [mode, filter, localFilter],

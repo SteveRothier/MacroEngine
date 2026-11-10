@@ -32,7 +32,7 @@ function isEditableContextTarget(target: EventTarget | null): boolean {
 
 /**
  * Shared editor chrome layout for Macro / Clicker / Script toolbars.
- * Portaled into `.caster-editor-toolbar-host` via TitleBarSlot.
+ * Portaled into the unified titlebar host via TitleBarSlot.
  */
 export function EditorToolbar({
   start,

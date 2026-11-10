@@ -712,6 +712,7 @@ export function ScriptEditorView({
     }
   }
 
+  const scriptEditDisabled = locked || loading || !draft || running;
   const titleBarPortal = useTitleBarSlot(
     draft?.name ?? scriptId,
     <ScriptTitleBarTools
@@ -852,7 +853,22 @@ export function ScriptEditorView({
         void persistProcessFilterPresets(next);
       }}
     />,
-    { active },
+    {
+      active,
+      chrome: (
+        <input
+          className="caster-titlebar-name-input caster-titlebar-name-input--wide"
+          value={draft?.name ?? scriptId}
+          disabled={scriptEditDisabled}
+          placeholder={t("scripts.toolbar.namePlaceholder")}
+          aria-label={t("scripts.toolbar.nameAria")}
+          onChange={(e) => patch({ name: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+          }}
+        />
+      ),
+    },
   );
 
   if (!draft) {

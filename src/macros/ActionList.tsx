@@ -31,11 +31,13 @@ import {
   Undo2,
   Variable,
   Workflow,
+  X,
 } from "lucide-react";
 import { confirmAction } from "../ui";
 import {
   ActionPickerMenu,
   ContextMenu,
+  Tooltip,
   findMenuItem,
   useContextMenuState,
   usePrefersReducedMotion,
@@ -150,6 +152,32 @@ const AUTO_SCROLL_MAX_PX = 18;
 
 /** In-memory step clipboard (not OS clipboard). Multi when copying a selection. */
 let actionClipboard: MacroAction[] | null = null;
+
+const ACTION_CLIPBOARD_EVENT = "caster-action-clipboard";
+
+function notifyActionClipboard() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(ACTION_CLIPBOARD_EVENT));
+}
+
+export function peekActionClipboard(): MacroAction[] | null {
+  return actionClipboard ? structuredClone(actionClipboard) : null;
+}
+
+export function writeActionClipboard(actions: MacroAction[]): void {
+  actionClipboard = actions.length > 0 ? structuredClone(actions) : null;
+  notifyActionClipboard();
+}
+
+export function hasActionClipboard(): boolean {
+  return Boolean(actionClipboard?.length);
+}
+
+export function subscribeActionClipboard(listener: () => void): () => void {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener(ACTION_CLIPBOARD_EVENT, listener);
+  return () => window.removeEventListener(ACTION_CLIPBOARD_EVENT, listener);
+}
 
 function isEditableTarget(t: EventTarget | null): boolean {
   if (!(t instanceof HTMLElement)) return false;
@@ -735,7 +763,7 @@ export function ActionList({
   const copyPath = (path: ActionPath) => {
     const src = getAtPath(actions, path);
     if (!src) return;
-    actionClipboard = [structuredClone(src)];
+    writeActionClipboard([src]);
     setClipboardTick((n) => n + 1);
   };
 
@@ -753,14 +781,14 @@ export function ActionList({
       if (src) items.push(structuredClone(src));
     }
     if (items.length === 0) return;
-    actionClipboard = items;
+    writeActionClipboard(items);
     setClipboardTick((n) => n + 1);
   };
 
   const cutPath = (path: ActionPath) => {
     const src = getAtPath(actions, path);
     if (!src) return;
-    actionClipboard = [structuredClone(src)];
+    writeActionClipboard([src]);
     setClipboardTick((n) => n + 1);
     onRemove(path);
   };
@@ -1375,24 +1403,41 @@ export function ActionList({
     }
   }, [actions, reducedMotion]);
 
-  function onRowPointerDown(flatIndex: number, e: ReactPointerEvent) {
+  function onHandlePointerDown(flatIndex: number, e: ReactPointerEvent) {
     if (locked || e.button !== 0) return;
-    const target = e.target as HTMLElement;
-    if (target.closest(".row-ops")) return;
-    if (
-      target.closest(
-        "input, select, textarea, button, label.action-cell-mod, .action-cell-btn, .caster-condition-field, .caster-select, .act-params",
-      )
-    ) {
-      return;
-    }
+    e.preventDefault();
+    e.stopPropagation();
 
+    const handleEl = e.currentTarget as HTMLElement;
+    const pointerId = e.pointerId;
     sessionRef.current = {
       from: flatIndex,
-      pointerId: e.pointerId,
+      pointerId,
       startX: e.clientX,
       startY: e.clientY,
       active: false,
+    };
+
+    try {
+      handleEl.setPointerCapture(pointerId);
+    } catch {
+      /* ignore */
+    }
+
+    const detach = () => {
+      try {
+        if (handleEl.hasPointerCapture?.(pointerId)) {
+          handleEl.releasePointerCapture(pointerId);
+        }
+      } catch {
+        /* ignore */
+      }
+      handleEl.removeEventListener("pointermove", onMove);
+      handleEl.removeEventListener("pointerup", onUp);
+      handleEl.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
     };
 
     const onMove = (ev: PointerEvent) => {
@@ -1426,6 +1471,7 @@ export function ActionList({
           });
         }
       } else {
+        ev.preventDefault();
         setGhost((g) => (g ? { ...g, x: ev.clientX, y: ev.clientY } : g));
       }
       autoScrollNearEdges(listRef.current, ev.clientY);
@@ -1442,11 +1488,13 @@ export function ActionList({
     };
 
     const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId !== pointerId) return;
+      detach();
       const session = sessionRef.current;
-      if (!session || ev.pointerId !== session.pointerId) return;
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
+      if (!session || ev.pointerId !== session.pointerId) {
+        clearDrag();
+        return;
+      }
 
       const wasActive = session.active;
       const from = session.from;
@@ -1479,7 +1527,10 @@ export function ActionList({
       onReorderRef.current(paths.fromPath, paths.toPath);
     };
 
-    window.addEventListener("pointermove", onMove);
+    handleEl.addEventListener("pointermove", onMove);
+    handleEl.addEventListener("pointerup", onUp);
+    handleEl.addEventListener("pointercancel", onUp);
+    window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
   }
@@ -1593,18 +1644,27 @@ export function ActionList({
               >
                 <span className="idx">
                   <em className="branch-tag">{label}</em>
-                  {onAddToBranch && !readOnly ? (
-                    <ActionPickerMenu
-                      label={addAria}
-                      disabled={locked}
-                      items={buildActionAddMenu(
-                        (kind) =>
-                          onAddToBranch(item.parentPath, item.branch, kind),
-                        t,
-                      )}
-                      triggerContent={<Plus size={14} aria-hidden />}
-                      triggerClassName="caster-btn caster-btn-ghost action-list-branch-slot-add"
-                    />
+                  {onAddToBranch ? (
+                    <span
+                      className={
+                        readOnly
+                          ? "action-list-branch-slot-add-wrap is-inert"
+                          : "action-list-branch-slot-add-wrap"
+                      }
+                      aria-hidden={readOnly ? true : undefined}
+                    >
+                      <ActionPickerMenu
+                        label={addAria}
+                        disabled={locked || readOnly}
+                        items={buildActionAddMenu(
+                          (kind) =>
+                            onAddToBranch(item.parentPath, item.branch, kind),
+                          t,
+                        )}
+                        triggerContent={<Plus size={14} aria-hidden />}
+                        triggerClassName="caster-btn caster-btn-ghost action-list-branch-slot-add"
+                      />
+                    </span>
                   ) : null}
                 </span>
                 <span className="lbl" />
@@ -1686,9 +1746,6 @@ export function ActionList({
                 data-list-index={flatIndex}
                 data-list-path={pathKey(row.path)}
                 data-tone={tone}
-                onPointerDown={
-                  !locked ? (ev) => onRowPointerDown(flatIndex, ev) : undefined
-                }
                 onClick={(e) => {
                   if (suppressClickRef.current) {
                     suppressClickRef.current = false;
@@ -1724,6 +1781,42 @@ export function ActionList({
                     }
                   : {})}
               >
+                <span
+                  className={[
+                    "act-drag-handle",
+                    locked || readOnly ? "is-inert" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  role="button"
+                  tabIndex={-1}
+                  aria-hidden={locked || readOnly ? true : undefined}
+                  aria-label={
+                    locked || readOnly
+                      ? undefined
+                      : t("macros.menu.list.dragHandle")
+                  }
+                  title={
+                    locked || readOnly
+                      ? undefined
+                      : t("macros.menu.list.dragHandle")
+                  }
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={
+                    locked || readOnly
+                      ? undefined
+                      : (ev) => onHandlePointerDown(flatIndex, ev)
+                  }
+                >
+                  <span className="act-drag-dots" aria-hidden>
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                </span>
                 <span className="idx">{padIndex(siblingIdx + 1)}</span>
                 <span className="act-icon" aria-hidden>
                   <ActionToneIcon tone={tone} />
@@ -1735,26 +1828,33 @@ export function ActionList({
                 <span className="act-value" title={value}>
                   {value}
                 </span>
-                {!readOnly ? (
-                  <div className="row-ops hover-reveal">
-                    <button
-                      type="button"
-                      className="icon-ghost"
-                      disabled={locked}
-                      title={t("macros.menu.list.moreTitle")}
-                      aria-label={t("macros.menu.list.moreTitle")}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setCtxPath(row.path);
-                        rowCtx.openFromEvent(e);
-                      }}
-                    >
-                      <MoreHorizontal size={14} aria-hidden />
-                    </button>
-                  </div>
-                ) : (
-                  <span />
-                )}
+                <div
+                  className={[
+                    "row-ops",
+                    "hover-reveal",
+                    readOnly ? "is-inert" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-hidden={readOnly ? true : undefined}
+                >
+                  <button
+                    type="button"
+                    className="icon-ghost"
+                    disabled={locked || readOnly}
+                    tabIndex={readOnly ? -1 : undefined}
+                    title={t("macros.menu.list.moreTitle")}
+                    aria-label={t("macros.menu.list.moreTitle")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (locked || readOnly) return;
+                      setCtxPath(row.path);
+                      rowCtx.openFromEvent(e);
+                    }}
+                  >
+                    <MoreHorizontal size={14} aria-hidden />
+                  </button>
+                </div>
                 {isControlFlow ? (
                   <span
                     className="action-list-control-fold-hit"
@@ -1767,10 +1867,23 @@ export function ActionList({
         })}
         {rows.length === 0 ? (
           <li className="action-list-empty">
-            <div className="caster-empty-state">
+            <div className="caster-empty-state action-list-empty-state">
               <strong>{t("macros.empty.noStepsTitle")}</strong>
               <p>{t("macros.empty.noStepsLead")}</p>
-              {onEmptyAdd && !readOnly ? (
+              {!readOnly && addMenuItems ? (
+                <ActionPickerMenu
+                  label={t("macros.empty.noStepsCta")}
+                  disabled={locked}
+                  items={addMenuItems}
+                  triggerClassName="caster-btn caster-btn-primary"
+                  triggerContent={
+                    <>
+                      <Plus size={14} aria-hidden />
+                      {t("macros.empty.noStepsCta")}
+                    </>
+                  }
+                />
+              ) : onEmptyAdd && !readOnly ? (
                 <button
                   type="button"
                   className="caster-btn caster-btn-primary"
@@ -1784,22 +1897,44 @@ export function ActionList({
             </div>
           </li>
         ) : null}
-        {addMenuItems && !readOnly && rows.length > 0 ? (
-          <li className="action-list-add-row">
-            <ActionPickerMenu
-              label={t("macros.toolbar.add")}
-              disabled={locked}
-              items={addMenuItems}
-              open={addMenuOpen}
-              onOpenChange={onAddMenuOpenChange}
-              triggerClassName="caster-btn caster-action-list-add-btn"
-            />
+        {rows.length > 0 ? (
+          <li
+            className={[
+              "action-list-add-row",
+              readOnly || !addMenuItems ? "is-inert" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            aria-hidden={readOnly || !addMenuItems ? true : undefined}
+          >
+            {addMenuItems ? (
+              <ActionPickerMenu
+                label={t("macros.toolbar.add")}
+                disabled={locked || readOnly}
+                items={addMenuItems}
+                open={readOnly ? false : addMenuOpen}
+                onOpenChange={readOnly ? undefined : onAddMenuOpenChange}
+                triggerClassName="caster-btn caster-action-list-add-btn"
+              />
+            ) : (
+              <span className="caster-action-list-add-btn-spacer" />
+            )}
           </li>
         ) : null}
       </ul>
 
-      {!readOnly && rows.length > 0 ? (
-        <p className="action-list-kbd-hint">{t("macros.menu.list.kbdHint")}</p>
+      {rows.length > 0 ? (
+        <p
+          className={[
+            "action-list-kbd-hint",
+            readOnly ? "is-inert" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-hidden={readOnly ? true : undefined}
+        >
+          {t("macros.menu.list.kbdHint")}
+        </p>
       ) : null}
 
       {!readOnly && !locked && multiKeys.size > 1 ? (
@@ -1807,82 +1942,95 @@ export function ActionList({
           <span className="action-list-bulk-count">
             {t("macros.bulk.selected", { n: multiKeys.size })}
           </span>
-          {onMove || onMoveMany ? (
-            <>
+          <div className="action-list-bulk-actions">
+            {onMove || onMoveMany ? (
+              <>
+                <Tooltip content={t("macros.bulk.moveUp")} side="top">
+                  <button
+                    type="button"
+                    className="action-list-bulk-btn"
+                    aria-label={t("macros.bulk.moveUp")}
+                    onClick={() => {
+                      const paths = rows
+                        .filter((r) => multiKeys.has(pathKey(r.path)))
+                        .map((r) => r.path);
+                      if (onMoveMany) {
+                        onMoveMany(paths, -1);
+                        return;
+                      }
+                      for (const p of paths) onMove?.(p, -1);
+                    }}
+                  >
+                    <ArrowUp size={13} aria-hidden />
+                  </button>
+                </Tooltip>
+                <Tooltip content={t("macros.bulk.moveDown")} side="top">
+                  <button
+                    type="button"
+                    className="action-list-bulk-btn"
+                    aria-label={t("macros.bulk.moveDown")}
+                    onClick={() => {
+                      const paths = rows
+                        .filter((r) => multiKeys.has(pathKey(r.path)))
+                        .map((r) => r.path);
+                      if (onMoveMany) {
+                        onMoveMany(paths, 1);
+                        return;
+                      }
+                      for (const p of [...paths].reverse()) onMove?.(p, 1);
+                    }}
+                  >
+                    <ArrowDown size={13} aria-hidden />
+                  </button>
+                </Tooltip>
+              </>
+            ) : null}
+            {onDuplicate || onDuplicateMany ? (
+              <Tooltip content={t("macros.bulk.duplicate")} side="top">
+                <button
+                  type="button"
+                  className="action-list-bulk-btn"
+                  aria-label={t("macros.bulk.duplicate")}
+                  onClick={() => {
+                    const paths = rows
+                      .filter((r) => multiKeys.has(pathKey(r.path)))
+                      .map((r) => r.path);
+                    if (onDuplicateMany) {
+                      onDuplicateMany(paths);
+                    } else {
+                      for (const p of [...paths].reverse()) onDuplicate?.(p);
+                    }
+                    setMultiKeys(new Set());
+                  }}
+                >
+                  <Copy size={13} aria-hidden />
+                </button>
+              </Tooltip>
+            ) : null}
+            <Tooltip content={t("macros.bulk.delete")} side="top">
               <button
                 type="button"
-                className="caster-btn caster-btn-ghost"
-                onClick={() => {
-                  const paths = rows
-                    .filter((r) => multiKeys.has(pathKey(r.path)))
-                    .map((r) => r.path);
-                  if (onMoveMany) {
-                    onMoveMany(paths, -1);
-                    return;
-                  }
-                  for (const p of paths) onMove?.(p, -1);
-                }}
+                className="action-list-bulk-btn is-danger"
+                aria-label={t("macros.bulk.delete")}
+                onClick={() => void removeSelectedPaths()}
               >
-                <ArrowUp size={14} aria-hidden />
-                {t("macros.bulk.moveUp")}
+                <Trash2 size={13} aria-hidden />
               </button>
+            </Tooltip>
+            <Tooltip content={t("macros.bulk.clear")} side="top">
               <button
                 type="button"
-                className="caster-btn caster-btn-ghost"
+                className="action-list-bulk-btn"
+                aria-label={t("macros.bulk.clear")}
                 onClick={() => {
-                  const paths = rows
-                    .filter((r) => multiKeys.has(pathKey(r.path)))
-                    .map((r) => r.path);
-                  if (onMoveMany) {
-                    onMoveMany(paths, 1);
-                    return;
-                  }
-                  for (const p of [...paths].reverse()) onMove?.(p, 1);
+                  setMultiKeys(new Set());
+                  onClearSelection?.();
                 }}
               >
-                <ArrowDown size={14} aria-hidden />
-                {t("macros.bulk.moveDown")}
+                <X size={14} aria-hidden />
               </button>
-            </>
-          ) : null}
-          {onDuplicate || onDuplicateMany ? (
-            <button
-              type="button"
-              className="caster-btn caster-btn-ghost"
-              onClick={() => {
-                const paths = rows
-                  .filter((r) => multiKeys.has(pathKey(r.path)))
-                  .map((r) => r.path);
-                if (onDuplicateMany) {
-                  onDuplicateMany(paths);
-                } else {
-                  for (const p of [...paths].reverse()) onDuplicate?.(p);
-                }
-                setMultiKeys(new Set());
-              }}
-            >
-              <Copy size={14} aria-hidden />
-              {t("macros.bulk.duplicate")}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="caster-btn caster-btn-danger-ghost"
-            onClick={() => void removeSelectedPaths()}
-          >
-            <Trash2 size={14} aria-hidden />
-            {t("macros.bulk.delete")}
-          </button>
-          <button
-            type="button"
-            className="caster-btn caster-btn-ghost"
-            onClick={() => {
-              setMultiKeys(new Set());
-              onClearSelection?.();
-            }}
-          >
-            {t("common.cancel")}
-          </button>
+            </Tooltip>
+          </div>
         </div>
       ) : null}
 
@@ -1933,6 +2081,14 @@ export function ActionList({
               }}
               aria-hidden
             >
+              <span className="act-drag-dots" aria-hidden>
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+                <span />
+              </span>
               <span className="idx">{ghost.indexLabel}</span>
               <strong className="act-type">{ghost.title}</strong>
             </div>,

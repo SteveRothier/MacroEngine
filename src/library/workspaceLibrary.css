@@ -7,6 +7,7 @@
   min-height: 0;
   background: var(--caster-bg-secondary);
   color: var(--caster-text-secondary);
+  border-right: none;
 }
 
 /* —— Chips —— */
@@ -77,9 +78,9 @@
 .caster-lib-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
-  padding: 14px 12px 12px;
+  padding: 10px 10px 8px;
   min-height: 28px;
 }
 
@@ -87,19 +88,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--caster-radius-sm);
   background: var(--caster-accent);
   color: var(--caster-accent-contrast);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
   line-height: 1;
 }
 
 .caster-lib-brand-name {
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--caster-text-primary);
   line-height: 1;
@@ -109,15 +110,17 @@
 .caster-lib-chrome {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
-  padding: 0 12px 12px;
+  padding: 0 10px 8px;
+  border-bottom: 1px solid var(--caster-border-subtle);
 }
 
 .caster-lib-footer {
   flex-shrink: 0;
   margin-top: auto;
-  padding: 14px 12px 12px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--caster-border-subtle);
   border-top: none;
   display: flex;
   flex-direction: column;
@@ -129,11 +132,13 @@
   box-sizing: border-box;
   flex-shrink: 0;
   display: flex;
+  flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  margin: 0 12px 4px;
-  padding: 3px 4px 3px 10px;
+  margin: 0 10px 4px;
+  padding: 3px 4px 3px 8px;
+  min-width: 0;
   min-height: 32px;
   border: 1px solid color-mix(in srgb, var(--caster-accent) 28%, transparent);
   border-radius: var(--caster-radius-md);
@@ -154,30 +159,24 @@
 
 .caster-lib-selection-actions {
   display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
-  flex-shrink: 0;
   gap: 1px;
+  flex: 0 0 auto;
+}
+
+.caster-lib-selection-actions > .caster-dropdown-menu-root,
+.caster-lib-selection-move {
+  flex: 0 0 auto;
+  display: inline-flex;
 }
 
 .caster-lib-chip.caster-lib-selection-btn {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-}
-
-.caster-lib-chip.caster-lib-selection-btn--label {
-  width: auto;
-  min-width: 0;
-  height: 24px;
-  padding: 0 7px;
-  gap: 4px;
-  font-size: 11px;
-  font-weight: 550;
-}
-
-.caster-lib-chip.caster-lib-selection-btn--label > span {
-  line-height: 1;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  flex: 0 0 auto;
 }
 
 .caster-lib-chip.caster-lib-selection-btn.is-danger:hover {
@@ -302,12 +301,12 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 28px;
-  height: 28px;
+  min-height: 26px;
+  height: 26px;
   padding: 0 8px;
   margin: 0;
   border: none;
-  border-radius: var(--caster-radius-md);
+  border-radius: var(--caster-radius-sm);
   background: transparent;
   color: var(--caster-text-secondary);
   font: inherit;

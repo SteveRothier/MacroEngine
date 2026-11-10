@@ -24,6 +24,8 @@ export type ProcessFilterPanelProps = {
   onGlobalFilterChange?: (filter: ProcessFilter) => void;
   presets?: ProcessFilterPreset[];
   onPresetsChange?: (presets: ProcessFilterPreset[]) => void;
+  /** Flattened chrome for embedding in inspector settings. */
+  embedded?: boolean;
 };
 
 function filterSummary(filter: ProcessFilter, t: TFunction): string {
@@ -52,6 +54,7 @@ export function ProcessFilterPanel({
   onGlobalFilterChange,
   presets,
   onPresetsChange,
+  embedded = false,
 }: ProcessFilterPanelProps) {
   const t = useT();
   const [editGlobal, setEditGlobal] = useState(false);
@@ -101,24 +104,37 @@ export function ProcessFilterPanel({
       : undefined;
 
   return (
-    <div className="caster-process-filter-panel">
+    <div
+      className={[
+        "caster-process-filter-panel",
+        embedded ? "is-embedded" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <header className="caster-process-filter-panel-head">
-        <div className="caster-process-filter-panel-title-row">
-          <h3 className="caster-process-filter-panel-title">
-            {t("common.process.panelTitle")}
-          </h3>
-          {onPresetsChange && onPresetApply ? (
-            <ProcessFilterPresetsMenu
-              filter={presetTarget}
-              onApply={onPresetApply}
-              disabled={disabled}
-              presets={presets}
-              onPresetsChange={onPresetsChange}
-              onCopyToGlobal={copyToGlobal}
-              onImportFromGlobal={importFromGlobal}
-            />
-          ) : null}
-        </div>
+        {!embedded || (onPresetsChange && onPresetApply) ? (
+          <div className="caster-process-filter-panel-title-row">
+            {!embedded ? (
+              <h3 className="caster-process-filter-panel-title">
+                {t("common.process.panelTitle")}
+              </h3>
+            ) : (
+              <span className="caster-process-filter-panel-title-spacer" />
+            )}
+            {onPresetsChange && onPresetApply ? (
+              <ProcessFilterPresetsMenu
+                filter={presetTarget}
+                onApply={onPresetApply}
+                disabled={disabled}
+                presets={presets}
+                onPresetsChange={onPresetsChange}
+                onCopyToGlobal={copyToGlobal}
+                onImportFromGlobal={importFromGlobal}
+              />
+            ) : null}
+          </div>
+        ) : null}
         <div
           className="caster-segmented caster-segmented--wide"
           role="group"

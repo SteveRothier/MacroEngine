@@ -36,6 +36,8 @@ type Props = {
   triggerClassName?: string;
   /** Icon-only (or custom) trigger; `label` stays the accessible name */
   triggerContent?: ReactNode;
+  /** Native `title` on icon triggers (disable when wrapping with Tooltip). */
+  nativeTitle?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
@@ -106,6 +108,7 @@ export function ActionPickerMenu({
   items,
   triggerClassName,
   triggerContent,
+  nativeTitle = true,
   open: openProp,
   onOpenChange,
 }: Props) {
@@ -307,7 +310,9 @@ export function ActionPickerMenu({
         }
         disabled={disabled}
         aria-label={triggerContent != null ? triggerLabel : undefined}
-        title={triggerContent != null ? triggerLabel : undefined}
+        title={
+          triggerContent != null && nativeTitle ? triggerLabel : undefined
+        }
         aria-expanded={open}
         aria-haspopup="menu"
         aria-controls={open ? menuId : undefined}

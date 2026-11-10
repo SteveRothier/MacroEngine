@@ -637,7 +637,7 @@ impl AppState {
     pub fn start_macro_from(&self, source: &str) -> Result<EngineState, String> {
         self.wait_while_stopping(Duration::from_millis(1000));
         let _lifecycle = self.lifecycle.lock().expect("lifecycle");
-        self.start_macro_inner(source, None)
+        self.start_macro_inner(source, None, false)
     }
 
     pub fn start_macro_from_path(
@@ -647,13 +647,14 @@ impl AppState {
     ) -> Result<EngineState, String> {
         self.wait_while_stopping(Duration::from_millis(1000));
         let _lifecycle = self.lifecycle.lock().expect("lifecycle");
-        self.start_macro_inner(source, Some(from_path))
+        self.start_macro_inner(source, Some(from_path), false)
     }
 
     fn start_macro_inner(
         &self,
         via: &str,
         from_path: Option<Vec<usize>>,
+        dry_run: bool,
     ) -> Result<EngineState, String> {
         self.ensure_idle_ready()?;
         let doc = self
@@ -662,7 +663,9 @@ impl AppState {
         if doc.actions.is_empty() {
             return Err("macro has no actions".into());
         }
-        let start_line = if via == "Jouer" {
+        let start_line = if dry_run {
+            format!("Dry-run « {} » · aucune injection", doc.name)
+        } else if via == "Jouer" {
             format!("Macro \"{}\" par Jouer", doc.name)
         } else {
             format!("Macro \"{}\" par le raccourci \"{}\"", doc.name, via)
@@ -676,7 +679,11 @@ impl AppState {
 
         let cancel = self.cancel.clone();
         let pause = self.pause.clone();
-        let injector = Arc::clone(&self.injector);
+        let injector: Arc<dyn MouseInjector> = if dry_run {
+            Arc::new(crate::input::RecordingInjector::new())
+        } else {
+            Arc::clone(&self.injector)
+        };
         let bus = Arc::clone(&self.bus);
         let process_filter = self.process_filter_handle();
         let app = self.clone();
@@ -949,7 +956,7 @@ impl AppState {
         let _ = self.worker.lock().expect("worker lock").take();
         let _lifecycle = self.lifecycle.lock().expect("lifecycle");
         self.set_macro(doc);
-        if let Err(e) = self.start_macro_inner("Enchaînement clicker", None) {
+        if let Err(e) = self.start_macro_inner("Enchaînement clicker", None, false) {
             self.bus.publish(EngineEvent::Log {
                 level: LogLevel::Warn,
                 message: format!("échec démarrage macro enchaînée: {e}"),
@@ -1036,7 +1043,7 @@ impl AppState {
             _ => {
                 let via = format_vk_label(self.hotkey_bindings().macro_vk);
                 let _lifecycle = self.lifecycle.lock().expect("lifecycle");
-                self.start_macro_inner(&via, None)
+                self.start_macro_inner(&via, None, false)
             }
         }
     }
@@ -1867,6 +1874,15 @@ impl AppState {
         config_dir: &std::path::Path,
         name: &str,
     ) -> Result<EngineState, String> {
+        self.activate_macro_by_name_opts(config_dir, name, false)
+    }
+
+    pub fn activate_macro_by_name_opts(
+        &self,
+        config_dir: &std::path::Path,
+        name: &str,
+        dry_run: bool,
+    ) -> Result<EngineState, String> {
         use crate::macro_library::load_macro;
         self.wait_while_stopping(Duration::from_millis(1000));
         let loaded = self.loaded_macro();
@@ -1896,7 +1912,7 @@ impl AppState {
                 let doc = load_macro(config_dir, name).map_err(|e| e.to_string())?;
                 let _lifecycle = self.lifecycle.lock().expect("lifecycle");
                 self.set_macro(doc);
-                self.start_macro_inner(&via, None)
+                self.start_macro_inner(&via, None, dry_run)
             }
             (ActiveKind::Clicker, _) => Err("clicker is active".into()),
             (ActiveKind::Record, _) => Ok(self.state()),
@@ -1904,7 +1920,7 @@ impl AppState {
                 let doc = load_macro(config_dir, name).map_err(|e| e.to_string())?;
                 let _lifecycle = self.lifecycle.lock().expect("lifecycle");
                 self.set_macro(doc);
-                self.start_macro_inner(&via, None)
+                self.start_macro_inner(&via, None, dry_run)
             }
         }
     }
@@ -1915,6 +1931,16 @@ impl AppState {
         config_dir: &std::path::Path,
         name: &str,
         from_path: Vec<usize>,
+    ) -> Result<EngineState, String> {
+        self.activate_macro_by_name_from_path_opts(config_dir, name, from_path, false)
+    }
+
+    pub fn activate_macro_by_name_from_path_opts(
+        &self,
+        config_dir: &std::path::Path,
+        name: &str,
+        from_path: Vec<usize>,
+        dry_run: bool,
     ) -> Result<EngineState, String> {
         use crate::macro_library::load_macro;
         self.wait_while_stopping(Duration::from_millis(1000));
@@ -1942,7 +1968,7 @@ impl AppState {
             .join("."));
         let _lifecycle = self.lifecycle.lock().expect("lifecycle");
         self.set_macro(doc);
-        self.start_macro_inner(&via, Some(from_path))
+        self.start_macro_inner(&via, Some(from_path), dry_run)
     }
 
     /// Run a library script outside of a macro (M5). Cancel via F8 / `request_cancel`.

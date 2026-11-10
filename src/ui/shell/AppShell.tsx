@@ -48,14 +48,13 @@ export function AppShell({
   libraryWidth,
   onLibraryWidthChange,
 }: Props) {
-  const dispatch = useTitleBarDispatch();
-  const subToolbarRef = useCallback(
+  const titleBarDispatch = useTitleBarDispatch();
+  const toolbarHostRef = useCallback(
     (el: HTMLDivElement | null) => {
-      dispatch?.setSubToolbarHost(el);
+      titleBarDispatch?.setSubToolbarHost(el);
     },
-    [dispatch],
+    [titleBarDispatch],
   );
-
   const [width, setWidth] = useState(() =>
     clampLib(libraryWidth ?? LIB_DEFAULT),
   );
@@ -177,7 +176,6 @@ export function AppShell({
                 const next = clampLib(width + 8);
                 widthRef.current = next;
                 setWidth(next);
-                onLibraryWidthChange?.(next);
               }
             }}
           />
@@ -185,7 +183,10 @@ export function AppShell({
       ) : null}
       <div className="caster-content">
         <div className="caster-titlebar-shell">{titleBar}</div>
-        <div className="caster-editor-toolbar-host" ref={subToolbarRef} />
+        <div
+          className="caster-editor-toolbar-strip"
+          ref={toolbarHostRef}
+        />
         <div className="caster-main">
           <div className="caster-stage">{children}</div>
           {execBar ? (
