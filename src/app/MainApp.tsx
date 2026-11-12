@@ -229,8 +229,6 @@ function MainAppInner({
           ? "error"
           : "idle";
   const activeDoc = activeDocTab(workspace);
-  const settingsActive = workspace.shellView.type === "settings";
-
   const refresh = useCallback(async () => {
     const next = await invoke<EngineStatus>("get_engine_state");
     setStatus(next);
@@ -864,21 +862,7 @@ function MainAppInner({
         }
         titleBar={
           <WindowTitleBar
-            onPrefetchEditor={prefetchEditor}
             onBarContextAction={(action) => void onBarContextAction(action)}
-            settingsActive={settingsActive}
-            onSettingsClick={() => {
-              prefetchEditor("settings");
-              goSettings(settingsSection);
-            }}
-            onJournalClick={() => {
-              setJournalOpen((o) => {
-                const next = !o;
-                void persistShell({ journalOpen: next });
-                return next;
-              });
-            }}
-            journalOpen={journalOpen}
           />
         }
       >

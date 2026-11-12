@@ -209,8 +209,12 @@ export function ProcessFilterPanel({
                   onClick={() => setEditGlobal((v) => !v)}
                 >
                   {editGlobal
-                    ? t("common.process.hideGlobal")
-                    : t("common.process.editGlobal")}
+                    ? embedded
+                      ? t("common.process.hideGlobalShort")
+                      : t("common.process.hideGlobal")
+                    : embedded
+                      ? t("common.process.editGlobalShort")
+                      : t("common.process.editGlobal")}
                 </button>
               ) : null}
               {onOpenSettings ? (
@@ -219,7 +223,9 @@ export function ProcessFilterPanel({
                   className="caster-btn caster-btn-ghost caster-btn-sm"
                   onClick={onOpenSettings}
                 >
-                  {t("common.process.openSecurity")}
+                  {embedded
+                    ? t("common.process.openSecurityShort")
+                    : t("common.process.openSecurity")}
                 </button>
               ) : null}
             </div>

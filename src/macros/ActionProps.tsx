@@ -147,7 +147,6 @@ type PointFieldsProps = {
   optional?: boolean;
   disabled?: boolean;
   onChangeXY: (x: number | null, y: number | null) => void;
-  hint?: ReactNode;
 };
 
 function PointFields({
@@ -156,7 +155,6 @@ function PointFields({
   optional = false,
   disabled,
   onChangeXY,
-  hint,
 }: PointFieldsProps) {
   const t = useT();
   const toast = useToast();
@@ -222,7 +220,6 @@ function PointFields({
       <>
         {banner}
         <div className="caster-field" style={{ gridColumn: "1 / -1" }}>
-          <span>{t("macros.params.position")}</span>
           <div className="action-props-point-mode-row">
             <Segmented
               ariaLabel={t("macros.params.positionModeAria")}
@@ -266,7 +263,6 @@ function PointFields({
               {pickButton}
             </div>
           ) : null}
-          {hint ? <p className="hint">{hint}</p> : null}
         </div>
       </>
     );
@@ -279,7 +275,6 @@ function PointFields({
         className="caster-field action-props-xy-field"
         style={{ gridColumn: "1 / -1" }}
       >
-        <span>{t("macros.params.position")}</span>
         <div className="action-props-xy-row">
           <WheelNumberInput
             className="action-props-xy-input"
@@ -300,7 +295,6 @@ function PointFields({
           />
           {pickButton}
         </div>
-        {hint ? <p className="hint">{hint}</p> : null}
       </div>
     </>
   );
@@ -332,7 +326,6 @@ export function ActionProps({
               optional
               disabled={disabled}
               onChangeXY={(nx, ny) => onChange({ ...action, x: nx, y: ny })}
-              hint={t("macros.params.clickAtCursorHint")}
             />
           </div>
         </InspectorSection>
@@ -380,7 +373,6 @@ export function ActionProps({
   }
 
   if (action.type === "mouse.down" || action.type === "mouse.up") {
-    const kind = action.type;
     return (
       <>
         <InspectorSection
@@ -410,11 +402,6 @@ export function ActionProps({
                 onChange={(button) => onChange({ ...action, button })}
               />
             </div>
-            <p className="hint" style={{ gridColumn: "1 / -1" }}>
-              {kind === "mouse.down"
-                ? t("macros.params.mouseDownHint")
-                : t("macros.params.mouseUpHint")}
-            </p>
           </div>
         </InspectorSection>
       </>

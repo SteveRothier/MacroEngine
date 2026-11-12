@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState, type MouseEvent } from "react";
-import { ScrollText, Settings } from "lucide-react";
 import { useT } from "../../i18n";
 import { WindowControls } from "../WindowControls";
 import {
@@ -10,23 +9,10 @@ import { ContextMenu } from "./ContextMenu";
 import { useTitleBarDispatch } from "./TitleBarContext";
 
 type Props = {
-  /** Prefetch lazy editor chunk (hover). */
-  onPrefetchEditor?: (kind: "macro" | "clicker" | "script" | "settings") => void;
   onBarContextAction?: (action: BarContextAction) => void;
-  settingsActive?: boolean;
-  onSettingsClick?: () => void;
-  onJournalClick?: () => void;
-  journalOpen?: boolean;
 };
 
-export function WindowTitleBar({
-  onPrefetchEditor,
-  onBarContextAction,
-  settingsActive = false,
-  onSettingsClick,
-  onJournalClick,
-  journalOpen,
-}: Props) {
+export function WindowTitleBar({ onBarContextAction }: Props) {
   const t = useT();
   const dispatch = useTitleBarDispatch();
   const [dragMenu, setDragMenu] = useState<{ x: number; y: number } | null>(
@@ -59,41 +45,6 @@ export function WindowTitleBar({
         onContextMenu={openDragMenu}
       />
       <div className="caster-titlebar-actions">
-        {onSettingsClick ? (
-          <button
-            type="button"
-            className={[
-              "caster-titlebar-btn caster-titlebar-icon-btn",
-              settingsActive ? "active" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            onClick={onSettingsClick}
-            onMouseEnter={() => onPrefetchEditor?.("settings")}
-            title={t("shell.navSettings")}
-            aria-label={t("shell.navSettings")}
-            aria-pressed={settingsActive}
-          >
-            <Settings size={14} aria-hidden />
-          </button>
-        ) : null}
-        {onJournalClick ? (
-          <button
-            type="button"
-            className={[
-              "caster-titlebar-btn caster-titlebar-icon-btn",
-              journalOpen ? "active" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-            onClick={onJournalClick}
-            title={t("shell.journalTitle")}
-            aria-label={t("shell.journalTitle")}
-            aria-pressed={journalOpen}
-          >
-            <ScrollText size={14} aria-hidden />
-          </button>
-        ) : null}
         <WindowControls className="caster-titlebar-controls" />
       </div>
       <ContextMenu
