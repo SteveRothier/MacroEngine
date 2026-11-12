@@ -7557,6 +7557,23 @@ button.caster-clicker-lock:focus-visible:not(:disabled) {
   grid-column: 1 / -1;
 }
 
+.caster-clicker-entry-split > .caster-inspector-section {
+  min-width: 0;
+}
+
+.caster-clicker-limits-panel,
+.caster-clicker-zones-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--caster-space-3);
+}
+
+.caster-clicker-limits-panel > .caster-inspector-section,
+.caster-clicker-zones-panel > .caster-inspector-section,
+.caster-clicker-target-panel > .caster-inspector-section {
+  width: 100%;
+}
+
 .caster-clicker-process-row {
   display: flex;
   align-items: center;

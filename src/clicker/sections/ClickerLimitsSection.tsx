@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Eye, Gauge } from "lucide-react";
 import { Switch } from "../../ui";
-import { Select, useToast } from "../../ui/shell";
+import { InspectorSection, Select, useToast } from "../../ui/shell";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { PixelPickBanner } from "../../ui/PixelPickBanner";
 import { useT } from "../../i18n";
@@ -335,11 +336,10 @@ export function ClickerLimitsSection({ editor: e }: Props) {
         }
         title={t("shell.pickPixelTitle")}
       />
-      <div className="caster-clicker-limits-block">
-        <h3 className="caster-clicker-limits-block-title caster-settings-row-label-with-info">
-          <span>{t("clicker.scenario.limitsTitle")}</span>
-          <ClickerInfoTip text={t("clicker.limits.titlebarProgressHint")} />
-        </h3>
+      <InspectorSection
+        title={t("clicker.scenario.limitsTitle")}
+        icon={<Gauge size={14} />}
+      >
       <div className="caster-settings-row caster-settings-row--stack">
         <div className="caster-settings-row-label">
           <span className="caster-settings-row-label-with-info">
@@ -466,13 +466,12 @@ export function ClickerLimitsSection({ editor: e }: Props) {
           />
         </div>
       </div>
-      </div>
+      </InspectorSection>
 
-      <div className="caster-clicker-limits-block">
-        <h3 className="caster-clicker-limits-block-title caster-settings-row-label-with-info">
-          <span>{t("clicker.limits.pixelCondition")}</span>
-          <ClickerInfoTip text={t("clicker.limits.pixelConditionHint")} />
-        </h3>
+      <InspectorSection
+        title={t("clicker.limits.pixelCondition")}
+        icon={<Eye size={14} />}
+      >
         <div className="caster-settings-row caster-settings-row--stack">
           <div className="caster-settings-row-control caster-settings-row-control--full caster-clicker-pixel-controls">
             <div className="caster-clicker-pixel-summary">
@@ -720,7 +719,7 @@ export function ClickerLimitsSection({ editor: e }: Props) {
             </details>
           </div>
         </div>
-      </div>
+      </InspectorSection>
     </div>
   );
 }

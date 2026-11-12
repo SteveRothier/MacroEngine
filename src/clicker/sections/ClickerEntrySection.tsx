@@ -1,3 +1,4 @@
+import { Keyboard, MousePointer2, Timer } from "lucide-react";
 import type { ClickerEditor } from "../useClickerEditor";
 import type {
   ClickKind,
@@ -10,6 +11,7 @@ import type {
   TimingMode,
 } from "../clickerTypes";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
+import { InspectorSection } from "../../ui/shell";
 import { useT } from "../../i18n";
 import { ClickerInfoTip } from "../ClickerInfoTip";
 
@@ -22,8 +24,16 @@ export function ClickerEntrySection({ editor: e }: Props) {
 
   return (
     <div className="caster-clicker-section caster-clicker-entry-split">
-      <div className="caster-clicker-entry-col">
-        <h3 className="caster-clicker-entry-col-title">{t("clicker.entry.title")}</h3>
+      <InspectorSection
+        title={t("clicker.entry.title")}
+        icon={
+          e.inputKind === "keyboard" ? (
+            <Keyboard size={14} />
+          ) : (
+            <MousePointer2 size={14} />
+          )
+        }
+      >
         <div className="caster-settings-row">
           <div className="caster-settings-row-label">
             <span>{t("clicker.entry.inputKind")}</span>
@@ -196,12 +206,12 @@ export function ClickerEntrySection({ editor: e }: Props) {
             </div>
           </div>
         </div>
-      </div>
+      </InspectorSection>
 
-      <div className="caster-clicker-entry-col">
-        <h3 className="caster-clicker-entry-col-title">
-          {t("clicker.entry.timingTitle")}
-        </h3>
+      <InspectorSection
+        title={t("clicker.entry.timingTitle")}
+        icon={<Timer size={14} />}
+      >
         <div className="caster-settings-row">
           <div className="caster-settings-row-label">
             <span>{t("clicker.entry.timingMode")}</span>
@@ -565,7 +575,7 @@ export function ClickerEntrySection({ editor: e }: Props) {
             </div>
           </div>
         ) : null}
-      </div>
+      </InspectorSection>
     </div>
   );
 }

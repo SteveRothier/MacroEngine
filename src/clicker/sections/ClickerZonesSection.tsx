@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { MousePointerClick, Shield } from "lucide-react";
 import {
   CORNER_LABELS,
   EDGES,
@@ -21,6 +22,7 @@ import {
 } from "../zoneGeom";
 import {
   ContextMenu,
+  InspectorSection,
   Select,
   useContextMenuState,
   usePointerReorder,
@@ -310,12 +312,10 @@ export function ClickerZonesSection({ editor: e }: Props) {
           </button>
         </div>
       ) : null}
-      <div className="caster-clicker-zones-section">
-        <h3 className="caster-clicker-zones-section-title caster-settings-row-label-with-info">
-          <span>{t("clicker.zones.safetyBlock")}</span>
-          <ClickerInfoTip text={t("clicker.scenario.safetyHint")} />
-        </h3>
-
+      <InspectorSection
+        title={t("clicker.zones.safetyBlock")}
+        icon={<Shield size={14} />}
+      >
         <div className="caster-clicker-zones-block">
           <div className="caster-clicker-zones-block-head">
             <span>{t("clicker.zones.corners")}</span>
@@ -606,14 +606,12 @@ export function ClickerZonesSection({ editor: e }: Props) {
             </ul>
           </div>
         ) : null}
-      </div>
+      </InspectorSection>
 
-      <div className="caster-clicker-zones-section">
-        <h3 className="caster-clicker-zones-section-title caster-settings-row-label-with-info">
-          <span>{t("clicker.zones.clickBlock")}</span>
-          <ClickerInfoTip text={t("clicker.scenario.clickZonesHint")} />
-        </h3>
-
+      <InspectorSection
+        title={t("clicker.zones.clickBlock")}
+        icon={<MousePointerClick size={14} />}
+      >
         {clickCustoms.length > 0 ? (
           <div className="caster-clicker-zones-block">
             <ul className="caster-clicker-zone-list">
@@ -693,7 +691,7 @@ export function ClickerZonesSection({ editor: e }: Props) {
             </button>
           </div>
         )}
-      </div>
+      </InspectorSection>
 
       {selectedCustom ? (
         <div className="caster-clicker-zone-detail">

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowDown, ArrowUp, Copy, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, Crosshair, Trash2 } from "lucide-react";
 import type { ClickerEditor } from "../useClickerEditor";
 import type { ClickPoint } from "../clickerTypes";
 import { useT } from "../../i18n";
 import { WheelNumberInput } from "../../ui/WheelNumberInput";
 import { PixelPickBanner } from "../../ui/PixelPickBanner";
+import { InspectorSection } from "../../ui/shell";
 import { ClickerInfoTip } from "../ClickerInfoTip";
 
 type Props = {
@@ -398,11 +399,10 @@ export function ClickerTargetSection({ editor: e }: Props) {
           ) : null
         }
       />
-      <div className="caster-settings-row-label-with-info caster-clicker-target-mode-head">
-        <span>{t("clicker.target.modeAria")}</span>
-        <ClickerInfoTip text={t("clicker.target.priorityHint")} />
-      </div>
-
+      <InspectorSection
+        title={t("clicker.target.modeAria")}
+        icon={<Crosshair size={14} />}
+      >
       <div
         className="caster-segmented caster-segmented--wide caster-clicker-target-modes"
         role="group"
@@ -937,6 +937,7 @@ export function ClickerTargetSection({ editor: e }: Props) {
             : null}
         </>
       ) : null}
+      </InspectorSection>
     </div>
   );
 }
